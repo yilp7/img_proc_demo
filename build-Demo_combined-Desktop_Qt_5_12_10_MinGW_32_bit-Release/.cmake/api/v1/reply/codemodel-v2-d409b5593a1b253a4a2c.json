@@ -1,0 +1,87 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Release-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.5"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3
+					]
+				}
+			],
+			"name" : "Release",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "Demo_combined",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "Demo_param::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Demo_param-Release-53e1a4ac5e1b865ae4b8.json",
+					"name" : "Demo_param",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Demo_param_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Demo_param_autogen-Release-1d820088c78f2f11e192.json",
+					"name" : "Demo_param_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Demo_release::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Demo_release-Release-1265cc3c35ee5b4f283c.json",
+					"name" : "Demo_release",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Demo_release_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Demo_release_autogen-Release-dcf619aafb257ce5c0e3.json",
+					"name" : "Demo_release_autogen",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "E:/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release",
+		"source" : "E:/workspace/qt5/Demo_combined"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

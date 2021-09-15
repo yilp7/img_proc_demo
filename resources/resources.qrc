@@ -1,0 +1,47 @@
+<RCC>
+    <qresource prefix="/logo">
+        <file>3.png</file>
+        <file>1.png</file>
+        <file>2.png</file>
+        <file>4.png</file>
+        <file>logo.png</file>
+        <file alias="YJS">YJS4.png</file>
+    </qresource>
+    <qresource prefix="/icon">
+        <file>icon.ico</file>
+    </qresource>
+    <qresource prefix="/style">
+        <file>style.qss</file>
+    </qresource>
+    <qresource prefix="/tools">
+        <file>check1.png</file>
+        <file>dot1.png</file>
+        <file>triangle1.png</file>
+        <file>exit.png</file>
+        <file>max.png</file>
+        <file>min.png</file>
+        <file>restore.png</file>
+        <file>settings.png</file>
+        <file>settings_on.png</file>
+        <file>capture.png</file>
+        <file>capture_on.png</file>
+        <file>move.png</file>
+        <file>select.png</file>
+        <file>lang.png</file>
+        <file>brush.png</file>
+        <file>brush_on.png</file>
+    </qresource>
+    <qresource prefix="/cursor">
+        <file>resize_h.png</file>
+        <file>resize_md.png</file>
+        <file>resize_sd.png</file>
+        <file>resize_v.png</file>
+        <file>cursor.png</file>
+    </qresource>
+    <qresource prefix="/pics">
+        <file>model.png</file>
+        <file>wave.png</file>
+        <file>jump.png</file>
+        <file>run.png</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,343 @@
+QMainWindow {
+	background-color: #282828;
+	color: #D7D7D7;
+	border-radius: 5px;
+}
+
+/* title bar */
+TitleBar {
+	background-color: #505050;
+}
+
+TitleButton {
+	background-color: transparent;
+	border-style: none;
+}
+/*
+#ICON {
+	image: url(:/logo/logo.png);
+}
+*/
+#NAME, #APP_NAME {
+	image: url(:/logo/YJS);
+}
+
+#MIN_BTN::hover, #MAX_BTN::hover {
+	background-color: #646464;
+}
+
+#MIN_BTN::pressed, #MAX_BTN::pressed {
+	background-color: #808080;
+	border-style: none;
+}
+
+#EXIT_BTN::hover {
+	background-color: #CD5C5C;
+}
+
+#EXIT_BTN::pressed {
+	background-color: #BD4C4C;
+}
+
+#SETTINGS_BTN {
+	image: url(:/tools/settings_on.png);
+}
+
+#SETTINGS_BTN::hover, #SETTINGS_BTN::pressed {
+	image: url(:/tools/settings.png);
+}
+
+#CAPTURE_BTN {
+	image: url(:/tools/capture_on.png);
+}
+
+#CAPTURE_BTN::hover, #CAPTURE_BTN::pressed {
+	image: url(:/tools/capture.png);
+}
+
+#LANGUAGE_BTN {
+	image: url(:/tools/lang.png);
+}
+
+#CLS_BTN {
+	image: url(:/tools/brush_on.png);
+}
+
+#CLS_BTN::hover, #CLS_BTN::pressed {
+	image: url(:/tools/brush.png);
+}
+
+/* menu bar */
+QMenuBar, QMenu {
+	background-color: #3C3C3C;
+	color: #C3C3C3;
+}
+
+QMenuBar::item:selected, QMenu::selected {
+	background-color: #323232;
+	color: #CDCDCD;
+}
+
+/* edit box */
+QLineEdit, QTextEdit, QComboBox, QDialog {
+	border: 2px solid #3C3C3C;
+	background-color: #323232;
+	color: #B0C4DE;
+	selection-background-color: #A0A0A0;
+	selection-color: #282828;
+	border-radius: 3px;
+}
+
+QLineEdit::disabled, QComboBox::disabled {
+	background-color: #646464;
+	color: #C3C3C3;
+}
+
+QLineEdit::focus, QComboBox::focus {
+	border: 2px solid #64648A;
+}
+
+/* combo selection */
+QComboBox::drop-down {
+	image: url(:/tools/triangle1.png);
+	width: 12px;
+	height: 12px;
+	margin-top: 2px;
+	margin-left: 2px;
+	background-color: #3C3C3C;
+	border-radius: 3px;
+}
+
+QComboBox::on {
+	border: 2px solid #64648A;
+}
+
+QComboBox::drop-down:disabled {
+	background-color: #646464;
+}
+
+QComboBox::drop-down:hover {
+	background-color: #646464;
+}
+
+QComboBox::drop-down:on {
+	background-color: #A0A0A0;
+}
+
+QComboBox QAbstractItemView {
+	background-color: #323232;
+	selection-background-color: #282828;
+	color: #C3C3C3;
+	selection-color: #B0C4DE;
+	border: 1px solid #101010;
+	border-radius: 3px;
+}
+
+/* display label */
+.QLabel {
+	color: #B0C4DE;
+}
+
+Display {
+	border: 1px solid #646464;
+	/*border-radius: 3px;*/
+}
+
+Ruler {
+	color: #646464;
+}
+
+QGroupBox {
+	color: #B0C4DE;
+	border: 2px solid #3C3C3C;
+	border-radius: 5px;
+	margin-top: 5px;
+}
+
+QGroupBox::title {
+	left: 10px;
+	bottom: 5px;
+}
+
+/* tab box */
+.QWidget {
+	background-color: #282828;
+	color: #D7D7D7;
+	border-radius: 3px;
+}
+
+QTabWidget::pane {
+	border: 2px solid #3C3C3C;
+	border-top-right-radius: 5px;
+	border-bottom-left-radius: 5px;
+	border-bottom-right-radius: 5px;
+}
+
+QTabBar::tab {
+	background-color: #323232;
+	color: #CDCDCD;
+	width: 64px;
+	height: 20px;
+	border-top-left-radius: 5px;
+	border-top-right-radius: 5px;
+}
+
+QTabBar::tab:selected {
+	background-color: #3C3C3C;
+	color: #C3C3C3;
+}
+
+QTabBar::tab:hover {
+	background-color: #3C3C3C;
+	color: #B0C4DE;
+}
+
+/* button */
+.QPushButton, .QToolButton {
+	background-color: #3C3C3C;
+	color: #B0C4DE;
+	border: 1px solid #646464;
+	border-radius: 3px;
+}
+
+.QPushButton::disabled, .QToolButton::disabled {
+	background-color: #646464;
+	border: 1px solid #282828;
+	color: #C3C3C3;
+}
+
+.QPushButton::hover, .QToolButton::hover {
+	background-color: #545454;
+	border: 1px solid #64648A;
+	color: #B0C4DE;
+}
+
+.QPushButton::pressed, .QToolButton::pressed {
+	background-color: #494964;
+	color: #B0C4DE;
+}
+
+QPushButton::menu-indicator {
+	image: none;
+}
+
+/* checkbox */
+.QCheckBox, .QRadioButton {
+	color: #B0C4DE;
+}
+
+.QCheckBox::disabled, .QRadioButton::disabled {
+	color: #C3C3C3;
+}
+
+.QCheckBox::indicator {
+	width: 10px;
+	height: 10px;
+	border: 2px solid #3C3C3C;
+	background-color: #323232;
+}
+
+.QRadioButton::indicator {
+	width: 10px;
+	height: 10px;
+	border: 2px solid #3C3C3C;
+	background-color: #323232;
+	border-radius: 7px;
+}
+
+.QCheckBox::indicator:checked {
+	image: url(:/tools/check1.png);
+}
+
+.QRadioButton::indicator:checked {
+	image: url(:/tools/dot1.png);
+}
+
+.QCheckBox::indicator:disabled, .QRadioButton::indicator:disabled {
+	background-color: #646464;
+}
+
+.QCheckBox::indicator:hover, .QRadioButton::indicator:hover {
+	background-color: #2F4F4F;
+}
+
+.QCheckBox::indicator:pressed, .QRadioButton::indicator:pressed {
+	background-color: #282828;
+}
+
+/* slider */
+QSlider::groove:horizontal {
+/*#MCP_SLIDER::groove:horizontal, #DELAY_SLIDER::groove:horizontal, #GAIN_SLIDER::groove:horizontal, #FOCUS_SPEED_SLIDER::groove:horizontal {*/
+	height: 4px;
+    background-color: #9B9B9B;
+    border-radius: 2px;
+}
+
+QSlider::handle:horizontal {
+	background-color: #3C3C3C;
+	border: 1px solid #5C5C5C;
+	border-radius: 2px;
+}
+
+QSlider::handle:horizontal:hover {
+	background-color: #2F4F4F;
+}
+
+QSlider::handle:horizontal:pressed {
+	background-color: #282828;
+}
+
+QSlider::handle:horizontal:disabled {
+	background-color: #646464;
+}
+
+#MCP_SLIDER::handle:horizontal, #DELAY_SLIDER::handle:horizontal, #GAIN_SLIDER::handle:horizontal {
+	width: 8px;
+	height: 16px;
+	margin-top: -6px;
+	margin-bottom: -6px;
+}
+
+#BRIGHTNESS_SLIDER::handle:horizontal, #CONTRAST_SLIDER::handle:horizontal, #FOCUS_SPEED_SLIDER::handle:horizontal {
+	width: 6px;
+	height: 8px;
+	margin-top: -2px;
+	margin-bottom: -2px;
+}
+
+/* tools (on display image) */
+Tools {
+	border-style: none;
+	border-radius: 3px;
+}
+
+#DRAG_TOOL::indicator {
+	width: 16px;
+	height: 16px;
+	margin-left: 2px;
+	image: url(:/tools/move.png);
+}
+
+#SELECT_TOOL::indicator {
+	width: 16px;
+	height: 16px;
+	margin-left: 2px;
+	image: url(:/tools/select.png);
+}
+
+Tools::checked {
+	background-color: #646464;
+}
+
+Tools::unchecked {
+	background-color: transparent;
+}
+
+Tools::hover {
+	background-color: #646464;
+}
+
+/* coordinate info */
+#CURR_COORD, #START_COORD, #SHAPE_INFO {
+	color: #DEC4B0;
+}
