@@ -74,7 +74,7 @@ Demo::Demo(QWidget *parent)
     , laser_width_u(0)
     , laser_width_n(500)
     , delay_n_n(0)
-    , stride(10)
+    , speed(100)
     , fps(10)
     , duty(5000)
     , mcp(5)
@@ -97,6 +97,8 @@ Demo::Demo(QWidget *parent)
     , h_grab_thread(NULL)
     , grab_thread_state(false)
     , h_mouse_thread(NULL)
+    , angle_per_frame(0)
+    , current_angle(M_PI / 4)
     , seq_idx(0)
     , accu_idx(0)
     , scan(false)
@@ -255,6 +257,8 @@ Demo::Demo(QWidget *parent)
         roi_table->setVerticalHeaderItem(i, h);
     }
 
+    angle_per_frame = 2 * M_PI * speed / 10 / 4096.0;
+
     // for presentation
     ui->CTRL_STATIC->hide();
     ui->ROI_TABLE->hide();
@@ -301,7 +305,7 @@ void Demo::data_exchange(bool read){
         delay_a_n = ui->DELAY_A_EDIT_N->text().toInt();
 //        gate_width_b_u = ui->GATE_WIDTH_B_EDIT_U->text().toInt();
 //        gate_width_b_n = ui->GATE_WIDTH_B_EDIT_N->text().toInt();
-        stride = ui->STRIDE_EDIT->text().toInt();
+        speed = ui->STRIDE_EDIT->text().toInt();
         delay_b_u = ui->DELAY_B_EDIT_U->text().toInt();
         delay_b_n = ui->DELAY_B_EDIT_N->text().toInt();
         delay_n_n = ui->DELAY_N_EDIT_N->text().toInt();
@@ -315,6 +319,8 @@ void Demo::data_exchange(bool read){
 //        delay = delay_a_u * 1000 + delay_a_n;
         delay_dist = (delay_a_u * 1000 + delay_a_n) * dist_ns;
         depth_of_vision = (gate_width_a_u * 1000 + gate_width_a_n) * dist_ns;
+
+        angle_per_frame = 2 * M_PI * speed / 10 / 4096.0;
     }
     else {
 //        ui->DEVICE_SELECTION->setCurrentIndex(device_idx);
@@ -343,7 +349,7 @@ void Demo::data_exchange(bool read){
         laser_width_u = gate_width_a_u = (int)(depth_of_vision / dist_ns) / 1000;
         laser_width_n = gate_width_a_n = (int)(depth_of_vision / dist_ns) % 1000;
 #endif
-        ui->STRIDE_EDIT->setText(QString::asprintf("%d", stride));
+        ui->STRIDE_EDIT->setText(QString::asprintf("%d", speed));
 
         ui->FREQ_EDIT->setText(QString::asprintf("%d", rep_freq));
         ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", laser_width_u));
@@ -367,6 +373,8 @@ int Demo::grab_thread_process() {
     Display *disp = ui->SOURCE_DISPLAY;
     QImage stream;
     cv::Mat sobel;
+    circle_mask = cv::Mat::zeros(h, w, CV_8U);
+    cv::circle(circle_mask, cv::Point(w / 2, h / 2), h / 2, 255, cv::FILLED);
     while (grab_thread_state) {
         if (img_q.empty()) {
             QThread::msleep(5);
@@ -405,6 +413,15 @@ int Demo::grab_thread_process() {
             seq_sum.release();
         }
         else modified_result = img_mem.clone();
+
+        static cv::Mat temp;
+        cv::warpAffine(img_mem, temp, cv::getRotationMatrix2D(cv::Point(w / 2, h / 2), current_angle * 360 / 2 / M_PI, 1), img_mem.size());
+        current_angle += angle_per_frame;
+        qDebug() << current_angle;
+        if (current_angle > 2 * M_PI) current_angle -= 2 * M_PI;
+
+        modified_result.release();
+        temp.copyTo(modified_result, circle_mask);
 
         if (scan && delay_dist > 10000) {on_SCAN_BUTTON_clicked();}
         if (scan) {
@@ -1512,7 +1529,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
             update_delay();
         }
         else if (edit == ui->STRIDE_EDIT) {
-            stride = edit->text().toInt();
+            speed = edit->text().toInt();
         }
         else if (edit == ui->ZOOM_EDIT) {
             set_zoom();
@@ -1533,36 +1550,36 @@ void Demo::keyPressEvent(QKeyEvent *event)
         break;
     // 100m => 667ns, 10m => 67ns
     case Qt::Key_W:
-        delay_dist += stride * 5;
+        delay_dist += speed * 5;
         update_delay();
         break;
     case Qt::Key_S:
-        delay_dist -= stride * 5;
+        delay_dist -= speed * 5;
         update_delay();
         break;
     case Qt::Key_D:
-        delay_dist += stride;
+        delay_dist += speed;
         update_delay();
         break;
     case Qt::Key_A:
-        delay_dist -= stride;
+        delay_dist -= speed;
         update_delay();
         break;
     // 50m => 333ns, 5m => 33ns
     case Qt::Key_I:
-        depth_of_vision += stride * 5;
+        depth_of_vision += speed * 5;
         update_gate_width();
         break;
     case Qt::Key_K:
-        depth_of_vision -= stride * 5;
+        depth_of_vision -= speed * 5;
         update_gate_width();
         break;
     case Qt::Key_L:
-        depth_of_vision += stride;
+        depth_of_vision += speed;
         update_gate_width();
         break;
     case Qt::Key_J:
-        depth_of_vision -= stride;
+        depth_of_vision -= speed;
         update_gate_width();
         break;
     default: break;

@@ -262,7 +262,7 @@ private:
     int                     laser_width_u, laser_width_n;
     int                     gate_width_a_u, gate_width_a_n;
     int                     delay_a_u, delay_a_n, delay_b_u, delay_b_n, delay_n_n;
-    int                     stride;
+    int                     speed;
     int                     fps;
     int                     duty;
     int                     mcp;
@@ -277,7 +277,7 @@ private:
     int                     display_option;
 
     std::queue<cv::Mat>     img_q;                      // image queue in grab_thread
-    std::deque<float>      scan_q;                     // objects' distance found while scanning
+    std::deque<float>       scan_q;                     // objects' distance found while scanning
 
 // info variables
 private:
@@ -307,6 +307,9 @@ private:
     cv::Mat                 seq_sum;
     cv::Mat                 accu[5];                    // for accumulation process
     cv::Mat                 accu_sum;
+    cv::Mat                 circle_mask;
+    float                   angle_per_frame;
+    float                   current_angle;
     uint                    hist[256];                  // display histogram
     int                     seq_idx;                    // frame-average current index
     int                     accu_idx;                   // accumulation current index

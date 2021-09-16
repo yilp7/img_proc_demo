@@ -734,7 +734,7 @@ public:
         ROI_TABLE->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         ROI_TABLE->setRowCount(4);
         ROI_TABLE->setColumnCount(2);
-        ROI_TABLE->verticalHeader()->setVisible(true);
+        ROI_TABLE->verticalHeader()->setVisible(false);
         RIGHT = new QFrame(CENTRAL);
         RIGHT->setObjectName(QString::fromUtf8("RIGHT"));
         RIGHT->setGeometry(QRect(880, 40, 240, 630));
@@ -1227,7 +1227,7 @@ public:
         ESTIMATED->setText(QApplication::translate("Demo", "Estimated dist.", nullptr));
         MCP->setText(QApplication::translate("Demo", "MCP", nullptr));
         STRIDE_UNIT->setText(QApplication::translate("Demo", "m", nullptr));
-        STRIDE->setText(QApplication::translate("Demo", "Stride", nullptr));
+        STRIDE->setText(QApplication::translate("Demo", "\317\211", nullptr));
         GATE_WIDTH->setText(QString());
         ESTIMATED_2->setText(QApplication::translate("Demo", "Depth of field", nullptr));
         LOGO2->setText(QString());

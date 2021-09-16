@@ -1,0 +1,3 @@
+"C:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\Demo_release.dir/objects.a
+D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\ar.exe qc CMakeFiles\Demo_release.dir/objects.a @CMakeFiles\Demo_release.dir\objects1.rsp
+D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe -g -mwindows -Wl,--whole-archive CMakeFiles\Demo_release.dir/objects.a -Wl,--no-whole-archive -o Demo_release.exe -Wl,--out-implib,libDemo_release.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\Demo_release.dir\linklibs.rsp

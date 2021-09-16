@@ -2126,7 +2126,7 @@
       <number>2</number>
      </property>
      <attribute name="verticalHeaderVisible">
-      <bool>true</bool>
+      <bool>false</bool>
      </attribute>
      <row/>
      <row/>
@@ -3313,7 +3313,7 @@
        <bool>false</bool>
       </property>
       <property name="text">
-       <string>Stride</string>
+       <string>ω</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
