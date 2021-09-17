@@ -559,23 +559,25 @@ int Demo::grab_thread_process() {
             vid_out[1].write(modified_result);
         }
 
-        save_img_mux.unlock();
+        if (ui->HISTOGRAM_RADIO->isChecked()) {
+            if (modified_result.channels() != 1) continue;
+            uchar *img = modified_result.data;
+            int step = modified_result.step;
+            memset(hist, 0, 256 * sizeof(uint));
+            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++)  hist[(img + i * step)[j]]++;
+            uint max = 0;
+            for (int i = 0; i < 256; i++) {
+                if (hist[i] > 10000) hist[i] = 0;
+                if (hist[i] > max) max = hist[i];
+            }
+            cv::Mat hist_image = cv::Mat::zeros(200, 256, CV_8UC3);
+            for (int i = 0; i < 256; i++) {
+                cv::rectangle(hist_image, cv::Point(i, 200), cv::Point(i + 2, 200 - hist[i] * 200.0 / max), cv::Scalar(222, 196, 176));
+            }
+            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+        }
 
-        if (modified_result.channels() != 1) continue;
-        uchar *img = modified_result.data;
-        int step = modified_result.step;
-        memset(hist, 0, 256 * sizeof(uint));
-        for (int i = 0; i < h; i++) for (int j = 0; j < w; j++)  hist[(img + i * step)[j]]++;
-        uint max = 0;
-        for (int i = 0; i < 256; i++) {
-            if (hist[i] > 10000) hist[i] = 0;
-            if (hist[i] > max) max = hist[i];
-        }
-        cv::Mat hist_image = cv::Mat::zeros(200, 256, CV_8UC3);
-        for (int i = 0; i < 256; i++) {
-            cv::rectangle(hist_image, cv::Point(i, 200), cv::Point(i + 2, 200 - hist[i] * 200.0 / max), cv::Scalar(222, 196, 176));
-        }
-        ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+        save_img_mux.unlock();
     }
     return 0;
 }
