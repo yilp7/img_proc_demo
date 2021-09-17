@@ -277,7 +277,7 @@ private:
     int                     display_option;
 
     std::queue<cv::Mat>     img_q;                      // image queue in grab_thread
-    std::deque<float>      scan_q;                     // objects' distance found while scanning
+    std::deque<float>       scan_q;                     // objects' distance found while scanning
 
 // info variables
 private:
@@ -307,7 +307,7 @@ private:
     cv::Mat                 seq_sum;
     cv::Mat                 accu[5];                    // for accumulation process
     cv::Mat                 accu_sum;
-    uint                    hist[256];                  // display histogram
+    uint                    *img_accu;                  // display histogram
     int                     seq_idx;                    // frame-average current index
     int                     accu_idx;                   // accumulation current index
 

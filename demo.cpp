@@ -97,6 +97,7 @@ Demo::Demo(QWidget *parent)
     , h_grab_thread(NULL)
     , grab_thread_state(false)
     , h_mouse_thread(NULL)
+    , img_accu(NULL)
     , seq_idx(0)
     , accu_idx(0)
     , scan(false)
@@ -542,10 +543,6 @@ int Demo::grab_thread_process() {
         }
         if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(cropped_img, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
 
-//        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
-        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, image_3d ? QImage::Format_RGB888 : QImage::Format_Indexed8);
-        ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
-
         if (save_original) save_to_file(false);
         if (save_modified) save_to_file(true);
         if (record_original) {
@@ -559,22 +556,47 @@ int Demo::grab_thread_process() {
             vid_out[1].write(modified_result);
         }
 
+        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, image_3d ? QImage::Format_RGB888 : QImage::Format_Indexed8);
         if (ui->HISTOGRAM_RADIO->isChecked()) {
             if (modified_result.channels() != 1) continue;
             uchar *img = modified_result.data;
             int step = modified_result.step;
-            memset(hist, 0, 256 * sizeof(uint));
-            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++)  hist[(img + i * step)[j]]++;
             uint max = 0;
-            for (int i = 0; i < 256; i++) {
-                if (hist[i] > 10000) hist[i] = 0;
-                if (hist[i] > max) max = hist[i];
+            if (img_accu) free(img_accu), img_accu = NULL;
+            img_accu = (uint*)calloc(w, sizeof(uint));
+            for (int i = 0; i < w; i++) {
+                for (int j = 0; j < h; j++) img_accu[i] += (img + j * step)[i];
+                if (img_accu[i] > max) max = img_accu[i];
             }
-            cv::Mat hist_image = cv::Mat::zeros(200, 256, CV_8UC3);
-            for (int i = 0; i < 256; i++) {
-                cv::rectangle(hist_image, cv::Point(i, 200), cv::Point(i + 2, 200 - hist[i] * 200.0 / max), cv::Scalar(222, 196, 176));
+            cv::Mat accu_image(400, w, CV_8UC3);
+            accu_image = cv::Scalar(60, 60, 60);
+            cv::Mat line_chart(1104, w, CV_8UC3);
+            line_chart = cv::Scalar(80, 80, 80);
+            for (int i = 0; i < w - 1; i++) {
+                cv::line(accu_image, cv::Point(i, 400 - img_accu[i] * 400.0 / max), cv::Point(i + 1, 400 - img_accu[i + 1] * 400.0 / max), cv::Scalar(222, 196, 176), 2);
             }
-            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+
+            if (img_accu) free(img_accu), img_accu = NULL;
+            img_accu = (uint*)calloc(h, sizeof(uint));
+            max = 0;
+            for (int i = 0; i < h; i++) {
+                for (int j = 0; j < w; j++) img_accu[i] += (img + i * step)[j];
+                if (img_accu[i] > max) max = img_accu[i];
+            }
+            accu_image.copyTo(line_chart(cv::Rect(0, 652, w, 400)));
+            accu_image = cv::Mat(400, h, CV_8UC3);
+            accu_image = cv::Scalar(60, 60, 60);
+            for (int i = 0; i < h - 1; i++) {
+                cv::line(accu_image, cv::Point(i, 400 - img_accu[i] * 400.0 / max), cv::Point(i + 1, 400 - img_accu[i + 1] * 400.0 / max), cv::Scalar(176, 196, 222), 2);
+            }
+            accu_image.copyTo(line_chart(cv::Rect((w - h) / 2, 52, h, 400)));
+            cv::imwrite("aaa.bmp", line_chart);
+
+            ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(QImage(line_chart.data, line_chart.cols, line_chart.rows, line_chart.step, QImage::Format_RGB888).scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+        }
+        else {
+            ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         }
 
         save_img_mux.unlock();
