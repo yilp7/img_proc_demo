@@ -566,8 +566,8 @@ int Demo::grab_thread_process() {
             memset(hist, 0, 256 * sizeof(uint));
             for (int i = 0; i < h; i++) for (int j = 0; j < w; j++)  hist[(img + i * step)[j]]++;
             uint max = 0;
-            for (int i = 0; i < 256; i++) {
-                if (hist[i] > 10000) hist[i] = 0;
+            for (int i = 1; i < 256; i++) {
+                if (hist[i] > 50000) hist[i] = 0;
                 if (hist[i] > max) max = hist[i];
             }
             cv::Mat hist_image = cv::Mat::zeros(200, 256, CV_8UC3);
