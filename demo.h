@@ -16,7 +16,7 @@
 #include <QEvent>
 #include <QTranslator>
 #include <QTableWidget>
-#include "mvcam.h"
+#include "cam.h"
 #include "imageproc.h"
 #include "opencv2/core.hpp"
 #include "opencv2/opencv.hpp"
@@ -248,7 +248,8 @@ private:
     bool                    trigger_by_software;        // whether the device gets trigger signal from sw
 
     QMutex                  save_img_mux;               // img handle lock
-    MvCam*                  curr_cam;                   // current camera
+    Cam*                    curr_cam;                   // current camera
+//    MvCam*                  curr_cam;                   // current camera
     float                   time_exposure_edit;
     float                   gain_analog_edit;
     float                   frame_rate_edit;

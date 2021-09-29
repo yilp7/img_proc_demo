@@ -263,6 +263,33 @@ Demo_release_autogen/mocs_compilation.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/Demo_release_autogen/mocs_compilation.cpp.s
 .PHONY : Demo_release_autogen/mocs_compilation.cpp.s
 
+cam.obj: cam.cpp.obj
+.PHONY : cam.obj
+
+# target to build an object file
+cam.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/cam.cpp.obj
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/cam.cpp.obj
+.PHONY : cam.cpp.obj
+
+cam.i: cam.cpp.i
+.PHONY : cam.i
+
+# target to preprocess a source file
+cam.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/cam.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/cam.cpp.i
+.PHONY : cam.cpp.i
+
+cam.s: cam.cpp.s
+.PHONY : cam.s
+
+# target to generate assembly for a file
+cam.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/cam.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/cam.cpp.s
+.PHONY : cam.cpp.s
+
 demo.obj: demo.cpp.obj
 .PHONY : demo.obj
 
@@ -353,33 +380,6 @@ main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/main.cpp.s
 .PHONY : main.cpp.s
 
-mvcam.obj: mvcam.cpp.obj
-.PHONY : mvcam.obj
-
-# target to build an object file
-mvcam.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/mvcam.cpp.obj
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/mvcam.cpp.obj
-.PHONY : mvcam.cpp.obj
-
-mvcam.i: mvcam.cpp.i
-.PHONY : mvcam.i
-
-# target to preprocess a source file
-mvcam.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/mvcam.cpp.i
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/mvcam.cpp.i
-.PHONY : mvcam.cpp.i
-
-mvcam.s: mvcam.cpp.s
-.PHONY : mvcam.s
-
-# target to generate assembly for a file
-mvcam.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/mvcam.cpp.s
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/mvcam.cpp.s
-.PHONY : mvcam.cpp.s
-
 mywidget.obj: mywidget.cpp.obj
 .PHONY : mywidget.obj
 
@@ -431,6 +431,9 @@ help:
 	@echo ... Demo_release_autogen/mocs_compilation.obj
 	@echo ... Demo_release_autogen/mocs_compilation.i
 	@echo ... Demo_release_autogen/mocs_compilation.s
+	@echo ... cam.obj
+	@echo ... cam.i
+	@echo ... cam.s
 	@echo ... demo.obj
 	@echo ... demo.i
 	@echo ... demo.s
@@ -441,9 +444,6 @@ help:
 	@echo ... main.obj
 	@echo ... main.i
 	@echo ... main.s
-	@echo ... mvcam.obj
-	@echo ... mvcam.i
-	@echo ... mvcam.s
 	@echo ... mywidget.obj
 	@echo ... mywidget.i
 	@echo ... mywidget.s

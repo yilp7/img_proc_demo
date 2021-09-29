@@ -44,11 +44,11 @@ add_executable(Demo_param WIN32
     demo.cpp
     mywidget.cpp
     imageproc.cpp
-    mvcam.cpp
+    cam.cpp
     demo.h
     mywidget.h
     imageproc.h
-    mvcam.h
+    cam.h
     demo_dev.ui
     resources/resources.qrc
     icon.rc
@@ -61,11 +61,11 @@ qt5_use_modules(Demo_param Widgets SerialPort)
 target_link_libraries(Demo_param
     Qt${QT_VERSION_MAJOR}::Widgets
     # mvs
-	MvCameraControl
+    MvCameraControl
     # HQV
-#	HQV_AVIProcess64
-#	HQV_DataConvert64
-#	HQV_SDK64
+    HQV_AVIProcess
+    HQV_DataConvert
+    HQV_SDK
     # opencv
     libopencv_core452
     libopencv_imgcodecs452
@@ -78,11 +78,11 @@ add_executable(Demo_release WIN32
     demo.cpp
     mywidget.cpp
     imageproc.cpp
-    mvcam.cpp
+    cam.cpp
     demo.h
     mywidget.h
     imageproc.h
-    mvcam.h
+    cam.h
     demo_rls.ui
     resources/resources.qrc
     icon.rc
@@ -94,11 +94,11 @@ qt5_use_modules(Demo_release Widgets SerialPort)
 target_link_libraries(Demo_release
     Qt${QT_VERSION_MAJOR}::Widgets
     # mvs
-        MvCameraControl
+    MvCameraControl
     # HQV
-#	HQV_AVIProcess64
-#	HQV_DataConvert64
-#	HQV_SDK64
+    HQV_AVIProcess
+    HQV_DataConvert
+    HQV_SDK
     # opencv
     libopencv_core452
     libopencv_imgcodecs452

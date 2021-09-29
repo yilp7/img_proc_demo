@@ -723,7 +723,7 @@ void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate)
 void Demo::on_ENUM_BUTTON_clicked()
 {
     if (curr_cam) delete curr_cam;
-    curr_cam = new MvCam;
+    curr_cam = new Cam;
     enable_controls(curr_cam->search_for_devices());
 }
 

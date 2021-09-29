@@ -336,7 +336,7 @@ CMakeFiles/Demo_param.dir/demo.cpp.obj: \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/qabstractitemview.h \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/qabstractscrollarea.h \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/qitemselectionmodel.h \
- E:\workspace\qt5\Demo_combined\mvcam.h \
+ E:\workspace\qt5\Demo_combined\cam.h \
  E:/workspace/qt5/Demo_combined/sdk32/mvs/include/MvCameraControl.h \
  E:/workspace/qt5/Demo_combined/sdk32/mvs/include/MvErrorDefine.h \
  E:/workspace/qt5/Demo_combined/sdk32/mvs/include/MvISPErrorDefine.h \
@@ -344,58 +344,9 @@ CMakeFiles/Demo_param.dir/demo.cpp.obj: \
  E:/workspace/qt5/Demo_combined/sdk32/mvs/include/PixelType.h \
  E:/workspace/qt5/Demo_combined/sdk32/mvs/include/MvObsoleteInterfaces.h \
  E:/workspace/qt5/Demo_combined/sdk32/mvs/include/ObsoleteCamParams.h \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/imgcodecs.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cvdef.h \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/version.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/hal/interface.h \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cv_cpu_dispatch.h \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/base.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/opencv_modules.hpp \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/climits \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cvstd.hpp \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/cstring \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/cmath \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/i686-w64-mingw32/include/math.h \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cvstd_wrapper.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/neon_utils.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/vsx_utils.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/check.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/traits.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/matx.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/saturate.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/fast_math.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/types.hpp \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/cfloat \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/float.h \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/i686-w64-mingw32/include/float.h \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/mat.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/bufferpool.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/mat.inl.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/persistence.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/operations.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cvstd.inl.hpp \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/complex \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/sstream \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/bits/sstream.tcc \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/utility.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/optim.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/ovx.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cvdef.h \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/imgproc.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/imgproc/segmentation.hpp \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/queue \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/deque \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/bits/stl_deque.h \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/bits/deque.tcc \
- D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/bits/stl_queue.h \
- D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/QApplication \
- D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/qapplication.h \
- D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/qcoreapplication.h \
- D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/qcoreevent.h \
- D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/qeventloop.h \
- D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtGui/qguiapplication.h \
- D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtGui/qinputmethod.h \
+ E:/workspace/qt5/Demo_combined/sdk32/HQV/include/HQV_API.h \
+ E:/workspace/qt5/Demo_combined/sdk32/HQV/include/HQV_Common.h \
+ E:/workspace/qt5/Demo_combined/sdk32/HQV/include/HQV_Param.h \
  D:/Qt/Qt5.12.10/Tools/mingw730_32/i686-w64-mingw32/include/windows.h \
  D:/Qt/Qt5.12.10/Tools/mingw730_32/i686-w64-mingw32/include/sdkddkver.h \
  D:/Qt/Qt5.12.10/Tools/mingw730_32/i686-w64-mingw32/include/excpt.h \
@@ -529,6 +480,58 @@ CMakeFiles/Demo_param.dir/demo.cpp.obj: \
  D:/Qt/Qt5.12.10/Tools/mingw730_32/i686-w64-mingw32/include/winsvc.h \
  D:/Qt/Qt5.12.10/Tools/mingw730_32/i686-w64-mingw32/include/mcx.h \
  D:/Qt/Qt5.12.10/Tools/mingw730_32/i686-w64-mingw32/include/imm.h \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/imgcodecs.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cvdef.h \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/version.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/hal/interface.h \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cv_cpu_dispatch.h \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/base.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/opencv_modules.hpp \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/climits \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cvstd.hpp \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/cstring \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/cmath \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/i686-w64-mingw32/include/math.h \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cvstd_wrapper.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/neon_utils.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/vsx_utils.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/check.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/traits.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/matx.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/saturate.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/fast_math.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/types.hpp \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/cfloat \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/float.h \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/i686-w64-mingw32/include/float.h \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/mat.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/bufferpool.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/mat.inl.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/persistence.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/operations.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cvstd.inl.hpp \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/complex \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/sstream \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/bits/sstream.tcc \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/utility.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/optim.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/ovx.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cvdef.h \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/imgproc.hpp \
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/imgproc/segmentation.hpp \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/queue \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/deque \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/bits/stl_deque.h \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/bits/deque.tcc \
+ D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/bits/stl_queue.h \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/QApplication \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/qapplication.h \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/qcoreapplication.h \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/qcoreevent.h \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/qeventloop.h \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtGui/qguiapplication.h \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtGui/qinputmethod.h \
  E:\workspace\qt5\Demo_combined\imageproc.h \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/QString \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/qstring.h \
@@ -627,9 +630,6 @@ CMakeFiles/Demo_param.dir/demo.cpp.obj: \
  E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/video.hpp \
  E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/video/tracking.hpp \
  E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/video/background_segm.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/HQV/include/HQV_API.h \
- E:/workspace/qt5/Demo_combined/sdk32/HQV/include/HQV_Common.h \
- E:/workspace/qt5/Demo_combined/sdk32/HQV/include/HQV_Param.h \
  E:/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release/Demo_param_autogen/include/ui_demo_dev.h \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/QLocale \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/qlocale.h \
