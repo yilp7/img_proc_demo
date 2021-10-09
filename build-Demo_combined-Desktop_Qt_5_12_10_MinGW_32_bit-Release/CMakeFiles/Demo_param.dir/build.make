@@ -182,20 +182,20 @@ CMakeFiles/Demo_param.dir/imageproc.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Demo_param.dir/imageproc.cpp.s"
 	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S E:\workspace\qt5\Demo_combined\imageproc.cpp -o CMakeFiles\Demo_param.dir\imageproc.cpp.s
 
-CMakeFiles/Demo_param.dir/cam.cpp.obj: CMakeFiles/Demo_param.dir/flags.make
-CMakeFiles/Demo_param.dir/cam.cpp.obj: CMakeFiles/Demo_param.dir/includes_CXX.rsp
-CMakeFiles/Demo_param.dir/cam.cpp.obj: ../cam.cpp
-CMakeFiles/Demo_param.dir/cam.cpp.obj: CMakeFiles/Demo_param.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/Demo_param.dir/cam.cpp.obj"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/cam.cpp.obj -MF CMakeFiles\Demo_param.dir\cam.cpp.obj.d -o CMakeFiles\Demo_param.dir\cam.cpp.obj -c E:\workspace\qt5\Demo_combined\cam.cpp
+CMakeFiles/Demo_param.dir/mvcam.cpp.obj: CMakeFiles/Demo_param.dir/flags.make
+CMakeFiles/Demo_param.dir/mvcam.cpp.obj: CMakeFiles/Demo_param.dir/includes_CXX.rsp
+CMakeFiles/Demo_param.dir/mvcam.cpp.obj: ../mvcam.cpp
+CMakeFiles/Demo_param.dir/mvcam.cpp.obj: CMakeFiles/Demo_param.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/Demo_param.dir/mvcam.cpp.obj"
+	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/mvcam.cpp.obj -MF CMakeFiles\Demo_param.dir\mvcam.cpp.obj.d -o CMakeFiles\Demo_param.dir\mvcam.cpp.obj -c E:\workspace\qt5\Demo_combined\mvcam.cpp
 
-CMakeFiles/Demo_param.dir/cam.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Demo_param.dir/cam.cpp.i"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E E:\workspace\qt5\Demo_combined\cam.cpp > CMakeFiles\Demo_param.dir\cam.cpp.i
+CMakeFiles/Demo_param.dir/mvcam.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Demo_param.dir/mvcam.cpp.i"
+	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E E:\workspace\qt5\Demo_combined\mvcam.cpp > CMakeFiles\Demo_param.dir\mvcam.cpp.i
 
-CMakeFiles/Demo_param.dir/cam.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Demo_param.dir/cam.cpp.s"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S E:\workspace\qt5\Demo_combined\cam.cpp -o CMakeFiles\Demo_param.dir\cam.cpp.s
+CMakeFiles/Demo_param.dir/mvcam.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Demo_param.dir/mvcam.cpp.s"
+	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S E:\workspace\qt5\Demo_combined\mvcam.cpp -o CMakeFiles\Demo_param.dir\mvcam.cpp.s
 
 CMakeFiles/Demo_param.dir/icon.rc.obj: CMakeFiles/Demo_param.dir/flags.make
 CMakeFiles/Demo_param.dir/icon.rc.obj: ../icon.rc
@@ -224,7 +224,7 @@ Demo_param_OBJECTS = \
 "CMakeFiles/Demo_param.dir/demo.cpp.obj" \
 "CMakeFiles/Demo_param.dir/mywidget.cpp.obj" \
 "CMakeFiles/Demo_param.dir/imageproc.cpp.obj" \
-"CMakeFiles/Demo_param.dir/cam.cpp.obj" \
+"CMakeFiles/Demo_param.dir/mvcam.cpp.obj" \
 "CMakeFiles/Demo_param.dir/icon.rc.obj" \
 "CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj"
 
@@ -236,7 +236,7 @@ Demo_param.exe: CMakeFiles/Demo_param.dir/main.cpp.obj
 Demo_param.exe: CMakeFiles/Demo_param.dir/demo.cpp.obj
 Demo_param.exe: CMakeFiles/Demo_param.dir/mywidget.cpp.obj
 Demo_param.exe: CMakeFiles/Demo_param.dir/imageproc.cpp.obj
-Demo_param.exe: CMakeFiles/Demo_param.dir/cam.cpp.obj
+Demo_param.exe: CMakeFiles/Demo_param.dir/mvcam.cpp.obj
 Demo_param.exe: CMakeFiles/Demo_param.dir/icon.rc.obj
 Demo_param.exe: CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj
 Demo_param.exe: CMakeFiles/Demo_param.dir/build.make
