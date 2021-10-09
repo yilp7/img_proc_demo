@@ -1,14 +1,13 @@
 #ifndef HQVCAM_H
 #define HQVCAM_H
 
-#include "cam.h"
 #include <HQV_API.h>
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
 #include <queue>
 #include <QApplication>
 
-class HqvCam
+class Cam
 {
 private:
     void* dev_handle;
@@ -18,8 +17,8 @@ public:
     int device_type;
 
 public:
-    HqvCam();
-    ~HqvCam();
+    Cam();
+    ~Cam();
 
     int search_for_devices();
 

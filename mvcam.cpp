@@ -1,9 +1,9 @@
 #include "mvcam.h"
 
-MvCam::MvCam() {dev_handle = NULL;}
-MvCam::~MvCam() {if (dev_handle) CloseHandle(dev_handle), dev_handle = NULL;}
+Cam::Cam() {dev_handle = NULL;}
+Cam::~Cam() {if (dev_handle) CloseHandle(dev_handle), dev_handle = NULL;}
 
-int MvCam::search_for_devices()
+int Cam::search_for_devices()
 {
     device_type = 0;
     MV_CC_DEVICE_INFO_LIST st_dev_list;
@@ -38,7 +38,7 @@ int MvCam::search_for_devices()
     return st_dev_list.nDeviceNum;
 }
 
-int MvCam::start() {
+int Cam::start() {
     MV_CC_DEVICE_INFO_LIST st_dev_list;
 
     // get and store devices list to m_stDevList
@@ -77,7 +77,7 @@ int MvCam::start() {
     return ret;
 }
 
-int MvCam::shut_down()
+int Cam::shut_down()
 {
     if (dev_handle == NULL) return MV_E_HANDLE;
 
@@ -88,28 +88,28 @@ int MvCam::shut_down()
     return ret;
 }
 
-int MvCam::set_frame_callback(void *user)
+int Cam::set_frame_callback(void *user)
 {
     return MV_CC_RegisterImageCallBackEx(dev_handle, frame_cb, user);
 }
 
-int MvCam::start_grabbing() {
+int Cam::start_grabbing() {
     return MV_CC_StartGrabbing(dev_handle);
 }
 
-int MvCam::stop_grabbing() {
+int Cam::stop_grabbing() {
     return MV_CC_StopGrabbing(dev_handle);
 }
 
-int MvCam::get_img_buffer(MV_FRAME_OUT* frame, int msec) {
+int Cam::get_img_buffer(MV_FRAME_OUT* frame, int msec) {
 	return MV_CC_GetImageBuffer(dev_handle, frame, msec);
 }
 
-int MvCam::free_img_buffer(MV_FRAME_OUT* frame) {
+int Cam::free_img_buffer(MV_FRAME_OUT* frame) {
 	return MV_CC_FreeImageBuffer(dev_handle, frame);
 }
 
-void MvCam::get_frame_size(int &w, int &h)
+void Cam::get_frame_size(int &w, int &h)
 {
     MVCC_INTVALUE int_value;
     MV_CC_GetIntValue(dev_handle, "Width", &int_value);
@@ -118,7 +118,7 @@ void MvCam::get_frame_size(int &w, int &h)
     h = int_value.nCurValue;
 }
 
-void MvCam::time_exposure(bool read, float *val)
+void Cam::time_exposure(bool read, float *val)
 {
     if (read) {
         MVCC_FLOATVALUE f_val;
@@ -128,7 +128,7 @@ void MvCam::time_exposure(bool read, float *val)
     else MV_CC_SetFloatValue(dev_handle, "ExposureTime", *val);
 }
 
-void MvCam::frame_rate(bool read, float *val)
+void Cam::frame_rate(bool read, float *val)
 {
     if (read) {
         MVCC_FLOATVALUE f_val;
@@ -138,7 +138,7 @@ void MvCam::frame_rate(bool read, float *val)
     else MV_CC_SetFloatValue(dev_handle, "AcquisitionFrameRate", *val);
 }
 
-void MvCam::gain_analog(bool read, float *val)
+void Cam::gain_analog(bool read, float *val)
 {
     if (read) {
         MVCC_FLOATVALUE f_val;
@@ -148,7 +148,7 @@ void MvCam::gain_analog(bool read, float *val)
     else MV_CC_SetFloatValue(dev_handle, "Gain", *val);
 }
 
-void MvCam::trigger_mode(bool read, bool *val)
+void Cam::trigger_mode(bool read, bool *val)
 {
     if (read) {
         MVCC_ENUMVALUE enum_val;
@@ -158,7 +158,7 @@ void MvCam::trigger_mode(bool read, bool *val)
     else MV_CC_SetEnumValue(dev_handle, "TriggerMode", *val);
 }
 
-void MvCam::trigger_source(bool read, bool *val)
+void Cam::trigger_source(bool read, bool *val)
 {
     if (read) {
         MVCC_ENUMVALUE enum_val;
@@ -171,12 +171,12 @@ void MvCam::trigger_source(bool read, bool *val)
     }
 }
 
-void MvCam::trigger_once()
+void Cam::trigger_once()
 {
     MV_CC_SetCommandValue(dev_handle, "TriggerSoftware");
 }
 
-void MvCam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *user_data)
+void Cam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *user_data)
 {
     static cv::Mat img(frame_info->nHeight, frame_info->nWidth, CV_8U);
     memcpy(img.data, data, frame_info->nFrameLen);

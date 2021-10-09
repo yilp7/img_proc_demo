@@ -1,9 +1,9 @@
 #include "hqvcam.h"
 
-HqvCam::HqvCam() {dev_handle = NULL;}
-HqvCam::~HqvCam() {if (dev_handle) CloseHandle(dev_handle), dev_handle = NULL;}
+Cam::Cam() {dev_handle = NULL;}
+Cam::~Cam() {if (dev_handle) CloseHandle(dev_handle), dev_handle = NULL;}
 
-int HqvCam::search_for_devices()
+int Cam::search_for_devices()
 {
     device_type = 0;
     BYTE dev_num = 0;
@@ -29,66 +29,66 @@ int HqvCam::search_for_devices()
     return dev_num;
 }
 
-int HqvCam::start()
+int Cam::start()
 {
     DWORD idx = 0;
     return HQV_DeviceOpen(&idx, &dev_handle, DEVICE_INDEX, DEVICE_USB);
 }
 
-int HqvCam::shut_down()
+int Cam::shut_down()
 {
     return HQV_DeviceClose(&dev_handle);
 }
 
-int HqvCam::set_frame_callback(void *user)
+int Cam::set_frame_callback(void *user)
 {
     return HQV_SetFrameCallback(dev_handle, frame_cb, user, DATA_GRAY);
 }
 
-int HqvCam::start_grabbing()
+int Cam::start_grabbing()
 {
     return HQV_CaptureStart(dev_handle);
 }
 
-int HqvCam::stop_grabbing()
+int Cam::stop_grabbing()
 {
     return HQV_CaptureStop(dev_handle);
 }
 
-void HqvCam::get_frame_size(int &w, int &h)
+void Cam::get_frame_size(int &w, int &h)
 {
     HQV_ParamGetValue(dev_handle, PARAM_ID_SFNC_WIDTH, &w, VALUE_INT);
     HQV_ParamGetValue(dev_handle, PARAM_ID_SFNC_HEIGHT, &h, VALUE_INT);
 }
 
-void HqvCam::time_exposure(bool read, float *val)
+void Cam::time_exposure(bool read, float *val)
 {
     int time_expo = *val;
     if (read) HQV_ParamGetValue(dev_handle, PARAM_ID_SFNC_EXPOSURETIME, &time_expo, VALUE_INT), *val = time_expo;
     else HQV_ParamSetValue(dev_handle, PARAM_ID_SFNC_EXPOSURETIME, &time_expo, VALUE_INT);
 }
 
-void HqvCam::frame_rate(bool read, float *val)
+void Cam::frame_rate(bool read, float *val)
 {
     int frame_rate = *val;
     if (read) HQV_ParamGetValue(dev_handle, PARAM_ID_SFNC_ACQUISITIONFRAMERATE, &frame_rate, VALUE_INT), *val = frame_rate;
     else HQV_ParamSetValue(dev_handle, PARAM_ID_SFNC_ACQUISITIONFRAMERATE, &frame_rate, VALUE_INT);
 }
 
-void HqvCam::gain_analog(bool read, float *val)
+void Cam::gain_analog(bool read, float *val)
 {
     int gain = *val;
     if (read) HQV_ParamGetValue(dev_handle, PARAM_ID_SFNC_GAIN, &gain, VALUE_INT), *val = gain;
     else HQV_ParamSetValue(dev_handle, PARAM_ID_SFNC_GAIN, &gain, VALUE_INT);
 }
 
-void HqvCam::trigger_mode(bool read, bool *val)
+void Cam::trigger_mode(bool read, bool *val)
 {
     if (read) HQV_ParamGetValue(dev_handle, PARAM_ID_SFNC_TRIGGERMODE, val, VALUE_INT);
     else HQV_ParamSetValue(dev_handle, PARAM_ID_SFNC_TRIGGERMODE, val, VALUE_INT);
 }
 
-void HqvCam::trigger_source(bool read, bool *val)
+void Cam::trigger_source(bool read, bool *val)
 {
     if (read) {
         HQV_ParamGetValue(dev_handle, PARAM_ID_SFNC_TRIGGERSOURCE, val, VALUE_INT);
@@ -99,13 +99,13 @@ void HqvCam::trigger_source(bool read, bool *val)
     }
 }
 
-void HqvCam::trigger_once()
+void Cam::trigger_once()
 {
     int n = 1;
     HQV_ParamSetValue(dev_handle, PARAM_ID_SFNC_TRIGGERSOFTWARE, &n, VALUE_INT);
 }
 
-DWORD HqvCam::frame_cb(HANDLE dev, HQV_FRAMEINFO frame_info, void *user_data)
+DWORD Cam::frame_cb(HANDLE dev, HQV_FRAMEINFO frame_info, void *user_data)
 {
     static cv::Mat raw_data(frame_info.lHeight, frame_info.lWidth, CV_16UC1), temp;
     memcpy(raw_data.data, frame_info.pBufPtr, frame_info.lBufSize);

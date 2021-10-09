@@ -8,7 +8,7 @@
 #include <QApplication>
 #include <windows.h>
 
-class MvCam
+class Cam
 {
 private:
     void* dev_handle;
@@ -18,8 +18,8 @@ public:
     int device_type;
 
 public:
-    MvCam();
-    ~MvCam();
+    Cam();
+    ~Cam();
 
     int search_for_devices();
 

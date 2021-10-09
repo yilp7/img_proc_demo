@@ -63,9 +63,9 @@ target_link_libraries(Demo_param
     # mvs
     MvCameraControl
     # HQV
-    HQV_AVIProcess
-    HQV_DataConvert
-    HQV_SDK
+	HQV_AVIProcess
+	HQV_DataConvert
+	HQV_SDK
     # opencv
     libopencv_core452
     libopencv_imgcodecs452
