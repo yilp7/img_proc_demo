@@ -52,10 +52,10 @@ RM = "C:\Program Files\CMake\bin\cmake.exe" -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = E:\workspace\qt5\Demo_combined
+CMAKE_SOURCE_DIR = C:\Users\2234\Documents\workspace\qt5\Demo_combined
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release
+CMAKE_BINARY_DIR = C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release
 
 # Include any dependencies generated for this target.
 include CMakeFiles/Demo_param.dir/depend.make
@@ -103,119 +103,119 @@ Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp: ../resources/model.png
 Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp: ../resources/jump.png
 Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp: ../resources/run.png
 Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp: ../resources/wave.png
-Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp: D:/Qt/Qt5.12.10/5.12.10/mingw73_32/bin/rcc.exe
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --blue --bold --progress-dir=E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Automatic RCC for resources/resources.qrc"
-	"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc E:/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release/CMakeFiles/Demo_param_autogen.dir/AutoRcc_resources_3YJK5W5UP7_Info.json Release
+Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp: C:/Qt/Qt5.12.10/5.12.10/mingw73_32/bin/rcc.exe
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --blue --bold --progress-dir=C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Automatic RCC for resources/resources.qrc"
+	"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc C:/Users/2234/Documents/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release/CMakeFiles/Demo_param_autogen.dir/AutoRcc_resources_3YJK5W5UP7_Info.json Release
 
 CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.obj: CMakeFiles/Demo_param.dir/flags.make
 CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.obj: CMakeFiles/Demo_param.dir/includes_CXX.rsp
 CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.obj: Demo_param_autogen/mocs_compilation.cpp
 CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.obj: CMakeFiles/Demo_param.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.obj"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.obj -MF CMakeFiles\Demo_param.dir\Demo_param_autogen\mocs_compilation.cpp.obj.d -o CMakeFiles\Demo_param.dir\Demo_param_autogen\mocs_compilation.cpp.obj -c E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\mocs_compilation.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.obj"
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.obj -MF CMakeFiles\Demo_param.dir\Demo_param_autogen\mocs_compilation.cpp.obj.d -o CMakeFiles\Demo_param.dir\Demo_param_autogen\mocs_compilation.cpp.obj -c C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\mocs_compilation.cpp
 
 CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.i"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\mocs_compilation.cpp > CMakeFiles\Demo_param.dir\Demo_param_autogen\mocs_compilation.cpp.i
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\mocs_compilation.cpp > CMakeFiles\Demo_param.dir\Demo_param_autogen\mocs_compilation.cpp.i
 
 CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.s"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\mocs_compilation.cpp -o CMakeFiles\Demo_param.dir\Demo_param_autogen\mocs_compilation.cpp.s
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\mocs_compilation.cpp -o CMakeFiles\Demo_param.dir\Demo_param_autogen\mocs_compilation.cpp.s
 
 CMakeFiles/Demo_param.dir/main.cpp.obj: CMakeFiles/Demo_param.dir/flags.make
 CMakeFiles/Demo_param.dir/main.cpp.obj: CMakeFiles/Demo_param.dir/includes_CXX.rsp
 CMakeFiles/Demo_param.dir/main.cpp.obj: ../main.cpp
 CMakeFiles/Demo_param.dir/main.cpp.obj: CMakeFiles/Demo_param.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/Demo_param.dir/main.cpp.obj"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/main.cpp.obj -MF CMakeFiles\Demo_param.dir\main.cpp.obj.d -o CMakeFiles\Demo_param.dir\main.cpp.obj -c E:\workspace\qt5\Demo_combined\main.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/Demo_param.dir/main.cpp.obj"
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/main.cpp.obj -MF CMakeFiles\Demo_param.dir\main.cpp.obj.d -o CMakeFiles\Demo_param.dir\main.cpp.obj -c C:\Users\2234\Documents\workspace\qt5\Demo_combined\main.cpp
 
 CMakeFiles/Demo_param.dir/main.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Demo_param.dir/main.cpp.i"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E E:\workspace\qt5\Demo_combined\main.cpp > CMakeFiles\Demo_param.dir\main.cpp.i
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\2234\Documents\workspace\qt5\Demo_combined\main.cpp > CMakeFiles\Demo_param.dir\main.cpp.i
 
 CMakeFiles/Demo_param.dir/main.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Demo_param.dir/main.cpp.s"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S E:\workspace\qt5\Demo_combined\main.cpp -o CMakeFiles\Demo_param.dir\main.cpp.s
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S C:\Users\2234\Documents\workspace\qt5\Demo_combined\main.cpp -o CMakeFiles\Demo_param.dir\main.cpp.s
 
 CMakeFiles/Demo_param.dir/demo.cpp.obj: CMakeFiles/Demo_param.dir/flags.make
 CMakeFiles/Demo_param.dir/demo.cpp.obj: CMakeFiles/Demo_param.dir/includes_CXX.rsp
 CMakeFiles/Demo_param.dir/demo.cpp.obj: ../demo.cpp
 CMakeFiles/Demo_param.dir/demo.cpp.obj: CMakeFiles/Demo_param.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/Demo_param.dir/demo.cpp.obj"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/demo.cpp.obj -MF CMakeFiles\Demo_param.dir\demo.cpp.obj.d -o CMakeFiles\Demo_param.dir\demo.cpp.obj -c E:\workspace\qt5\Demo_combined\demo.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/Demo_param.dir/demo.cpp.obj"
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/demo.cpp.obj -MF CMakeFiles\Demo_param.dir\demo.cpp.obj.d -o CMakeFiles\Demo_param.dir\demo.cpp.obj -c C:\Users\2234\Documents\workspace\qt5\Demo_combined\demo.cpp
 
 CMakeFiles/Demo_param.dir/demo.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Demo_param.dir/demo.cpp.i"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E E:\workspace\qt5\Demo_combined\demo.cpp > CMakeFiles\Demo_param.dir\demo.cpp.i
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\2234\Documents\workspace\qt5\Demo_combined\demo.cpp > CMakeFiles\Demo_param.dir\demo.cpp.i
 
 CMakeFiles/Demo_param.dir/demo.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Demo_param.dir/demo.cpp.s"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S E:\workspace\qt5\Demo_combined\demo.cpp -o CMakeFiles\Demo_param.dir\demo.cpp.s
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S C:\Users\2234\Documents\workspace\qt5\Demo_combined\demo.cpp -o CMakeFiles\Demo_param.dir\demo.cpp.s
 
 CMakeFiles/Demo_param.dir/mywidget.cpp.obj: CMakeFiles/Demo_param.dir/flags.make
 CMakeFiles/Demo_param.dir/mywidget.cpp.obj: CMakeFiles/Demo_param.dir/includes_CXX.rsp
 CMakeFiles/Demo_param.dir/mywidget.cpp.obj: ../mywidget.cpp
 CMakeFiles/Demo_param.dir/mywidget.cpp.obj: CMakeFiles/Demo_param.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/Demo_param.dir/mywidget.cpp.obj"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/mywidget.cpp.obj -MF CMakeFiles\Demo_param.dir\mywidget.cpp.obj.d -o CMakeFiles\Demo_param.dir\mywidget.cpp.obj -c E:\workspace\qt5\Demo_combined\mywidget.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/Demo_param.dir/mywidget.cpp.obj"
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/mywidget.cpp.obj -MF CMakeFiles\Demo_param.dir\mywidget.cpp.obj.d -o CMakeFiles\Demo_param.dir\mywidget.cpp.obj -c C:\Users\2234\Documents\workspace\qt5\Demo_combined\mywidget.cpp
 
 CMakeFiles/Demo_param.dir/mywidget.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Demo_param.dir/mywidget.cpp.i"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E E:\workspace\qt5\Demo_combined\mywidget.cpp > CMakeFiles\Demo_param.dir\mywidget.cpp.i
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\2234\Documents\workspace\qt5\Demo_combined\mywidget.cpp > CMakeFiles\Demo_param.dir\mywidget.cpp.i
 
 CMakeFiles/Demo_param.dir/mywidget.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Demo_param.dir/mywidget.cpp.s"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S E:\workspace\qt5\Demo_combined\mywidget.cpp -o CMakeFiles\Demo_param.dir\mywidget.cpp.s
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S C:\Users\2234\Documents\workspace\qt5\Demo_combined\mywidget.cpp -o CMakeFiles\Demo_param.dir\mywidget.cpp.s
 
 CMakeFiles/Demo_param.dir/imageproc.cpp.obj: CMakeFiles/Demo_param.dir/flags.make
 CMakeFiles/Demo_param.dir/imageproc.cpp.obj: CMakeFiles/Demo_param.dir/includes_CXX.rsp
 CMakeFiles/Demo_param.dir/imageproc.cpp.obj: ../imageproc.cpp
 CMakeFiles/Demo_param.dir/imageproc.cpp.obj: CMakeFiles/Demo_param.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/Demo_param.dir/imageproc.cpp.obj"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/imageproc.cpp.obj -MF CMakeFiles\Demo_param.dir\imageproc.cpp.obj.d -o CMakeFiles\Demo_param.dir\imageproc.cpp.obj -c E:\workspace\qt5\Demo_combined\imageproc.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/Demo_param.dir/imageproc.cpp.obj"
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/imageproc.cpp.obj -MF CMakeFiles\Demo_param.dir\imageproc.cpp.obj.d -o CMakeFiles\Demo_param.dir\imageproc.cpp.obj -c C:\Users\2234\Documents\workspace\qt5\Demo_combined\imageproc.cpp
 
 CMakeFiles/Demo_param.dir/imageproc.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Demo_param.dir/imageproc.cpp.i"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E E:\workspace\qt5\Demo_combined\imageproc.cpp > CMakeFiles\Demo_param.dir\imageproc.cpp.i
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\2234\Documents\workspace\qt5\Demo_combined\imageproc.cpp > CMakeFiles\Demo_param.dir\imageproc.cpp.i
 
 CMakeFiles/Demo_param.dir/imageproc.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Demo_param.dir/imageproc.cpp.s"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S E:\workspace\qt5\Demo_combined\imageproc.cpp -o CMakeFiles\Demo_param.dir\imageproc.cpp.s
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S C:\Users\2234\Documents\workspace\qt5\Demo_combined\imageproc.cpp -o CMakeFiles\Demo_param.dir\imageproc.cpp.s
 
-CMakeFiles/Demo_param.dir/mvcam.cpp.obj: CMakeFiles/Demo_param.dir/flags.make
-CMakeFiles/Demo_param.dir/mvcam.cpp.obj: CMakeFiles/Demo_param.dir/includes_CXX.rsp
-CMakeFiles/Demo_param.dir/mvcam.cpp.obj: ../mvcam.cpp
-CMakeFiles/Demo_param.dir/mvcam.cpp.obj: CMakeFiles/Demo_param.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/Demo_param.dir/mvcam.cpp.obj"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/mvcam.cpp.obj -MF CMakeFiles\Demo_param.dir\mvcam.cpp.obj.d -o CMakeFiles\Demo_param.dir\mvcam.cpp.obj -c E:\workspace\qt5\Demo_combined\mvcam.cpp
+CMakeFiles/Demo_param.dir/euresyscam.cpp.obj: CMakeFiles/Demo_param.dir/flags.make
+CMakeFiles/Demo_param.dir/euresyscam.cpp.obj: CMakeFiles/Demo_param.dir/includes_CXX.rsp
+CMakeFiles/Demo_param.dir/euresyscam.cpp.obj: ../euresyscam.cpp
+CMakeFiles/Demo_param.dir/euresyscam.cpp.obj: CMakeFiles/Demo_param.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/Demo_param.dir/euresyscam.cpp.obj"
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/euresyscam.cpp.obj -MF CMakeFiles\Demo_param.dir\euresyscam.cpp.obj.d -o CMakeFiles\Demo_param.dir\euresyscam.cpp.obj -c C:\Users\2234\Documents\workspace\qt5\Demo_combined\euresyscam.cpp
 
-CMakeFiles/Demo_param.dir/mvcam.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Demo_param.dir/mvcam.cpp.i"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E E:\workspace\qt5\Demo_combined\mvcam.cpp > CMakeFiles\Demo_param.dir\mvcam.cpp.i
+CMakeFiles/Demo_param.dir/euresyscam.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Demo_param.dir/euresyscam.cpp.i"
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\2234\Documents\workspace\qt5\Demo_combined\euresyscam.cpp > CMakeFiles\Demo_param.dir\euresyscam.cpp.i
 
-CMakeFiles/Demo_param.dir/mvcam.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Demo_param.dir/mvcam.cpp.s"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S E:\workspace\qt5\Demo_combined\mvcam.cpp -o CMakeFiles\Demo_param.dir\mvcam.cpp.s
+CMakeFiles/Demo_param.dir/euresyscam.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Demo_param.dir/euresyscam.cpp.s"
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S C:\Users\2234\Documents\workspace\qt5\Demo_combined\euresyscam.cpp -o CMakeFiles\Demo_param.dir\euresyscam.cpp.s
 
 CMakeFiles/Demo_param.dir/icon.rc.obj: CMakeFiles/Demo_param.dir/flags.make
 CMakeFiles/Demo_param.dir/icon.rc.obj: ../icon.rc
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building RC object CMakeFiles/Demo_param.dir/icon.rc.obj"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\windres.exe -O coff $(RC_DEFINES) $(RC_INCLUDES) $(RC_FLAGS) E:\workspace\qt5\Demo_combined\icon.rc CMakeFiles\Demo_param.dir\icon.rc.obj
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building RC object CMakeFiles/Demo_param.dir/icon.rc.obj"
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\windres.exe -O coff $(RC_DEFINES) $(RC_INCLUDES) $(RC_FLAGS) C:\Users\2234\Documents\workspace\qt5\Demo_combined\icon.rc CMakeFiles\Demo_param.dir\icon.rc.obj
 
 CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj: CMakeFiles/Demo_param.dir/flags.make
 CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj: CMakeFiles/Demo_param.dir/includes_CXX.rsp
 CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj: Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp
 CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj: CMakeFiles/Demo_param.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj -MF CMakeFiles\Demo_param.dir\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp.obj.d -o CMakeFiles\Demo_param.dir\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp.obj -c E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj"
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj -MF CMakeFiles\Demo_param.dir\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp.obj.d -o CMakeFiles\Demo_param.dir\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp.obj -c C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp
 
 CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.i"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp > CMakeFiles\Demo_param.dir\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp.i
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp > CMakeFiles\Demo_param.dir\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp.i
 
 CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.s"
-	D:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp -o CMakeFiles\Demo_param.dir\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp.s
+	C:\Qt\Qt5.12.10\Tools\mingw730_32\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp -o CMakeFiles\Demo_param.dir\Demo_param_autogen\3YJK5W5UP7\qrc_resources.cpp.s
 
 # Object files for target Demo_param
 Demo_param_OBJECTS = \
@@ -224,7 +224,7 @@ Demo_param_OBJECTS = \
 "CMakeFiles/Demo_param.dir/demo.cpp.obj" \
 "CMakeFiles/Demo_param.dir/mywidget.cpp.obj" \
 "CMakeFiles/Demo_param.dir/imageproc.cpp.obj" \
-"CMakeFiles/Demo_param.dir/mvcam.cpp.obj" \
+"CMakeFiles/Demo_param.dir/euresyscam.cpp.obj" \
 "CMakeFiles/Demo_param.dir/icon.rc.obj" \
 "CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj"
 
@@ -236,19 +236,19 @@ Demo_param.exe: CMakeFiles/Demo_param.dir/main.cpp.obj
 Demo_param.exe: CMakeFiles/Demo_param.dir/demo.cpp.obj
 Demo_param.exe: CMakeFiles/Demo_param.dir/mywidget.cpp.obj
 Demo_param.exe: CMakeFiles/Demo_param.dir/imageproc.cpp.obj
-Demo_param.exe: CMakeFiles/Demo_param.dir/mvcam.cpp.obj
+Demo_param.exe: CMakeFiles/Demo_param.dir/euresyscam.cpp.obj
 Demo_param.exe: CMakeFiles/Demo_param.dir/icon.rc.obj
 Demo_param.exe: CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj
 Demo_param.exe: CMakeFiles/Demo_param.dir/build.make
-Demo_param.exe: D:/Qt/Qt5.12.10/5.12.10/mingw73_32/lib/libQt5SerialPort.a
-Demo_param.exe: D:/Qt/Qt5.12.10/5.12.10/mingw73_32/lib/libQt5Widgets.a
-Demo_param.exe: D:/Qt/Qt5.12.10/5.12.10/mingw73_32/lib/libQt5Gui.a
-Demo_param.exe: D:/Qt/Qt5.12.10/5.12.10/mingw73_32/lib/libQt5Core.a
-Demo_param.exe: D:/Qt/Qt5.12.10/5.12.10/mingw73_32/lib/libqtmain.a
+Demo_param.exe: C:/Qt/Qt5.12.10/5.12.10/mingw73_32/lib/libQt5SerialPort.a
+Demo_param.exe: C:/Qt/Qt5.12.10/5.12.10/mingw73_32/lib/libQt5Widgets.a
+Demo_param.exe: C:/Qt/Qt5.12.10/5.12.10/mingw73_32/lib/libQt5Gui.a
+Demo_param.exe: C:/Qt/Qt5.12.10/5.12.10/mingw73_32/lib/libQt5Core.a
+Demo_param.exe: C:/Qt/Qt5.12.10/5.12.10/mingw73_32/lib/libqtmain.a
 Demo_param.exe: CMakeFiles/Demo_param.dir/linklibs.rsp
 Demo_param.exe: CMakeFiles/Demo_param.dir/objects1.rsp
 Demo_param.exe: CMakeFiles/Demo_param.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Linking CXX executable Demo_param.exe"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Linking CXX executable Demo_param.exe"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles\Demo_param.dir\link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
@@ -260,6 +260,6 @@ CMakeFiles/Demo_param.dir/clean:
 .PHONY : CMakeFiles/Demo_param.dir/clean
 
 CMakeFiles/Demo_param.dir/depend: Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp
-	$(CMAKE_COMMAND) -E cmake_depends "MinGW Makefiles" E:\workspace\qt5\Demo_combined E:\workspace\qt5\Demo_combined E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles\Demo_param.dir\DependInfo.cmake --color=$(COLOR)
+	$(CMAKE_COMMAND) -E cmake_depends "MinGW Makefiles" C:\Users\2234\Documents\workspace\qt5\Demo_combined C:\Users\2234\Documents\workspace\qt5\Demo_combined C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles\Demo_param.dir\DependInfo.cmake --color=$(COLOR)
 .PHONY : CMakeFiles/Demo_param.dir/depend
 
