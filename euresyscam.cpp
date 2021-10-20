@@ -22,6 +22,7 @@ int Cam::search_for_devices()
 int Cam::start() {
     clSerialClose(serial_ref);
     int cl_ret = clSerialInit(0, &serial_ref);
+    qDebug() << cl_ret;
     if (cl_ret != CL_ERR_NO_ERR) return cl_ret;
 
     MCSTATUS ret = 0;
@@ -108,11 +109,10 @@ void Cam::get_frame_size(int &w, int &h)
 float Cam::communicate(char* out, char* in, uint out_size, uint in_size, bool read) {
     QString str_s = "s", str_r = "r";
 
-    qDebug () << clSerialWrite(serial_ref, out, &out_size, 1000);// qDebug() << out_size;
+    clSerialWrite(serial_ref, out, &out_size, 1000);// qDebug() << out_size;
     for (int i = 0; i < 7; i++) str_s += QString::asprintf(" %02X", i + (int)out_size - 7 < 0 ? 0 : ((uchar*)out)[i + out_size - 7]);
-    QThread::msleep(10);
 
-    qDebug() << clSerialRead(serial_ref, in, &in_size, 1000);// qDebug() << in_size;
+    clSerialRead(serial_ref, in, &in_size, 1000);// qDebug() << in_size;
     for (int i = 0; i < 6; i++) str_r += QString::asprintf(" %02X", i + (int)in_size - 6 < 0 ? 0 : ((uchar*)in)[i + in_size - 6]);
 
     qDebug() << str_s << str_r;
