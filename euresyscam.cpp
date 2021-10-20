@@ -16,18 +16,19 @@ int Cam::search_for_devices()
     // McSetParamInt (MC_CONFIGURATION, MC_ErrorHandling, MC_ErrorHandling_MSGBOX);
     // McSetParamStr (MC_CONFIGURATION, MC_ErrorLog, "error.log");
 
-    // Create a channel and associate it with the first connector on the first board
-    McCreate(MC_CHANNEL, &dev_handle);
-    McSetParamInt(dev_handle, MC_DriverIndex, 0);
-
     return 1;
 }
 
 int Cam::start() {
+    clSerialClose(serial_ref);
     int cl_ret = clSerialInit(0, &serial_ref);
     if (cl_ret != CL_ERR_NO_ERR) return cl_ret;
 
     MCSTATUS ret = 0;
+    // Create a channel and associate it with the first connector on the first board
+    McCreate(MC_CHANNEL, &dev_handle);
+    McSetParamInt(dev_handle, MC_DriverIndex, 0);
+
     // In order to use single camera on connector A
     // MC_Connector need to be set to A for Grablink DualBase
     // For all the other Grablink boards the parameter has to be set to M  
@@ -72,6 +73,8 @@ int Cam::shut_down()
     int ret = McDelete(dev_handle);
     dev_handle = NULL;
 
+    if (serial_ref) clSerialClose(serial_ref);
+
     return ret;
 }
 
@@ -103,22 +106,28 @@ void Cam::get_frame_size(int &w, int &h)
 }
 
 float Cam::communicate(char* out, char* in, uint out_size, uint in_size, bool read) {
-    clSerialWrite(serial_ref, out, &out_size, 100);
+    QString str_s = "s", str_r = "r";
+
+    qDebug () << clSerialWrite(serial_ref, out, &out_size, 1000);// qDebug() << out_size;
+    for (int i = 0; i < 7; i++) str_s += QString::asprintf(" %02X", i + (int)out_size - 7 < 0 ? 0 : ((uchar*)out)[i + out_size - 7]);
     QThread::msleep(10);
 
-    clSerialRead(serial_ref, (char*)in, &in_size, 100);
-    return read ? (in[3] << 8) + in[4] : 0;
+    qDebug() << clSerialRead(serial_ref, in, &in_size, 1000);// qDebug() << in_size;
+    for (int i = 0; i < 6; i++) str_r += QString::asprintf(" %02X", i + (int)in_size - 6 < 0 ? 0 : ((uchar*)in)[i + in_size - 6]);
+
+    qDebug() << str_s << str_r;
+    return read ? (in[2] << 8) + in[3] : 0;
 }
 
 void Cam::time_exposure(bool read, float *val)
 {
     if (read) {
-        uchar out[7] = {0xB0, 0x00, 0x00, 0xFF, 0x21, 0x0D, 0x1A};
+        uchar out[7] = {0xB0, 0x00, 0x00, 0xFF, 0x21, 0x1D, 0x1A};
         uchar in[6] = {0};
-        *val = communicate((char*)out, (char*)in, 7, 6, true) / 1000.0;
+        *val = communicate((char*)out, (char*)in, 7, 6, true);
     }
     else {
-        int te = *val / 1000;
+        int te = *val;
         uchar out[7] = {0xA0, 0x00, 0x00, 0xFF, 0x21, 0x0D, 0x0A};
         uchar in[1] = {0};
         communicate((char*)out, (char*)in, 7, 1);
@@ -132,7 +141,7 @@ void Cam::time_exposure(bool read, float *val)
 void Cam::frame_rate(bool read, float *val)
 {
     if (read) {
-        uchar out[7] = {0xB0, 0x00, 0x00, 0xFF, 0x1F, 0x0D, 0x1A};
+        uchar out[7] = {0xB0, 0x00, 0x00, 0xFF, 0x1F, 0x1D, 0x1A};
         uchar in[6] = {0};
         *val = communicate((char*)out, (char*)in, 7, 6, true);
     }
@@ -150,7 +159,7 @@ void Cam::frame_rate(bool read, float *val)
 void Cam::gain_analog(bool read, float *val)
 {
     if (read) {
-        uchar out[7] = {0xB0, 0x00, 0x00, 0xFF, 0x17, 0x0D, 0x1A};
+        uchar out[7] = {0xB0, 0x00, 0x00, 0xFF, 0x17, 0x1D, 0x1A};
         uchar in[6] = {0};
         *val = communicate((char*)out, (char*)in, 7, 6, true);
     }
@@ -168,7 +177,7 @@ void Cam::gain_analog(bool read, float *val)
 void Cam::trigger_mode(bool read, bool *val)
 {
     if (read) {
-        uchar out[7] = {0xB0, 0x00, 0x00, 0xFF, 0x1D, 0x0D, 0x1A};
+        uchar out[7] = {0xB0, 0x00, 0x00, 0xFF, 0x1D, 0x1D, 0x1A};
         uchar in[6] = {0};
         *val = communicate((char*)out, (char*)in, 7, 6, true);
     }
@@ -186,7 +195,7 @@ void Cam::trigger_mode(bool read, bool *val)
 void Cam::trigger_source(bool read, bool *val)
 {
     if (read) {
-        uchar out[7] = {0xB0, 0x00, 0x00, 0xFF, 0x1D, 0x0D, 0x1A};
+        uchar out[7] = {0xB0, 0x00, 0x00, 0xFF, 0x1D, 0x1D, 0x1A};
         uchar in[6] = {0};
         *val = communicate((char*)out, (char*)in, 7, 6, true) == 1;
     }
