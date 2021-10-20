@@ -26,7 +26,7 @@ void MouseThread::run()
 {
     if (!t) draw_cursor(), t = new QTimer();
     connect(t, SIGNAL(timeout()), this, SLOT(draw_cursor()), Qt::QueuedConnection);
-    t->start(5);
+    t->start(20);
     this->exec();
 }
 

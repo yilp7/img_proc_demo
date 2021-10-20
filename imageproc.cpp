@@ -272,3 +272,17 @@ cv::Mat ImageProc::gated3D(cv::Mat &img1, cv::Mat &img2, double delay, double gw
 
     return img_3d;
 }
+
+void ImageProc::adaptive_enhance(cv::Mat *in, cv::Mat *out, double low_in, double high_in, double low_out, double high_out, double gamma)
+{
+    double low = low_in * 255, high = high_in * 255;
+    double bottom = low_out * 255, top = high_out * 255;
+    double err_in = high - low, err_out = top - bottom;
+
+    // intensity transform
+    for(int y = 0; y < in->rows; y++) {
+        for (int x = 0; x < in->cols; x++) {
+            out->data[x + y * out->step] = cv::saturate_cast<uchar>(pow((in->data[x + y * in->step] - low) / err_in, gamma) * err_out + bottom);
+        }
+    }
+}
