@@ -31,13 +31,6 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class Demo; }
 QT_END_NAMESPACE
 
-typedef struct SettingsData {
-    int start_pos;
-    int end_pos;
-    int frame_count;
-    int step_size;
-}Settings;
-
 class GrabThread : public QThread {
 public:
     GrabThread(void *info);
@@ -262,6 +255,7 @@ private:
     float                   gain_analog_edit;
     float                   frame_rate_edit;
     QString                 save_location;              // where to save the image
+    QString                 TEMP_SAVE_LOCATION;      // temp location to save the image
     cv::VideoWriter         vid_out[2];
 
     QSerialPort*            com[4];                     // 0: tcu, 1: range, 2: focus, 3: thermo

@@ -42,10 +42,10 @@ set(CMAKE_RC_TARGET_INCLUDE_PATH
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "E:/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp" "CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.obj.d"
   "E:/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release/Demo_param_autogen/mocs_compilation.cpp" "CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.obj.d"
-  "E:/workspace/qt5/Demo_combined/cam.cpp" "CMakeFiles/Demo_param.dir/cam.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/cam.cpp.obj.d"
   "E:/workspace/qt5/Demo_combined/demo.cpp" "CMakeFiles/Demo_param.dir/demo.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/demo.cpp.obj.d"
   "E:/workspace/qt5/Demo_combined/imageproc.cpp" "CMakeFiles/Demo_param.dir/imageproc.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/imageproc.cpp.obj.d"
   "E:/workspace/qt5/Demo_combined/main.cpp" "CMakeFiles/Demo_param.dir/main.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/main.cpp.obj.d"
+  "E:/workspace/qt5/Demo_combined/mvcam.cpp" "CMakeFiles/Demo_param.dir/mvcam.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/mvcam.cpp.obj.d"
   "E:/workspace/qt5/Demo_combined/mywidget.cpp" "CMakeFiles/Demo_param.dir/mywidget.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/mywidget.cpp.obj.d"
   "E:/workspace/qt5/Demo_combined/progsettings.cpp" "CMakeFiles/Demo_param.dir/progsettings.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/progsettings.cpp.obj.d"
   )

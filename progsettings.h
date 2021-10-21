@@ -24,14 +24,22 @@ protected:
 private slots:
     void update_scan();
 
+private:
+    Ui::ProgSettings *ui;
+
 public:
     int   start_pos;
     int   end_pos;
     int   frame_count;
     float step_size;
 
-private:
-    Ui::ProgSettings *ui;
+    int   kernel;
+    float gamma;
+    float log;
+    float low_in;
+    float high_in;
+    float low_out;
+    float high_out;
 
 };
 

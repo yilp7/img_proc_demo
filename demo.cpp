@@ -67,6 +67,7 @@ Demo::Demo(QWidget *parent)
     , gain_analog_edit(0)
     , frame_rate_edit(10)
     , save_location("")
+    , TEMP_SAVE_LOCATION("")
     , com{NULL}
     , out_buffer{0}
     , in_buffer{0}
@@ -120,9 +121,10 @@ Demo::Demo(QWidget *parent)
 
     // initialization
     // - default save path
-    save_location += "C:/Users/";
-    save_location += QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section("/", -1, -1);
+    save_location += QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section("/", 0, -1);
+//    qDebug() << QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section('/', 0, -1);
     save_location += "/Pictures";
+    TEMP_SAVE_LOCATION = QString(save_location);
 
     // - image operations
     QComboBox *enhance_options = ui->ENHANCE_OPTIONS;
@@ -368,6 +370,7 @@ void Demo::data_exchange(bool read){
 
 int Demo::grab_thread_process() {
     Display *disp = ui->SOURCE_DISPLAY;
+    ProgSettings *settings = ui->TITLE->prog_settings;
     QImage stream;
     cv::Mat sobel;
     while (grab_thread_state) {
@@ -428,7 +431,7 @@ int Demo::grab_thread_process() {
                 modified_result.convertTo(img_log, CV_32F);
                 modified_result += 1.0;
                 cv::log(img_log, img_log);
-                img_log *= 1.2;
+                img_log *= settings->log;
                 cv::normalize(img_log, img_log, 0, 255, cv::NORM_MINMAX);
                 cv::convertScaleAbs(img_log, modified_result);
                 break;
@@ -437,7 +440,7 @@ int Demo::grab_thread_process() {
             case 4: {
                 cv::Mat img_gamma;
                 modified_result.convertTo(img_gamma, CV_32F, 1.0 / 255, 0);
-                cv::pow(img_gamma, 2.5, img_gamma);
+                cv::pow(img_gamma, settings->gamma, img_gamma);
                 img_gamma.convertTo(modified_result, CV_8U, 255, 0);
                 break;
             }
@@ -496,13 +499,13 @@ int Demo::grab_thread_process() {
             case 7: {
 //                double low = low_in * 255, high = high_in * 255; // (0, 12.75)
 //                double bottom = low_out * 255, top = high_out * 255; // (0, 255)
-                double low = 0 * 255, high = 0.05 * 255; // (0, 12.75)
-                double bottom = 0 * 255, top = 1 * 255; // (0, 255)
+                double low = settings->low_in * 255, high = settings->high_in * 255; // (0, 12.75)
+                double bottom = settings->low_out * 255, top = settings->high_out * 255; // (0, 255)
                 double err_in = high - low, err_out = top - bottom; // (12.75, 255)
                 // cv::pow((modified_result - low) / err_in, gamma, modified_result);
                 cv::Mat temp;
                 modified_result.convertTo(temp, CV_32F);
-                cv::pow((temp - low) / err_in, 1.2, temp);
+                cv::pow((temp - low) / err_in, settings->gamma, temp);
                 temp = temp * err_out + bottom;
                 cv::normalize(temp, temp, 0, 255, cv::NORM_MINMAX);
                 cv::convertScaleAbs(temp, modified_result);
@@ -555,14 +558,14 @@ int Demo::grab_thread_process() {
         stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, image_3d ? QImage::Format_RGB888 : QImage::Format_Indexed8);
         ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 
-        if (scan && delay_dist > scan_farthest) {on_SCAN_BUTTON_clicked();}
         if (scan) {
             emit update_delay_in_thread();
 
-            delay_dist += scan_step;
             save_scan_img();
+            delay_dist += scan_step;
 //            filter_scan();
         }
+        if (scan && delay_dist >= scan_farthest) {on_SCAN_BUTTON_clicked();}
 
         if (save_original) save_to_file(false);
         if (save_modified) save_to_file(true);
@@ -693,12 +696,20 @@ void Demo::enable_controls(bool cam_rdy) {
 }
 
 void Demo::save_to_file(bool save_result) {
-    cv::imwrite(QString(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp").toLatin1().data(), save_result ? modified_result : img_mem);
+    QString temp = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"),
+            dest = QString(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
+    cv::imwrite(temp.toLatin1().data(), save_result ? modified_result : img_mem);
+    QFile::rename(temp, dest);
 }
 
 void Demo::save_scan_img() {
-    cv::imwrite(QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp").toLatin1().data(), modified_result);
-    cv::imwrite(QString(save_location + "/" + scan_name + "/raw_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp").toLatin1().data(), img_mem);
+    QString temp = QString(TEMP_SAVE_LOCATION + "/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp"),
+            dest = QString(save_location + "/" + scan_name + "/raw_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
+    cv::imwrite(temp.toLatin1().data(), img_mem);
+    QFile::rename(temp, dest);
+    dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
+    cv::imwrite(temp.toLatin1().data(), modified_result);
+    QFile::rename(temp, dest);
 }
 
 void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate) {
@@ -895,17 +906,21 @@ void Demo::on_SAVE_BMP_BUTTON_clicked()
 
 void Demo::on_SAVE_FINAL_BUTTON_clicked()
 {
+    static QString res_avi;
 //    cv::imwrite(QString(save_location + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".jpg").toLatin1().data(), modified_result);
     if (record_modified) {
 //        curr_cam->stop_recording(0);
         save_img_mux.lock();
         vid_out[1].release();
         save_img_mux.unlock();
+        QString dest = save_location + "/" + res_avi.section('/', -1, -1);
+        QFile::rename(res_avi, dest);
     }
     else {
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         save_img_mux.lock();
-        vid_out[1].open(QString(save_location + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi").toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), false);
+        res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi");
+        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), false);
         save_img_mux.unlock();
     }
     record_modified = !record_modified;
@@ -1752,16 +1767,20 @@ void Demo::mouseDoubleClickEvent(QMouseEvent *event)
 
 void Demo::on_SAVE_AVI_BUTTON_clicked()
 {
+    static QString raw_avi;
     if (record_original) {
 //        curr_cam->stop_recording(0);
         save_img_mux.lock();
         vid_out[0].release();
         save_img_mux.unlock();
+        QString dest = save_location + "/" + raw_avi.section('/', -1, -1);
+        QFile::rename(raw_avi, dest);
     }
     else {
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         save_img_mux.lock();
-        vid_out[0].open(QString(save_location + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw.avi").toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), false);
+        raw_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw.avi");
+        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), false);
         save_img_mux.unlock();
     }
     record_original = !record_original;
@@ -1786,7 +1805,7 @@ void Demo::on_SCAN_BUTTON_clicked()
         delay_dist = settings->start_pos * dist_ns;
         scan_farthest = settings->end_pos * dist_ns;
         scan_step = settings->step_size * dist_ns;
-        scan_name = QDateTime::currentDateTime().toString("MMdd_hhmmss");
+        scan_name = "scan_" + QDateTime::currentDateTime().toString("MMdd_hhmmss");
         if (!QDir(save_location + "/" + scan_name).exists()) {
             QDir().mkdir(save_location + "/" + scan_name);
             QDir().mkdir(save_location + "/" + scan_name + "/raw_bmp");

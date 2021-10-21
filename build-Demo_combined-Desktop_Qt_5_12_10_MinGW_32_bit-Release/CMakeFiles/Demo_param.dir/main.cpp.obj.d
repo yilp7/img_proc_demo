@@ -629,4 +629,6 @@ CMakeFiles/Demo_param.dir/main.cpp.obj: \
  E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/stitching/detail/camera.hpp \
  E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/video.hpp \
  E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/video/tracking.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/video/background_segm.hpp
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/video/background_segm.hpp \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/QTextCodec \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore/qtextcodec.h

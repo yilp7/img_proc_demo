@@ -40,7 +40,7 @@
     <rect>
      <x>20</x>
      <y>20</y>
-     <width>101</width>
+     <width>111</width>
      <height>181</height>
     </rect>
    </property>
@@ -176,6 +176,180 @@
     </property>
     <property name="text">
      <string>ns</string>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QGroupBox" name="ENHANCE_GROUP">
+   <property name="geometry">
+    <rect>
+     <x>150</x>
+     <y>20</y>
+     <width>161</width>
+     <height>181</height>
+    </rect>
+   </property>
+   <property name="title">
+    <string>Img Enhance Options</string>
+   </property>
+   <widget class="QLineEdit" name="KERNEL_EDIT">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>35</y>
+      <width>41</width>
+      <height>21</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="KERNEL_SIZE">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>20</y>
+      <width>77</width>
+      <height>14</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Kernel size</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="LOW_IN_EDIT">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>115</y>
+      <width>41</width>
+      <height>21</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="LOW_OUT_EDIT">
+    <property name="geometry">
+     <rect>
+      <x>80</x>
+      <y>115</y>
+      <width>41</width>
+      <height>21</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="HIGH_IN_EDIT">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>155</y>
+      <width>41</width>
+      <height>21</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="HIGH_OUT_EDIT">
+    <property name="geometry">
+     <rect>
+      <x>80</x>
+      <y>155</y>
+      <width>41</width>
+      <height>21</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="GAMMA_EDIT">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>75</y>
+      <width>41</width>
+      <height>21</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="LOW_IN">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>100</y>
+      <width>47</width>
+      <height>13</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>low in</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="HIGH_IN">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>140</y>
+      <width>49</width>
+      <height>14</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>high in</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="LOW_OUT">
+    <property name="geometry">
+     <rect>
+      <x>80</x>
+      <y>100</y>
+      <width>49</width>
+      <height>14</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>low out</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="HIGH_OUT">
+    <property name="geometry">
+     <rect>
+      <x>80</x>
+      <y>140</y>
+      <width>56</width>
+      <height>14</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>high out</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="GAMMA">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>60</y>
+      <width>35</width>
+      <height>14</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Gamma</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="LOG_EDIT">
+    <property name="geometry">
+     <rect>
+      <x>80</x>
+      <y>75</y>
+      <width>41</width>
+      <height>21</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="LOG">
+    <property name="geometry">
+     <rect>
+      <x>80</x>
+      <y>60</y>
+      <width>21</width>
+      <height>14</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Log</string>
     </property>
    </widget>
   </widget>
