@@ -272,8 +272,6 @@ cv::Mat ImageProc::gated3D(cv::Mat &img1, cv::Mat &img2, double delay, double gw
 
     return img_3d;
 }
-<<<<<<< HEAD
-=======
 
 // low: 0, 0; high: 0.05, 1; gamma:1.2
 void ImageProc::adaptive_enhance(cv::Mat *in, cv::Mat *out, double low_in, double high_in, double low_out, double high_out, double gamma)
@@ -293,4 +291,3 @@ void ImageProc::adaptive_enhance(cv::Mat *in, cv::Mat *out, double low_in, doubl
 //        }
 //    }
 }
->>>>>>> 7ac248c (img enhance - adaptive)
