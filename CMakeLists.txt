@@ -44,12 +44,12 @@ add_executable(Demo_param WIN32
     demo.cpp
     mywidget.cpp
     imageproc.cpp
-	mvcam.cpp
+	cam.cpp
 	progsettings.cpp
     demo.h
     mywidget.h
     imageproc.h
-	mvcam.h
+	cam.h
 	progsettings.h
 	demo_dev.ui
 	settings.ui
@@ -81,12 +81,12 @@ add_executable(Demo_release WIN32
     demo.cpp
     mywidget.cpp
     imageproc.cpp
-	mvcam.cpp
+	cam.cpp
 	progsettings.cpp
 	demo.h
     mywidget.h
     imageproc.h
-	mvcam.h
+	cam.h
 	progsettings.h
 	demo_rls.ui
 	settings.ui

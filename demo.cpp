@@ -256,6 +256,8 @@ Demo::Demo(QWidget *parent)
         roi_table->setVerticalHeaderItem(i, h);
     }
 
+    scan_q.push_back(-1);
+
     // for presentation
     ui->CTRL_STATIC->hide();
     ui->ROI_TABLE->hide();
@@ -314,8 +316,8 @@ void Demo::data_exchange(bool read){
         focus = ui->FOCUS_EDIT->text().toInt();
 
 //        delay = delay_a_u * 1000 + delay_a_n;
-        delay_dist = (delay_a_u * 1000 + delay_a_n) * dist_ns;
-        depth_of_vision = (gate_width_a_u * 1000 + gate_width_a_n) * dist_ns;
+        delay_dist = std::round((delay_a_u * 1000 + delay_a_n) * dist_ns);
+        depth_of_vision = std::round((gate_width_a_u * 1000 + gate_width_a_n) * dist_ns);
     }
     else {
 //        ui->DEVICE_SELECTION->setCurrentIndex(device_idx);
@@ -329,20 +331,20 @@ void Demo::data_exchange(bool read){
         ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.2f", frame_rate_edit));
         ui->FILE_PATH_EDIT->setText(save_location);
 
-        delay_a_u = (int)(delay_dist / dist_ns) / 1000;
-        delay_a_n = (int)(delay_dist / dist_ns) % 1000;
-        delay_b_u = (int)(delay_dist / dist_ns + delay_n_n) / 1000;
-        delay_b_n = (int)(delay_dist / dist_ns + delay_n_n) % 1000;
+        delay_a_u = std::round(delay_dist / dist_ns) / 1000;
+        delay_a_n = (int)std::round(delay_dist / dist_ns) % 1000;
+        delay_b_u = std::round(delay_dist / dist_ns + delay_n_n) / 1000;
+        delay_b_n = (int)std::round(delay_dist / dist_ns + delay_n_n) % 1000;
 //        laser_width_u = gate_width_a_u = gate_width_b_u = (int)(depth_of_vision / dist_ns) / 1000;
 //        laser_width_n = gate_width_a_n = gate_width_b_n = (int)(depth_of_vision / dist_ns) % 1000;
 //        gate_width_a_u = gate_width_b_u = (int)(depth_of_vision / dist_ns) / 1000;
 //        gate_width_a_n = gate_width_b_n = (int)(depth_of_vision / dist_ns) % 1000;
 #ifdef PARAM
-        gate_width_a_u = (int)(depth_of_vision / dist_ns) / 1000;
-        gate_width_a_n = (int)(depth_of_vision / dist_ns) % 1000;
+        gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
+        gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
 #else
-        laser_width_u = gate_width_a_u = (int)(depth_of_vision / dist_ns) / 1000;
-        laser_width_n = gate_width_a_n = (int)(depth_of_vision / dist_ns) % 1000;
+        laser_width_u = gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
+        laser_width_n = gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
 #endif
         ui->STRIDE_EDIT->setText(QString::asprintf("%d", stride));
 
@@ -406,14 +408,6 @@ int Demo::grab_thread_process() {
             seq_sum.release();
         }
         else modified_result = img_mem.clone();
-
-        if (scan && delay_dist > 10000) {on_SCAN_BUTTON_clicked();}
-        if (scan) {
-            emit update_delay_in_thread();
-
-            delay_dist += scan_step;
-//            filter_scan();
-        }
 
         if (ui->IMG_ENHANCE_CHECK->isChecked()) {
             switch (ui->ENHANCE_OPTIONS->currentIndex()) {
@@ -561,6 +555,15 @@ int Demo::grab_thread_process() {
         stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, image_3d ? QImage::Format_RGB888 : QImage::Format_Indexed8);
         ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 
+        if (scan && delay_dist > scan_farthest) {on_SCAN_BUTTON_clicked();}
+        if (scan) {
+            emit update_delay_in_thread();
+
+            delay_dist += scan_step;
+            save_scan_img();
+//            filter_scan();
+        }
+
         if (save_original) save_to_file(false);
         if (save_modified) save_to_file(true);
         if (record_original) {
@@ -694,8 +697,8 @@ void Demo::save_to_file(bool save_result) {
 }
 
 void Demo::save_scan_img() {
-    cv::imwrite(QString(save_location + "/" + scan_name + "/res_bmp/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp").toLatin1().data(), modified_result);
-    cv::imwrite(QString(save_location + "/" + scan_name + "/raw_bmp/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp").toLatin1().data(), img_mem);
+    cv::imwrite(QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp").toLatin1().data(), modified_result);
+    cv::imwrite(QString(save_location + "/" + scan_name + "/raw_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp").toLatin1().data(), img_mem);
 }
 
 void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate) {
@@ -1062,7 +1065,7 @@ void Demo::update_gate_width() {
     if (depth_of_vision > 1500) depth_of_vision = 1500;
 
     unsigned int send = 0;
-    int gw = depth_of_vision / dist_ns;
+    int gw = std::round(depth_of_vision / dist_ns);
 
     ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_vision));
 //    gate_width_a_n = gate_width_b_n = laser_width_n = gw % 1000;
@@ -1784,7 +1787,11 @@ void Demo::on_SCAN_BUTTON_clicked()
         scan_farthest = settings->end_pos * dist_ns;
         scan_step = settings->step_size * dist_ns;
         scan_name = QDateTime::currentDateTime().toString("MMdd_hhmmss");
-        if (!QDir(save_location + "/" + scan_name).exists()) QDir().mkdir(save_location + "/" + scan_name);
+        if (!QDir(save_location + "/" + scan_name).exists()) {
+            QDir().mkdir(save_location + "/" + scan_name);
+            QDir().mkdir(save_location + "/" + scan_name + "/raw_bmp");
+            QDir().mkdir(save_location + "/" + scan_name + "/res_bmp");
+        }
 
         on_CONTINUE_SCAN_BUTTON_clicked();
     }
@@ -1792,7 +1799,7 @@ void Demo::on_SCAN_BUTTON_clicked()
         emit update_scan(false);
         scan = false;
 
-        for (uint i = scan_q.size(); i; i--) qDebug("dist %f", scan_q.front()), scan_q.pop_front();
+//        for (uint i = scan_q.size(); i; i--) qDebug("dist %f", scan_q.front()), scan_q.pop_front();
     }
 
     ui->SCAN_BUTTON->setText(start_scan ? tr("Stop") : tr("Scan"));
@@ -1823,7 +1830,7 @@ void Demo::append_data(QString text)
 
 void Demo::enable_scan_options(bool show)
 {
-    if (delay_dist > scan_q.back()) scan_q.push_back(delay_dist);
+//    if (delay_dist > scan_q.back()) scan_q.push_back(delay_dist);
     ui->CONTINUE_SCAN_BUTTON->setEnabled(!scan);
     ui->RESTART_SCAN_BUTTON->setEnabled(!scan);
 

@@ -74,6 +74,12 @@
 	"HEADERS" : 
 	[
 		[
+			"E:/workspace/qt5/Demo_combined/cam.h",
+			"MU",
+			"EWIEGA46WW/moc_cam.cpp",
+			null
+		],
+		[
 			"E:/workspace/qt5/Demo_combined/demo.h",
 			"MU",
 			"EWIEGA46WW/moc_demo.cpp",
@@ -83,12 +89,6 @@
 			"E:/workspace/qt5/Demo_combined/imageproc.h",
 			"MU",
 			"EWIEGA46WW/moc_imageproc.cpp",
-			null
-		],
-		[
-			"E:/workspace/qt5/Demo_combined/mvcam.h",
-			"MU",
-			"EWIEGA46WW/moc_mvcam.cpp",
 			null
 		],
 		[
@@ -167,10 +167,10 @@
 	"SETTINGS_FILE" : "E:/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release/CMakeFiles/Demo_release_autogen.dir/AutogenUsed.txt",
 	"SOURCES" : 
 	[
+		[ "E:/workspace/qt5/Demo_combined/cam.cpp", "MU", null ],
 		[ "E:/workspace/qt5/Demo_combined/demo.cpp", "MU", null ],
 		[ "E:/workspace/qt5/Demo_combined/imageproc.cpp", "MU", null ],
 		[ "E:/workspace/qt5/Demo_combined/main.cpp", "MU", null ],
-		[ "E:/workspace/qt5/Demo_combined/mvcam.cpp", "MU", null ],
 		[ "E:/workspace/qt5/Demo_combined/mywidget.cpp", "MU", null ],
 		[ "E:/workspace/qt5/Demo_combined/progsettings.cpp", "MU", null ]
 	],

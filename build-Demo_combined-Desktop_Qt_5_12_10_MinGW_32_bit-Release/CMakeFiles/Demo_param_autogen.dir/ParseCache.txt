@@ -16,3 +16,5 @@ E:/workspace/qt5/Demo_combined/mvcam.cpp
 E:/workspace/qt5/Demo_combined/mywidget.cpp
 E:/workspace/qt5/Demo_combined/progsettings.cpp
  uic:ui_settings.h
+E:/workspace/qt5/Demo_combined/cam.h
+E:/workspace/qt5/Demo_combined/cam.cpp
