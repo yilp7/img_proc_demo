@@ -135,6 +135,7 @@ Demo::Demo(QWidget *parent)
     enhance_options->addItem(tr("Gamma-based"));
     enhance_options->addItem(tr("Accumulative"));
     enhance_options->addItem(tr("Custom"));
+    enhance_options->addItem(tr("Adaptive"));
     enhance_options->setCurrentIndex(0);
     sp_options->addItem("1");
     sp_options->addItem("2");
@@ -497,6 +498,20 @@ int Demo::grab_thread_process() {
                 cv::normalize(img_log, img_log, 0, 255, cv::NORM_MINMAX);
                 cv::convertScaleAbs(img_log, img_log);
                 modified_result = 0.05 * img_log + 0.05 * img_nonLT + 0.8 * modified_result;
+            }
+            case 7: {
+//                double low = low_in * 255, high = high_in * 255; // (0, 12.75)
+//                double bottom = low_out * 255, top = high_out * 255; // (0, 255)
+                double low = 0 * 255, high = 0.05 * 255; // (0, 12.75)
+                double bottom = 0 * 255, top = 1 * 255; // (0, 255)
+                double err_in = high - low, err_out = top - bottom; // (12.75, 255)
+                // cv::pow((modified_result - low) / err_in, gamma, modified_result);
+                cv::Mat temp;
+                modified_result.convertTo(temp, CV_32F);
+                cv::pow((temp - low) / err_in, 1.2, temp);
+                temp = temp * err_out + bottom;
+                cv::normalize(temp, temp, 0, 255, cv::NORM_MINMAX);
+                cv::convertScaleAbs(temp, modified_result);
             }
             // none
             default:

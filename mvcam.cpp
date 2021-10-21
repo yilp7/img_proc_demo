@@ -58,21 +58,22 @@ int Cam::start() {
     int size = MV_CC_GetOptimalPacketSize(dev_handle);
     if (size >= MV_OK) MV_CC_SetIntValueEx(dev_handle, "GevSCPSPacketSize", size);
 
+    MV_CC_SetPixelFormat(dev_handle, PixelType_Gvsp_Mono8);
     MV_CC_SetEnumValue(dev_handle, "ExposureMode", MV_EXPOSURE_MODE_TIMED);
     MV_CC_SetEnumValue(dev_handle, "ExposureAuto", MV_EXPOSURE_AUTO_MODE_OFF);
     MV_CC_SetEnumValue(dev_handle, "GainAuto", 0);
     MV_CC_SetBoolValue(dev_handle, "AcquisitionFrameRateEnable", true);
 
-    MVCC_ENUMVALUE pix = {0};
-    MV_CC_GetPixelFormat(dev_handle, &pix);
-    switch (pix.nCurValue) {
-    case PixelType_Gvsp_Mono8:
-    case PixelType_Gvsp_Mono10:
-    case PixelType_Gvsp_Mono12:
-    case PixelType_Gvsp_Mono10_Packed:
-    case PixelType_Gvsp_Mono12_Packed:
-    break;
-    }
+//    MVCC_ENUMVALUE pix = {0};
+//    MV_CC_GetPixelFormat(dev_handle, &pix);
+//    switch (pix.nCurValue) {
+//    case PixelType_Gvsp_Mono8:
+//    case PixelType_Gvsp_Mono10:
+//    case PixelType_Gvsp_Mono12:
+//    case PixelType_Gvsp_Mono10_Packed:
+//    case PixelType_Gvsp_Mono12_Packed:
+//    break;
+//    }
 
     return ret;
 }
