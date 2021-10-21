@@ -14,6 +14,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/Demo_param.dir/mvcam.cpp.obj.d"
   "CMakeFiles/Demo_param.dir/mywidget.cpp.obj"
   "CMakeFiles/Demo_param.dir/mywidget.cpp.obj.d"
+  "CMakeFiles/Demo_param.dir/progsettings.cpp.obj"
+  "CMakeFiles/Demo_param.dir/progsettings.cpp.obj.d"
   "Demo_param.exe"
   "Demo_param.exe.manifest"
   "Demo_param.pdb"

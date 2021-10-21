@@ -690,4 +690,8 @@ CMakeFiles/Demo_release.dir/demo.cpp.obj: \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/qmenu.h \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/QDesktopWidget \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/qdesktopwidget.h \
- D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/QRadioButton
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/QRadioButton \
+ E:/workspace/qt5/Demo_combined/progsettings.h \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/QDialog \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/qdialog.h \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtGui/QKeyEvent

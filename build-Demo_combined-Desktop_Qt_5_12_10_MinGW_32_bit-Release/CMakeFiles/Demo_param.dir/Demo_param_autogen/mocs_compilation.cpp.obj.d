@@ -656,4 +656,10 @@ CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.obj: \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/QDesktopWidget \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/qdesktopwidget.h \
  D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/QRadioButton \
- D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/qradiobutton.h
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/qradiobutton.h \
+ E:/workspace/qt5/Demo_combined/progsettings.h \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/QDialog \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/qdialog.h \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtGui/QKeyEvent \
+ E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\Demo_param_autogen\EWIEGA46WW/moc_progsettings.cpp \
+ E:/workspace/qt5/Demo_combined/progsettings.h

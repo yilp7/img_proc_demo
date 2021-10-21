@@ -16,6 +16,7 @@
 #include <QDesktopWidget>
 #include <QRadioButton>
 #include "opencv2/core.hpp"
+#include "progsettings.h"
 
 class Display : public QLabel
 {
@@ -111,21 +112,23 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *event);
 
 public:
-    InfoLabel   *icon;
-    InfoLabel   *title;
-    TitleButton *settings;
-    TitleButton *capture;
-    TitleButton *lang;
-    TitleButton *cls;
-    TitleButton *min;
-    TitleButton *max;
-    TitleButton *exit;
+    InfoLabel    *icon;
+    InfoLabel    *title;
+    TitleButton  *settings;
+    TitleButton  *capture;
+    TitleButton  *lang;
+    TitleButton  *cls;
+    TitleButton  *min;
+    TitleButton  *max;
+    TitleButton  *exit;
 
-    bool        is_maximized;
-    QPoint      prev_pos;
-    QRect       normal_stat;
+    bool         is_maximized;
+    QPoint       prev_pos;
+    QRect        normal_stat;
 
-    bool        pressed;
+    bool         pressed;
+
+    ProgSettings *prog_settings;
 
 };
 

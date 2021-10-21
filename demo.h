@@ -31,6 +31,13 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class Demo; }
 QT_END_NAMESPACE
 
+typedef struct SettingsData {
+    int start_pos;
+    int end_pos;
+    int frame_count;
+    int step_size;
+}Settings;
+
 class GrabThread : public QThread {
 public:
     GrabThread(void *info);
@@ -219,8 +226,9 @@ private:
 
 // helper function
 private:
-    // save img in buffer to file
+    // save img in buffer to file; or save imgs while scanning
     void save_to_file(bool save_result);
+    void save_scan_img();
 
     // convert data to be sent to HEX buffer
     void convert_to_send_tcu(uchar num, unsigned int send);
@@ -278,7 +286,7 @@ private:
     int                     display_option;
 
     std::queue<cv::Mat>     img_q;                      // image queue in grab_thread
-    std::deque<float>      scan_q;                     // objects' distance found while scanning
+    std::deque<float>       scan_q;                     // objects' distance found while scanning
 
 // info variables
 private:
@@ -316,7 +324,10 @@ private:
     QLineEdit*              com_edit[4];
 
     bool                    scan;                       // auto-scan for object detection
-    int                     scan_distance;              // curr distance of scanning
+    float                   scan_distance;              // curr distance of scanning
+    float                   scan_step;                  // stepping size when scanning
+    float                   scan_farthest;              // upper limit for scanning
+    QString                 scan_name;
 
     float                   c;                          // light speed
     float                   dist_ns;                    // dist of light per ns

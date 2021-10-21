@@ -45,12 +45,15 @@ add_executable(Demo_param WIN32
     mywidget.cpp
     imageproc.cpp
 	mvcam.cpp
+	progsettings.cpp
     demo.h
     mywidget.h
     imageproc.h
 	mvcam.h
-    demo_dev.ui
-    resources/resources.qrc
+	progsettings.h
+	demo_dev.ui
+	settings.ui
+	resources/resources.qrc
     icon.rc
     zh.qm
 )
@@ -78,13 +81,16 @@ add_executable(Demo_release WIN32
     demo.cpp
     mywidget.cpp
     imageproc.cpp
-    cam.cpp
-    demo.h
+	mvcam.cpp
+	progsettings.cpp
+	demo.h
     mywidget.h
     imageproc.h
-    cam.h
-    demo_rls.ui
-    resources/resources.qrc
+	mvcam.h
+	progsettings.h
+	demo_rls.ui
+	settings.ui
+	resources/resources.qrc
     icon.rc
     zh.qm
 )

@@ -47,6 +47,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "E:/workspace/qt5/Demo_combined/main.cpp" "CMakeFiles/Demo_param.dir/main.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/main.cpp.obj.d"
   "E:/workspace/qt5/Demo_combined/mvcam.cpp" "CMakeFiles/Demo_param.dir/mvcam.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/mvcam.cpp.obj.d"
   "E:/workspace/qt5/Demo_combined/mywidget.cpp" "CMakeFiles/Demo_param.dir/mywidget.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/mywidget.cpp.obj.d"
+  "E:/workspace/qt5/Demo_combined/progsettings.cpp" "CMakeFiles/Demo_param.dir/progsettings.cpp.obj" "gcc" "CMakeFiles/Demo_param.dir/progsettings.cpp.obj.d"
   )
 
 # Targets to which this target links.

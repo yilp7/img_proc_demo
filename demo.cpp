@@ -120,9 +120,9 @@ Demo::Demo(QWidget *parent)
 
     // initialization
     // - default save path
-    save_location += "C:\\Users\\";
+    save_location += "C:/Users/";
     save_location += QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section("/", -1, -1);
-    save_location += "\\Pictures";
+    save_location += "/Pictures";
 
     // - image operations
     QComboBox *enhance_options = ui->ENHANCE_OPTIONS;
@@ -411,8 +411,8 @@ int Demo::grab_thread_process() {
         if (scan) {
             emit update_delay_in_thread();
 
-            delay_dist += 100;
-            filter_scan();
+            delay_dist += scan_step;
+//            filter_scan();
         }
 
         if (ui->IMG_ENHANCE_CHECK->isChecked()) {
@@ -690,7 +690,12 @@ void Demo::enable_controls(bool cam_rdy) {
 }
 
 void Demo::save_to_file(bool save_result) {
-    cv::imwrite(QString(save_location + (save_result ? "\\res_bmp\\" : "\\raw_bmp\\") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp").toLatin1().data(), save_result ? modified_result : img_mem);
+    cv::imwrite(QString(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp").toLatin1().data(), save_result ? modified_result : img_mem);
+}
+
+void Demo::save_scan_img() {
+    cv::imwrite(QString(save_location + "/" + scan_name + "/res_bmp/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp").toLatin1().data(), modified_result);
+    cv::imwrite(QString(save_location + "/" + scan_name + "/raw_bmp/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp").toLatin1().data(), img_mem);
 }
 
 void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate) {
@@ -881,7 +886,7 @@ void Demo::on_STOP_GRABBING_BUTTON_clicked()
 void Demo::on_SAVE_BMP_BUTTON_clicked()
 {
     save_original = !save_original;
-    if (save_original && !QDir(save_location + "\\raw_bmp").exists()) QDir().mkdir(save_location + "\\raw_bmp");
+    if (save_original && !QDir(save_location + "/raw_bmp").exists()) QDir().mkdir(save_location + "/raw_bmp");
     ui->SAVE_BMP_BUTTON->setText(save_original ? tr("Stop") : tr("ORI"));
 }
 
@@ -895,9 +900,9 @@ void Demo::on_SAVE_FINAL_BUTTON_clicked()
         save_img_mux.unlock();
     }
     else {
-//        curr_cam->start_recording(0, QString(save_location + "\\" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
+//        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         save_img_mux.lock();
-        vid_out[1].open(QString(save_location + "\\" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi").toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), false);
+        vid_out[1].open(QString(save_location + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi").toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), false);
         save_img_mux.unlock();
     }
     record_modified = !record_modified;
@@ -1751,9 +1756,9 @@ void Demo::on_SAVE_AVI_BUTTON_clicked()
         save_img_mux.unlock();
     }
     else {
-//        curr_cam->start_recording(0, QString(save_location + "\\" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
+//        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         save_img_mux.lock();
-        vid_out[0].open(QString(save_location + "\\" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw.avi").toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), false);
+        vid_out[0].open(QString(save_location + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw.avi").toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), false);
         save_img_mux.unlock();
     }
     record_original = !record_original;
@@ -1771,10 +1776,15 @@ void Demo::on_GAIN_EDIT_textEdited(const QString &arg1)
 
 void Demo::on_SCAN_BUTTON_clicked()
 {
+    static ProgSettings *settings = ui->TITLE->prog_settings;
     bool start_scan = ui->SCAN_BUTTON->text() == tr("Scan");
 
     if (start_scan) {
-        delay_dist = 200;
+        delay_dist = settings->start_pos * dist_ns;
+        scan_farthest = settings->end_pos * dist_ns;
+        scan_step = settings->step_size * dist_ns;
+        scan_name = QDateTime::currentDateTime().toString("MMdd_hhmmss");
+        if (!QDir(save_location + "/" + scan_name).exists()) QDir().mkdir(save_location + "/" + scan_name);
 
         on_CONTINUE_SCAN_BUTTON_clicked();
     }
@@ -1847,7 +1857,7 @@ void Demo::on_FOCUS_SPEED_EDIT_textEdited(const QString &arg1)
 void Demo::on_SAVE_RESULT_BUTTON_clicked()
 {
     save_modified = !save_modified;
-    if (save_modified && !QDir(save_location + "\\res_bmp").exists()) QDir().mkdir(save_location + "\\res_bmp");
+    if (save_modified && !QDir(save_location + "/res_bmp").exists()) QDir().mkdir(save_location + "/res_bmp");
     ui->SAVE_RESULT_BUTTON->setText(save_modified ? tr("Stop") : tr("RES"));
 }
 

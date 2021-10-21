@@ -358,4 +358,8 @@ CMakeFiles/Demo_param.dir/mywidget.cpp.obj: \
  D:/Qt/Qt5.12.10/Tools/mingw730_32/lib/gcc/i686-w64-mingw32/7.3.0/include/c++/bits/std_mutex.h \
  E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/optim.hpp \
  E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/ovx.hpp \
- E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cvdef.h
+ E:/workspace/qt5/Demo_combined/sdk32/opencv/include/opencv2/core/cvdef.h \
+ E:\workspace\qt5\Demo_combined\progsettings.h \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/QDialog \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets/qdialog.h \
+ D:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtGui/QKeyEvent

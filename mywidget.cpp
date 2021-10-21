@@ -183,12 +183,15 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     connect(max, SIGNAL(clicked()), SLOT(process_maximize()));
     connect(exit, SIGNAL(clicked()), window(), SLOT(close()));
 
+    prog_settings = new ProgSettings();
+
     settings = new TitleButton("", this);
     settings->setObjectName("SETTINGS_BTN");
     QMenu *settings_menu = new QMenu();
-    QAction *click=new QAction("-", this);
-    settings_menu->addAction(click);
+    QAction *options = new QAction("-", this);
+    settings_menu->addAction(options);
     settings->setMenu(settings_menu);
+    connect(options, SIGNAL(triggered()), prog_settings, SLOT(show()));
 
     capture = new TitleButton("", this);
     capture->setObjectName("CAPTURE_BTN");

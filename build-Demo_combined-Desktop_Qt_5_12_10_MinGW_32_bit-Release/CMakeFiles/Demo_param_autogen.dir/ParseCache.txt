@@ -2,6 +2,8 @@
 E:/workspace/qt5/Demo_combined/demo.h
  mmc:Q_OBJECT
 E:/workspace/qt5/Demo_combined/imageproc.h
+E:/workspace/qt5/Demo_combined/progsettings.h
+ mmc:Q_OBJECT
 E:/workspace/qt5/Demo_combined/mvcam.h
 E:/workspace/qt5/Demo_combined/mywidget.h
  mmc:Q_OBJECT
@@ -12,3 +14,5 @@ E:/workspace/qt5/Demo_combined/imageproc.cpp
 E:/workspace/qt5/Demo_combined/main.cpp
 E:/workspace/qt5/Demo_combined/mvcam.cpp
 E:/workspace/qt5/Demo_combined/mywidget.cpp
+E:/workspace/qt5/Demo_combined/progsettings.cpp
+ uic:ui_settings.h
