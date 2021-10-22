@@ -21,13 +21,13 @@ Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" p
 
 Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CMakeCXXCompilerId.obj"
 
-The CXX compiler identification is MSVC, found in "E:/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MSVC2017_32bit-Release/CMakeFiles/3.21.1/CompilerIdCXX/CMakeCXXCompilerId.exe"
+The CXX compiler identification is MSVC, found in "C:/Users/2234/Documents/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MSVC2017_32bit-Release/CMakeFiles/3.21.3/CompilerIdCXX/CMakeCXXCompilerId.exe"
 
 Detecting CXX compiler ABI info compiled with the following output:
-Change Dir: E:/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MSVC2017_32bit-Release/CMakeFiles/CMakeTmp
+Change Dir: C:/Users/2234/Documents/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MSVC2017_32bit-Release/CMakeFiles/CMakeTmp
 
-Run Build Command(s):C:/PROGRA~2/MICROS~3/2017/COMMUN~1/Common7/IDE/COMMON~1/MICROS~1/CMake/Ninja/ninja.exe cmTC_a8343 && [1/2] Building CXX object CMakeFiles\cmTC_a8343.dir\CMakeCXXCompilerABI.cpp.obj
-[2/2] Linking CXX executable cmTC_a8343.exe
+Run Build Command(s):C:/PROGRA~2/MICROS~2/2017/COMMUN~1/Common7/IDE/COMMON~1/MICROS~1/CMake/Ninja/ninja.exe cmTC_d624c && [1/2] Building CXX object CMakeFiles\cmTC_d624c.dir\CMakeCXXCompilerABI.cpp.obj
+[2/2] Linking CXX executable cmTC_d624c.exe
 
 
 

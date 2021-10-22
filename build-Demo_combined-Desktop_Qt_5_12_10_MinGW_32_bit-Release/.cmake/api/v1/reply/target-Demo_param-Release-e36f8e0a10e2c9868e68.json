@@ -1,0 +1,612 @@
+{
+	"artifacts" : 
+	[
+		{
+			"path" : "Demo_param.exe"
+		},
+		{
+			"path" : "Demo_param.pdb"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_executable",
+			"link_directories",
+			"target_link_libraries",
+			"qt5_use_modules",
+			"target_compile_definitions",
+			"set_property",
+			"include_directories"
+		],
+		"files" : 
+		[
+			"CMakeLists.txt",
+			"C:/Qt/Qt5.12.10/5.12.10/mingw73_32/lib/cmake/Qt5Core/Qt5CoreMacros.cmake"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 45,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 40,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 41,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 42,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 43,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 62,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 388,
+				"parent" : 6
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 388,
+				"parent" : 6
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 64,
+				"parent" : 0
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 60,
+				"parent" : 0
+			},
+			{
+				"command" : 5,
+				"file" : 1,
+				"line" : 390,
+				"parent" : 6
+			},
+			{
+				"command" : 5,
+				"file" : 1,
+				"line" : 390,
+				"parent" : 6
+			},
+			{
+				"command" : 6,
+				"file" : 0,
+				"line" : 35,
+				"parent" : 0
+			},
+			{
+				"command" : 6,
+				"file" : 0,
+				"line" : 36,
+				"parent" : 0
+			},
+			{
+				"command" : 6,
+				"file" : 0,
+				"line" : 37,
+				"parent" : 0
+			},
+			{
+				"command" : 6,
+				"file" : 0,
+				"line" : 38,
+				"parent" : 0
+			},
+			{
+				"command" : 5,
+				"file" : 1,
+				"line" : 389,
+				"parent" : 6
+			},
+			{
+				"command" : 5,
+				"file" : 1,
+				"line" : 389,
+				"parent" : 6
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "-O3 -DNDEBUG"
+				},
+				{
+					"fragment" : "-std=gnu++11"
+				}
+			],
+			"defines" : 
+			[
+				{
+					"backtrace" : 10,
+					"define" : "PARAM=1"
+				},
+				{
+					"backtrace" : 11,
+					"define" : "QT_CORE_LIB"
+				},
+				{
+					"backtrace" : 11,
+					"define" : "QT_GUI_LIB"
+				},
+				{
+					"backtrace" : 8,
+					"define" : "QT_NO_DEBUG"
+				},
+				{
+					"backtrace" : 12,
+					"define" : "QT_SERIALPORT_LIB"
+				},
+				{
+					"backtrace" : 11,
+					"define" : "QT_WIDGETS_LIB"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release"
+				},
+				{
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined"
+				},
+				{
+					"backtrace" : 0,
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release/Demo_param_autogen/include"
+				},
+				{
+					"backtrace" : 13,
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined/sdk32/mvs/include"
+				},
+				{
+					"backtrace" : 14,
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined/sdk32/HQV/include"
+				},
+				{
+					"backtrace" : 15,
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined/sdk32/euresys/include"
+				},
+				{
+					"backtrace" : 16,
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined/sdk32/opencv/include"
+				},
+				{
+					"backtrace" : 17,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/include"
+				},
+				{
+					"backtrace" : 17,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets"
+				},
+				{
+					"backtrace" : 17,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtGui"
+				},
+				{
+					"backtrace" : 17,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore"
+				},
+				{
+					"backtrace" : 17,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/./mkspecs/win32-g++"
+				},
+				{
+					"backtrace" : 17,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtANGLE"
+				},
+				{
+					"backtrace" : 18,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtSerialPort"
+				}
+			],
+			"language" : "CXX",
+			"languageStandard" : 
+			{
+				"backtraces" : 
+				[
+					8
+				],
+				"standard" : "11"
+			},
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				15
+			]
+		},
+		{
+			"defines" : 
+			[
+				{
+					"backtrace" : 10,
+					"define" : "PARAM=1"
+				},
+				{
+					"backtrace" : 11,
+					"define" : "QT_CORE_LIB"
+				},
+				{
+					"backtrace" : 11,
+					"define" : "QT_GUI_LIB"
+				},
+				{
+					"backtrace" : 8,
+					"define" : "QT_NO_DEBUG"
+				},
+				{
+					"backtrace" : 12,
+					"define" : "QT_SERIALPORT_LIB"
+				},
+				{
+					"backtrace" : 11,
+					"define" : "QT_WIDGETS_LIB"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release"
+				},
+				{
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined"
+				},
+				{
+					"backtrace" : 0,
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release/Demo_param_autogen/include"
+				},
+				{
+					"backtrace" : 13,
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined/sdk32/mvs/include"
+				},
+				{
+					"backtrace" : 14,
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined/sdk32/HQV/include"
+				},
+				{
+					"backtrace" : 15,
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined/sdk32/euresys/include"
+				},
+				{
+					"backtrace" : 16,
+					"path" : "C:/Users/2234/Documents/workspace/qt5/Demo_combined/sdk32/opencv/include"
+				},
+				{
+					"backtrace" : 17,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/include"
+				},
+				{
+					"backtrace" : 17,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtWidgets"
+				},
+				{
+					"backtrace" : 17,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtGui"
+				},
+				{
+					"backtrace" : 17,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtCore"
+				},
+				{
+					"backtrace" : 17,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/./mkspecs/win32-g++"
+				},
+				{
+					"backtrace" : 17,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtANGLE"
+				},
+				{
+					"backtrace" : 18,
+					"isSystem" : true,
+					"path" : "C:/Qt/Qt5.12.10/5.12.10/mingw73_32/include/QtSerialPort"
+				}
+			],
+			"language" : "RC",
+			"sourceIndexes" : 
+			[
+				12
+			]
+		}
+	],
+	"dependencies" : 
+	[
+		{
+			"backtrace" : 0,
+			"id" : "Demo_param_autogen::@6890427a1f51a3e7e1df"
+		}
+	],
+	"id" : "Demo_param::@6890427a1f51a3e7e1df",
+	"link" : 
+	{
+		"commandFragments" : 
+		[
+			{
+				"fragment" : "-O3 -DNDEBUG",
+				"role" : "flags"
+			},
+			{
+				"fragment" : "-mwindows",
+				"role" : "flags"
+			},
+			{
+				"backtrace" : 2,
+				"fragment" : "-LC:\\Users\\2234\\Documents\\workspace\\qt5\\Demo_combined\\sdk32\\mvs\\lib",
+				"role" : "libraryPath"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "-LC:\\Users\\2234\\Documents\\workspace\\qt5\\Demo_combined\\sdk32\\HQV\\lib",
+				"role" : "libraryPath"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-LC:\\Users\\2234\\Documents\\workspace\\qt5\\Demo_combined\\sdk32\\euresys\\lib",
+				"role" : "libraryPath"
+			},
+			{
+				"backtrace" : 5,
+				"fragment" : "-LC:\\Users\\2234\\Documents\\workspace\\qt5\\Demo_combined\\sdk32\\opencv\\lib",
+				"role" : "libraryPath"
+			},
+			{
+				"backtrace" : 7,
+				"fragment" : "C:\\Qt\\Qt5.12.10\\5.12.10\\mingw73_32\\lib\\libQt5SerialPort.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 8,
+				"fragment" : "C:\\Qt\\Qt5.12.10\\5.12.10\\mingw73_32\\lib\\libQt5Widgets.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 9,
+				"fragment" : "-lMultiCam",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 9,
+				"fragment" : "-llibopencv_core452",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 9,
+				"fragment" : "-llibopencv_imgcodecs452",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 9,
+				"fragment" : "-llibopencv_imgproc452",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 9,
+				"fragment" : "-llibopencv_videoio452",
+				"role" : "libraries"
+			},
+			{
+				"fragment" : "C:\\Qt\\Qt5.12.10\\5.12.10\\mingw73_32\\lib\\libQt5Gui.a",
+				"role" : "libraries"
+			},
+			{
+				"fragment" : "C:\\Qt\\Qt5.12.10\\5.12.10\\mingw73_32\\lib\\libQt5Core.a",
+				"role" : "libraries"
+			},
+			{
+				"fragment" : "C:\\Qt\\Qt5.12.10\\5.12.10\\mingw73_32\\lib\\libqtmain.a",
+				"role" : "libraries"
+			},
+			{
+				"fragment" : "-lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32",
+				"role" : "libraries"
+			}
+		],
+		"language" : "CXX"
+	},
+	"name" : "Demo_param",
+	"nameOnDisk" : "Demo_param.exe",
+	"paths" : 
+	{
+		"build" : ".",
+		"source" : "."
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				12,
+				15
+			]
+		},
+		{
+			"name" : "Header Files",
+			"sourceIndexes" : 
+			[
+				6,
+				7,
+				8,
+				9,
+				14
+			]
+		},
+		{
+			"name" : "",
+			"sourceIndexes" : 
+			[
+				10,
+				11,
+				13
+			]
+		},
+		{
+			"name" : "CMake Rules",
+			"sourceIndexes" : 
+			[
+				16
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 0,
+			"compileGroupIndex" : 0,
+			"isGenerated" : true,
+			"path" : "build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release/Demo_param_autogen/mocs_compilation.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "main.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "demo.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "mywidget.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "imageproc.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "euresyscam.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"path" : "demo.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "mywidget.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "imageproc.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "euresyscam.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "demo_dev.ui",
+			"sourceGroupIndex" : 2
+		},
+		{
+			"backtrace" : 1,
+			"path" : "resources/resources.qrc",
+			"sourceGroupIndex" : 2
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 1,
+			"path" : "icon.rc",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"path" : "zh.qm",
+			"sourceGroupIndex" : 2
+		},
+		{
+			"backtrace" : 0,
+			"isGenerated" : true,
+			"path" : "build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release/Demo_param_autogen/include/ui_demo_dev.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 0,
+			"compileGroupIndex" : 0,
+			"isGenerated" : true,
+			"path" : "build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 0,
+			"isGenerated" : true,
+			"path" : "build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release/Demo_param_autogen/3YJK5W5UP7/qrc_resources.cpp.rule",
+			"sourceGroupIndex" : 3
+		}
+	],
+	"type" : "EXECUTABLE"
+}

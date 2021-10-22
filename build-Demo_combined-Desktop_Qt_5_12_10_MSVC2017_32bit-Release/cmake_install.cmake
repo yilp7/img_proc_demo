@@ -1,4 +1,4 @@
-# Install script for directory: E:/workspace/qt5/Demo_combined
+# Install script for directory: C:/Users/2234/Documents/workspace/qt5/Demo_combined
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -40,5 +40,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "E:/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MSVC2017_32bit-Release/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "C:/Users/2234/Documents/workspace/qt5/Demo_combined/build-Demo_combined-Desktop_Qt_5_12_10_MSVC2017_32bit-Release/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

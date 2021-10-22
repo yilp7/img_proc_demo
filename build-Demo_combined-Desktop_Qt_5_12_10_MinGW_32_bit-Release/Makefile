@@ -56,10 +56,10 @@ RM = "C:\Program Files\CMake\bin\cmake.exe" -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = E:\workspace\qt5\Demo_combined
+CMAKE_SOURCE_DIR = C:\Users\2234\Documents\workspace\qt5\Demo_combined
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release
+CMAKE_BINARY_DIR = C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -86,9 +86,9 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\\CMakeFiles\progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\\CMakeFiles\progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start E:\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start C:\Users\2234\Documents\workspace\qt5\Demo_combined\build-Demo_combined-Desktop_Qt_5_12_10_MinGW_32_bit-Release\CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -116,19 +116,6 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named Demo_release
-
-# Build rule for target.
-Demo_release: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Makefile2 Demo_release
-.PHONY : Demo_release
-
-# fast build rule for target.
-Demo_release/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/build
-.PHONY : Demo_release/fast
-
-#=============================================================================
 # Target rules for targets named Demo_param
 
 # Build rule for target.
@@ -140,19 +127,6 @@ Demo_param: cmake_check_build_system
 Demo_param/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/build
 .PHONY : Demo_param/fast
-
-#=============================================================================
-# Target rules for targets named Demo_release_autogen
-
-# Build rule for target.
-Demo_release_autogen: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Makefile2 Demo_release_autogen
-.PHONY : Demo_release_autogen
-
-# fast build rule for target.
-Demo_release_autogen/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release_autogen.dir\build.make CMakeFiles/Demo_release_autogen.dir/build
-.PHONY : Demo_release_autogen/fast
 
 #=============================================================================
 # Target rules for targets named Demo_param_autogen
@@ -215,60 +189,11 @@ Demo_param_autogen/mocs_compilation.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/Demo_param_autogen/mocs_compilation.cpp.s
 .PHONY : Demo_param_autogen/mocs_compilation.cpp.s
 
-Demo_release_autogen/3YJK5W5UP7/qrc_resources.obj: Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.obj
-.PHONY : Demo_release_autogen/3YJK5W5UP7/qrc_resources.obj
-
-# target to build an object file
-Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.obj
-.PHONY : Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.obj
-
-Demo_release_autogen/3YJK5W5UP7/qrc_resources.i: Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.i
-.PHONY : Demo_release_autogen/3YJK5W5UP7/qrc_resources.i
-
-# target to preprocess a source file
-Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.i
-.PHONY : Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.i
-
-Demo_release_autogen/3YJK5W5UP7/qrc_resources.s: Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.s
-.PHONY : Demo_release_autogen/3YJK5W5UP7/qrc_resources.s
-
-# target to generate assembly for a file
-Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.s
-.PHONY : Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.s
-
-Demo_release_autogen/mocs_compilation.obj: Demo_release_autogen/mocs_compilation.cpp.obj
-.PHONY : Demo_release_autogen/mocs_compilation.obj
-
-# target to build an object file
-Demo_release_autogen/mocs_compilation.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/Demo_release_autogen/mocs_compilation.cpp.obj
-.PHONY : Demo_release_autogen/mocs_compilation.cpp.obj
-
-Demo_release_autogen/mocs_compilation.i: Demo_release_autogen/mocs_compilation.cpp.i
-.PHONY : Demo_release_autogen/mocs_compilation.i
-
-# target to preprocess a source file
-Demo_release_autogen/mocs_compilation.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/Demo_release_autogen/mocs_compilation.cpp.i
-.PHONY : Demo_release_autogen/mocs_compilation.cpp.i
-
-Demo_release_autogen/mocs_compilation.s: Demo_release_autogen/mocs_compilation.cpp.s
-.PHONY : Demo_release_autogen/mocs_compilation.s
-
-# target to generate assembly for a file
-Demo_release_autogen/mocs_compilation.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/Demo_release_autogen/mocs_compilation.cpp.s
-.PHONY : Demo_release_autogen/mocs_compilation.cpp.s
-
 demo.obj: demo.cpp.obj
 .PHONY : demo.obj
 
 # target to build an object file
 demo.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/demo.cpp.obj
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/demo.cpp.obj
 .PHONY : demo.cpp.obj
 
@@ -277,7 +202,6 @@ demo.i: demo.cpp.i
 
 # target to preprocess a source file
 demo.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/demo.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/demo.cpp.i
 .PHONY : demo.cpp.i
 
@@ -286,16 +210,38 @@ demo.s: demo.cpp.s
 
 # target to generate assembly for a file
 demo.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/demo.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/demo.cpp.s
 .PHONY : demo.cpp.s
+
+euresyscam.obj: euresyscam.cpp.obj
+.PHONY : euresyscam.obj
+
+# target to build an object file
+euresyscam.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/euresyscam.cpp.obj
+.PHONY : euresyscam.cpp.obj
+
+euresyscam.i: euresyscam.cpp.i
+.PHONY : euresyscam.i
+
+# target to preprocess a source file
+euresyscam.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/euresyscam.cpp.i
+.PHONY : euresyscam.cpp.i
+
+euresyscam.s: euresyscam.cpp.s
+.PHONY : euresyscam.s
+
+# target to generate assembly for a file
+euresyscam.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/euresyscam.cpp.s
+.PHONY : euresyscam.cpp.s
 
 icon.obj: icon.rc.obj
 .PHONY : icon.obj
 
 # target to build an object file
 icon.rc.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/icon.rc.obj
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/icon.rc.obj
 .PHONY : icon.rc.obj
 
@@ -304,7 +250,6 @@ imageproc.obj: imageproc.cpp.obj
 
 # target to build an object file
 imageproc.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/imageproc.cpp.obj
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/imageproc.cpp.obj
 .PHONY : imageproc.cpp.obj
 
@@ -313,7 +258,6 @@ imageproc.i: imageproc.cpp.i
 
 # target to preprocess a source file
 imageproc.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/imageproc.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/imageproc.cpp.i
 .PHONY : imageproc.cpp.i
 
@@ -322,7 +266,6 @@ imageproc.s: imageproc.cpp.s
 
 # target to generate assembly for a file
 imageproc.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/imageproc.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/imageproc.cpp.s
 .PHONY : imageproc.cpp.s
 
@@ -331,7 +274,6 @@ main.obj: main.cpp.obj
 
 # target to build an object file
 main.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/main.cpp.obj
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/main.cpp.obj
 .PHONY : main.cpp.obj
 
@@ -340,7 +282,6 @@ main.i: main.cpp.i
 
 # target to preprocess a source file
 main.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/main.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/main.cpp.i
 .PHONY : main.cpp.i
 
@@ -349,43 +290,14 @@ main.s: main.cpp.s
 
 # target to generate assembly for a file
 main.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/main.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/main.cpp.s
 .PHONY : main.cpp.s
-
-mvcam.obj: mvcam.cpp.obj
-.PHONY : mvcam.obj
-
-# target to build an object file
-mvcam.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/mvcam.cpp.obj
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/mvcam.cpp.obj
-.PHONY : mvcam.cpp.obj
-
-mvcam.i: mvcam.cpp.i
-.PHONY : mvcam.i
-
-# target to preprocess a source file
-mvcam.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/mvcam.cpp.i
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/mvcam.cpp.i
-.PHONY : mvcam.cpp.i
-
-mvcam.s: mvcam.cpp.s
-.PHONY : mvcam.s
-
-# target to generate assembly for a file
-mvcam.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/mvcam.cpp.s
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/mvcam.cpp.s
-.PHONY : mvcam.cpp.s
 
 mywidget.obj: mywidget.cpp.obj
 .PHONY : mywidget.obj
 
 # target to build an object file
 mywidget.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/mywidget.cpp.obj
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/mywidget.cpp.obj
 .PHONY : mywidget.cpp.obj
 
@@ -394,7 +306,6 @@ mywidget.i: mywidget.cpp.i
 
 # target to preprocess a source file
 mywidget.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/mywidget.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/mywidget.cpp.i
 .PHONY : mywidget.cpp.i
 
@@ -403,36 +314,8 @@ mywidget.s: mywidget.cpp.s
 
 # target to generate assembly for a file
 mywidget.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/mywidget.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/mywidget.cpp.s
 .PHONY : mywidget.cpp.s
-
-progsettings.obj: progsettings.cpp.obj
-.PHONY : progsettings.obj
-
-# target to build an object file
-progsettings.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/progsettings.cpp.obj
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/progsettings.cpp.obj
-.PHONY : progsettings.cpp.obj
-
-progsettings.i: progsettings.cpp.i
-.PHONY : progsettings.i
-
-# target to preprocess a source file
-progsettings.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/progsettings.cpp.i
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/progsettings.cpp.i
-.PHONY : progsettings.cpp.i
-
-progsettings.s: progsettings.cpp.s
-.PHONY : progsettings.s
-
-# target to generate assembly for a file
-progsettings.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_release.dir\build.make CMakeFiles/Demo_release.dir/progsettings.cpp.s
-	$(MAKE) $(MAKESILENT) -f CMakeFiles\Demo_param.dir\build.make CMakeFiles/Demo_param.dir/progsettings.cpp.s
-.PHONY : progsettings.cpp.s
 
 # Help Target
 help:
@@ -443,24 +326,19 @@ help:
 	@echo ... edit_cache
 	@echo ... rebuild_cache
 	@echo ... Demo_param_autogen
-	@echo ... Demo_release_autogen
 	@echo ... Demo_param
-	@echo ... Demo_release
 	@echo ... Demo_param_autogen/3YJK5W5UP7/qrc_resources.obj
 	@echo ... Demo_param_autogen/3YJK5W5UP7/qrc_resources.i
 	@echo ... Demo_param_autogen/3YJK5W5UP7/qrc_resources.s
 	@echo ... Demo_param_autogen/mocs_compilation.obj
 	@echo ... Demo_param_autogen/mocs_compilation.i
 	@echo ... Demo_param_autogen/mocs_compilation.s
-	@echo ... Demo_release_autogen/3YJK5W5UP7/qrc_resources.obj
-	@echo ... Demo_release_autogen/3YJK5W5UP7/qrc_resources.i
-	@echo ... Demo_release_autogen/3YJK5W5UP7/qrc_resources.s
-	@echo ... Demo_release_autogen/mocs_compilation.obj
-	@echo ... Demo_release_autogen/mocs_compilation.i
-	@echo ... Demo_release_autogen/mocs_compilation.s
 	@echo ... demo.obj
 	@echo ... demo.i
 	@echo ... demo.s
+	@echo ... euresyscam.obj
+	@echo ... euresyscam.i
+	@echo ... euresyscam.s
 	@echo ... icon.obj
 	@echo ... imageproc.obj
 	@echo ... imageproc.i
@@ -468,15 +346,9 @@ help:
 	@echo ... main.obj
 	@echo ... main.i
 	@echo ... main.s
-	@echo ... mvcam.obj
-	@echo ... mvcam.i
-	@echo ... mvcam.s
 	@echo ... mywidget.obj
 	@echo ... mywidget.i
 	@echo ... mywidget.s
-	@echo ... progsettings.obj
-	@echo ... progsettings.i
-	@echo ... progsettings.s
 .PHONY : help
 
 

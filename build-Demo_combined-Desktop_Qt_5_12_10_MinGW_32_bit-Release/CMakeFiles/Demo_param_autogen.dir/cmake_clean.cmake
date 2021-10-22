@@ -1,8 +1,6 @@
 file(REMOVE_RECURSE
   "CMakeFiles/Demo_param_autogen"
   "Demo_param_autogen/include/ui_demo_dev.h"
-  "Demo_param_autogen/include/ui_demo_rls.h"
-  "Demo_param_autogen/include/ui_settings.h"
   "Demo_param_autogen/mocs_compilation.cpp"
 )
 

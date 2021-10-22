@@ -1,4 +1,7 @@
 file(REMOVE_RECURSE
+  "CMakeFiles/Demo_release_autogen.dir/AutogenUsed.txt"
+  "CMakeFiles/Demo_release_autogen.dir/ParseCache.txt"
+  "Demo_release_autogen"
   "CMakeFiles/Demo_release.dir/Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.obj"
   "CMakeFiles/Demo_release.dir/Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp.obj.d"
   "CMakeFiles/Demo_release.dir/Demo_release_autogen/mocs_compilation.cpp.obj"
@@ -20,9 +23,6 @@ file(REMOVE_RECURSE
   "Demo_release.exe.manifest"
   "Demo_release.pdb"
   "Demo_release_autogen/3YJK5W5UP7/qrc_resources.cpp"
-  "CMakeFiles/Demo_release_autogen.dir/AutogenUsed.txt"
-  "CMakeFiles/Demo_release_autogen.dir/ParseCache.txt"
-  "Demo_release_autogen"
   "libDemo_release.dll.a"
 )
 

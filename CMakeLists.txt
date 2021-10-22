@@ -13,6 +13,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(Hik_SDK_DIR "${PROJECT_SOURCE_DIR}/sdk32/mvs")
 set(HQV_DIR "${PROJECT_SOURCE_DIR}/sdk32/HQV")
+set(EURESYS_DIR "${PROJECT_SOURCE_DIR}/sdk32/euresys")
 set(OpenCV_DIR "${PROJECT_SOURCE_DIR}/sdk32/opencv")
 
 # QtCreator supports the following variables for Android, which are identical to qmake Android variables.
@@ -33,10 +34,12 @@ find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort REQUIRED)
 
 include_directories(${Hik_SDK_DIR}/include)
 include_directories(${HQV_DIR}/include)
+include_directories(${EURESYS_DIR}/include)
 include_directories(${OpenCV_DIR}/include)
 
 link_directories(${Hik_SDK_DIR}/lib)
 link_directories(${HQV_DIR}/lib)
+link_directories(${EURESYS_DIR}/lib)
 link_directories(${OpenCV_DIR}/lib)
 
 add_executable(Demo_param WIN32
@@ -44,16 +47,13 @@ add_executable(Demo_param WIN32
     demo.cpp
     mywidget.cpp
     imageproc.cpp
-	mvcam.cpp
-	progsettings.cpp
+	euresyscam.cpp
     demo.h
     mywidget.h
     imageproc.h
-	mvcam.h
-	progsettings.h
-	demo_dev.ui
-	settings.ui
-	resources/resources.qrc
+	euresyscam.h
+    demo_dev.ui
+    resources/resources.qrc
     icon.rc
     zh.qm
 )
@@ -64,50 +64,50 @@ qt5_use_modules(Demo_param Widgets SerialPort)
 target_link_libraries(Demo_param
     Qt${QT_VERSION_MAJOR}::Widgets
     # mvs
-	MvCameraControl
+#	MvCameraControl
     # HQV
-	HQV_AVIProcess
-	HQV_DataConvert
-	HQV_SDK
-    # opencv
-	libopencv_core452
-	libopencv_imgcodecs452
-	libopencv_imgproc452
-	libopencv_videoio452
+#	HQV_AVIProcess
+#	HQV_DataConvert
+#	HQV_SDK
+    # Euresys
+	MultiCam
+	clallserial
+	# opencv
+	opencv_core452
+	opencv_imgcodecs452
+	opencv_imgproc452
+	opencv_videoio452
 )
 
-add_executable(Demo_release WIN32
-    main.cpp
-    demo.cpp
-    mywidget.cpp
-    imageproc.cpp
-	mvcam.cpp
-	progsettings.cpp
-	demo.h
-    mywidget.h
-    imageproc.h
-	mvcam.h
-	progsettings.h
-	demo_rls.ui
-	settings.ui
-	resources/resources.qrc
-    icon.rc
-    zh.qm
-)
+#add_executable(Demo_release WIN32
+#    main.cpp
+#    demo.cpp
+#    mywidget.cpp
+#    imageproc.cpp
+#    cam.cpp
+#    demo.h
+#    mywidget.h
+#    imageproc.h
+#    cam.h
+#    demo_rls.ui
+#    resources/resources.qrc
+#    icon.rc
+#    zh.qm
+#)
 
-qt5_use_modules(Demo_release Widgets SerialPort)
+#qt5_use_modules(Demo_release Widgets SerialPort)
 
-target_link_libraries(Demo_release
-    Qt${QT_VERSION_MAJOR}::Widgets
-    # mvs
-    MvCameraControl
-    # HQV
-    HQV_AVIProcess
-    HQV_DataConvert
-    HQV_SDK
-    # opencv
-    libopencv_core452
-    libopencv_imgcodecs452
-    libopencv_imgproc452
-    libopencv_videoio452
-)
+#target_link_libraries(Demo_release
+#    Qt${QT_VERSION_MAJOR}::Widgets
+#    # mvs
+#    MvCameraControl
+#    # HQV
+#    HQV_AVIProcess
+#    HQV_DataConvert
+#    HQV_SDK
+#    # opencv
+#    libopencv_core452
+#    libopencv_imgcodecs452
+#    libopencv_imgproc452
+#    libopencv_videoio452
+#)
