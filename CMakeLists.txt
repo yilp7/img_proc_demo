@@ -43,36 +43,39 @@ link_directories(${EURESYS_DIR}/lib)
 link_directories(${OpenCV_DIR}/lib)
 
 add_executable(Demo_param WIN32
-    main.cpp
-    demo.cpp
-    mywidget.cpp
-    imageproc.cpp
-	euresyscam.cpp
-    demo.h
-    mywidget.h
-    imageproc.h
-	euresyscam.h
-    demo_dev.ui
-    resources/resources.qrc
-    icon.rc
-    zh.qm
+	main.cpp
+	demo.cpp
+	mywidget.cpp
+	progsettings.cpp
+	imageproc.cpp
+	mvcam.cpp
+	demo.h
+	mywidget.h
+	progsettings.h
+	imageproc.h
+	mvcam.h
+	demo_dev.ui
+	settings.ui
+	resources/resources.qrc
+	icon.rc
+	zh.qm
 )
 target_compile_definitions(Demo_param PRIVATE PARAM=1)
 
 qt5_use_modules(Demo_param Widgets SerialPort)
 
 target_link_libraries(Demo_param
-    Qt${QT_VERSION_MAJOR}::Widgets
-    # mvs
-#	MvCameraControl
-    # HQV
+	Qt${QT_VERSION_MAJOR}::Widgets
+	# mvs
+	MvCameraControl
+	# HQV
 #	HQV_AVIProcess
 #	HQV_DataConvert
 #	HQV_SDK
     # Euresys
-	MultiCam
-	clallserial
-	# opencv
+#	MultiCam
+#	clallserial
+    # opencv
 	opencv_core452
 	opencv_imgcodecs452
 	opencv_imgproc452
