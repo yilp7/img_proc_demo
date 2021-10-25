@@ -5,6 +5,12 @@
     #include "./ui_demo_rls.h"
 #endif
 
+// used when moving temp recorded vid to destination
+void move_to_dest(QString src, QString dst)
+{
+    QFile::rename(src, dst);
+}
+
 GrabThread::GrabThread(void *info)
 {
     p_info = info;
@@ -922,7 +928,9 @@ void Demo::on_SAVE_FINAL_BUTTON_clicked()
         vid_out[1].release();
         save_img_mux.unlock();
         QString dest = save_location + "/" + res_avi.section('/', -1, -1);
-        QFile::rename(res_avi, dest);
+        std::thread t(move_to_dest, QString(res_avi), QString(dest));
+        t.detach();
+//        QFile::rename(res_avi, dest);
     }
     else {
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
@@ -1784,7 +1792,9 @@ void Demo::on_SAVE_AVI_BUTTON_clicked()
         vid_out[0].release();
         save_img_mux.unlock();
         QString dest = save_location + "/" + raw_avi.section('/', -1, -1);
-        QFile::rename(raw_avi, dest);
+        std::thread t(move_to_dest, QString(raw_avi), QString(dest));
+        t.detach();
+//        QFile::rename(raw_avi, dest);
     }
     else {
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
