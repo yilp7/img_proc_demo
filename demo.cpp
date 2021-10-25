@@ -380,6 +380,7 @@ int Demo::grab_thread_process() {
             QThread::msleep(5);
             continue;
         }
+        while (img_q.size() > 10) img_q.pop();
         img_mem = img_q.front();
         img_q.pop();
 
@@ -699,20 +700,24 @@ void Demo::enable_controls(bool cam_rdy) {
 }
 
 void Demo::save_to_file(bool save_result) {
-    QString temp = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"),
-            dest = QString(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
-    cv::imwrite(temp.toLatin1().data(), save_result ? modified_result : img_mem);
-    QFile::rename(temp, dest);
+//    QString temp = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"),
+//            dest = QString(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
+//    cv::imwrite(temp.toLatin1().data(), save_result ? modified_result : img_mem);
+//    QFile::rename(temp, dest);
+    cv::Mat *temp = save_result ? &modified_result : &img_mem;
+    QPixmap::fromImage(QImage(temp->data, temp->cols, temp->rows, temp->step, QImage::Format_Indexed8)).save(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", "BMP", 100);
 }
 
 void Demo::save_scan_img() {
-    QString temp = QString(TEMP_SAVE_LOCATION + "/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp"),
-            dest = QString(save_location + "/" + scan_name + "/raw_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
-    cv::imwrite(temp.toLatin1().data(), img_mem);
-    QFile::rename(temp, dest);
-    dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
-    cv::imwrite(temp.toLatin1().data(), modified_result);
-    QFile::rename(temp, dest);
+//    QString temp = QString(TEMP_SAVE_LOCATION + "/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp"),
+//            dest = QString(save_location + "/" + scan_name + "/raw_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
+//    cv::imwrite(temp.toLatin1().data(), img_mem);
+//    QFile::rename(temp, dest);
+    QPixmap::fromImage(QImage(img_mem.data, img_mem.cols, img_mem.rows, img_mem.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/raw_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp", "BMP");
+//    dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
+//    cv::imwrite(temp.toLatin1().data(), modified_result);
+//    QFile::rename(temp, dest);
+    QPixmap::fromImage(QImage(modified_result.data, modified_result.cols, modified_result.rows, modified_result.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp", "BMP");
 }
 
 void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate) {
@@ -978,6 +983,8 @@ void Demo::on_FILE_PATH_BROWSE_clicked()
 {
     QString temp = QFileDialog::getExistingDirectory(this, tr("Select folder"), save_location);
     if (!temp.isEmpty()) save_location = temp;
+    if (save_original && !QDir(temp + "/raw_bmp").exists()) QDir().mkdir(temp + "/raw_bmp");
+    if (save_modified && !QDir(temp + "/res_bmp").exists()) QDir().mkdir(temp + "/res_bmp");
     data_exchange(false);
 }
 

@@ -192,6 +192,7 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     settings_menu->addAction(options);
     settings->setMenu(settings_menu);
     connect(options, SIGNAL(triggered()), prog_settings, SLOT(show()));
+    connect(options, SIGNAL(triggered()), prog_settings, SLOT(raise()));
     connect(prog_settings, SIGNAL(simplify_step_chk_clicked(bool)), this->parent()->parent(), SLOT(setup_stepping(bool)));
 
     capture = new TitleButton("", this);
