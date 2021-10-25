@@ -8,24 +8,28 @@ ProgSettings::ProgSettings(QWidget *parent) :
     end_pos(0),
     frame_count(1),
     step_size(0),
+    rep_freq(10),
     kernel(3),
     gamma(1.2),
     log(1.2),
     low_in(0),
     high_in(0.05),
     low_out(0),
-    high_out(1)
+    high_out(1),
+    auto_rep_freq(true),
+    simplify_step(false)
 {
     ui->setupUi(this);
 
     setWindowFlags(Qt::FramelessWindowHint);
 
-    data_exchange(false);
-
     connect(ui->START_POS_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
     connect(ui->END_POS_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
     connect(ui->FRAME_COUNT_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
     connect(ui->STEP_SIZE_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
+
+    data_exchange(false);
+
 }
 
 ProgSettings::~ProgSettings()
@@ -40,6 +44,7 @@ void ProgSettings::data_exchange(bool read)
         end_pos = ui->END_POS_EDIT->text().toInt();
         frame_count = ui->FRAME_COUNT_EDIT->text().toInt();
         step_size = ui->STEP_SIZE_EDIT->text().toFloat();
+        rep_freq = ui->REP_FREQ_EDIT->text().toFloat();
 
         kernel = ui->KERNEL_EDIT->text().toInt();
         gamma = ui->GAMMA_EDIT->text().toFloat();
@@ -48,6 +53,9 @@ void ProgSettings::data_exchange(bool read)
         high_in = ui->HIGH_IN_EDIT->text().toFloat();
         low_out = ui->LOW_OUT_EDIT->text().toFloat();
         high_out = ui->HIGH_OUT_EDIT->text().toFloat();
+
+        auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
+        simplify_step = ui->SIMPLIFY_STEP_CHK->isChecked();
     }
     else {
         ui->START_POS_EDIT->setText(QString::number(start_pos));
@@ -62,6 +70,10 @@ void ProgSettings::data_exchange(bool read)
         ui->HIGH_IN_EDIT->setText(QString::number(high_in, 'f', 2));
         ui->LOW_OUT_EDIT->setText(QString::number(low_out, 'f', 2));
         ui->HIGH_OUT_EDIT->setText(QString::number(high_out, 'f', 2));
+        ui->REP_FREQ_EDIT->setText(QString::number(rep_freq, 'f', 2));
+
+        ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
+        ui->SIMPLIFY_STEP_CHK->setChecked(simplify_step);
     }
 }
 
@@ -101,4 +113,42 @@ void ProgSettings::keyPressEvent(QKeyEvent *event)
     default: break;
     }
     if (edit) this->focusWidget()->clearFocus(), edit = NULL;
+}
+
+void ProgSettings::mousePressEvent(QMouseEvent *event)
+{
+    QDialog::mousePressEvent(event);
+
+    if(event->button() != Qt::LeftButton) return;
+    pressed = true;
+    prev_pos = event->globalPos();
+}
+
+void ProgSettings::mouseMoveEvent(QMouseEvent *event)
+{
+    QDialog::mouseMoveEvent(event);
+
+    if (!pressed) return;
+    // use globalPos instead of pos to prevent window shaking
+    window()->move(window()->pos() + event->globalPos() - prev_pos);
+    prev_pos = event->globalPos();
+}
+
+void ProgSettings::mouseReleaseEvent(QMouseEvent *event)
+{
+    QDialog::mouseReleaseEvent(event);
+
+    if(event->button() != Qt::LeftButton) return;
+    pressed = false;
+}
+
+void ProgSettings::on_SIMPLIFY_STEP_CHK_stateChanged(int arg1)
+{
+    simplify_step = arg1;
+    emit simplify_step_chk_clicked(!arg1);
+}
+
+void ProgSettings::on_AUTO_REP_FREQ_CHK_stateChanged(int arg1)
+{
+    auto_rep_freq = arg1;
 }

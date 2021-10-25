@@ -59,7 +59,7 @@
       <x>10</x>
       <y>40</y>
       <width>210</width>
-      <height>630</height>
+      <height>631</height>
      </rect>
     </property>
     <property name="font">
@@ -1107,7 +1107,7 @@
       <x>220</x>
       <y>40</y>
       <width>660</width>
-      <height>630</height>
+      <height>631</height>
      </rect>
     </property>
     <property name="font">
@@ -1504,7 +1504,7 @@
       <x>880</x>
       <y>40</y>
       <width>240</width>
-      <height>630</height>
+      <height>631</height>
      </rect>
     </property>
     <property name="font">
@@ -2450,7 +2450,7 @@
        <string> μs</string>
       </property>
      </widget>
-     <widget class="QLineEdit" name="STRIDE_EDIT">
+     <widget class="QLineEdit" name="STEPPING_EDIT">
       <property name="geometry">
        <rect>
         <x>140</x>
@@ -2495,7 +2495,7 @@
        <string>ns</string>
       </property>
      </widget>
-     <widget class="QLabel" name="STRIDE">
+     <widget class="QLabel" name="STEPPING">
       <property name="geometry">
        <rect>
         <x>132</x>
@@ -2516,18 +2516,18 @@
        <bool>false</bool>
       </property>
       <property name="text">
-       <string>Stride</string>
+       <string>Stepping</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
       </property>
      </widget>
-     <widget class="QLabel" name="STRIDE_UNIT">
+     <widget class="QLabel" name="STEPPING_UNIT">
       <property name="geometry">
        <rect>
         <x>194</x>
         <y>203</y>
-        <width>7</width>
+        <width>14</width>
         <height>14</height>
        </rect>
       </property>
@@ -2793,10 +2793,10 @@
      <zorder>DELAY_B_EDIT_N</zorder>
      <zorder>GATE_WIDTH_A</zorder>
      <zorder>GATE_WIDTH_A_UNIT_U</zorder>
-     <zorder>STRIDE_EDIT</zorder>
+     <zorder>STEPPING_EDIT</zorder>
      <zorder>GATE_WIDTH_A_UNIT_N</zorder>
-     <zorder>STRIDE</zorder>
-     <zorder>STRIDE_UNIT</zorder>
+     <zorder>STEPPING</zorder>
+     <zorder>STEPPING_UNIT</zorder>
      <zorder>GATE_WIDTH_A_EDIT_N</zorder>
      <zorder>ESTIMATED</zorder>
      <zorder>EST_DIST</zorder>
@@ -3563,7 +3563,7 @@
   <tabstop>MCP_SLIDER</tabstop>
   <tabstop>GATE_WIDTH_A_EDIT_U</tabstop>
   <tabstop>GATE_WIDTH_A_EDIT_N</tabstop>
-  <tabstop>STRIDE_EDIT</tabstop>
+  <tabstop>STEPPING_EDIT</tabstop>
   <tabstop>ZOOM_EDIT</tabstop>
   <tabstop>FOCUS_EDIT</tabstop>
   <tabstop>FOCUS_SPEED_EDIT</tabstop>
@@ -3617,7 +3617,6 @@
   <tabstop>CENTER_CHECK</tabstop>
  </tabstops>
  <resources>
-  <include location="resources/resources.qrc"/>
   <include location="resources/resources.qrc"/>
  </resources>
  <connections/>

@@ -9,6 +9,7 @@
 #include <QPaintEvent>
 #include <QTimer>
 #include <QPushButton>
+#include <QComboBox>
 #include <QMutex>
 #include <QMenu>
 #include <QApplication>

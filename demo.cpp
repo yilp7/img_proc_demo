@@ -75,7 +75,8 @@ Demo::Demo(QWidget *parent)
     , laser_width_u(0)
     , laser_width_n(500)
     , delay_n_n(0)
-    , stride(10)
+    , stepping(10)
+    , stepping_in_ns(false)
     , fps(10)
     , duty(5000)
     , mcp(5)
@@ -259,6 +260,7 @@ Demo::Demo(QWidget *parent)
     }
 
     scan_q.push_back(-1);
+    setup_stepping(true);
 
     // for presentation
     ui->CTRL_STATIC->hide();
@@ -306,7 +308,7 @@ void Demo::data_exchange(bool read){
         delay_a_n = ui->DELAY_A_EDIT_N->text().toInt();
 //        gate_width_b_u = ui->GATE_WIDTH_B_EDIT_U->text().toInt();
 //        gate_width_b_n = ui->GATE_WIDTH_B_EDIT_N->text().toInt();
-        stride = ui->STRIDE_EDIT->text().toInt();
+        stepping = ui->STEPPING_EDIT->text().toFloat();
         delay_b_u = ui->DELAY_B_EDIT_U->text().toInt();
         delay_b_n = ui->DELAY_B_EDIT_N->text().toInt();
         delay_n_n = ui->DELAY_N_EDIT_N->text().toInt();
@@ -348,7 +350,7 @@ void Demo::data_exchange(bool read){
         laser_width_u = gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
         laser_width_n = gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
 #endif
-        ui->STRIDE_EDIT->setText(QString::asprintf("%d", stride));
+        ui->STEPPING_EDIT->setText(QString::asprintf("%.2f", stepping));
 
         ui->FREQ_EDIT->setText(QString::asprintf("%d", rep_freq));
         ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", laser_width_u));
@@ -632,6 +634,7 @@ void Demo::closeEvent(QCloseEvent *event)
 {
     shut_down();
     event->accept();
+    ui->TITLE->prog_settings->reject();
     if (QFile::exists("HQVSDK.xml")) QFile::remove("HQVSDK.xml");
 }
 
@@ -993,6 +996,12 @@ void Demo::clean()
     seq_sum.release();
 }
 
+void Demo::setup_stepping(bool in_ns)
+{
+    stepping_in_ns = in_ns;
+    ui->STEPPING_UNIT->setText(stepping_in_ns ? "ns" : "m");
+}
+
 // convert data to be sent to TCU-COM to hex buffer
 void Demo::convert_to_send_tcu(uchar num, unsigned int send) {
     out_buffer[0] = 0x88;
@@ -1039,13 +1048,15 @@ void Demo::update_delay()
     ui->DELAY_SLIDER->setValue(delay_dist);
 
     if (scan) {
-        rep_freq = 10;
+        rep_freq = ui->TITLE->prog_settings->rep_freq;
     }
     else {
         // change fps according to delay: fps (kHz) <= 1s / delay (μs)
-        rep_freq = delay_dist ? 1.0 * 1e6 / (delay_dist / dist_ns + depth_of_vision / dist_ns + 3) : 30;
-        if (rep_freq > 30) rep_freq = 30;
-        if (rep_freq < 10) rep_freq = 10;
+        if (ui->TITLE->prog_settings->auto_rep_freq) {
+            rep_freq = delay_dist ? 1.0 * 1e6 / (delay_dist / dist_ns + depth_of_vision / dist_ns + 3) : 30;
+            if (rep_freq > 30) rep_freq = 30;
+            if (rep_freq < 10) rep_freq = 10;
+        }
 
         send = 1.25e5 / rep_freq;
         convert_to_send_tcu(0x00, send);
@@ -1504,8 +1515,8 @@ void Demo::keyPressEvent(QKeyEvent *event)
             }
         }
         if (edit == ui->FREQ_EDIT) {
-            fps = ui->FREQ_EDIT->text().toInt();
-            send = 1.25e5 / fps;
+            rep_freq = ui->FREQ_EDIT->text().toInt();
+            send = 1.25e5 / rep_freq;
             convert_to_send_tcu(0x00, send);
             communicate_display(com[0], 1, 7, false);
         }
@@ -1551,8 +1562,8 @@ void Demo::keyPressEvent(QKeyEvent *event)
             delay_n_n = edit->text().toInt();
             update_delay();
         }
-        else if (edit == ui->STRIDE_EDIT) {
-            stride = edit->text().toInt();
+        else if (edit == ui->STEPPING_EDIT) {
+            stepping = edit->text().toFloat();
         }
         else if (edit == ui->ZOOM_EDIT) {
             set_zoom();
@@ -1573,36 +1584,36 @@ void Demo::keyPressEvent(QKeyEvent *event)
         break;
     // 100m => 667ns, 10m => 67ns
     case Qt::Key_W:
-        delay_dist += stride * 5;
+        delay_dist += stepping * 5 * (stepping_in_ns ? dist_ns : 1);
         update_delay();
         break;
     case Qt::Key_S:
-        delay_dist -= stride * 5;
+        delay_dist -= stepping * 5 * (stepping_in_ns ? dist_ns : 1);
         update_delay();
         break;
     case Qt::Key_D:
-        delay_dist += stride;
+        delay_dist += stepping * (stepping_in_ns ? dist_ns : 1);
         update_delay();
         break;
     case Qt::Key_A:
-        delay_dist -= stride;
+        delay_dist -= stepping * (stepping_in_ns ? dist_ns : 1);
         update_delay();
         break;
     // 50m => 333ns, 5m => 33ns
     case Qt::Key_I:
-        depth_of_vision += stride * 5;
+        depth_of_vision += stepping * 5 * (stepping_in_ns ? dist_ns : 1);
         update_gate_width();
         break;
     case Qt::Key_K:
-        depth_of_vision -= stride * 5;
+        depth_of_vision -= stepping * 5 * (stepping_in_ns ? dist_ns : 1);
         update_gate_width();
         break;
     case Qt::Key_L:
-        depth_of_vision += stride;
+        depth_of_vision += stepping * (stepping_in_ns ? dist_ns : 1);
         update_gate_width();
         break;
     case Qt::Key_J:
-        depth_of_vision -= stride;
+        depth_of_vision -= stepping * (stepping_in_ns ? dist_ns : 1);
         update_gate_width();
         break;
     default: break;
@@ -1616,14 +1627,6 @@ void Demo::resizeEvent(QResizeEvent *event)
     int grp_width = ui->RIGHT->width();
 
     ui->RIGHT->move(window.width() - 12 - grp_width, 40);
-//    ui->TCU_STATIC->move(pos_x, 20);
-//    ui->LENS_STATIC->move(pos_x, 260);
-//    ui->IMG_SAVE_STATIC->move(pos_x, 360);
-//    ui->DATA_EXCHANGE->move(pos_x, 460);
-//    ui->NAME->move(pos_x + 70, 50);
-//    ui->CTRL_STATIC->move(pos_x, 140);
-//    ui->LOGO1->move(pos_x, window.height() - 21 - 74);
-//    ui->LOGO2->move(pos_x + 70, window.height() - 21 - 74 - 10 - 90);
 
     QRect region = ui->SOURCE_DISPLAY->geometry();
     QPoint center = ui->SOURCE_DISPLAY->center;
@@ -1632,7 +1635,7 @@ void Demo::resizeEvent(QResizeEvent *event)
     ui->MID->setGeometry(10 + ui->LEFT->width(), 40, mid_width, window.height() - 50);
     int width = mid_width - 20, height = width * h / w;
 //    qDebug("width %d, height %d\n", width, height);
-    int height_constraint = window.height() - 30 - 50 - 20,
+    int height_constraint = window.height() - 30 - 50 - 32,
         width_constraint = height_constraint * w / h;
 //    qDebug("width_constraint %d, height_constraint %d\n", width_constraint, height_constraint);
     if (width < width_constraint) width_constraint = width, height_constraint = width_constraint * h / w;

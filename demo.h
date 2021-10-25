@@ -80,6 +80,7 @@ public slots:
     void switch_language();
     void screenshot();
     void clean();
+    void setup_stepping(bool in_ns);
 
 private slots:
     // on clicking enum btn: enumerate devices
@@ -266,7 +267,8 @@ private:
     int                     laser_width_u, laser_width_n;
     int                     gate_width_a_u, gate_width_a_n;
     int                     delay_a_u, delay_a_n, delay_b_u, delay_b_n, delay_n_n;
-    int                     stride;
+    float                   stepping;
+    bool                    stepping_in_ns;
     int                     fps;
     int                     duty;
     int                     mcp;
