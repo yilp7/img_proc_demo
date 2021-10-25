@@ -16,16 +16,17 @@
 #include <QEvent>
 #include <QTranslator>
 #include <QTableWidget>
-#include "euresyscam.h"
-#include "imageproc.h"
-#include "opencv2/core.hpp"
-#include "opencv2/opencv.hpp"
-#include "opencv2/imgcodecs.hpp"
-#include "opencv2/highgui.hpp"
-#include "opencv2/videoio.hpp"
-//#include "HQV_API.h"
-
+#include <opencv2/core.hpp>
+#include <opencv2/opencv.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/videoio.hpp>
 #include <windows.h>
+
+#include "imageproc.h"
+//#include "mvcam.h"
+//#include "hqvscam.h"
+#include "euresyscam.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class Demo; }

@@ -48,12 +48,16 @@ add_executable(Demo_param WIN32
 	mywidget.cpp
 	progsettings.cpp
 	imageproc.cpp
-	mvcam.cpp
+#	mvcam.cpp
+#	hqvcam.cpp
+    euresyscam.cpp
 	demo.h
 	mywidget.h
 	progsettings.h
 	imageproc.h
-	mvcam.h
+#	mvcam.h
+#	hqvcam.h
+    euresyscam.h
 	demo_dev.ui
 	settings.ui
 	resources/resources.qrc
@@ -67,15 +71,15 @@ qt5_use_modules(Demo_param Widgets SerialPort)
 target_link_libraries(Demo_param
 	Qt${QT_VERSION_MAJOR}::Widgets
 	# mvs
-	MvCameraControl
-	# HQV
+#	MvCameraControl
+    # HQV
 #	HQV_AVIProcess
 #	HQV_DataConvert
 #	HQV_SDK
     # Euresys
-#	MultiCam
-#	clallserial
-    # opencv
+	MultiCam
+	clallserial
+	# opencv
 	opencv_core452
 	opencv_imgcodecs452
 	opencv_imgproc452

@@ -22,8 +22,7 @@ int Cam::search_for_devices()
 int Cam::start() {
     clSerialClose(serial_ref);
     int cl_ret = clSerialInit(0, &serial_ref);
-    qDebug() << cl_ret;
-    if (cl_ret != CL_ERR_NO_ERR) return cl_ret;
+//    if (cl_ret != CL_ERR_NO_ERR) return cl_ret;
 
     MCSTATUS ret = 0;
     // Create a channel and associate it with the first connector on the first board
@@ -116,7 +115,7 @@ float Cam::communicate(char* out, char* in, uint out_size, uint in_size, bool re
     for (int i = 0; i < 6; i++) str_r += QString::asprintf(" %02X", i + (int)in_size - 6 < 0 ? 0 : ((uchar*)in)[i + in_size - 6]);
 
     qDebug() << str_s << str_r;
-    return read ? (in[2] << 8) + in[3] : 0;
+    return read ? (((uchar*)in)[0] << 24) + (((uchar*)in)[1] << 16) + (((uchar*)in)[2] << 8) + ((uchar*)in)[3] : 0;
 }
 
 void Cam::time_exposure(bool read, float *val)
@@ -131,7 +130,10 @@ void Cam::time_exposure(bool read, float *val)
         uchar out[7] = {0xA0, 0x00, 0x00, 0xFF, 0x21, 0x0D, 0x0A};
         uchar in[1] = {0};
         communicate((char*)out, (char*)in, 7, 1);
+        qDebug() << te;
         out[0] = 0xA1;
+        out[1] = (te >> 24) & 0xFF;
+        out[2] = (te >> 16) & 0xFF;
         out[3] = (te >> 8) & 0xFF;
         out[4] = te & 0xFF;
         communicate((char*)out, (char*)in, 7, 1);
