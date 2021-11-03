@@ -24,9 +24,9 @@
 #include <windows.h>
 
 #include "imageproc.h"
-//#include "mvcam.h"
+#include "mvcam.h"
 //#include "hqvscam.h"
-#include "euresyscam.h"
+//#include "euresyscam.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class Demo; }
@@ -250,7 +250,7 @@ private:
     double                  range_threshold;            // range threshold for building 3d images
     bool                    trigger_by_software;        // whether the device gets trigger signal from sw
 
-    QMutex                  save_img_mux;               // img handle lock
+    QMutex                  image_mutex;               // img handle lock
     Cam*                    curr_cam;                   // current camera
 //    MvCam*                  curr_cam;                   // current camera
     float                   time_exposure_edit;
@@ -294,6 +294,7 @@ private:
     bool                    record_modified;            // whether recording modified stream
     bool                    save_original;              // saving original bmp
     bool                    save_modified;              // saving modified bmp
+    bool                    save_scan;
     bool                    image_3d;                   // whether to build a 3d image
     int                     trigger_source;             // where the device gets the trigger signal
 

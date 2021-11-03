@@ -390,7 +390,7 @@ int Demo::grab_thread_process() {
         img_mem = img_q.front();
         img_q.pop();
 
-        save_img_mux.lock();
+        image_mutex.lock();
 
         // tenengrad (sobel) auto-focus
         cv::Sobel(img_mem, sobel, CV_16U, 1, 1);
@@ -421,7 +421,7 @@ int Demo::grab_thread_process() {
         }
         else modified_result = img_mem.clone();
 
-        if (ui->IMG_ENHANCE_CHECK->isChecked()) {
+        if (!image_3d && ui->IMG_ENHANCE_CHECK->isChecked()) {
             switch (ui->ENHANCE_OPTIONS->currentIndex()) {
             // histogram
             case 1: {
@@ -524,7 +524,7 @@ int Demo::grab_thread_process() {
                 break;
             }
         }
-        if (ui->SP_CHECK->isChecked()) ImageProc::plateau_equl_hist(&modified_result, &modified_result, ui->SP_OPTIONS->currentIndex());
+        if (!image_3d && ui->SP_CHECK->isChecked()) ImageProc::plateau_equl_hist(&modified_result, &modified_result, ui->SP_OPTIONS->currentIndex());
 
         // brightness & contrast
         int val = ui->BRIGHTNESS_SLIDER->value() * 12.8;
@@ -548,14 +548,16 @@ int Demo::grab_thread_process() {
             cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
         }
 
-        cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? w + 104 : w) / disp->width(), disp->display_region.br() * (image_3d ? w + 104 : w) / disp->width());
+//        cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? w + 104 : w) / disp->width(), disp->display_region.br() * (image_3d ? w + 104 : w) / disp->width());
+        cv::Rect region = cv::Rect(disp->display_region.tl() * w / disp->width(), disp->display_region.br() * w / disp->width());
         if (region.height > h) region.height = h;
-//        qDebug("x: %d y: %d, w: %d, h: %d\n", region.x, region.y, region.width, region.height);
+//        qDebug("region x: %d y: %d, w: %d, h: %d\n", region.x, region.y, region.width, region.height);
+//        qDebug("image  w: %d, h: %d\n", modified_result.cols, modified_result.rows);
         cropped_img = modified_result(region);
         // resize to display size
         cv::resize(cropped_img, cropped_img, cv::Size(ui->SOURCE_DISPLAY->width(), ui->SOURCE_DISPLAY->height()), 0, 0, cv::INTER_AREA);
         // draw the center cross
-        if (ui->CENTER_CHECK->isChecked()) {
+        if (!image_3d && ui->CENTER_CHECK->isChecked()) {
 //            for (int i = cropped_img.cols / 2 - 9; i < cropped_img.cols / 2 + 10; i++) cropped_img.at<uchar>(cropped_img.rows / 2, i) = 255 - cropped_img.at<uchar>(cropped_img.rows / 2, i);
 //            for (int i = cropped_img.rows / 2 - 9; i < cropped_img.rows / 2 + 10; i++) cropped_img.at<uchar>(i, cropped_img.cols / 2) = 255 - cropped_img.at<uchar>(i, cropped_img.cols / 2);
             for (int i = cropped_img.cols / 2 - 9; i < cropped_img.cols / 2 + 10; i++) cropped_img.at<uchar>(cropped_img.rows / 2, i) = cropped_img.at<uchar>(cropped_img.rows / 2, i) > 127 ? 0 : 255;
@@ -570,7 +572,7 @@ int Demo::grab_thread_process() {
         if (scan) {
             emit update_delay_in_thread();
 
-            save_scan_img();
+            if (ui->TITLE->prog_settings->save_scan) save_scan_img();
             delay_dist += scan_step;
 //            filter_scan();
         }
@@ -589,12 +591,12 @@ int Demo::grab_thread_process() {
             vid_out[1].write(modified_result);
         }
 
-        if (ui->HISTOGRAM_RADIO->isChecked()) {
+        if (ui->HISTOGRAM_RADIO->isChecked() && !image_3d) {
             if (modified_result.channels() != 1) continue;
             uchar *img = modified_result.data;
             int step = modified_result.step;
             memset(hist, 0, 256 * sizeof(uint));
-            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++)  hist[(img + i * step)[j]]++;
+            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img + i * step)[j]]++;
             uint max = 0;
             for (int i = 1; i < 256; i++) {
                 if (hist[i] > 50000) hist[i] = 0;
@@ -607,7 +609,7 @@ int Demo::grab_thread_process() {
             ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         }
 
-        save_img_mux.unlock();
+        image_mutex.unlock();
     }
     return 0;
 }
@@ -711,7 +713,7 @@ void Demo::save_to_file(bool save_result) {
 //    cv::imwrite(temp.toLatin1().data(), save_result ? modified_result : img_mem);
 //    QFile::rename(temp, dest);
     cv::Mat *temp = save_result ? &modified_result : &img_mem;
-    QPixmap::fromImage(QImage(temp->data, temp->cols, temp->rows, temp->step, QImage::Format_Indexed8)).save(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", "BMP", 100);
+    QPixmap::fromImage(QImage(temp->data, temp->cols, temp->rows, temp->step, temp->channels() == 3 ? QImage::Format_RGB888 : QImage::Format_Indexed8)).save(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", "BMP", 100);
 }
 
 void Demo::save_scan_img() {
@@ -924,9 +926,9 @@ void Demo::on_SAVE_FINAL_BUTTON_clicked()
 //    cv::imwrite(QString(save_location + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".jpg").toLatin1().data(), modified_result);
     if (record_modified) {
 //        curr_cam->stop_recording(0);
-        save_img_mux.lock();
+        image_mutex.lock();
         vid_out[1].release();
-        save_img_mux.unlock();
+        image_mutex.unlock();
         QString dest = save_location + "/" + res_avi.section('/', -1, -1);
         std::thread t(move_to_dest, QString(res_avi), QString(dest));
         t.detach();
@@ -934,10 +936,10 @@ void Demo::on_SAVE_FINAL_BUTTON_clicked()
     }
     else {
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
-        save_img_mux.lock();
+        image_mutex.lock();
         res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi");
         vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), false);
-        save_img_mux.unlock();
+        image_mutex.unlock();
     }
     record_modified = !record_modified;
     ui->SAVE_FINAL_BUTTON->setText(record_modified ? tr("Stop") : tr("RES"));
@@ -1205,11 +1207,15 @@ void Demo::on_DIST_BTN_clicked() {
 
 void Demo::on_IMG_3D_CHECK_stateChanged(int arg1)
 {
-    QRect region = ui->SOURCE_DISPLAY->geometry();
-    region.setHeight(ui->SOURCE_DISPLAY->width() * h / (arg1 ? w + 104 : w));
-    ui->SOURCE_DISPLAY->setGeometry(region);
+//    QRect region = ui->SOURCE_DISPLAY->geometry();
+//    region.setHeight(ui->SOURCE_DISPLAY->width() * h / (arg1 ? w + 104 : w));
+//    ui->SOURCE_DISPLAY->setGeometry(region);
 //    qDebug("display region x: %d, y: %d, w: %d, h: %d\n", region.x(), region.y(), region.width(), region.height());
-    ui->SOURCE_DISPLAY->update_roi(QPoint());
+//    ui->SOURCE_DISPLAY->update_roi(QPoint());
+    image_mutex.lock();
+    w = arg1 ? w + 104 : w - 104;
+    image_mutex.unlock();
+    resizeEvent(new QResizeEvent(this->size(), this->size()));
 
     data_exchange(true);
 }
@@ -1677,11 +1683,11 @@ void Demo::resizeEvent(QResizeEvent *event)
     ui->RULER_H->setGeometry(region.left(), region.bottom() - 10, region.width(), 32);
     ui->RULER_V->setGeometry(region.right() - 10, region.top(), 32, region.height());
 
-    save_img_mux.lock();
+    image_mutex.lock();
     ui->SOURCE_DISPLAY->setGeometry(region);
     ui->SOURCE_DISPLAY->update_roi(center);
     qDebug("display region x: %d, y: %d, w: %d, h: %d\n", region.x(), region.y(), region.width(), region.height());
-    save_img_mux.unlock();
+    image_mutex.unlock();
 
     event->accept();
 }
@@ -1788,9 +1794,9 @@ void Demo::on_SAVE_AVI_BUTTON_clicked()
     static QString raw_avi;
     if (record_original) {
 //        curr_cam->stop_recording(0);
-        save_img_mux.lock();
+        image_mutex.lock();
         vid_out[0].release();
-        save_img_mux.unlock();
+        image_mutex.unlock();
         QString dest = save_location + "/" + raw_avi.section('/', -1, -1);
         std::thread t(move_to_dest, QString(raw_avi), QString(dest));
         t.detach();
@@ -1798,10 +1804,10 @@ void Demo::on_SAVE_AVI_BUTTON_clicked()
     }
     else {
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
-        save_img_mux.lock();
+        image_mutex.lock();
         raw_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw.avi");
         vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), false);
-        save_img_mux.unlock();
+        image_mutex.unlock();
     }
     record_original = !record_original;
     ui->SAVE_AVI_BUTTON->setText(record_original ? tr("Stop") : tr("ORI"));
@@ -2037,9 +2043,9 @@ void Demo::on_HISTOGRAM_RADIO_clicked()
 
 void Demo::screenshot()
 {
-    save_img_mux.lock();
+    image_mutex.lock();
     window()->grab().save(save_location + "/screenshot_" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".png");
-    save_img_mux.unlock();
+    image_mutex.unlock();
 }
 
 void Demo::on_DRAG_TOOL_clicked()

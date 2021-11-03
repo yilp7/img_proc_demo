@@ -17,7 +17,8 @@ ProgSettings::ProgSettings(QWidget *parent) :
     low_out(0),
     high_out(1),
     auto_rep_freq(true),
-    simplify_step(false)
+    simplify_step(false),
+    save_scan(true)
 {
     ui->setupUi(this);
 
@@ -74,6 +75,7 @@ void ProgSettings::data_exchange(bool read)
 
         ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
         ui->SIMPLIFY_STEP_CHK->setChecked(simplify_step);
+        ui->SAVE_SCAN_CHK->setChecked(save_scan);
     }
 }
 
@@ -151,4 +153,9 @@ void ProgSettings::on_SIMPLIFY_STEP_CHK_stateChanged(int arg1)
 void ProgSettings::on_AUTO_REP_FREQ_CHK_stateChanged(int arg1)
 {
     auto_rep_freq = arg1;
+}
+
+void ProgSettings::on_SAVE_SCAN_CHK_stateChanged(int arg1)
+{
+    save_scan = arg1;
 }

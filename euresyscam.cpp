@@ -23,6 +23,7 @@ int Cam::start() {
     clSerialClose(serial_ref);
     int cl_ret = clSerialInit(0, &serial_ref);
 //    if (cl_ret != CL_ERR_NO_ERR) return cl_ret;
+	cl_ret = clSetBaudRate(serial_ref, CL_BAUDRATE_115200);
 
     MCSTATUS ret = 0;
     // Create a channel and associate it with the first connector on the first board
@@ -60,8 +61,6 @@ int Cam::start() {
     // Enable MultiCam signals
     ret = McSetParamInt(dev_handle, MC_SignalEnable + MC_SIG_SURFACE_PROCESSING, MC_SignalEnable_ON);
     ret = McSetParamInt(dev_handle, MC_SignalEnable + MC_SIG_ACQUISITION_FAILURE, MC_SignalEnable_ON);
-
-    cl_ret = clSetBaudRate(serial_ref, CL_BAUDRATE_115200);
 
     return ret;
 }
@@ -108,8 +107,12 @@ void Cam::get_frame_size(int &w, int &h)
 float Cam::communicate(char* out, char* in, uint out_size, uint in_size, bool read) {
     QString str_s = "s", str_r = "r";
 
+    clFlushPort(serial_ref);
+
     clSerialWrite(serial_ref, out, &out_size, 1000);// qDebug() << out_size;
     for (int i = 0; i < 7; i++) str_s += QString::asprintf(" %02X", i + (int)out_size - 7 < 0 ? 0 : ((uchar*)out)[i + out_size - 7]);
+
+	clFlushPort(serial_ref);
 
     clSerialRead(serial_ref, in, &in_size, 1000);// qDebug() << in_size;
     for (int i = 0; i < 6; i++) str_r += QString::asprintf(" %02X", i + (int)in_size - 6 < 0 ? 0 : ((uchar*)in)[i + in_size - 6]);
@@ -124,7 +127,9 @@ void Cam::time_exposure(bool read, float *val)
         uchar out[7] = {0xB0, 0x00, 0x00, 0xFF, 0x21, 0x1D, 0x1A};
         uchar in[6] = {0};
         *val = communicate((char*)out, (char*)in, 7, 6, true);
-    }
+		out[4] = 0x22;
+		*val += communicate((char*)out, (char*)in, 7, 6, true) * 65536;
+	}
     else {
         int te = *val;
         uchar out[7] = {0xA0, 0x00, 0x00, 0xFF, 0x21, 0x0D, 0x0A};

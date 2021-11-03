@@ -30,6 +30,8 @@ private slots:
     void on_SIMPLIFY_STEP_CHK_stateChanged(int arg1);
     void on_AUTO_REP_FREQ_CHK_stateChanged(int arg1);
 
+    void on_SAVE_SCAN_CHK_stateChanged(int arg1);
+
 signals:
     void simplify_step_chk_clicked(bool);
 
@@ -55,6 +57,7 @@ public:
 
     bool   auto_rep_freq;
     bool   simplify_step;
+    bool   save_scan;
 
 };
 

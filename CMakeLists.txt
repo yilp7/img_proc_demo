@@ -50,15 +50,15 @@ add_executable(Demo_param WIN32
 	imageproc.cpp
 	mvcam.cpp
 #	hqvcam.cpp
-#    euresyscam.cpp
+#	euresyscam.cpp
 	demo.h
 	mywidget.h
 	progsettings.h
 	imageproc.h
 	mvcam.h
 #	hqvcam.h
-#    euresyscam.h
-	demo_dev.ui
+#	euresyscam.h
+    demo_dev.ui
 	settings.ui
 	resources/resources.qrc
 	icon.rc

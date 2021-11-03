@@ -41,7 +41,7 @@
      <x>20</x>
      <y>20</y>
      <width>111</width>
-     <height>221</height>
+     <height>241</height>
     </rect>
    </property>
    <property name="title">
@@ -212,6 +212,19 @@
     </property>
     <property name="text">
      <string>Rep. freq.</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="SAVE_SCAN_CHK">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>220</y>
+      <width>95</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Save image</string>
     </property>
    </widget>
   </widget>
