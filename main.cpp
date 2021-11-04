@@ -7,7 +7,6 @@
 
 void log_message(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
-    // 加锁
     static QMutex mutex;
     mutex.lock();
     QString text;
@@ -29,15 +28,12 @@ void log_message(QtMsgType type, const QMessageLogContext &context, const QStrin
         break;
     }
 
-    // 设置输出信息格式
     QString message = text + QString::asprintf("File:(%s) Line (%d), ", context.file, context.line) + msg + QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss ") + "\n";
-    // 输出信息至文件中（读写、追加形式）
     static QFile file("log");
     file.open(QIODevice::WriteOnly | QIODevice::Append);
     file.write(message.toLatin1());
     file.flush();
     file.close();
-    // 解锁
     mutex.unlock();
 }
 

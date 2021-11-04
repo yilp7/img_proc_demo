@@ -9,6 +9,7 @@ ProgSettings::ProgSettings(QWidget *parent) :
     frame_count(1),
     step_size(0),
     rep_freq(10),
+    save_scan(true),
     kernel(3),
     gamma(1.2),
     log(1.2),
@@ -18,7 +19,7 @@ ProgSettings::ProgSettings(QWidget *parent) :
     high_out(1),
     auto_rep_freq(true),
     simplify_step(false),
-    save_scan(true)
+    max_dist(15000)
 {
     ui->setupUi(this);
 
@@ -46,6 +47,7 @@ void ProgSettings::data_exchange(bool read)
         frame_count = ui->FRAME_COUNT_EDIT->text().toInt();
         step_size = ui->STEP_SIZE_EDIT->text().toFloat();
         rep_freq = ui->REP_FREQ_EDIT->text().toFloat();
+        save_scan = ui->SAVE_SCAN_CHK->isChecked();
 
         kernel = ui->KERNEL_EDIT->text().toInt();
         gamma = ui->GAMMA_EDIT->text().toFloat();
@@ -57,12 +59,14 @@ void ProgSettings::data_exchange(bool read)
 
         auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
         simplify_step = ui->SIMPLIFY_STEP_CHK->isChecked();
+        max_dist = ui->MAX_DIST_EDT->text().toInt();
     }
     else {
         ui->START_POS_EDIT->setText(QString::number(start_pos));
         ui->END_POS_EDIT->setText(QString::number(end_pos));
         ui->FRAME_COUNT_EDIT->setText(QString::number(frame_count));
         ui->STEP_SIZE_EDIT->setText(QString::number(step_size, 'f', 2));
+        ui->SAVE_SCAN_CHK->setChecked(save_scan);
 
         ui->KERNEL_EDIT->setText(QString::number(kernel));
         ui->GAMMA_EDIT->setText(QString::number(gamma, 'f', 2));
@@ -75,7 +79,7 @@ void ProgSettings::data_exchange(bool read)
 
         ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
         ui->SIMPLIFY_STEP_CHK->setChecked(simplify_step);
-        ui->SAVE_SCAN_CHK->setChecked(save_scan);
+        ui->MAX_DIST_EDT->setText(QString::number(max_dist));
     }
 }
 
@@ -158,4 +162,9 @@ void ProgSettings::on_AUTO_REP_FREQ_CHK_stateChanged(int arg1)
 void ProgSettings::on_SAVE_SCAN_CHK_stateChanged(int arg1)
 {
     save_scan = arg1;
+}
+
+void ProgSettings::on_MAX_DIST_EDT_editingFinished()
+{
+    emit max_dist_changed(max_dist);
 }

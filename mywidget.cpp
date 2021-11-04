@@ -194,6 +194,7 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     connect(options, SIGNAL(triggered()), prog_settings, SLOT(show()));
     connect(options, SIGNAL(triggered()), prog_settings, SLOT(raise()));
     connect(prog_settings, SIGNAL(simplify_step_chk_clicked(bool)), this->parent()->parent(), SLOT(setup_stepping(bool)));
+    connect(prog_settings, SIGNAL(max_dist_changed(int)), this->parent()->parent(), SLOT(setup_max_dist(int)));
 
     capture = new TitleButton("", this);
     capture->setObjectName("CAPTURE_BTN");

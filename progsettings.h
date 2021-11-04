@@ -32,8 +32,11 @@ private slots:
 
     void on_SAVE_SCAN_CHK_stateChanged(int arg1);
 
+    void on_MAX_DIST_EDT_editingFinished();
+
 signals:
     void simplify_step_chk_clicked(bool);
+    void max_dist_changed(int);
 
 public:
     Ui::ProgSettings *ui;
@@ -46,6 +49,7 @@ public:
     int    frame_count;
     float  step_size;
     float  rep_freq;
+    bool   save_scan;
 
     int    kernel;
     float  gamma;
@@ -57,7 +61,7 @@ public:
 
     bool   auto_rep_freq;
     bool   simplify_step;
-    bool   save_scan;
+    int    max_dist;
 
 };
 

@@ -1488,7 +1488,7 @@
       <number>2</number>
      </property>
      <attribute name="verticalHeaderVisible">
-      <bool>true</bool>
+      <bool>false</bool>
      </attribute>
      <row/>
      <row/>
@@ -2771,6 +2771,22 @@
        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
       </property>
      </widget>
+     <widget class="QLabel" name="MCP_LABEL">
+      <property name="geometry">
+       <rect>
+        <x>120</x>
+        <y>55</y>
+        <width>21</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>255</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+      </property>
+     </widget>
      <zorder>FREQ_EDIT</zorder>
      <zorder>FREQ</zorder>
      <zorder>FREQ_UNIT</zorder>
@@ -2809,6 +2825,7 @@
      <zorder>GATE_WIDTH_A_EDIT_U</zorder>
      <zorder>ESTIMATED_2</zorder>
      <zorder>GATE_WIDTH</zorder>
+     <zorder>MCP_LABEL</zorder>
     </widget>
     <widget class="QGroupBox" name="OPERATION_STATIC">
      <property name="geometry">

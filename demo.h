@@ -1,8 +1,6 @@
 #ifndef DEMO_H
 #define DEMO_H
 
-#include <QtCore>
-#include <QtWidgets>
 #include <QSerialPort>
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -10,6 +8,7 @@
 #include <opencv2/videoio.hpp>
 #include <windows.h>
 
+#include "mywidget.h"
 #include "imageproc.h"
 #include "mvcam.h"
 //#include "hqvscam.h"
@@ -50,7 +49,7 @@ signals:
 
 };
 
-class Demo : public QMainWindow
+ class Demo : public QMainWindow
 {
     Q_OBJECT
 
@@ -73,6 +72,7 @@ public slots:
 
     // signaled in settings ui
     void setup_stepping(bool in_ns);
+    void setup_max_dist(int max_dist);
 
 private slots:
     // on clicking enum btn: enumerate devices
@@ -220,18 +220,18 @@ private:
     void set_zoom();
     void set_focus();
     // inline function for auto-focus
-    inline void focus_far();
-    inline void focus_near();
+    void focus_far();
+    void focus_near();
 
     // save img in buffer to file; or save imgs while scanning
     void save_to_file(bool save_result);
     void save_scan_img();
 
     // convert data to be sent to HEX buffer
-    void convert_to_send_tcu(uchar num, unsigned int send);
+    QByteArray convert_to_send_tcu(uchar num, unsigned int send);
 
     // update data to data-display; fb: whether reading feedback from com
-    void communicate_display(QSerialPort *com, int receive_size, int send_size, bool fb);
+    QByteArray communicate_display(QSerialPort *com, QByteArray write, int write_size, int read_size, bool fb);
 
     // update gate width
     void update_gate_width();

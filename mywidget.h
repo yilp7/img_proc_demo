@@ -1,21 +1,8 @@
 #ifndef MYWIDGET_H
 #define MYWIDGET_H
 
-#include <QMainWindow>
-#include <QLabel>
-#include <QWidget>
-#include <QMouseEvent>
-#include <QPainter>
-#include <QPaintEvent>
-#include <QTimer>
-#include <QPushButton>
-#include <QComboBox>
-#include <QMutex>
-#include <QMenu>
-#include <QApplication>
-#include <QDebug>
-#include <QDesktopWidget>
-#include <QRadioButton>
+#include <Qtcore>
+#include <QtWidgets>
 #include "opencv2/core.hpp"
 #include "progsettings.h"
 

@@ -1,8 +1,8 @@
 #include "demo.h"
-#ifdef PARAM
-    #include "./ui_demo_dev.h"
-#else
+#ifndef PARAM
     #include "./ui_demo_rls.h"
+#else
+    #include "./ui_demo_dev.h"
 #endif
 
 // used when moving temp recorded vid to destination
@@ -192,7 +192,8 @@ Demo::Demo(QWidget *parent)
     ui->MCP_SLIDER->setMaximum(255);
     ui->MCP_SLIDER->setSingleStep(1);
     ui->MCP_SLIDER->setPageStep(10);
-    ui->MCP_SLIDER->setValue(5);
+    change_mcp(5);
+//    ui->MCP_SLIDER->setValue(5);
     connect(ui->MCP_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_mcp(int)));
 
     ui->DELAY_SLIDER->setMinimum(0);
@@ -358,12 +359,13 @@ void Demo::data_exchange(bool read){
 //        laser_width_n = gate_width_a_n = gate_width_b_n = (int)(depth_of_vision / dist_ns) % 1000;
 //        gate_width_a_u = gate_width_b_u = (int)(depth_of_vision / dist_ns) / 1000;
 //        gate_width_a_n = gate_width_b_n = (int)(depth_of_vision / dist_ns) % 1000;
-#ifdef PARAM
-        gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
-        gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
-#else
+#ifndef PARAM
         laser_width_u = gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
         laser_width_n = gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
+
+#else
+        gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
+        gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
 #endif
         ui->STEPPING_EDIT->setText(QString::asprintf("%.2f", stepping));
 
@@ -471,7 +473,7 @@ int Demo::grab_thread_process() {
                 for (int i = 0; i < h; i++) {
                     for (int j = 0; j < w; j++) {
                         uchar p = img[i * modified_result.step + j];
-                        if (p < 64)       {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.48);}
+                        if      (p < 64)  {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.48);}
                         else if (p < 112) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.36);}
                         else if (p < 144) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.32);}
                         else if (p < 160) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.30);}
@@ -652,14 +654,14 @@ void Demo::switch_language()
 {
     en ? qApp->removeTranslator(&trans) : qApp->installTranslator(&trans);
     ui->retranslateUi(this);
-    int idx = ui->ENHANCE_OPTIONS->currentIndex();
-    ui->ENHANCE_OPTIONS->clear();
-    ui->ENHANCE_OPTIONS->addItem(tr("None"));
-    ui->ENHANCE_OPTIONS->addItem(tr("Histogram"));
-    ui->ENHANCE_OPTIONS->addItem(tr("Laplace"));
-    ui->ENHANCE_OPTIONS->addItem(tr("Log-based"));
-    ui->ENHANCE_OPTIONS->addItem(tr("Gamma-based"));
-    ui->ENHANCE_OPTIONS->setCurrentIndex(idx);
+//    int idx = ui->ENHANCE_OPTIONS->currentIndex();
+//    ui->ENHANCE_OPTIONS->clear();
+//    ui->ENHANCE_OPTIONS->addItem(tr("None"));
+//    ui->ENHANCE_OPTIONS->addItem(tr("Histogram"));
+//    ui->ENHANCE_OPTIONS->addItem(tr("Laplace"));
+//    ui->ENHANCE_OPTIONS->addItem(tr("Log-based"));
+//    ui->ENHANCE_OPTIONS->addItem(tr("Gamma-based"));
+//    ui->ENHANCE_OPTIONS->setCurrentIndex(idx);
     en ^= 1;
 }
 
@@ -774,8 +776,8 @@ void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate)
         // send initial data
         switch (id) {
         case 0:
-            convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8);
-            communicate_display(com[0], 1, 7, false);
+//            convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8);
+            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8), 7, 1, false);
             update_delay();
             update_gate_width();
             change_mcp(5);
@@ -978,17 +980,12 @@ void Demo::on_SET_PARAMS_BUTTON_clicked()
     duty = 1e6 / fps - 1000;
 #endif
 
-    uint send = 0;
 
     // CCD FREQUENCY
-    send = 1.25e8 / fps;
-    convert_to_send_tcu(0x06, send);
-    communicate_display(com[0], 1, 7, false);
+    communicate_display(com[0], convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
 
     // DUTY RATIO -> EXPO. TIME
-    send = duty * 1.25e2;
-    convert_to_send_tcu(0x07, send);
-    communicate_display(com[0], 1, 7, false);
+    communicate_display(com[0], convert_to_send_tcu(0x07, duty * 1.25e2), 7, 1, false);
 
     time_exposure_edit = duty;
     frame_rate_edit = fps;
@@ -1036,6 +1033,8 @@ void Demo::clean()
     prev_3d.release();
     for (auto& m: seq) m.release();
     seq_sum.release();
+    for (auto& m: accu) m.release();
+    accu_sum.release();
 }
 
 void Demo::setup_stepping(bool in_ns)
@@ -1044,45 +1043,53 @@ void Demo::setup_stepping(bool in_ns)
     ui->STEPPING_UNIT->setText(stepping_in_ns ? "ns" : "m");
 }
 
+void Demo::setup_max_dist(int max_dist)
+{
+    ui->DELAY_SLIDER->setMaximum(max_dist);
+}
+
 // convert data to be sent to TCU-COM to hex buffer
-void Demo::convert_to_send_tcu(uchar num, unsigned int send) {
-    out_buffer[0] = 0x88;
-    out_buffer[1] = num;
-    out_buffer[6] = 0x99;
+QByteArray Demo::convert_to_send_tcu(uchar num, unsigned int send) {
+    QByteArray out(7, 0x00);
+    out[0] = 0x88;
+    out[1] = num;
+    out[6] = 0x99;
 
-    out_buffer[5] = send & 0xFF; send >>= 8;
-    out_buffer[4] = send & 0xFF; send >>= 8;
-    out_buffer[3] = send & 0xFF; send >>= 8;
-    out_buffer[2] = send & 0xFF;
-
-//    QByteArray(7, 0x00);
+    out[5] = send & 0xFF; send >>= 8;
+    out[4] = send & 0xFF; send >>= 8;
+    out[3] = send & 0xFF; send >>= 8;
+    out[2] = send & 0xFF;
+    return out;
 }
 
 // send and receive data from COM, and display
-void Demo::communicate_display(QSerialPort *com, int receive_size, int send_size, bool fb) {
+QByteArray Demo::communicate_display(QSerialPort *com, QByteArray write, int write_size, int read_size, bool fb) {
     QString str_s("sent    "), str_r("received");
 
-    for (char i = 0; i < 7; i++) str_s += QString::asprintf(" %02X", i + send_size - 7 < 0 ? 0 : out_buffer[i + send_size - 7]);
+    for (char i = 0; i < 7; i++) str_s += QString::asprintf(" %02X", i + write_size - 7 < 0 ? 0 : (uchar)write[i + write_size - 7]);
     emit append_text(str_s);
 
-    if (com == NULL) return;
+    if (com == NULL) return QByteArray();
     com->clear();
-    com->write(QByteArray((char*)out_buffer, send_size));
+    com->write(write, write_size);
     while (com->waitForBytesWritten(10)) ;
 
     if (fb) while (com->waitForReadyRead(100)) ;
-    memset(in_buffer, 0, 7);
-    memcpy(in_buffer, com->readAll(), receive_size);
-    for (char i = 0; i < 7; i++) str_r += QString::asprintf(" %02X", i + receive_size - 7 < 0 ? 0 : in_buffer[i + receive_size - 7]);
+
+    static QTimer t;
+    t.start(100);
+    QByteArray read = com->read(read_size);
+    while (t.remainingTime() && read.size() < read_size) read.append(com->read(read_size - read.size()));
+    t.stop();
+    for (char i = 0; i < 7; i++) str_r += QString::asprintf(" %02X", i + read_size - 7 < 0 ? 0 : (uchar)read[i + read.size() - 7]);
     emit append_text(str_r);
 
-    QThread().msleep(10);
+//    QThread().msleep(10);
+    return read;
 }
 
 void Demo::update_delay()
 {
-    unsigned int send = 0;
-
     // REPEATED FREQUENCY
     if (delay_dist < 0) delay_dist = 0;
     if (delay_dist > 15000) delay_dist = 15000;
@@ -1102,9 +1109,7 @@ void Demo::update_delay()
             if (rep_freq < 10) rep_freq = 10;
         }
 
-        send = 1.25e5 / rep_freq;
-        convert_to_send_tcu(0x00, send);
-        communicate_display(com[0], 1, 7, false);
+        communicate_display(com[0], convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
     }
 
     data_exchange(false);
@@ -1120,50 +1125,38 @@ void Demo::update_delay()
     communicate_display(com[0], 1, 7);
 */
     // DELAY A
-    send = (delay_a_u * 1000 + delay_a_n) + 68;
-    convert_to_send_tcu(0x02, send);
-    communicate_display(com[0], 1, 7, false);
+    communicate_display(com[0], convert_to_send_tcu(0x02, (delay_a_u * 1000 + delay_a_n) + 68), 7, 1, false);
 
     // DELAY B
-    send = (delay_b_u * 1000 + delay_b_n) + 68;
-    convert_to_send_tcu(0x04, send);
-    communicate_display(com[0], 1, 7, false);
+    communicate_display(com[0], convert_to_send_tcu(0x04, (delay_b_u * 1000 + delay_b_n) + 68), 7, 1, false);
 }
 
 void Demo::update_gate_width() {
     if (depth_of_vision < 0) depth_of_vision = 0;
     if (depth_of_vision > 1500) depth_of_vision = 1500;
 
-    unsigned int send = 0;
     int gw = std::round(depth_of_vision / dist_ns);
 
     ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_vision));
 //    gate_width_a_n = gate_width_b_n = laser_width_n = gw % 1000;
 //    gate_width_a_u = gate_width_b_u = laser_width_u = gw / 1000;
-#ifdef PARAM
-    gate_width_a_n = gw % 1000;
-    gate_width_a_u = gw / 1000;
-#else
+#ifndef PARAM
     gate_width_a_n = laser_width_n = gw % 1000;
     gate_width_a_u = laser_width_u = gw / 1000;
 
     // LASER WIDTH
-    send = (gw - 18) / 8;
-    convert_to_send_tcu(0x01, send);
-    communicate_display(com[0], 1, 7, false);
+    communicate_display(com[0], convert_to_send_tcu(0x01, (gw - 18) / 8), 7, 1, false);
+#else
+    gate_width_a_n = gw % 1000;
+    gate_width_a_u = gw / 1000;
 #endif
 
     // GATE WIDTH A
-//    send = gw - 18;
-    send = gw + 8;
-    convert_to_send_tcu(0x03, send);
-    communicate_display(com[0], 1, 7, false);
+    communicate_display(com[0], convert_to_send_tcu(0x03, gw + 8), 7, 1, false);
 
     // GATE WIDTH B
 //    send = gw - 18;
-    send = gw + 8;
-    convert_to_send_tcu(0x05, send);
-    communicate_display(com[0], 1, 7, false);
+    communicate_display(com[0], convert_to_send_tcu(0x05, gw + 8), 7, 1, false);
 
     data_exchange(false);
 }
@@ -1188,28 +1181,12 @@ void Demo::update_current()
 
 void Demo::on_DIST_BTN_clicked() {
     if (com[1]) {
-        com[1]->write(QByteArray(1, 0xA5));
-        while (com[1]->waitForReadyRead(100)) ;
-        uchar read1[6] = {0};
-        memcpy(read1, com[1]->readAll().data(), 6);
-        QString read_dist1;
-        for (int i = 0; i < 6; i++) read_dist1 += QString::asprintf(" %02X", read1[i]);
-        qDebug("%s", read_dist1.toLatin1().data());
+        QByteArray read = communicate_display(com[1], QByteArray(1, 0xA5), 1, 6, true);
+//        qDebug("%s", read_dist.toLatin1().data());
 
-        out_buffer[0] = 0xEE;
-        out_buffer[1] = 0x16;
-        out_buffer[2] = 0x02;
-        out_buffer[3] = 0x03;
-        out_buffer[4] = 0x02;
-        out_buffer[5] = 0x05;
-
-        com[1]->write(QByteArray((char*)out_buffer, 6));
-        while (com[1]->waitForReadyRead(1000)) ;
-        uchar read[10] = {0};
-        memcpy(read, com[1]->readAll().data(), 10);
-        QString read_dist;
-        for (int i = 0; i < 10; i++) read_dist += QString::asprintf(" %02X", read[i]);
-        qDebug("%s", read_dist.toLatin1().data());
+        read.clear();
+        read = communicate_display(com[1], QByteArray((char*)new uchar[6]{0xEE, 0x16, 0x02, 0x03, 0x02, 0x05}, 6), 6, 10, true);
+//        qDebug("%s", read_dist.toLatin1().data());
 //        communicate_display(com[1], 7, 7, true);
 //        QString ascii;
 //        for (int i = 0; i < 7; i++) ascii += QString::asprintf(" %2c", in_buffer[i]);
@@ -1247,78 +1224,18 @@ void Demo::on_IMG_3D_CHECK_stateChanged(int arg1)
     data_exchange(true);
 }
 
-/*
-case IDC_OPEN_BUTTON:
-    GetDlgItem(IDC_OPEN_BUTTON)->SetWindowText(_T("stop"));
-
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x02;
-    out_buffer[3] = 0x00;
-    out_buffer[4] = 0x00;
-    out_buffer[5] = 0x00;
-    out_buffer[6] = 0x03;
-
-    communicate_single(h_com_focus, 1, 7);
-    break;
-case IDC_CLOSE_BUTTON:
-    GetDlgItem(IDC_CLOSE_BUTTON)->SetWindowText(_T("stop"));
-
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x04;
-    out_buffer[3] = 0x00;
-    out_buffer[4] = 0x00;
-    out_buffer[5] = 0x00;
-    out_buffer[6] = 0x05;
-
-    communicate_single(h_com_focus, 1, 7);
-    break;
-*/
 void Demo::on_ZOOM_IN_BTN_pressed()
 {
     ui->ZOOM_IN_BTN->setText("x");
 
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x00;
-    out_buffer[3] = 0x40;
-    out_buffer[4] = 0x00;
-    out_buffer[5] = 0x00;
-    out_buffer[6] = 0x41;
-
-//    out_buffer[0] = 0xFF;
-//    out_buffer[1] = 0x01;
-//    out_buffer[2] = 0x01;
-//    out_buffer[3] = 0x00;
-//    out_buffer[4] = 0x00;
-//    out_buffer[5] = 0x00;
-//    out_buffer[6] = 0x02;
-
-    communicate_display(com[2], 1, 7, false);
+    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
 }
 
 void Demo::on_ZOOM_OUT_BTN_pressed()
 {
     ui->ZOOM_OUT_BTN->setText("x");
 
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x00;
-    out_buffer[3] = 0x20;
-    out_buffer[4] = 0x00;
-    out_buffer[5] = 0x00;
-    out_buffer[6] = 0x21;
-
-//    out_buffer[0] = 0xFF;
-//    out_buffer[1] = 0x01;
-//    out_buffer[2] = 0x00;
-//    out_buffer[3] = 0x80;
-//    out_buffer[4] = 0x00;
-//    out_buffer[5] = 0x00;
-//    out_buffer[6] = 0x81;
-
-    communicate_display(com[2], 1, 7, false);
+    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
 }
 
 void Demo::on_FOCUS_NEAR_BTN_pressed()
@@ -1327,25 +1244,9 @@ void Demo::on_FOCUS_NEAR_BTN_pressed()
     focus_near();
 }
 
-void Demo::focus_near()
+inline void Demo::focus_near()
 {
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x01;
-    out_buffer[3] = 0x00;
-    out_buffer[4] = 0x00;
-    out_buffer[5] = 0x00;
-    out_buffer[6] = 0x02;
-
-//    out_buffer[0] = 0xFF;
-//    out_buffer[1] = 0x01;
-//    out_buffer[2] = 0x00;
-//    out_buffer[3] = 0x40;
-//    out_buffer[4] = 0x00;
-//    out_buffer[5] = 0x00;
-//    out_buffer[6] = 0x41;
-
-    communicate_display(com[2], 1, 7, false);
+    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
 }
 
 void Demo::on_FOCUS_FAR_BTN_pressed()
@@ -1354,84 +1255,55 @@ void Demo::on_FOCUS_FAR_BTN_pressed()
     focus_far();
 }
 
-void Demo::focus_far()
+inline void Demo::focus_far()
 {
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x00;
-    out_buffer[3] = 0x80;
-    out_buffer[4] = 0x00;
-    out_buffer[5] = 0x00;
-    out_buffer[6] = 0x81;
-
-//    out_buffer[0] = 0xFF;
-//    out_buffer[1] = 0x01;
-//    out_buffer[2] = 0x00;
-//    out_buffer[3] = 0x20;
-//    out_buffer[4] = 0x00;
-//    out_buffer[5] = 0x00;
-//    out_buffer[6] = 0x21;
-
-    communicate_display(com[2], 1, 7, false);
+    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), 7, 1, false);
 }
 
-void Demo::lens_stop() {
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x00;
-    out_buffer[3] = 0x00;
-    out_buffer[4] = 0x00;
-    out_buffer[5] = 0x00;
-    out_buffer[6] = 0x01;
-
-    communicate_display(com[2], 1, 7, false);
+inline void Demo::lens_stop() {
+    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 }
 
 void Demo::set_zoom()
 {
     data_exchange(true);
-    unsigned short sum = 0;
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x00;
-    out_buffer[3] = 0x4F;
-    out_buffer[4] = (zoom >> 8) & 0xFF;
-    out_buffer[5] = zoom & 0xFF;
+    unsigned sum = 0;
+    uchar out[7];
+    out[0] = 0xFF;
+    out[1] = 0x01;
+    out[2] = 0x00;
+    out[3] = 0x4F;
+    out[4] = (zoom >> 8) & 0xFF;
+    out[5] = zoom & 0xFF;
     for (int i = 1; i < 6; i++)
-        sum += out_buffer[i];
-    out_buffer[6] = sum & 0xFF;
+        sum += out[i];
+    out[6] = sum & 0xFF;
 
-    communicate_display(com[2], 1, 7, false);
+    communicate_display(com[2], QByteArray((char*)out), 7, 1, false);
 }
 
 void Demo::set_focus()
 {
     data_exchange(true);
-    unsigned short sum = 0;
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x00;
-    out_buffer[3] = 0x4E;
-    out_buffer[4] = (focus >> 8) & 0xFF;
-    out_buffer[5] = focus & 0xFF;
+    unsigned sum = 0;
+    uchar out[7];
+    out[0] = 0xFF;
+    out[1] = 0x01;
+    out[2] = 0x00;
+    out[3] = 0x4E;
+    out[4] = (focus >> 8) & 0xFF;
+    out[5] = focus & 0xFF;
     for (int i = 1; i < 6; i++)
-        sum += out_buffer[i];
-    out_buffer[6] = sum & 0xFF;
+        sum += out[i];
+    out[6] = sum & 0xFF;
 
-    communicate_display(com[2], 1, 7, false);
+    communicate_display(com[2], QByteArray((char*)out), 7, 1, false);
 }
 
 
 void Demo::start_laser()
 {
-    out_buffer[0]=0x88;
-    out_buffer[1]=0x08;
-    out_buffer[2]=0x00;
-    out_buffer[3]=0x00;
-    out_buffer[4]=0x00;
-    out_buffer[5]=0x01;
-    out_buffer[6]=0x99;
-    communicate_display(com[0], 0, 7, false);
+    communicate_display(com[0], QByteArray((char*)new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
     QTimer::singleShot(100000, this, SLOT(init_laser()));
 }
 
@@ -1472,10 +1344,11 @@ void Demo::change_mcp(int val)
 {
     mcp = val;
 
-    convert_to_send_tcu(0x0A, mcp);
-    communicate_display(com[0], 1, 7, false);
+//    convert_to_send_tcu(0x0A, mcp);
+    communicate_display(com[0], convert_to_send_tcu(0x0A, mcp), 7, 1, false);
 
-    ui->MCP_SLIDER->setStatusTip(QString::number(val));
+    ui->MCP_LABEL->setText(QString::number(val));
+//    ui->MCP_SLIDER->setToolTip(QString::number(val));
 }
 
 void Demo::change_gain(int val)
@@ -1512,7 +1385,7 @@ void Demo::change_focus_speed(int val)
     out_data[8] = (4 * (uint)val + 0xA2) & 0xFF;
 
     if (com[2]) com[2]->write(QByteArray((char*)out_data, 9));
-    while (com[2] && com[2]->waitForReadyRead(100)) ;
+    while (com[2] && com[2]->waitForReadyRead(20)) ;
 }
 
 void Demo::on_ZOOM_IN_BTN_released()
@@ -1542,7 +1415,6 @@ void Demo::on_FOCUS_FAR_BTN_released()
 void Demo::keyPressEvent(QKeyEvent *event)
 {
     static QLineEdit *edit;
-    uint send;
 
     if (event->key() == Qt::Key_Escape) {
         this->focusWidget()->clearFocus();
@@ -1564,9 +1436,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
         }
         if (edit == ui->FREQ_EDIT) {
             rep_freq = ui->FREQ_EDIT->text().toInt();
-            send = 1.25e5 / rep_freq;
-            convert_to_send_tcu(0x00, send);
-            communicate_display(com[0], 1, 7, false);
+            communicate_display(com[0], convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
         }
         else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
             depth_of_vision = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt()) * dist_ns;
@@ -1574,10 +1444,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
         }
         else if (edit == ui->LASER_WIDTH_EDIT_U) {
             laser_width_u = edit->text().toInt();
-//            send = (laser_width_u * 1000 + laser_width_n - 18) / 8;
-            send = (laser_width_u * 1000 + laser_width_n + 8) / 8;
-            convert_to_send_tcu(0x01, send);
-            communicate_display(com[0], 1, 7, false);
+            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8), 7, 1, false);
         }
         else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
             depth_of_vision = (edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000) * dist_ns;
@@ -1585,10 +1452,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
         }
         else if (edit == ui->LASER_WIDTH_EDIT_N) {
             laser_width_n = edit->text().toInt();
-//            send = (laser_width_u * 1000 + laser_width_n - 18) / 8;
-            send = (laser_width_u * 1000 + laser_width_n + 8) / 8;
-            convert_to_send_tcu(0x01, send);
-            communicate_display(com[0], 1, 7, false);
+            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8), 7, 1, false);
         }
         else if (edit == ui->DELAY_A_EDIT_U) {
             delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt()) * dist_ns;
@@ -1883,7 +1747,7 @@ void Demo::on_CONTINUE_SCAN_BUTTON_clicked()
     emit update_scan(true);
 
     convert_to_send_tcu(0x00, (uint)(1.25e5 / rep_freq));
-    communicate_display(com[0], 1, 7, false);
+    communicate_display(com[0], convert_to_send_tcu(0x00, (uint)(1.25e5 / rep_freq)), 7, 1, false);
 }
 
 void Demo::on_RESTART_SCAN_BUTTON_clicked()
@@ -1944,30 +1808,14 @@ void Demo::on_LASER_ZOOM_IN_BTN_pressed()
 {
     ui->LASER_ZOOM_IN_BTN->setText("x");
 
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x02;
-    out_buffer[3] = 0x00;
-    out_buffer[4] = 0x00;
-    out_buffer[5] = 0x00;
-    out_buffer[6] = 0x03;
-
-    communicate_display(com[2], 1, 7, false);
+    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
 }
 
 void Demo::on_LASER_ZOOM_OUT_BTN_pressed()
 {
     ui->LASER_ZOOM_OUT_BTN->setText("x");
 
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x04;
-    out_buffer[3] = 0x00;
-    out_buffer[4] = 0x00;
-    out_buffer[5] = 0x00;
-    out_buffer[6] = 0x05;
-
-    communicate_display(com[2], 1, 7, false);
+    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
 }
 
 void Demo::on_LASER_ZOOM_IN_BTN_released()
@@ -1986,25 +1834,11 @@ void Demo::on_LASER_BTN_clicked()
 {
     if (ui->LASER_BTN->text() == "ON") {
         ui->LASER_BTN->setEnabled(false);
-        out_buffer[0]=0x88;
-        out_buffer[1]=0x08;
-        out_buffer[2]=0x00;
-        out_buffer[3]=0x00;
-        out_buffer[4]=0x00;
-        out_buffer[5]=0x01;
-        out_buffer[6]=0x99;
-        communicate_display(com[0], 0, 7, false);
+        communicate_display(com[0], QByteArray((char*)new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
         QTimer::singleShot(4000, this, SLOT(start_laser()));
     }
     else {
-        out_buffer[0]=0x88;
-        out_buffer[1]=0x08;
-        out_buffer[2]=0x00;
-        out_buffer[3]=0x00;
-        out_buffer[4]=0x00;
-        out_buffer[5]=0x02;
-        out_buffer[6]=0x99;
-        communicate_display(com[0], 0, 7, false);
+        communicate_display(com[0], QByteArray((char*)new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 7, 0, false);
 
         ui->LASER_BTN->setText(tr("ON"));
         ui->CURRENT_EDIT->setEnabled(false);
@@ -2013,26 +1847,10 @@ void Demo::on_LASER_BTN_clicked()
 
 void Demo::on_GET_LENS_PARAM_BTN_clicked()
 {
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x00;
-    out_buffer[3] = 0x55;
-    out_buffer[4] = 0x00;
-    out_buffer[5] = 0x00;
-    out_buffer[6] = 0x56;
+    QByteArray read = communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
+    zoom = (read[4] << 8) + read[5];
 
-    communicate_display(com[2], 7, 7, true);
-    zoom = (in_buffer[4] << 8) + in_buffer[5];
-
-    out_buffer[0] = 0xFF;
-    out_buffer[1] = 0x01;
-    out_buffer[2] = 0x00;
-    out_buffer[3] = 0x56;
-    out_buffer[4] = 0x00;
-    out_buffer[5] = 0x00;
-    out_buffer[6] = 0x57;
-
-    communicate_display(com[2], 7, 7, true);
+    read = communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
     focus = (in_buffer[4] << 8) + in_buffer[5];
 
     data_exchange(false);
