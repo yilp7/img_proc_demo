@@ -113,8 +113,8 @@ target_link_libraries(Demo_param
 #    HQV_DataConvert
 #    HQV_SDK
 #    # opencv
-#    libopencv_core452
-#    libopencv_imgcodecs452
-#    libopencv_imgproc452
-#    libopencv_videoio452
+#    opencv_core452
+#    opencv_imgcodecs452
+#    opencv_imgproc452
+#    opencv_videoio452
 #)

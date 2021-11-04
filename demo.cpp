@@ -42,20 +42,31 @@ void MouseThread::draw_cursor()
     if (QApplication::mouseButtons() == Qt::LeftButton || ptr->is_maximized()) return;
 //    QWidget *w = QApplication::widgetAt(ptr->cursor().pos());
     QPoint diff = ptr->cursor().pos() - ptr->pos();
+    // cursor in title bar
     if (diff.y() < 30 && diff.x() > ptr->width() - 5) emit set_cursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+    // cursor in main window
     else if (diff.y() < 5) {
+        // cursor @ topleft corner
         if (diff.x() < 5) emit set_cursor(QCursor(QPixmap(":/cursor/resize_md.png").scaled(16, 16)));
+        // cursor on min, max, exit button
         else if (diff.x() > ptr->width() - 120) emit set_cursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+        // cursor @ top border
         else emit set_cursor(QCursor(QPixmap(":/cursor/resize_v.png").scaled(20, 20)));
     }
     else if (diff.y() > ptr->height() - 5) {
+        // cursor @ bottom left corner
         if (diff.x() < 5) emit set_cursor(QCursor(QPixmap(":/cursor/resize_sd.png").scaled(16, 16)));
+        // cursor @ bottom right corner
         else if (diff.x() > ptr->width() - 5) emit set_cursor(QCursor(QPixmap(":/cursor/resize_md.png").scaled(16, 16)));
+        // cursor @ bottom border
         else emit set_cursor(QCursor(QPixmap(":/cursor/resize_v.png").scaled(20, 20)));
     }
     else {
+        // cursor @ left border
         if (diff.x() < 5) emit set_cursor(QCursor(QPixmap(":/cursor/resize_h.png").scaled(20, 20)));
+        // cursor @ right border
         else if (diff.x() > ptr->width() - 5) emit set_cursor(QCursor(QPixmap(":/cursor/resize_h.png").scaled(20, 20)));
+        // cursor inside window
         else emit set_cursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
     }
 }
@@ -63,58 +74,56 @@ void MouseThread::draw_cursor()
 Demo* wnd;
 
 Demo::Demo(QWidget *parent)
-    : QMainWindow(parent)
-    , ui(new Ui::Demo)
-    , calc_avg_option(5)
-    , range_threshold(0)
-    , trigger_by_software(false)
-    , curr_cam(NULL)
-    , time_exposure_edit(5000)
-    , gain_analog_edit(0)
-    , frame_rate_edit(10)
-    , save_location("")
-    , TEMP_SAVE_LOCATION("")
-    , com{NULL}
-    , out_buffer{0}
-    , in_buffer{0}
-    , rep_freq(30)
-    , laser_width_u(0)
-    , laser_width_n(500)
-    , delay_n_n(0)
-    , stepping(10)
-    , stepping_in_ns(false)
-    , fps(10)
-    , duty(5000)
-    , mcp(5)
-    , zoom(0)
-    , focus(0)
-    , distance(0)
-    , delay_dist(15)
-    , depth_of_vision(15)
-    , focus_direction(0)
-    , display_option(1)
-    , device_on(false)
-    , start_grabbing(false)
-    , record_original(false)
-    , record_modified(false)
-    , save_original(false)
-    , save_modified(false)
-    , image_3d(false)
-    , w(640)
-    , h(400)
-    , h_grab_thread(NULL)
-    , grab_thread_state(false)
-    , h_mouse_thread(NULL)
-    , seq_idx(0)
-    , accu_idx(0)
-    , scan(false)
-    , scan_distance(200)
-    , c(3e8)
-    , frame_a_3d(false)
-    , hide_left(false)
-    , resize_place(22)
-    , en(false)
-    , mouse_pressed(false)
+    : QMainWindow(parent),
+    mouse_pressed(false),
+    ui(new Ui::Demo),
+    calc_avg_option(5),
+    range_threshold(0),
+    trigger_by_software(false),
+    curr_cam(NULL),
+    time_exposure_edit(5000),
+    gain_analog_edit(0),
+    frame_rate_edit(10),
+    com{NULL},
+    out_buffer{0},
+    in_buffer{0},
+    rep_freq(30),
+    laser_width_u(0),
+    laser_width_n(500),
+    delay_n_n(0),
+    stepping(10),
+    stepping_in_ns(false),
+    fps(10),
+    duty(5000),
+    mcp(5),
+    zoom(0),
+    focus(0),
+    distance(0),
+    delay_dist(15),
+    depth_of_vision(15),
+    focus_direction(0),
+    display_option(1),
+    device_on(false),
+    start_grabbing(false),
+    record_original(false),
+    record_modified(false),
+    save_original(false),
+    save_modified(false),
+    image_3d(false),
+    w(640),
+    h(400),
+    h_grab_thread(NULL),
+    grab_thread_state(false),
+    h_mouse_thread(NULL),
+    seq_idx(0),
+    accu_idx(0),
+    scan(false),
+    scan_distance(200),
+    c(3e8),
+    frame_a_3d(false),
+    hide_left(false),
+    resize_place(22),
+    en(false)
 {
     ui->setupUi(this);
     wnd = this;
@@ -128,9 +137,8 @@ Demo::Demo(QWidget *parent)
 
     // initialization
     // - default save path
-    save_location += QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section("/", 0, -1);
+    save_location += QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section("/", 0, -1) + "/Pictures";
 //    qDebug() << QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section('/', 0, -1);
-    save_location += "/Pictures";
     TEMP_SAVE_LOCATION = QString(save_location);
 
     // - image operations
@@ -224,14 +232,6 @@ Demo::Demo(QWidget *parent)
     ui->CONTRAST_SLIDER->setValue(10);
     ui->CONTRAST_SLIDER->setTickInterval(5);
 
-    on_ENUM_BUTTON_clicked();
-    if (com[0] && com[3]) on_LASER_BTN_clicked();
-
-    ui->COM_DATA_RADIO->click();
-
-    // - set startup focus
-    (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
-
     ui->RULER_V->vertical = true;
 //    ui->label->setup_animation(":/pics/model.png", QSize(700, 400), 500);
 //    ui->label_2->setup_animation(":/pics/wave.png", QSize(512, 512), 100);
@@ -267,6 +267,15 @@ Demo::Demo(QWidget *parent)
 
     scan_q.push_back(-1);
     setup_stepping(true);
+
+    // right before gui display (init state)
+    on_ENUM_BUTTON_clicked();
+    if (com[0] && com[3]) on_LASER_BTN_clicked();
+
+    ui->COM_DATA_RADIO->click();
+
+    // - set startup focus
+    (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
     // for presentation
     ui->CTRL_STATIC->hide();
@@ -399,13 +408,14 @@ int Demo::grab_thread_process() {
 //            qDebug() << "qqqq" << focus_direction;
             if (clarity[2] > clarity[1] && clarity[1] > clarity[0]) {
                 focus_direction *= -2;
-                // TO-DO: change speed
+                // TODO not yet well implemented
                 if (abs(focus_direction) > 7) lens_stop(), focus_direction = 0;
                 else if (focus_direction > 0) lens_stop(), change_focus_speed(8), focus_far();
                 else if (focus_direction < 0) lens_stop(), change_focus_speed(16), focus_near();
             }
         }
 
+        // process frame average
         if (seq_sum.empty()) seq_sum = cv::Mat::zeros(h, w, CV_16U);
         if (ui->FRAME_AVG_CHECK->isChecked()) {
             calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 5 + 5;
@@ -421,6 +431,7 @@ int Demo::grab_thread_process() {
         }
         else modified_result = img_mem.clone();
 
+        // process normal image enhance
         if (!image_3d && ui->IMG_ENHANCE_CHECK->isChecked()) {
             switch (ui->ENHANCE_OPTIONS->currentIndex()) {
             // histogram
@@ -453,6 +464,7 @@ int Demo::grab_thread_process() {
                 img_gamma.convertTo(modified_result, CV_8U, 255, 0);
                 break;
             }
+            // accumulative
             case 5: {
                 uchar *img = modified_result.data;
                 uchar *accu_frame = accu[accu_idx].data;
@@ -471,13 +483,14 @@ int Demo::grab_thread_process() {
                         else if (p < 224) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.22);}
                         else if (p < 240) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.21);}
                         else if (p < 256) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.2);}
-
                     }
                 }
                 modified_result = cv::Mat::zeros(h, w, CV_8U);
                 for(auto m: accu) modified_result += m;
                 accu_idx = (accu_idx + 1) % 5;
+                break;
             }
+            // custom (mergw log w/ 1/(1+exp))
             case 6: {
                 uchar *img = modified_result.data;
                 cv::Mat img_log, img_nonLT = cv::Mat(h, w, CV_8U);
@@ -504,7 +517,9 @@ int Demo::grab_thread_process() {
                 cv::normalize(img_log, img_log, 0, 255, cv::NORM_MINMAX);
                 cv::convertScaleAbs(img_log, img_log);
                 modified_result = 0.05 * img_log + 0.05 * img_nonLT + 0.8 * modified_result;
+                break;
             }
+            // adaptive
             case 7: {
 //                double low = low_in * 255, high = high_in * 255; // (0, 12.75)
 //                double bottom = low_out * 255, top = high_out * 255; // (0, 255)
@@ -518,12 +533,14 @@ int Demo::grab_thread_process() {
                 temp = temp * err_out + bottom;
                 cv::normalize(temp, temp, 0, 255, cv::NORM_MINMAX);
                 cv::convertScaleAbs(temp, modified_result);
+                break;
             }
             // none
             default:
                 break;
             }
         }
+        // process special image enhance
         if (!image_3d && ui->SP_CHECK->isChecked()) ImageProc::plateau_equl_hist(&modified_result, &modified_result, ui->SP_OPTIONS->currentIndex());
 
         // brightness & contrast
@@ -535,6 +552,7 @@ int Demo::grab_thread_process() {
             if (modified_result.at<uchar>(i, j) == val) modified_result.at<uchar>(i, j) = 0;
         }
 
+        // process 3d image construction from ABN frames
         if (image_3d) {
             range_threshold = ui->RANGE_THRESH_EDIT->text().toFloat();
             modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_vision / dist_ns, range_threshold);
@@ -543,11 +561,13 @@ int Demo::grab_thread_process() {
         }
         prev_img = img_mem.clone();
 
+        // put info (dist, dov, time) as text on image
         if (ui->INFO_CHECK->isChecked()) {
             cv::putText(modified_result, QString::asprintf("DIST %05d m", (int)delay_dist).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
             cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
         }
 
+        // image display
 //        cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? w + 104 : w) / disp->width(), disp->display_region.br() * (image_3d ? w + 104 : w) / disp->width());
         cv::Rect region = cv::Rect(disp->display_region.tl() * w / disp->width(), disp->display_region.br() * w / disp->width());
         if (region.height > h) region.height = h;
@@ -569,6 +589,7 @@ int Demo::grab_thread_process() {
         stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, image_3d ? QImage::Format_RGB888 : QImage::Format_Indexed8);
         ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 
+        // process scan
         if (scan) {
             emit update_delay_in_thread();
 
@@ -578,6 +599,7 @@ int Demo::grab_thread_process() {
         }
         if (scan && delay_dist >= scan_farthest) {on_SCAN_BUTTON_clicked();}
 
+        // image write / video record
         if (save_original) save_to_file(false);
         if (save_modified) save_to_file(true);
         if (record_original) {
@@ -591,6 +613,7 @@ int Demo::grab_thread_process() {
             vid_out[1].write(modified_result);
         }
 
+        // display grayscale histogram of current image
         if (ui->HISTOGRAM_RADIO->isChecked() && !image_3d) {
             if (modified_result.channels() != 1) continue;
             uchar *img = modified_result.data;
@@ -599,6 +622,7 @@ int Demo::grab_thread_process() {
             for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img + i * step)[j]]++;
             uint max = 0;
             for (int i = 1; i < 256; i++) {
+                // discard abnormal value
                 if (hist[i] > 50000) hist[i] = 0;
                 if (hist[i] > max) max = hist[i];
             }
@@ -649,6 +673,7 @@ void Demo::closeEvent(QCloseEvent *event)
 
 int Demo::shut_down() {
     if (record_original) on_SAVE_AVI_BUTTON_clicked();
+    if (record_modified) on_SAVE_FINAL_BUTTON_clicked();
 
     grab_thread_state = false;
     if (h_grab_thread) {
@@ -822,7 +847,7 @@ void Demo::on_START_BUTTON_clicked()
 void Demo::on_SHUTDOWN_BUTTON_clicked()
 {
     shut_down();
-    enable_controls(true);
+    on_ENUM_BUTTON_clicked();
     clean();
 }
 
@@ -1029,6 +1054,8 @@ void Demo::convert_to_send_tcu(uchar num, unsigned int send) {
     out_buffer[4] = send & 0xFF; send >>= 8;
     out_buffer[3] = send & 0xFF; send >>= 8;
     out_buffer[2] = send & 0xFF;
+
+//    QByteArray(7, 0x00);
 }
 
 // send and receive data from COM, and display

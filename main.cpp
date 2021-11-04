@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
     style.open(QIODevice::ReadOnly);
     a.setStyleSheet(style.readAll());
 
-    qInstallMessageHandler(log_message);
+//    qInstallMessageHandler(log_message);
 
 //    buggyFunc();
 
