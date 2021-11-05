@@ -53,13 +53,25 @@ signals:
 {
     Q_OBJECT
 
+// enumerations only
+public:
+     enum PREF_TYPE {
+         WIN_PREF = 0,
+         TCU      = 1,
+         SCAN     = 2,
+         IMG      = 3,
+         TCU_PREF = 4,
+     };
+
 public:
     Demo(QWidget *parent = nullptr);
     ~Demo();
 
-public:
     int grab_thread_process();
     bool is_maximized();
+
+    // rename vid file in new thread
+    static void move_to_dest(QString src, QString dst);
 
 public slots:
     // signaled by MouseThread
@@ -71,8 +83,11 @@ public slots:
     void clean();
 
     // signaled in settings ui
-    void setup_stepping(bool in_ns);
+    void setup_hz(int hz_unit);
+    void setup_stepping(int base_unit);
     void setup_max_dist(int max_dist);
+    void export_config();
+    void load_config();
 
 private slots:
     // on clicking enum btn: enumerate devices
@@ -242,13 +257,16 @@ private:
     // change current in laser
     void update_current();
 
+    // write/read params to config file
+    void convert_write(QDataStream &out, const int TYPE);
+    bool convert_read(QDataStream &out, const int TYPE);
+
 public:
     bool                    mouse_pressed;
 
 private:
-    Ui::Demo *ui;
+    Ui::Demo*               ui;
 
-private:
     int                     calc_avg_option;            // a: 5 frames; b: 10 frames
     double                  range_threshold;            // range threshold for building 3d images
     bool                    trigger_by_software;        // whether the device gets trigger signal from sw
@@ -265,12 +283,13 @@ private:
     QSerialPort*            com[4];                     // 0: tcu, 1: range, 2: focus, 3: laser
     uchar                   out_buffer[7];              // write buffer for serial communication
     uchar                   in_buffer[7];               // read buffer for serial communication
-    int                     rep_freq;
+    float                   rep_freq;
     int                     laser_width_u, laser_width_n;
     int                     gate_width_a_u, gate_width_a_n;
     int                     delay_a_u, delay_a_n, delay_b_u, delay_b_n, delay_n_n;
     float                   stepping;
-    bool                    stepping_in_ns;
+    int                     hz_unit;
+    int                     base_unit;
     int                     fps;
     int                     duty;
     int                     mcp;
@@ -340,5 +359,5 @@ private:
     bool                    en;                         // for language switching
     QTranslator             trans;
 
-};
+ };
 #endif // DEMO_H

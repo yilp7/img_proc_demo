@@ -188,13 +188,21 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     settings = new TitleButton("", this);
     settings->setObjectName("SETTINGS_BTN");
     QMenu *settings_menu = new QMenu();
-    QAction *options = new QAction("-", this);
-    settings_menu->addAction(options);
-    settings->setMenu(settings_menu);
-    connect(options, SIGNAL(triggered()), prog_settings, SLOT(show()));
-    connect(options, SIGNAL(triggered()), prog_settings, SLOT(raise()));
-    connect(prog_settings, SIGNAL(simplify_step_chk_clicked(bool)), this->parent()->parent(), SLOT(setup_stepping(bool)));
+    settings_menu->setFont(QFont("Consolas", 9));
+    QAction *pref = new QAction("-- preference", this);
+    QAction *expt = new QAction(">> export pref.", this);
+    QAction *load = new QAction("<< load pref.", this);
+    settings_menu->addAction(pref);
+    connect(pref, SIGNAL(triggered()), prog_settings, SLOT(show()));
+    connect(pref, SIGNAL(triggered()), prog_settings, SLOT(raise()));
+    connect(prog_settings, SIGNAL(rep_freq_unit_changed(int)), this->parent()->parent(), SLOT(setup_hz(int)));
+    connect(prog_settings, SIGNAL(base_unit_changed(int)), this->parent()->parent(), SLOT(setup_stepping(int)));
     connect(prog_settings, SIGNAL(max_dist_changed(int)), this->parent()->parent(), SLOT(setup_max_dist(int)));
+    settings_menu->addAction(expt);
+    connect(expt, SIGNAL(triggered()), this->parent()->parent(), SLOT(export_config()));
+    settings_menu->addAction(load);
+    connect(load, SIGNAL(triggered()), this->parent()->parent(), SLOT(load_config()));
+    settings->setMenu(settings_menu);
 
     capture = new TitleButton("", this);
     capture->setObjectName("CAPTURE_BTN");

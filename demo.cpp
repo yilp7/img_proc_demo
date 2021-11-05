@@ -6,7 +6,7 @@
 #endif
 
 // used when moving temp recorded vid to destination
-void move_to_dest(QString src, QString dst)
+void Demo::move_to_dest(QString src, QString dst)
 {
     QFile::rename(src, dst);
 }
@@ -92,7 +92,8 @@ Demo::Demo(QWidget *parent)
     laser_width_n(500),
     delay_n_n(0),
     stepping(10),
-    stepping_in_ns(false),
+    hz_unit(0),
+    base_unit(0),
     fps(10),
     duty(5000),
     mcp(5),
@@ -137,7 +138,7 @@ Demo::Demo(QWidget *parent)
 
     // initialization
     // - default save path
-    save_location += QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section("/", 0, -1) + "/Pictures";
+    save_location += QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
 //    qDebug() << QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section('/', 0, -1);
     TEMP_SAVE_LOCATION = QString(save_location);
 
@@ -192,9 +193,9 @@ Demo::Demo(QWidget *parent)
     ui->MCP_SLIDER->setMaximum(255);
     ui->MCP_SLIDER->setSingleStep(1);
     ui->MCP_SLIDER->setPageStep(10);
-    change_mcp(5);
-//    ui->MCP_SLIDER->setValue(5);
     connect(ui->MCP_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_mcp(int)));
+//    change_mcp(5);
+    ui->MCP_SLIDER->setValue(5);
 
     ui->DELAY_SLIDER->setMinimum(0);
     ui->DELAY_SLIDER->setMaximum(15000);
@@ -267,7 +268,7 @@ Demo::Demo(QWidget *parent)
     }
 
     scan_q.push_back(-1);
-    setup_stepping(true);
+//    setup_stepping(0);
 
     // right before gui display (init state)
     on_ENUM_BUTTON_clicked();
@@ -315,7 +316,13 @@ void Demo::data_exchange(bool read){
         frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
         save_location = ui->FILE_PATH_EDIT->text();
 
-        rep_freq = ui->FREQ_EDIT->text().toInt();
+        switch (hz_unit) {
+        // kHz
+        case 0: rep_freq = ui->FREQ_EDIT->text().toFloat(); break;
+        // Hz
+        case 1: rep_freq = ui->FREQ_EDIT->text().toFloat() / 1000; break;
+        default: break;
+        }
         laser_width_u = ui->LASER_WIDTH_EDIT_U->text().toInt();
         laser_width_n = ui->LASER_WIDTH_EDIT_N->text().toInt();
         gate_width_a_u = ui->GATE_WIDTH_A_EDIT_U->text().toInt();
@@ -324,6 +331,15 @@ void Demo::data_exchange(bool read){
         delay_a_n = ui->DELAY_A_EDIT_N->text().toInt();
 //        gate_width_b_u = ui->GATE_WIDTH_B_EDIT_U->text().toInt();
 //        gate_width_b_n = ui->GATE_WIDTH_B_EDIT_N->text().toInt();
+        switch (base_unit) {
+        // ns
+        case 0: stepping = ui->STEPPING_EDIT->text().toFloat(); break;
+        // μs
+        case 1: stepping = ui->STEPPING_EDIT->text().toFloat() * 1000; break;
+        // m
+        case 2: stepping = ui->STEPPING_EDIT->text().toFloat() / dist_ns; break;
+        default: break;
+        }
         stepping = ui->STEPPING_EDIT->text().toFloat();
         delay_b_u = ui->DELAY_B_EDIT_U->text().toInt();
         delay_b_n = ui->DELAY_B_EDIT_N->text().toInt();
@@ -367,9 +383,7 @@ void Demo::data_exchange(bool read){
         gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
         gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
 #endif
-        ui->STEPPING_EDIT->setText(QString::asprintf("%.2f", stepping));
-
-        ui->FREQ_EDIT->setText(QString::asprintf("%d", rep_freq));
+        setup_hz(hz_unit);
         ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", laser_width_u));
         ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%d", laser_width_n));
         ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", gate_width_a_u));
@@ -381,6 +395,8 @@ void Demo::data_exchange(bool read){
         ui->DELAY_B_EDIT_U->setText(QString::asprintf("%d", delay_b_u));
         ui->DELAY_B_EDIT_N->setText(QString::asprintf("%d", delay_b_n));
         ui->DELAY_N_EDIT_N->setText(QString::asprintf("%d", delay_n_n));
+
+        setup_stepping(base_unit);
 
         ui->ZOOM_EDIT->setText(QString::asprintf("%d", zoom));
         ui->FOCUS_EDIT->setText(QString::asprintf("%d", focus));
@@ -565,7 +581,8 @@ int Demo::grab_thread_process() {
 
         // put info (dist, dov, time) as text on image
         if (ui->INFO_CHECK->isChecked()) {
-            cv::putText(modified_result, QString::asprintf("DIST %05d m", (int)delay_dist).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+            if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+            else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04 ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255), 3);
             cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
         }
 
@@ -605,12 +622,14 @@ int Demo::grab_thread_process() {
         if (save_original) save_to_file(false);
         if (save_modified) save_to_file(true);
         if (record_original) {
-            cv::putText(img_mem, QString::asprintf("DIST %05d m", (int)delay_dist).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+            if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04 ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
             cv::putText(img_mem, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
             vid_out[0].write(img_mem);
         }
         if (record_modified) {
-            cv::putText(modified_result, QString::asprintf("DIST %05d m", (int)delay_dist).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+            if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04 ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
             cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
             vid_out[1].write(modified_result);
         }
@@ -957,7 +976,7 @@ void Demo::on_SAVE_FINAL_BUTTON_clicked()
         vid_out[1].release();
         image_mutex.unlock();
         QString dest = save_location + "/" + res_avi.section('/', -1, -1);
-        std::thread t(move_to_dest, QString(res_avi), QString(dest));
+        std::thread t(Demo::move_to_dest, QString(res_avi), QString(dest));
         t.detach();
 //        QFile::rename(res_avi, dest);
     }
@@ -1037,15 +1056,86 @@ void Demo::clean()
     accu_sum.release();
 }
 
-void Demo::setup_stepping(bool in_ns)
+void Demo::setup_hz(int hz_unit)
 {
-    stepping_in_ns = in_ns;
-    ui->STEPPING_UNIT->setText(stepping_in_ns ? "ns" : "m");
+    this->hz_unit = hz_unit;
+    switch (hz_unit) {
+    // kHz
+    case 0: ui->FREQ_UNIT->setText("kHz"); ui->FREQ_EDIT->setText(QString::number((int)rep_freq)); break;
+    // Hz
+    case 1: ui->FREQ_UNIT->setText("Hz"); ui->FREQ_EDIT->setText(QString::number((int)(rep_freq * 1000))); break;
+    default: break;
+    }
+}
+
+void Demo::setup_stepping(int base_unit)
+{
+    this->base_unit = base_unit;
+    switch (base_unit) {
+    // ns
+    case 0: ui->STEPPING_UNIT->setText("ns"); ui->STEPPING_EDIT->setText(QString::number((int)stepping)); break;
+    // μs
+    case 1: ui->STEPPING_UNIT->setText("μs"); ui->STEPPING_EDIT->setText(QString::number((int)(stepping / 1000))); break;
+    // m
+    case 2: ui->STEPPING_UNIT->setText("m"); ui->STEPPING_EDIT->setText(QString::number(stepping * dist_ns, 'f', 2)); break;
+    default: break;
+    }
 }
 
 void Demo::setup_max_dist(int max_dist)
 {
     ui->DELAY_SLIDER->setMaximum(max_dist);
+}
+
+void Demo::export_config()
+{
+    QString config_name = QFileDialog::getSaveFileName(this, tr("Save Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/config.ssy", tr("*.ssy"));
+    if (config_name.isEmpty()) return;
+    if (!config_name.endsWith(".ssy")) config_name.append(".ssy");
+    QFile config(config_name);
+    config.open(QIODevice::WriteOnly);
+    if (config.isOpen()) {
+        QDataStream out(&config);
+        convert_write(out, WIN_PREF);
+        convert_write(out, TCU);
+        convert_write(out, SCAN);
+        convert_write(out, IMG);
+        convert_write(out, TCU_PREF);
+        config.close();
+    }
+    else {
+        QMessageBox::warning(this, "PROMPT", tr("cannot create config file"));
+    }
+}
+
+void Demo::load_config()
+{
+    QString config_name = QFileDialog::getOpenFileName(this, tr("Load Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation), tr("*.ssy"));
+    if (config_name.isEmpty()) return;
+    QFile config(config_name);
+    config.open(QIODevice::ReadOnly);
+    bool read_success = true;
+    if (config.isOpen()) {
+        QDataStream out(&config);
+        read_success &= convert_read(out, WIN_PREF);
+        read_success &= convert_read(out, TCU);
+        read_success &= convert_read(out, SCAN);
+        read_success &= convert_read(out, IMG);
+        read_success &= convert_read(out, TCU_PREF);
+        config.close();
+    }
+    else {
+        QMessageBox::warning(this, "PROMPT", tr("cannot open config file"));
+    }
+    if (read_success) {
+        data_exchange(false);
+        ui->TITLE->prog_settings->data_exchange(false);
+    }
+    else {
+        data_exchange(true);
+        ui->TITLE->prog_settings->data_exchange(true);
+        QMessageBox::warning(this, "PROMPT", tr("cannot read config file"));
+    }
 }
 
 // convert data to be sent to TCU-COM to hex buffer
@@ -1177,6 +1267,98 @@ void Demo::update_current()
     com[3]->waitForBytesWritten(100);
     com[3]->readAll();
     qDebug() << send;
+}
+
+void Demo::convert_write(QDataStream &out, const int TYPE)
+{
+    out << uchar(0xAA) << uchar(0xAA);
+    static ProgSettings *ps = ui->TITLE->prog_settings;
+    switch (TYPE) {
+    case WIN_PREF:
+    {
+        out << "WIN_PREF" << uchar('.');
+        out << com_edit[0]->text().toInt() << com_edit[1]->text().toInt() << com_edit[2]->text().toInt() << com_edit[3]->text().toInt() << save_location.toUtf8().constData();
+    }
+    case TCU:
+    {
+        out << "TCU" << uchar('.');
+        out << fps << duty << rep_freq << laser_width_u << laser_width_n << mcp << delay_a_u << delay_a_n << delay_b_u << delay_b_n << delay_n_n << gate_width_a_u << gate_width_a_n;
+    }
+    case SCAN:
+    {
+        out << "SCAN" << uchar('.');
+        out << ps->start_pos << ps->end_pos << ps->frame_count << ps->step_size << ps->rep_freq << (int)(ps->save_scan);
+    }
+    case IMG:
+    {
+        out << "IMG" << uchar('.');
+        out << ps->kernel << ps->gamma << ps->log << ps->low_in << ps->low_out << ps->high_in << ps->high_out;
+    }
+    case TCU_PREF:
+    {
+        out << "TCU_PREF" << uchar('.');
+        out << (int)(ps->auto_rep_freq) << ps->hz_unit << ps->base_unit << ps->max_dist;
+    }
+    default: break;
+    }
+    out << uchar('.') << uchar(0xFF) << uchar(0xFF);
+}
+
+bool Demo::convert_read(QDataStream &out, const int TYPE)
+{
+    uchar temp_uchar = 0x00;
+    char *temp_str = (char*)malloc(100 * sizeof(char));
+    memset(temp_str, 0, 100);
+    out >> temp_uchar; if (temp_uchar != 0xAA) return false;
+    out >> temp_uchar; if (temp_uchar != 0xAA) return false;
+    static ProgSettings *ps = ui->TITLE->prog_settings;
+    switch (TYPE) {
+    case WIN_PREF:
+    {
+        out >> temp_str; if (std::strcmp(temp_str, "WIN_PREF")) return false;
+        out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
+        int temp_int = 0;
+        for (int i = 0; i < 4; i++) {
+            out >> temp_int;
+            com_edit[i]->setText(QString::number(temp_int));
+        }
+        out >> temp_str; save_location = QString::fromUtf8(temp_str);
+    }
+    case TCU:
+    {
+        out >> temp_str; if (std::strcmp(temp_str, "TCU")) return false;
+        out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
+        out >> fps >> duty >> rep_freq >> laser_width_u >> laser_width_n >> mcp >> delay_a_u >> delay_a_n >> delay_b_u >> delay_b_n >> delay_n_n >> gate_width_a_u >> gate_width_a_n;
+    }
+    case SCAN:
+    {
+        out >> temp_str; if (std::strcmp(temp_str, "SCAN")) return false;
+        out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
+        int temp_bool;
+        out >> ps->start_pos >> ps->end_pos >> ps->frame_count >> ps->step_size >> ps->rep_freq >> temp_bool;
+        ps->save_scan = temp_bool;
+    }
+    case IMG:
+    {
+        out >> temp_str; if (std::strcmp(temp_str, "IMG")) return false;
+        out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
+        out >> ps->kernel >> ps->gamma >> ps->log >> ps->low_in >> ps->low_out >> ps->high_in >> ps->high_out;
+    }
+    case TCU_PREF:
+    {
+        out >> temp_str; if (std::strcmp(temp_str, "TCU_PREF")) return false;
+        out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
+        int temp_bool;
+        out >> temp_bool >> ps->hz_unit >> ps->base_unit >> ps->max_dist;
+        ps->auto_rep_freq = temp_bool;
+    }
+    default: break;
+    }
+    out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
+    out >> temp_uchar; if (temp_uchar != 0xFF) return false;
+    out >> temp_uchar; if (temp_uchar != 0xFF) return false;
+    free(temp_str);
+    return true;
 }
 
 void Demo::on_DIST_BTN_clicked() {
@@ -1347,7 +1529,7 @@ void Demo::change_mcp(int val)
 //    convert_to_send_tcu(0x0A, mcp);
     communicate_display(com[0], convert_to_send_tcu(0x0A, mcp), 7, 1, false);
 
-    ui->MCP_LABEL->setText(QString::number(val));
+    ui->MCP_EDIT->setText(QString::number(val));
 //    ui->MCP_SLIDER->setToolTip(QString::number(val));
 }
 
@@ -1435,7 +1617,13 @@ void Demo::keyPressEvent(QKeyEvent *event)
             }
         }
         if (edit == ui->FREQ_EDIT) {
-            rep_freq = ui->FREQ_EDIT->text().toInt();
+            switch (hz_unit) {
+            // kHz
+            case 0: rep_freq = ui->FREQ_EDIT->text().toFloat(); break;
+            // Hz
+            case 1: rep_freq = ui->FREQ_EDIT->text().toFloat() / 1000; break;
+            default: break;
+            }
             communicate_display(com[0], convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
         }
         else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
@@ -1474,8 +1662,13 @@ void Demo::keyPressEvent(QKeyEvent *event)
             delay_n_n = edit->text().toInt();
             update_delay();
         }
+        else if (edit == ui->MCP_EDIT) {
+            mcp = ui->MCP_EDIT->text().toInt();
+            ui->MCP_SLIDER->setValue(mcp);
+        }
         else if (edit == ui->STEPPING_EDIT) {
             stepping = edit->text().toFloat();
+            setup_stepping(base_unit);
         }
         else if (edit == ui->ZOOM_EDIT) {
             set_zoom();
@@ -1496,36 +1689,36 @@ void Demo::keyPressEvent(QKeyEvent *event)
         break;
     // 100m => 667ns, 10m => 67ns
     case Qt::Key_W:
-        delay_dist += stepping * 5 * (stepping_in_ns ? dist_ns : 1);
+        delay_dist += stepping * 5 * dist_ns;
         update_delay();
         break;
     case Qt::Key_S:
-        delay_dist -= stepping * 5 * (stepping_in_ns ? dist_ns : 1);
+        delay_dist -= stepping * 5 * dist_ns;
         update_delay();
         break;
     case Qt::Key_D:
-        delay_dist += stepping * (stepping_in_ns ? dist_ns : 1);
+        delay_dist += stepping * dist_ns;
         update_delay();
         break;
     case Qt::Key_A:
-        delay_dist -= stepping * (stepping_in_ns ? dist_ns : 1);
+        delay_dist -= stepping * dist_ns;
         update_delay();
         break;
     // 50m => 333ns, 5m => 33ns
     case Qt::Key_I:
-        depth_of_vision += stepping * 5 * (stepping_in_ns ? dist_ns : 1);
+        depth_of_vision += stepping * 5 * dist_ns;
         update_gate_width();
         break;
     case Qt::Key_K:
-        depth_of_vision -= stepping * 5 * (stepping_in_ns ? dist_ns : 1);
+        depth_of_vision -= stepping * 5 * dist_ns;
         update_gate_width();
         break;
     case Qt::Key_L:
-        depth_of_vision += stepping * (stepping_in_ns ? dist_ns : 1);
+        depth_of_vision += stepping * dist_ns;
         update_gate_width();
         break;
     case Qt::Key_J:
-        depth_of_vision -= stepping * (stepping_in_ns ? dist_ns : 1);
+        depth_of_vision -= stepping * dist_ns;
         update_gate_width();
         break;
     default: break;

@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QKeyEvent>
+#include <QDebug>
 
 namespace Ui {
 class ProgSettings;
@@ -23,19 +24,22 @@ protected:
     void mousePressEvent(QMouseEvent *event);
     void mouseMoveEvent(QMouseEvent *event);
     void mouseReleaseEvent(QMouseEvent *event);
+    bool eventFilter(QObject *obj, QEvent* event);
 
 private slots:
     void update_scan();
 
-    void on_SIMPLIFY_STEP_CHK_stateChanged(int arg1);
-    void on_AUTO_REP_FREQ_CHK_stateChanged(int arg1);
-
     void on_SAVE_SCAN_CHK_stateChanged(int arg1);
+
+    void on_HZ_LIST_currentIndexChanged(int index);
+    void on_UNIT_LIST_currentIndexChanged(int index);
+    void on_AUTO_REP_FREQ_CHK_stateChanged(int arg1);
 
     void on_MAX_DIST_EDT_editingFinished();
 
 signals:
-    void simplify_step_chk_clicked(bool);
+    void rep_freq_unit_changed(int);
+    void base_unit_changed(int);
     void max_dist_changed(int);
 
 public:
@@ -59,9 +63,11 @@ public:
     float  low_out;
     float  high_out;
 
+    float  dist_ns;
     bool   auto_rep_freq;
-    bool   simplify_step;
-    int    max_dist;
+    int    hz_unit; // 0: kHz, 1:Hz
+    int    base_unit; // 0: ns, 1: μs, 2: m
+    float  max_dist;
 
 };
 

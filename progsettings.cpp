@@ -17,16 +17,30 @@ ProgSettings::ProgSettings(QWidget *parent) :
     high_in(0.05),
     low_out(0),
     high_out(1),
+    dist_ns(3e8 / 2e9),
     auto_rep_freq(true),
-    simplify_step(false),
+    hz_unit(0),
+    base_unit(0),
     max_dist(15000)
 {
     ui->setupUi(this);
 
     setWindowFlags(Qt::FramelessWindowHint);
 
-    connect(ui->START_POS_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
-    connect(ui->END_POS_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
+    ui->HZ_LIST->addItem("kHz");
+    ui->HZ_LIST->addItem("Hz");
+    ui->HZ_LIST->installEventFilter(this);
+
+    ui->UNIT_LIST->addItem("ns");
+    ui->UNIT_LIST->addItem("μs");
+    ui->UNIT_LIST->addItem("m");
+    ui->UNIT_LIST->setCurrentIndex(0);
+    ui->UNIT_LIST->installEventFilter(this);
+
+    connect(ui->START_POS_EDIT_U, SIGNAL(editingFinished()), SLOT(update_scan()));
+    connect(ui->START_POS_EDIT_N, SIGNAL(editingFinished()), SLOT(update_scan()));
+    connect(ui->END_POS_EDIT_U, SIGNAL(editingFinished()), SLOT(update_scan()));
+    connect(ui->END_POS_EDIT_N, SIGNAL(editingFinished()), SLOT(update_scan()));
     connect(ui->FRAME_COUNT_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
     connect(ui->STEP_SIZE_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
 
@@ -42,12 +56,19 @@ ProgSettings::~ProgSettings()
 void ProgSettings::data_exchange(bool read)
 {
     if (read) {
-        start_pos = ui->START_POS_EDIT->text().toInt();
-        end_pos = ui->END_POS_EDIT->text().toInt();
+        start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
+        end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
         frame_count = ui->FRAME_COUNT_EDIT->text().toInt();
         step_size = ui->STEP_SIZE_EDIT->text().toFloat();
         rep_freq = ui->REP_FREQ_EDIT->text().toFloat();
         save_scan = ui->SAVE_SCAN_CHK->isChecked();
+        switch (hz_unit) {
+        // kHz
+        case 0: rep_freq = ui->REP_FREQ_EDIT->text().toFloat(); break;
+        // Hz
+        case 1: rep_freq = ui->REP_FREQ_EDIT->text().toFloat() / 1000; break;
+        default: break;
+        }
 
         kernel = ui->KERNEL_EDIT->text().toInt();
         gamma = ui->GAMMA_EDIT->text().toFloat();
@@ -58,15 +79,32 @@ void ProgSettings::data_exchange(bool read)
         high_out = ui->HIGH_OUT_EDIT->text().toFloat();
 
         auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
-        simplify_step = ui->SIMPLIFY_STEP_CHK->isChecked();
-        max_dist = ui->MAX_DIST_EDT->text().toInt();
+        base_unit = ui->UNIT_LIST->currentIndex();
+        switch (base_unit) {
+        // ns
+        case 0: max_dist = ui->MAX_DIST_EDT->text().toInt() * dist_ns; break;
+        // μs
+        case 1: max_dist = ui->MAX_DIST_EDT->text().toInt() * dist_ns * 1000; break;
+        // m
+        case 2: max_dist = ui->MAX_DIST_EDT->text().toInt(); break;
+        default: break;
+        }
     }
     else {
-        ui->START_POS_EDIT->setText(QString::number(start_pos));
-        ui->END_POS_EDIT->setText(QString::number(end_pos));
+        ui->START_POS_EDIT_N->setText(QString::number(start_pos % 1000));
+        ui->START_POS_EDIT_U->setText(QString::number(start_pos / 1000));
+        ui->END_POS_EDIT_N->setText(QString::number(end_pos % 1000));
+        ui->END_POS_EDIT_U->setText(QString::number(end_pos / 1000));
         ui->FRAME_COUNT_EDIT->setText(QString::number(frame_count));
         ui->STEP_SIZE_EDIT->setText(QString::number(step_size, 'f', 2));
         ui->SAVE_SCAN_CHK->setChecked(save_scan);
+        switch (hz_unit) {
+        // kHz
+        case 0: ui->REP_FREQ_EDIT->setText(QString::number((int)rep_freq)); ui->FREQ_UNIT->setText("kHz"); break;
+        // Hz
+        case 1: ui->REP_FREQ_EDIT->setText(QString::number((int)(rep_freq / 1000))); ui->FREQ_UNIT->setText("Hz"); break;
+        default: break;
+        }
 
         ui->KERNEL_EDIT->setText(QString::number(kernel));
         ui->GAMMA_EDIT->setText(QString::number(gamma, 'f', 2));
@@ -75,11 +113,18 @@ void ProgSettings::data_exchange(bool read)
         ui->HIGH_IN_EDIT->setText(QString::number(high_in, 'f', 2));
         ui->LOW_OUT_EDIT->setText(QString::number(low_out, 'f', 2));
         ui->HIGH_OUT_EDIT->setText(QString::number(high_out, 'f', 2));
-        ui->REP_FREQ_EDIT->setText(QString::number(rep_freq, 'f', 2));
 
         ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
-        ui->SIMPLIFY_STEP_CHK->setChecked(simplify_step);
-        ui->MAX_DIST_EDT->setText(QString::number(max_dist));
+        ui->UNIT_LIST->setCurrentIndex(base_unit);
+        switch (base_unit) {
+        // ns
+        case 0: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist / dist_ns))); break;
+        // μs
+        case 1: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist / dist_ns / 1000))); break;
+        // m
+        case 2: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist))); break;
+        default: break;
+        }
     }
 }
 
@@ -87,16 +132,16 @@ void ProgSettings::update_scan()
 {
     QLineEdit *source = qobject_cast<QLineEdit*>(sender());
     if (source == ui->STEP_SIZE_EDIT) {
-        start_pos = ui->START_POS_EDIT->text().toInt();
-        end_pos = ui->END_POS_EDIT->text().toInt();
+        start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
+        end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
         step_size = ui->STEP_SIZE_EDIT->text().toFloat();
         frame_count = step_size ? (end_pos - start_pos) / step_size : 0;
         ui->FRAME_COUNT_EDIT->setText(QString::number(frame_count));
         ui->STEP_SIZE_EDIT->setText(QString::number(step_size, 'f', 2));
     }
     else {
-        start_pos = ui->START_POS_EDIT->text().toInt();
-        end_pos = ui->END_POS_EDIT->text().toInt();
+        start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
+        end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
         frame_count = ui->FRAME_COUNT_EDIT->text().toInt();
         if (!frame_count) frame_count = 1;
         step_size = 1.0 * (end_pos - start_pos) / frame_count;
@@ -123,45 +168,72 @@ void ProgSettings::keyPressEvent(QKeyEvent *event)
 
 void ProgSettings::mousePressEvent(QMouseEvent *event)
 {
-    QDialog::mousePressEvent(event);
-
     if(event->button() != Qt::LeftButton) return;
     pressed = true;
     prev_pos = event->globalPos();
+
+    QDialog::mousePressEvent(event);
 }
 
 void ProgSettings::mouseMoveEvent(QMouseEvent *event)
 {
-    QDialog::mouseMoveEvent(event);
-
     if (!pressed) return;
     // use globalPos instead of pos to prevent window shaking
     window()->move(window()->pos() + event->globalPos() - prev_pos);
     prev_pos = event->globalPos();
+
+    QDialog::mouseMoveEvent(event);
 }
 
 void ProgSettings::mouseReleaseEvent(QMouseEvent *event)
 {
-    QDialog::mouseReleaseEvent(event);
-
     if(event->button() != Qt::LeftButton) return;
     pressed = false;
+
+    QDialog::mouseReleaseEvent(event);
 }
 
-void ProgSettings::on_SIMPLIFY_STEP_CHK_stateChanged(int arg1)
+bool ProgSettings::eventFilter(QObject *obj, QEvent *event)
 {
-    simplify_step = arg1;
-    emit simplify_step_chk_clicked(!arg1);
-}
-
-void ProgSettings::on_AUTO_REP_FREQ_CHK_stateChanged(int arg1)
-{
-    auto_rep_freq = arg1;
+    if (qobject_cast<QComboBox*>(obj) && event->type() == QEvent::MouseMove) return true;
+    return QDialog::eventFilter(obj, event);
 }
 
 void ProgSettings::on_SAVE_SCAN_CHK_stateChanged(int arg1)
 {
     save_scan = arg1;
+}
+
+void ProgSettings::on_HZ_LIST_currentIndexChanged(int index)
+{
+    hz_unit = index;
+    emit rep_freq_unit_changed(index);
+    switch (hz_unit) {
+    // kHz
+    case 0: ui->REP_FREQ_EDIT->setText(QString::number((int)rep_freq)); ui->FREQ_UNIT->setText("kHz"); break;
+    // Hz
+    case 1: ui->REP_FREQ_EDIT->setText(QString::number((int)(rep_freq * 1000))); ui->FREQ_UNIT->setText("Hz"); break;
+    default: break;
+    }
+}
+
+void ProgSettings::on_UNIT_LIST_currentIndexChanged(int index)
+{
+    base_unit = index;
+    emit base_unit_changed(index);
+    switch (base_unit) {
+    // ns
+    case 0: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist / dist_ns))); ui->MAX_DIST_UNIT->setText("ns"); break;
+    // μs
+    case 1: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist / dist_ns / 1000))); ui->MAX_DIST_UNIT->setText("μs"); break;
+    // m
+    case 2: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist))); ui->MAX_DIST_UNIT->setText("m"); break;
+    default: break;
+    }
+}
+void ProgSettings::on_AUTO_REP_FREQ_CHK_stateChanged(int arg1)
+{
+    auto_rep_freq = arg1;
 }
 
 void ProgSettings::on_MAX_DIST_EDT_editingFinished()

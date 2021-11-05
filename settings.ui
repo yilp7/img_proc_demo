@@ -40,21 +40,24 @@
     <rect>
      <x>20</x>
      <y>20</y>
-     <width>111</width>
+     <width>121</width>
      <height>241</height>
     </rect>
    </property>
    <property name="title">
     <string>Scan Options</string>
    </property>
-   <widget class="QLineEdit" name="START_POS_EDIT">
+   <widget class="QLineEdit" name="START_POS_EDIT_N">
     <property name="geometry">
      <rect>
-      <x>10</x>
+      <x>65</x>
       <y>35</y>
-      <width>61</width>
+      <width>31</width>
       <height>21</height>
      </rect>
+    </property>
+    <property name="text">
+     <string/>
     </property>
    </widget>
    <widget class="QLabel" name="START_LBL">
@@ -83,12 +86,12 @@
      <string>End pos.</string>
     </property>
    </widget>
-   <widget class="QLineEdit" name="END_POS_EDIT">
+   <widget class="QLineEdit" name="END_POS_EDIT_N">
     <property name="geometry">
      <rect>
-      <x>10</x>
+      <x>65</x>
       <y>75</y>
-      <width>61</width>
+      <width>31</width>
       <height>21</height>
      </rect>
     </property>
@@ -142,7 +145,7 @@
    <widget class="QLabel" name="UNIT_NS">
     <property name="geometry">
      <rect>
-      <x>75</x>
+      <x>100</x>
       <y>40</y>
       <width>14</width>
       <height>14</height>
@@ -155,7 +158,7 @@
    <widget class="QLabel" name="UNIT_NS_2">
     <property name="geometry">
      <rect>
-      <x>75</x>
+      <x>100</x>
       <y>80</y>
       <width>14</width>
       <height>14</height>
@@ -178,7 +181,7 @@
      <string>ns</string>
     </property>
    </widget>
-   <widget class="QLabel" name="UNIT_KHZ">
+   <widget class="QLabel" name="FREQ_UNIT">
     <property name="geometry">
      <rect>
       <x>74</x>
@@ -227,11 +230,60 @@
      <string>Save image</string>
     </property>
    </widget>
+   <widget class="QLabel" name="UNIT_US">
+    <property name="geometry">
+     <rect>
+      <x>45</x>
+      <y>40</y>
+      <width>14</width>
+      <height>14</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>μs</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="START_POS_EDIT_U">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>35</y>
+      <width>31</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="END_POS_EDIT_U">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>75</y>
+      <width>31</width>
+      <height>21</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="UNIT_US_2">
+    <property name="geometry">
+     <rect>
+      <x>45</x>
+      <y>80</y>
+      <width>14</width>
+      <height>14</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>μs</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QGroupBox" name="ENHANCE_GROUP">
    <property name="geometry">
     <rect>
-     <x>150</x>
+     <x>160</x>
      <y>20</y>
      <width>161</width>
      <height>181</height>
@@ -405,10 +457,10 @@
   <widget class="QGroupBox" name="TCU_GRP">
    <property name="geometry">
     <rect>
-     <x>330</x>
+     <x>340</x>
      <y>20</y>
      <width>141</width>
-     <height>101</height>
+     <height>141</height>
     </rect>
    </property>
    <property name="title">
@@ -427,24 +479,11 @@
      <string>Auto rep. freq.</string>
     </property>
    </widget>
-   <widget class="QCheckBox" name="SIMPLIFY_STEP_CHK">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>40</y>
-      <width>116</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Simplify Step</string>
-    </property>
-   </widget>
    <widget class="QLineEdit" name="MAX_DIST_EDT">
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>75</y>
+      <y>115</y>
       <width>101</width>
       <height>21</height>
      </rect>
@@ -454,26 +493,72 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>60</y>
-      <width>84</width>
+      <y>100</y>
+      <width>63</width>
       <height>14</height>
      </rect>
     </property>
     <property name="text">
-     <string>MAX distance</string>
+     <string>MAX delay</string>
     </property>
    </widget>
-   <widget class="QLabel" name="label">
+   <widget class="QLabel" name="MAX_DIST_UNIT">
     <property name="geometry">
      <rect>
       <x>115</x>
-      <y>80</y>
-      <width>7</width>
+      <y>120</y>
+      <width>14</width>
       <height>14</height>
      </rect>
     </property>
     <property name="text">
-     <string>m</string>
+     <string>ns</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="BASE_UNIT">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>73</y>
+      <width>63</width>
+      <height>14</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Base unit</string>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="UNIT_LIST">
+    <property name="geometry">
+     <rect>
+      <x>85</x>
+      <y>70</y>
+      <width>45</width>
+      <height>22</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="HZ_LIST">
+    <property name="geometry">
+     <rect>
+      <x>85</x>
+      <y>40</y>
+      <width>45</width>
+      <height>22</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="REP_FREQ_UNIT">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>43</y>
+      <width>63</width>
+      <height>14</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Rep. freq</string>
     </property>
    </widget>
   </widget>
