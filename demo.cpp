@@ -1,8 +1,8 @@
 #include "demo.h"
-#ifndef PARAM
-    #include "./ui_demo_rls.h"
-#else
+#ifdef PARAM
     #include "./ui_demo_dev.h"
+#else
+    #include "./ui_demo_rls.h"
 #endif
 
 // used when moving temp recorded vid to destination
@@ -363,8 +363,8 @@ void Demo::data_exchange(bool read){
         ui->IMG_3D_CHECK->setChecked(image_3d);
 
         ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)gain_analog_edit));
-        ui->DUTY_EDIT->setText(QString::asprintf("%.2f", time_exposure_edit / 1000));
-        ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.2f", frame_rate_edit));
+        ui->DUTY_EDIT->setText(QString::asprintf("%.2f", (time_exposure_edit = duty) / 1000));
+        ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.2f", frame_rate_edit = fps));
         ui->FILE_PATH_EDIT->setText(save_location);
 
         delay_a_u = std::round(delay_dist / dist_ns) / 1000;
@@ -375,13 +375,12 @@ void Demo::data_exchange(bool read){
 //        laser_width_n = gate_width_a_n = gate_width_b_n = (int)(depth_of_vision / dist_ns) % 1000;
 //        gate_width_a_u = gate_width_b_u = (int)(depth_of_vision / dist_ns) / 1000;
 //        gate_width_a_n = gate_width_b_n = (int)(depth_of_vision / dist_ns) % 1000;
-#ifndef PARAM
-        laser_width_u = gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
-        laser_width_n = gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
-
-#else
+#ifdef PARAM
         gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
         gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
+#else
+        laser_width_u = gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
+        laser_width_n = gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
 #endif
         setup_hz(hz_unit);
         ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", laser_width_u));
@@ -582,7 +581,7 @@ int Demo::grab_thread_process() {
         // put info (dist, dov, time) as text on image
         if (ui->INFO_CHECK->isChecked()) {
             if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
-            else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04 ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255), 3);
+            else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
             cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
         }
 
@@ -623,13 +622,13 @@ int Demo::grab_thread_process() {
         if (save_modified) save_to_file(true);
         if (record_original) {
             if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
-            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04 ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
             cv::putText(img_mem, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
             vid_out[0].write(img_mem);
         }
         if (record_modified) {
             if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
-            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04 ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
             cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
             vid_out[1].write(modified_result);
         }
@@ -999,7 +998,6 @@ void Demo::on_SET_PARAMS_BUTTON_clicked()
     duty = 1e6 / fps - 1000;
 #endif
 
-
     // CCD FREQUENCY
     communicate_display(com[0], convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
 
@@ -1128,7 +1126,14 @@ void Demo::load_config()
         QMessageBox::warning(this, "PROMPT", tr("cannot open config file"));
     }
     if (read_success) {
-        data_exchange(false);
+//        data_exchange(false);
+        update_delay();
+        update_gate_width();
+#ifdef PARAM
+        communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8), 7, 1, false);
+#endif
+        ui->MCP_SLIDER->setValue(mcp);
+        on_SET_PARAMS_BUTTON_clicked();
         ui->TITLE->prog_settings->data_exchange(false);
     }
     else {
@@ -1164,12 +1169,12 @@ QByteArray Demo::communicate_display(QSerialPort *com, QByteArray write, int wri
     com->write(write, write_size);
     while (com->waitForBytesWritten(10)) ;
 
-    if (fb) while (com->waitForReadyRead(100)) ;
+//    if (fb) while (com->waitForReadyRead(100)) ;
 
     static QTimer t;
     t.start(100);
     QByteArray read = com->read(read_size);
-    while (t.remainingTime() && read.size() < read_size) read.append(com->read(read_size - read.size()));
+    while (fb && t.remainingTime() && read.size() < read_size) read.append(com->read(read_size - read.size()));
     t.stop();
     for (char i = 0; i < 7; i++) str_r += QString::asprintf(" %02X", i + read_size - 7 < 0 ? 0 : (uchar)read[i + read.size() - 7]);
     emit append_text(str_r);
@@ -1230,15 +1235,15 @@ void Demo::update_gate_width() {
     ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_vision));
 //    gate_width_a_n = gate_width_b_n = laser_width_n = gw % 1000;
 //    gate_width_a_u = gate_width_b_u = laser_width_u = gw / 1000;
-#ifndef PARAM
+#ifdef PARAM
+    gate_width_a_n = gw % 1000;
+    gate_width_a_u = gw / 1000;
+#else
     gate_width_a_n = laser_width_n = gw % 1000;
     gate_width_a_u = laser_width_u = gw / 1000;
 
     // LASER WIDTH
     communicate_display(com[0], convert_to_send_tcu(0x01, (gw - 18) / 8), 7, 1, false);
-#else
-    gate_width_a_n = gw % 1000;
-    gate_width_a_u = gw / 1000;
 #endif
 
     // GATE WIDTH A
@@ -1271,6 +1276,7 @@ void Demo::update_current()
 
 void Demo::convert_write(QDataStream &out, const int TYPE)
 {
+    data_exchange(true);
     out << uchar(0xAA) << uchar(0xAA);
     static ProgSettings *ps = ui->TITLE->prog_settings;
     switch (TYPE) {
@@ -1282,7 +1288,7 @@ void Demo::convert_write(QDataStream &out, const int TYPE)
     case TCU:
     {
         out << "TCU" << uchar('.');
-        out << fps << duty << rep_freq << laser_width_u << laser_width_n << mcp << delay_a_u << delay_a_n << delay_b_u << delay_b_n << delay_n_n << gate_width_a_u << gate_width_a_n;
+        out << fps << duty << rep_freq << laser_width_u << laser_width_n << mcp << delay_dist << delay_n_n << depth_of_vision;
     }
     case SCAN:
     {
@@ -1328,7 +1334,7 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
     {
         out >> temp_str; if (std::strcmp(temp_str, "TCU")) return false;
         out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
-        out >> fps >> duty >> rep_freq >> laser_width_u >> laser_width_n >> mcp >> delay_a_u >> delay_a_n >> delay_b_u >> delay_b_n >> delay_n_n >> gate_width_a_u >> gate_width_a_n;
+        out >> fps >> duty >> rep_freq >> laser_width_u >> laser_width_n >> mcp >> delay_dist >> delay_n_n >> depth_of_vision;
     }
     case SCAN:
     {
@@ -1921,6 +1927,20 @@ void Demo::on_SCAN_BUTTON_clicked()
             QDir().mkdir(save_location + "/" + scan_name + "/raw_bmp");
             QDir().mkdir(save_location + "/" + scan_name + "/res_bmp");
         }
+
+        QFile params(save_location + "/" + scan_name + "/scan_params");
+        params.open(QIODevice::WriteOnly);
+        params.write(QString::asprintf("starting delay:     %06d ns\n"
+                                       "ending delay:       %06d ns\n"
+                                       "frames count:       50\n"
+                                       "stepping size:      2000.00 ns\n"
+                                       "repeated frequency: 000010 Hz\n"
+                                       "laser width:        000500 ns\n"
+                                       "gate width:         000100 ns\n"
+                                       "MCP:                005",
+                                       settings->start_pos, settings->end_pos, settings->frame_count, settings->step_size, rep_freq,
+                                       laser_width_u * 1000 + laser_width_n, gate_width_a_u * 1000, gate_width_a_n, mcp).toUtf8());
+        params.close();
 
         on_CONTINUE_SCAN_BUTTON_clicked();
     }

@@ -22,17 +22,23 @@
   <widget class="QDialogButtonBox" name="USER_BTN_GRP">
    <property name="geometry">
     <rect>
-     <x>330</x>
+     <x>410</x>
      <y>270</y>
-     <width>161</width>
+     <width>81</width>
      <height>32</height>
     </rect>
+   </property>
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
    </property>
    <property name="orientation">
     <enum>Qt::Horizontal</enum>
    </property>
    <property name="standardButtons">
-    <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+    <set>QDialogButtonBox::Ok</set>
    </property>
   </widget>
   <widget class="QGroupBox" name="SCAN_GRP">
