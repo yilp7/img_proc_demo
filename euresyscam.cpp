@@ -106,8 +106,8 @@ void Cam::get_frame_size(int &w, int &h)
 
 float Cam::communicate(char* out, char* in, uint out_size, uint in_size, bool read) {
     QString str_s = "s", str_r = "r";
-    int temp_size = 16;
-    char temp[temp_size] = {0};
+	uint temp_size = 16;
+	char temp[16] = {0};
     clSerialRead(serial_ref, temp, &temp_size, 20);// qDebug() << temp_size;
 
     clFlushPort(serial_ref);
@@ -138,7 +138,6 @@ void Cam::time_exposure(bool read, float *val)
         uchar out[7] = {0xA0, 0x00, 0x00, 0xFF, 0x21, 0x0D, 0x0A};
         uchar in[1] = {0};
         communicate((char*)out, (char*)in, 7, 1);
-        qDebug() << te;
         out[0] = 0xA1;
         out[1] = (te >> 24) & 0xFF;
         out[2] = (te >> 16) & 0xFF;

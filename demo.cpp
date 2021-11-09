@@ -611,7 +611,7 @@ int Demo::grab_thread_process() {
         if (scan) {
             emit update_delay_in_thread();
 
-            if (ui->TITLE->prog_settings->save_scan) save_scan_img();
+            save_scan_img();
             delay_dist += scan_step;
 //            filter_scan();
         }
@@ -766,11 +766,11 @@ void Demo::save_scan_img() {
 //            dest = QString(save_location + "/" + scan_name + "/raw_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), img_mem);
 //    QFile::rename(temp, dest);
-    QPixmap::fromImage(QImage(img_mem.data, img_mem.cols, img_mem.rows, img_mem.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/raw_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp", "BMP");
+    if (ui->TITLE->prog_settings->save_scan_ori) QPixmap::fromImage(QImage(img_mem.data, img_mem.cols, img_mem.rows, img_mem.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/raw_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
 //    dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), modified_result);
 //    QFile::rename(temp, dest);
-    QPixmap::fromImage(QImage(modified_result.data, modified_result.cols, modified_result.rows, modified_result.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp", "BMP");
+    if (ui->TITLE->prog_settings->save_scan_res) QPixmap::fromImage(QImage(modified_result.data, modified_result.cols, modified_result.rows, modified_result.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
 }
 
 void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate) {
@@ -1293,7 +1293,7 @@ void Demo::convert_write(QDataStream &out, const int TYPE)
     case SCAN:
     {
         out << "SCAN" << uchar('.');
-        out << ps->start_pos << ps->end_pos << ps->frame_count << ps->step_size << ps->rep_freq << (int)(ps->save_scan);
+        out << ps->start_pos << ps->end_pos << ps->frame_count << ps->step_size << ps->rep_freq << (int)(ps->save_scan_ori);
     }
     case IMG:
     {
@@ -1342,7 +1342,7 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
         out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
         int temp_bool;
         out >> ps->start_pos >> ps->end_pos >> ps->frame_count >> ps->step_size >> ps->rep_freq >> temp_bool;
-        ps->save_scan = temp_bool;
+        ps->save_scan_ori = temp_bool;
     }
     case IMG:
     {

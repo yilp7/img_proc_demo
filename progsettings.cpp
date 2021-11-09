@@ -9,7 +9,8 @@ ProgSettings::ProgSettings(QWidget *parent) :
     frame_count(1),
     step_size(0),
     rep_freq(10),
-    save_scan(true),
+    save_scan_ori(true),
+    save_scan_res(false),
     kernel(3),
     gamma(1.2),
     log(1.2),
@@ -61,7 +62,8 @@ void ProgSettings::data_exchange(bool read)
         frame_count = ui->FRAME_COUNT_EDIT->text().toInt();
         step_size = ui->STEP_SIZE_EDIT->text().toFloat();
         rep_freq = ui->REP_FREQ_EDIT->text().toFloat();
-        save_scan = ui->SAVE_SCAN_CHK->isChecked();
+        save_scan_ori = ui->SAVE_SCAN_ORI_CHK->isChecked();
+        save_scan_res = ui->SAVE_SCAN_RES_CHK->isChecked();
         switch (hz_unit) {
         // kHz
         case 0: rep_freq = ui->REP_FREQ_EDIT->text().toFloat(); break;
@@ -97,7 +99,8 @@ void ProgSettings::data_exchange(bool read)
         ui->END_POS_EDIT_U->setText(QString::number(end_pos / 1000));
         ui->FRAME_COUNT_EDIT->setText(QString::number(frame_count));
         ui->STEP_SIZE_EDIT->setText(QString::number(step_size, 'f', 2));
-        ui->SAVE_SCAN_CHK->setChecked(save_scan);
+        ui->SAVE_SCAN_ORI_CHK->setChecked(save_scan_ori);
+        ui->SAVE_SCAN_RES_CHK->setChecked(save_scan_res);
         switch (hz_unit) {
         // kHz
         case 0: ui->REP_FREQ_EDIT->setText(QString::number((int)rep_freq)); ui->FREQ_UNIT->setText("kHz"); break;
@@ -199,9 +202,14 @@ bool ProgSettings::eventFilter(QObject *obj, QEvent *event)
     return QDialog::eventFilter(obj, event);
 }
 
-void ProgSettings::on_SAVE_SCAN_CHK_stateChanged(int arg1)
+void ProgSettings::on_SAVE_SCAN_ORI_CHK_stateChanged(int arg1)
 {
-    save_scan = arg1;
+    save_scan_ori = arg1;
+}
+
+void ProgSettings::on_SAVE_SCAN_RES_CHK_stateChanged(int arg1)
+{
+    save_scan_ori = arg1;
 }
 
 void ProgSettings::on_HZ_LIST_currentIndexChanged(int index)

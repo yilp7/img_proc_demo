@@ -47,7 +47,7 @@
      <x>20</x>
      <y>20</y>
      <width>121</width>
-     <height>241</height>
+     <height>261</height>
     </rect>
    </property>
    <property name="title">
@@ -71,12 +71,12 @@
      <rect>
       <x>10</x>
       <y>20</y>
-      <width>70</width>
+      <width>98</width>
       <height>14</height>
      </rect>
     </property>
     <property name="text">
-     <string>Start pos.</string>
+     <string>Starting delay</string>
     </property>
    </widget>
    <widget class="QLabel" name="END_LBL">
@@ -84,12 +84,12 @@
      <rect>
       <x>10</x>
       <y>60</y>
-      <width>56</width>
+      <width>84</width>
       <height>14</height>
      </rect>
     </property>
     <property name="text">
-     <string>End pos.</string>
+     <string>Ending delay</string>
     </property>
    </widget>
    <widget class="QLineEdit" name="END_POS_EDIT_N">
@@ -130,12 +130,12 @@
      <rect>
       <x>10</x>
       <y>140</y>
-      <width>63</width>
+      <width>91</width>
       <height>14</height>
      </rect>
     </property>
     <property name="text">
-     <string>Step size</string>
+     <string>Stepping size</string>
     </property>
    </widget>
    <widget class="QLineEdit" name="STEP_SIZE_EDIT">
@@ -223,17 +223,17 @@
      <string>Rep. freq.</string>
     </property>
    </widget>
-   <widget class="QCheckBox" name="SAVE_SCAN_CHK">
+   <widget class="QCheckBox" name="SAVE_SCAN_ORI_CHK">
     <property name="geometry">
      <rect>
       <x>10</x>
       <y>220</y>
-      <width>95</width>
+      <width>109</width>
       <height>20</height>
      </rect>
     </property>
     <property name="text">
-     <string>Save image</string>
+     <string>original img</string>
     </property>
    </widget>
    <widget class="QLabel" name="UNIT_US">
@@ -283,6 +283,19 @@
     </property>
     <property name="text">
      <string>μs</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="SAVE_SCAN_RES_CHK">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>240</y>
+      <width>95</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>result img</string>
     </property>
    </widget>
   </widget>

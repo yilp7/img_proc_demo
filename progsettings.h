@@ -29,7 +29,8 @@ protected:
 private slots:
     void update_scan();
 
-    void on_SAVE_SCAN_CHK_stateChanged(int arg1);
+    void on_SAVE_SCAN_ORI_CHK_stateChanged(int arg1);
+    void on_SAVE_SCAN_RES_CHK_stateChanged(int arg1);
 
     void on_HZ_LIST_currentIndexChanged(int index);
     void on_UNIT_LIST_currentIndexChanged(int index);
@@ -53,7 +54,8 @@ public:
     int    frame_count;
     float  step_size;
     float  rep_freq;
-    bool   save_scan;
+    bool   save_scan_ori;
+    bool   save_scan_res;
 
     int    kernel;
     float  gamma;
