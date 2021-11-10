@@ -363,8 +363,8 @@ void Demo::data_exchange(bool read){
         ui->IMG_3D_CHECK->setChecked(image_3d);
 
         ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)gain_analog_edit));
-        ui->DUTY_EDIT->setText(QString::asprintf("%.2f", (time_exposure_edit = duty) / 1000));
-        ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.2f", frame_rate_edit = fps));
+        ui->DUTY_EDIT->setText(QString::asprintf("%.2f", (time_exposure_edit) / 1000));
+        ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.2f", frame_rate_edit));
         ui->FILE_PATH_EDIT->setText(save_location);
 
         delay_a_u = std::round(delay_dist / dist_ns) / 1000;
@@ -777,7 +777,7 @@ void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate)
     if (*com) delete *com;
     *com = new QSerialPort;
     (*com)->setPortName("COM" + port_num);
-    qDebug("%p\n", *com);
+    qDebug("%p", *com);
 
     if ((*com)->open(QIODevice::ReadWrite)) {
         QThread::msleep(10);
@@ -854,7 +854,7 @@ void Demo::on_START_BUTTON_clicked()
 
     // adjust display size according to frame size
     curr_cam->get_frame_size(w, h);
-    qDebug("frame w: %d, h: %d\n", w, h);
+    qInfo("frame w: %d, h: %d", w, h);
 //    QRect region = ui->SOURCE_DISPLAY->geometry();
 //    region.setHeight(ui->SOURCE_DISPLAY->width() * h / w);
 //    ui->SOURCE_DISPLAY->setGeometry(region);
@@ -1776,7 +1776,7 @@ void Demo::resizeEvent(QResizeEvent *event)
     image_mutex.lock();
     ui->SOURCE_DISPLAY->setGeometry(region);
     ui->SOURCE_DISPLAY->update_roi(center);
-    qDebug("display region x: %d, y: %d, w: %d, h: %d\n", region.x(), region.y(), region.width(), region.height());
+    qInfo("display region x: %d, y: %d, w: %d, h: %d", region.x(), region.y(), region.width(), region.height());
     image_mutex.unlock();
 
     event->accept();

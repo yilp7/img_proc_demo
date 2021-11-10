@@ -7,6 +7,7 @@
 #include <QApplication>
 #include <QDebug>
 #include <QThread>
+#include <QMutex>
 #include "windows.h"
 #include "multicam.h"
 #include "clallserial.h"

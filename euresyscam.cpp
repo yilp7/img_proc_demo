@@ -2,6 +2,7 @@
 
 int x;
 int y;
+QMutex mutex;
 
 Cam::Cam() {dev_handle = NULL;}
 Cam::~Cam() {if (dev_handle) shut_down();}
@@ -105,25 +106,41 @@ void Cam::get_frame_size(int &w, int &h)
 }
 
 float Cam::communicate(char* out, char* in, uint out_size, uint in_size, bool read) {
+    mutex.lock();
     QString str_s = "s", str_r = "r";
-    uint temp_size = 1;
-    char temp = 0;
-    while(!clSerialRead(serial_ref, &temp, &temp_size, 20)) temp_size = 1;// qDebug() << temp_size;
+    static uint temp_size = 1;
+    static char temp = 0;
+//    while(!clSerialRead(serial_ref, &temp, &temp_size, 20)) temp_size = 1;// qDebug() << temp_size;
 
     clFlushPort(serial_ref);
 
-    clSerialWrite(serial_ref, out, &out_size, 20);// qDebug() << out_size;
+    clSerialWrite(serial_ref, out, &out_size, 10);// qDebug() << out_size;
     for (int i = 0; i < 7; i++) str_s += QString::asprintf(" %02X", i + (int)out_size - 7 < 0 ? 0 : ((uchar*)out)[i + out_size - 7]);
 
 //    clFlushPort(serial_ref);
 
     QByteArray in_buffer;
-    while(!clSerialRead(serial_ref, &temp, &temp_size, 20)) in_buffer.append(temp), temp_size = 1;
-//    clSerialRead(serial_ref, in, &in_size, 20);// qDebug() << in_size;
-    memcpy(in, in_buffer.data() + in_buffer.size() - in_size, in_buffer.size());
+    while(!clSerialRead(serial_ref, &temp, &temp_size, 10)) in_buffer.append(temp), temp_size = 1;
+//    if (in_buffer.size() < (int)in_size) {read = false; goto UNLOCK;}
+    static QByteArray ending_r((char*)new uchar[2]{0x55, 0xAA}, 2);
+    static QByteArray ending_wa((char*)new uchar[1]{0xA0}, 1);
+    static QByteArray ending_wd((char*)new uchar[1]{0xA1}, 1);
+    int idx = -1;
+    switch ((uchar)out[0]) {
+    case 0xA0: idx = in_buffer.indexOf(ending_wa); qDebug() << "wa" << idx; break;
+    case 0xA1: idx = in_buffer.indexOf(ending_wd); qDebug() << "wd" << idx; break;
+    case 0xB0: idx = in_buffer.indexOf(ending_r) - 4; qDebug() << "rr" << idx; break;
+    default: break;
+    }
+    if (idx < 0) {read = false; goto UNLOCK;}
+    memcpy(in, in_buffer.data() + idx, in_size);
+
     for (int i = 0; i < 6; i++) str_r += QString::asprintf(" %02X", i + (int)in_size - 6 < 0 ? 0 : ((uchar*)in)[i + in_size - 6]);
 
     qDebug() << str_s << str_r;
+
+UNLOCK:
+    mutex.unlock();
     return read ? (((uchar*)in)[0] << 24) + (((uchar*)in)[1] << 16) + (((uchar*)in)[2] << 8) + ((uchar*)in)[3] : 0;
 }
 
