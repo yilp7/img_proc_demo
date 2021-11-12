@@ -5,8 +5,7 @@
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
 #include <queue>
-#include <QDebug>
-#include <windows.h>
+#include <QtCore>
 
 class Cam
 {

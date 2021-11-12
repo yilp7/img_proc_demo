@@ -48,14 +48,16 @@ add_executable(Demo_param WIN32
 	mywidget.cpp
 	progsettings.cpp
 	imageproc.cpp
-	mvcam.cpp
+	cam.cpp
+#	mvcam.cpp
 #	hqvcam.cpp
 #	euresyscam.cpp
 	demo.h
 	mywidget.h
 	progsettings.h
 	imageproc.h
-	mvcam.h
+	cam.h
+#	mvcam.h
 #	hqvcam.h
 #	euresyscam.h
     demo_dev.ui
@@ -73,9 +75,9 @@ target_link_libraries(Demo_param
 	# mvs
 	MvCameraControl
     # HQV
-#	HQV_AVIProcess
-#	HQV_DataConvert
-#	HQV_SDK
+	HQV_AVIProcess
+	HQV_DataConvert
+	HQV_SDK
     # Euresys
 #	MultiCam
 #	clallserial

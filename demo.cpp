@@ -1293,7 +1293,7 @@ void Demo::convert_write(QDataStream &out, const int TYPE)
     case SCAN:
     {
         out << "SCAN" << uchar('.');
-        out << ps->start_pos << ps->end_pos << ps->frame_count << ps->step_size << ps->rep_freq << (int)(ps->save_scan_ori);
+        out << ps->start_pos << ps->end_pos << ps->frame_count << ps->step_size << ps->rep_freq << (int)(ps->save_scan_ori) << (int)(ps->save_scan_res);
     }
     case IMG:
     {
@@ -1343,6 +1343,8 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
         int temp_bool;
         out >> ps->start_pos >> ps->end_pos >> ps->frame_count >> ps->step_size >> ps->rep_freq >> temp_bool;
         ps->save_scan_ori = temp_bool;
+        out >> temp_bool;
+        ps->save_scan_res = temp_bool;
     }
     case IMG:
     {

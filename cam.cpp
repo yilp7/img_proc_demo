@@ -23,11 +23,25 @@ int Cam::start() {
         MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
         int ret = MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
 
+        if (!MV_CC_IsDeviceAccessible(st_dev_list.pDeviceInfo[0], MV_ACCESS_Exclusive)) {
+//            MV_GIGE_DEVICE_INFO gige_info = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo;
+            MV_GIGE_ForceIpEx(dev_handle, (192 << 24) + (168 << 16) + (1 << 8) + 179, (255 << 24) + (255 << 16) + (255 << 8), (192 << 24) + (168 << 16) + (1 << 8) + 1);
+
+            MV_CC_DestroyHandle(dev_handle);
+
+            MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
+            for (uint i = 0; i < st_dev_list.nDeviceNum; i++) {
+                ret = MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
+                if (!ret) break;
+            }
+        }
+
         ret = MV_CC_OpenDevice(dev_handle);
 
         int size = MV_CC_GetOptimalPacketSize(dev_handle);
         if (size >= MV_OK) MV_CC_SetIntValueEx(dev_handle, "GevSCPSPacketSize", size);
 
+        MV_CC_SetPixelFormat(dev_handle, PixelType_Gvsp_Mono8);
         MV_CC_SetEnumValue(dev_handle, "ExposureMode", MV_EXPOSURE_MODE_TIMED);
         MV_CC_SetEnumValue(dev_handle, "ExposureAuto", MV_EXPOSURE_AUTO_MODE_OFF);
         MV_CC_SetEnumValue(dev_handle, "GainAuto", 0);

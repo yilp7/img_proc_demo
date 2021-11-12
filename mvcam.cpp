@@ -1,7 +1,7 @@
 #include "mvcam.h"
 
 Cam::Cam() {dev_handle = NULL;}
-Cam::~Cam() {if (dev_handle) CloseHandle(dev_handle), dev_handle = NULL;}
+Cam::~Cam() {if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;}
 
 int Cam::search_for_devices()
 {
