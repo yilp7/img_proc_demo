@@ -50,7 +50,8 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
 
     int id = QFontDatabase::addApplicationFont(":/fonts/monaco.ttf");
-    monaco = QFont(QFontDatabase::applicationFontFamilies(id).at(0), 8);
+    monaco = QFont(QFontDatabase::applicationFontFamilies(id).at(0));
+    monaco.setPointSizeF(8.6);
 //    monaco.setLetterSpacing(QFont::PercentageSpacing, 120);
 
     id = QFontDatabase::addApplicationFont(":/fonts/consola.ttf");
