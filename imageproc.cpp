@@ -236,30 +236,30 @@ cv::Mat ImageProc::gated3D(cv::Mat &img1, cv::Mat &img2, double delay, double gw
     for(i = 0; i < BARHEIGHT; i++) {
         idx1 = i * step_color, idx2 = i * step_gray;
         for(j = 0; j < BARWIDTH; j++) {
-            uchar c0 = ptr2[idx2];
+            uchar c0 = ptr2[idx2++];
             if(c0 == 0) {
                 ptr1[idx1++] = 255;
-                ptr1[idx1++] = 4 * ptr2[idx2++];
+                ptr1[idx1++] = 4 * c0;
                 ptr1[idx1++] = 0;
             }
             else if(c0 <= 64) {
                 ptr1[idx1++] = 255;
-                ptr1[idx1++] = 4 * ptr2[idx2++] - 1;
+                ptr1[idx1++] = 4 * c0 - 1;
                 ptr1[idx1++] = 0;
             }
             else if(c0 <= 128) {
-                ptr1[idx1++] = 4 * (128 - ptr2[idx2++]);
+                ptr1[idx1++] = 4 * (128 - c0);
                 ptr1[idx1++] = 255;
                 ptr1[idx1++] = 0;
             }
             else if(c0 <= 192) {
                 ptr1[idx1++] = 0;
                 ptr1[idx1++] = 255;
-                ptr1[idx1++] = 4 * (ptr2[idx2++] - 128) - 1;
+                ptr1[idx1++] = 4 * (c0 - 128) - 1;
             }
             else if(c0 <= 256) {
                 ptr1[idx1++] = 0;
-                ptr1[idx1++] = 4 * (256 - ptr2[idx2++]);
+                ptr1[idx1++] = 4 * (256 - c0);
                 ptr1[idx1++] = 255;
             }
         }

@@ -97,9 +97,11 @@ Demo::Demo(QWidget *parent)
     fps(10),
     duty(5000),
     mcp(5),
+    laser_on(0),
     zoom(0),
     focus(0),
     distance(0),
+    max_dist(15000),
     delay_dist(15),
     depth_of_vision(15),
     focus_direction(0),
@@ -175,12 +177,12 @@ Demo::Demo(QWidget *parent)
 //    foreach (const QSerialPortInfo & info, QSerialPortInfo::availablePorts()) qDebug("%s\n", qPrintable(info.portName()));
     com_label[0] = ui->TCU_COM;
     com_label[1] = ui->RANGE_COM;
-    com_label[2] = ui->FOCUS_COM;
+    com_label[2] = ui->LENS_COM;
     com_label[3] = ui->LASER_COM;
 
     com_edit[0] = ui->TCU_COM_EDIT;
     com_edit[1] = ui->RANGE_COM_EDIT;
-    com_edit[2] = ui->FOCUS_COM_EDIT;
+    com_edit[2] = ui->LENS_COM_EDIT;
     com_edit[3] = ui->LASER_COM_EDIT;
 
     setup_com(com + 0, 0, com_edit[0]->text(), 9600);
@@ -198,7 +200,7 @@ Demo::Demo(QWidget *parent)
     ui->MCP_SLIDER->setValue(5);
 
     ui->DELAY_SLIDER->setMinimum(0);
-    ui->DELAY_SLIDER->setMaximum(15000);
+    ui->DELAY_SLIDER->setMaximum(max_dist);
     ui->DELAY_SLIDER->setSingleStep(10);
     ui->DELAY_SLIDER->setPageStep(100);
     ui->DELAY_SLIDER->setValue(0);
@@ -275,6 +277,9 @@ Demo::Demo(QWidget *parent)
     if (com[0] && com[3]) on_LASER_BTN_clicked();
 
     ui->COM_DATA_RADIO->click();
+    QFont temp_f(consolas);
+    temp_f.setPointSize(8);
+    ui->DATA_EXCHANGE->setFont(temp_f);
 
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
@@ -394,6 +399,8 @@ void Demo::data_exchange(bool read){
         ui->DELAY_B_EDIT_U->setText(QString::asprintf("%d", delay_b_u));
         ui->DELAY_B_EDIT_N->setText(QString::asprintf("%d", delay_b_n));
         ui->DELAY_N_EDIT_N->setText(QString::asprintf("%d", delay_n_n));
+        ui->DELAY_SLIDER->setValue(delay_dist);
+        ui->MCP_SLIDER->setValue(mcp);
 
         setup_stepping(base_unit);
 
@@ -1009,7 +1016,8 @@ void Demo::on_SET_PARAMS_BUTTON_clicked()
     if (device_on) {
         curr_cam->time_exposure(false, &time_exposure_edit);
         curr_cam->frame_rate(false, &frame_rate_edit);
-        curr_cam->gain_analog(false, &gain_analog_edit);
+//        curr_cam->gain_analog(false, &gain_analog_edit);
+        change_gain(gain_analog_edit);
     }
     data_exchange(false);
 }
@@ -1082,7 +1090,17 @@ void Demo::setup_stepping(int base_unit)
 
 void Demo::setup_max_dist(int max_dist)
 {
+    this->max_dist = max_dist;
     ui->DELAY_SLIDER->setMaximum(max_dist);
+}
+
+void Demo::setup_laser(int laser_on)
+{
+    int change = laser_on ^ this->laser_on;
+//    qDebug() << QString::number(laser_on, 2);
+//    qDebug() << QString::number(change, 2);
+    for(int i = 0; i < 4; i++) if ((change >> i) & 1) communicate_display(com[0], convert_to_send_tcu(0x1A + i, laser_on & (1 << i) ? 8 : 4), 7, 1, false);
+    this->laser_on = laser_on;
 }
 
 void Demo::export_config()
@@ -1187,7 +1205,7 @@ void Demo::update_delay()
 {
     // REPEATED FREQUENCY
     if (delay_dist < 0) delay_dist = 0;
-    if (delay_dist > 15000) delay_dist = 15000;
+    if (delay_dist > max_dist) delay_dist = max_dist;
 //    qDebug("estimated distance: %f\n", delay_dist);
 
     ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
@@ -1207,7 +1225,6 @@ void Demo::update_delay()
         communicate_display(com[0], convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
     }
 
-    data_exchange(false);
 /*
     // DAC1
     send = dac1;
@@ -1224,6 +1241,9 @@ void Demo::update_delay()
 
     // DELAY B
     communicate_display(com[0], convert_to_send_tcu(0x04, (delay_b_u * 1000 + delay_b_n) + 68), 7, 1, false);
+
+    data_exchange(false);
+
 }
 
 void Demo::update_gate_width() {
@@ -1538,13 +1558,26 @@ void Demo::change_mcp(int val)
     communicate_display(com[0], convert_to_send_tcu(0x0A, mcp), 7, 1, false);
 
     ui->MCP_EDIT->setText(QString::number(val));
-//    ui->MCP_SLIDER->setToolTip(QString::number(val));
+    ui->MCP_SLIDER->setValue(mcp);
 }
 
 void Demo::change_gain(int val)
 {
+
+    if (val < 0) val = 0;
+    switch (curr_cam->device_type) {
+    case 1:
+        if (val > 23) val = 23; break;
+    case 2:
+        if (val > 480) val = 480; break;
+    default:
+        break;
+    }
+
     gain_analog_edit = val;
     curr_cam->gain_analog(false, &gain_analog_edit);
+    ui->GAIN_EDIT->setText(QString::number((int)gain_analog_edit));
+    ui->GAIN_SLIDER->setValue(gain_analog_edit);
     data_exchange(false);
 }
 
@@ -1559,6 +1592,8 @@ void Demo::change_delay(int val)
 void Demo::change_focus_speed(int val)
 {
     if (com[2]) com[2]->clear();
+    if (val < 1)  val = 1;
+    if (val > 64) val = 64;
     ui->FOCUS_SPEED_EDIT->setText(QString::asprintf("%d", val));
     if (val > 1) val -= 1;
 
@@ -1684,7 +1719,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
         else if (edit == ui->FOCUS_EDIT) {
             set_focus();
         }
-        else if (edit == ui->CCD_FREQ_EDIT || edit == ui->DUTY_EDIT) {
+        else if (edit == ui->CCD_FREQ_EDIT || edit == ui->DUTY_EDIT || edit == ui->GAIN_EDIT) {
             on_SET_PARAMS_BUTTON_clicked();
         }
         else if (edit == ui->FOCUS_SPEED_EDIT) {
@@ -1694,6 +1729,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
             update_current();
         }
         this->focusWidget()->clearFocus();
+        data_exchange(false);
         break;
     // 100m => 667ns, 10m => 67ns
     case Qt::Key_W:
@@ -1905,15 +1941,6 @@ void Demo::on_SAVE_AVI_BUTTON_clicked()
     ui->SAVE_AVI_BUTTON->setText(record_original ? tr("Stop") : tr("ORI"));
 }
 
-void Demo::on_GAIN_EDIT_textEdited(const QString &arg1)
-{
-    gain_analog_edit = (int)arg1.toFloat();
-    if (gain_analog_edit < 0) gain_analog_edit = 0;
-    if (gain_analog_edit > 480) gain_analog_edit = 480;
-    ui->GAIN_SLIDER->setValue(gain_analog_edit);
-    data_exchange(false);
-}
-
 void Demo::on_SCAN_BUTTON_clicked()
 {
     static ProgSettings *settings = ui->TITLE->prog_settings;
@@ -2003,13 +2030,6 @@ void Demo::on_FRAME_AVG_CHECK_stateChanged(int arg1)
         seq_idx = 0;
     }
     data_exchange(true);
-}
-
-void Demo::on_FOCUS_SPEED_EDIT_textEdited(const QString &arg1)
-{
-    uint speed = arg1.toUInt();
-    if (speed < 1)  ui->FOCUS_SPEED_EDIT->setText(QString::asprintf("%u", 1));
-    if (speed > 64) ui->FOCUS_SPEED_EDIT->setText(QString::asprintf("%u", 64));
 }
 
 void Demo::on_SAVE_RESULT_BUTTON_clicked()

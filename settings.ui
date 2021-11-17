@@ -10,12 +10,6 @@
     <height>318</height>
    </rect>
   </property>
-  <property name="font">
-   <font>
-    <family>Consolas</family>
-    <pointsize>9</pointsize>
-   </font>
-  </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
@@ -71,7 +65,7 @@
      <rect>
       <x>10</x>
       <y>20</y>
-      <width>98</width>
+      <width>110</width>
       <height>14</height>
      </rect>
     </property>
@@ -84,7 +78,7 @@
      <rect>
       <x>10</x>
       <y>60</y>
-      <width>84</width>
+      <width>110</width>
       <height>14</height>
      </rect>
     </property>
@@ -107,7 +101,7 @@
      <rect>
       <x>10</x>
       <y>100</y>
-      <width>77</width>
+      <width>75</width>
       <height>14</height>
      </rect>
     </property>
@@ -130,12 +124,12 @@
      <rect>
       <x>10</x>
       <y>140</y>
-      <width>91</width>
+      <width>75</width>
       <height>14</height>
      </rect>
     </property>
     <property name="text">
-     <string>Stepping size</string>
+     <string>Stepping</string>
     </property>
    </widget>
    <widget class="QLineEdit" name="STEP_SIZE_EDIT">
@@ -153,7 +147,7 @@
      <rect>
       <x>100</x>
       <y>40</y>
-      <width>14</width>
+      <width>21</width>
       <height>14</height>
      </rect>
     </property>
@@ -166,7 +160,7 @@
      <rect>
       <x>100</x>
       <y>80</y>
-      <width>14</width>
+      <width>21</width>
       <height>14</height>
      </rect>
     </property>
@@ -179,7 +173,7 @@
      <rect>
       <x>75</x>
       <y>160</y>
-      <width>14</width>
+      <width>21</width>
       <height>14</height>
      </rect>
     </property>
@@ -215,7 +209,7 @@
      <rect>
       <x>10</x>
       <y>180</y>
-      <width>70</width>
+      <width>75</width>
       <height>14</height>
      </rect>
     </property>
@@ -228,7 +222,7 @@
      <rect>
       <x>10</x>
       <y>220</y>
-      <width>109</width>
+      <width>110</width>
       <height>20</height>
      </rect>
     </property>
@@ -241,7 +235,7 @@
      <rect>
       <x>45</x>
       <y>40</y>
-      <width>14</width>
+      <width>21</width>
       <height>14</height>
      </rect>
     </property>
@@ -277,7 +271,7 @@
      <rect>
       <x>45</x>
       <y>80</y>
-      <width>14</width>
+      <width>21</width>
       <height>14</height>
      </rect>
     </property>
@@ -290,7 +284,7 @@
      <rect>
       <x>10</x>
       <y>240</y>
-      <width>95</width>
+      <width>110</width>
       <height>20</height>
      </rect>
     </property>
@@ -326,7 +320,7 @@
      <rect>
       <x>10</x>
       <y>20</y>
-      <width>77</width>
+      <width>80</width>
       <height>14</height>
      </rect>
     </property>
@@ -389,7 +383,7 @@
      <rect>
       <x>10</x>
       <y>100</y>
-      <width>47</width>
+      <width>60</width>
       <height>13</height>
      </rect>
     </property>
@@ -402,7 +396,7 @@
      <rect>
       <x>10</x>
       <y>140</y>
-      <width>49</width>
+      <width>60</width>
       <height>14</height>
      </rect>
     </property>
@@ -415,7 +409,7 @@
      <rect>
       <x>80</x>
       <y>100</y>
-      <width>49</width>
+      <width>60</width>
       <height>14</height>
      </rect>
     </property>
@@ -428,7 +422,7 @@
      <rect>
       <x>80</x>
       <y>140</y>
-      <width>56</width>
+      <width>60</width>
       <height>14</height>
      </rect>
     </property>
@@ -441,7 +435,7 @@
      <rect>
       <x>10</x>
       <y>60</y>
-      <width>35</width>
+      <width>60</width>
       <height>14</height>
      </rect>
     </property>
@@ -464,7 +458,7 @@
      <rect>
       <x>80</x>
       <y>60</y>
-      <width>21</width>
+      <width>60</width>
       <height>14</height>
      </rect>
     </property>
@@ -479,7 +473,7 @@
      <x>340</x>
      <y>20</y>
      <width>141</width>
-     <height>141</height>
+     <height>191</height>
     </rect>
    </property>
    <property name="title">
@@ -513,7 +507,7 @@
      <rect>
       <x>10</x>
       <y>100</y>
-      <width>63</width>
+      <width>126</width>
       <height>14</height>
      </rect>
     </property>
@@ -526,7 +520,7 @@
      <rect>
       <x>115</x>
       <y>120</y>
-      <width>14</width>
+      <width>21</width>
       <height>14</height>
      </rect>
     </property>
@@ -539,7 +533,7 @@
      <rect>
       <x>10</x>
       <y>73</y>
-      <width>63</width>
+      <width>70</width>
       <height>14</height>
      </rect>
     </property>
@@ -572,12 +566,77 @@
      <rect>
       <x>10</x>
       <y>43</y>
-      <width>63</width>
+      <width>70</width>
       <height>14</height>
      </rect>
     </property>
     <property name="text">
      <string>Rep. freq</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="LASER_CHK_1">
+    <property name="geometry">
+     <rect>
+      <x>50</x>
+      <y>140</y>
+      <width>32</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>1</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="LASER_CHK_2">
+    <property name="geometry">
+     <rect>
+      <x>90</x>
+      <y>140</y>
+      <width>32</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>2</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="LASER_CHK_3">
+    <property name="geometry">
+     <rect>
+      <x>50</x>
+      <y>170</y>
+      <width>32</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>3</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="LASER_CHK_4">
+    <property name="geometry">
+     <rect>
+      <x>90</x>
+      <y>170</y>
+      <width>32</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>4</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="LASER">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>143</y>
+      <width>35</width>
+      <height>14</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Laser</string>
     </property>
    </widget>
   </widget>

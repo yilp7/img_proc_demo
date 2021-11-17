@@ -1,10 +1,8 @@
 #ifndef MYWIDGET_H
 #define MYWIDGET_H
 
-#include <Qtcore>
-#include <QtWidgets>
-#include "opencv2/core.hpp"
 #include "progsettings.h"
+#include "utils.h"
 
 class Display : public QLabel
 {

@@ -2,10 +2,6 @@
 #define DEMO_H
 
 #include <QSerialPort>
-#include <opencv2/core.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/videoio.hpp>
 #include <windows.h>
 
 #include "mywidget.h"
@@ -87,6 +83,7 @@ public slots:
     void setup_hz(int hz_unit);
     void setup_stepping(int base_unit);
     void setup_max_dist(int max_dist);
+    void setup_laser(int laser_on);
     void export_config();
     void load_config();
 
@@ -123,7 +120,6 @@ private slots:
     // set & get curr device's params
     void on_SET_PARAMS_BUTTON_clicked();
     void on_GET_PARAMS_BUTTON_clicked();
-    void on_GAIN_EDIT_textEdited(const QString &arg1);
 
     // customize the savepath through a file dialog
     void on_FILE_PATH_BROWSE_clicked();
@@ -144,7 +140,6 @@ private slots:
     void on_FOCUS_NEAR_BTN_released();
     void on_FOCUS_FAR_BTN_pressed();
     void on_FOCUS_FAR_BTN_released();
-    void on_FOCUS_SPEED_EDIT_textEdited(const QString &arg1);
 
     void on_GET_LENS_PARAM_BTN_clicked();
     // TODO rewrite auto focus function
@@ -294,9 +289,11 @@ private:
     int                     fps;
     int                     duty;
     int                     mcp;
+    int                     laser_on;
     int                     zoom;
     int                     focus;
     int                     distance;                   // dist read from rangefinder
+    float                   max_dist;
     float                   delay_dist;                 // estimated distance calculated from delay
     float                   depth_of_vision;
     // TODO rewrite auto focus function

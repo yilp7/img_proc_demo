@@ -22,7 +22,9 @@ ProgSettings::ProgSettings(QWidget *parent) :
     auto_rep_freq(true),
     hz_unit(0),
     base_unit(0),
-    max_dist(15000)
+    max_dist(15000),
+    laser_grp(NULL),
+    laser_on(0)
 {
     ui->setupUi(this);
 
@@ -44,6 +46,14 @@ ProgSettings::ProgSettings(QWidget *parent) :
     connect(ui->END_POS_EDIT_N, SIGNAL(editingFinished()), SLOT(update_scan()));
     connect(ui->FRAME_COUNT_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
     connect(ui->STEP_SIZE_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
+
+    laser_grp = new QButtonGroup();
+    laser_grp->addButton(ui->LASER_CHK_1, 0);
+    laser_grp->addButton(ui->LASER_CHK_2, 1);
+    laser_grp->addButton(ui->LASER_CHK_3, 2);
+    laser_grp->addButton(ui->LASER_CHK_4, 3);
+    laser_grp->setExclusive(false);
+    connect(laser_grp, SIGNAL(buttonToggled(int, bool)), SLOT(toggle_laser(int, bool)));
 
     data_exchange(false);
 
@@ -91,6 +101,11 @@ void ProgSettings::data_exchange(bool read)
         case 2: max_dist = ui->MAX_DIST_EDT->text().toInt(); break;
         default: break;
         }
+        laser_on = 0;
+        laser_on ^= ui->LASER_CHK_1->isChecked() << 0;
+        laser_on ^= ui->LASER_CHK_2->isChecked() << 1;
+        laser_on ^= ui->LASER_CHK_3->isChecked() << 2;
+        laser_on ^= ui->LASER_CHK_4->isChecked() << 3;
     }
     else {
         ui->START_POS_EDIT_N->setText(QString::number(start_pos % 1000));
@@ -128,6 +143,10 @@ void ProgSettings::data_exchange(bool read)
         case 2: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist))); break;
         default: break;
         }
+        ui->LASER_CHK_1->setChecked(laser_on & 0b0001);
+        ui->LASER_CHK_2->setChecked(laser_on & 0b0010);
+        ui->LASER_CHK_3->setChecked(laser_on & 0b0100);
+        ui->LASER_CHK_4->setChecked(laser_on & 0b1000);
     }
 }
 
@@ -247,4 +266,11 @@ void ProgSettings::on_AUTO_REP_FREQ_CHK_stateChanged(int arg1)
 void ProgSettings::on_MAX_DIST_EDT_editingFinished()
 {
     emit max_dist_changed(max_dist);
+}
+
+void ProgSettings::toggle_laser(int id, bool on)
+{
+    if (on) laser_on += 1 << id;
+    else    laser_on -= 1 << id;
+    emit laser_toggled(laser_on);
 }

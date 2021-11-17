@@ -9,29 +9,29 @@ void log_message(QtMsgType type, const QMessageLogContext &context, const QStrin
 {
     static QMutex mutex;
     mutex.lock();
-    QString text;
+    QString text = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz ");
     switch(type)
     {
     case QtDebugMsg:
-        text = QString("Debug: ");
+        text += QString("[Debug] ");
         break;
     case QtWarningMsg:
-        text = QString("Warning: ");
+        text += QString("[Warning] ");
         break;
     case QtCriticalMsg:
-        text = QString("Critical: ");
+        text += QString("[Critical] ");
         break;
     case QtFatalMsg:
-        text = QString("Fatal: ");
+        text += QString("[Fatal] ");
         break;
     default:
         break;
     }
 
-    QString message = text + QString::asprintf("File:(%s) Line (%d), ", context.file, context.line) + msg + QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss ") + "\n";
-    static QFile file("log");
+//    QString message = text + QString::asprintf("File:(%s) Line (%d), ", context.file, context.line) + msg + "\n";
+    static QFile file("../log");
     file.open(QIODevice::WriteOnly | QIODevice::Append);
-    file.write(message.toLatin1());
+    file.write((text + msg + "\n").toUtf8());
     file.flush();
     file.close();
     mutex.unlock();
@@ -48,7 +48,17 @@ int main(int argc, char *argv[])
     QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
 
     QApplication a(argc, argv);
-    a.setFont(QFont("Consolas", 9));
+
+    int id = QFontDatabase::addApplicationFont(":/fonts/monaco.ttf");
+    monaco = QFont(QFontDatabase::applicationFontFamilies(id).at(0), 8);
+//    monaco.setLetterSpacing(QFont::PercentageSpacing, 120);
+
+    id = QFontDatabase::addApplicationFont(":/fonts/consola.ttf");
+    consolas = QFont(QFontDatabase::applicationFontFamilies(id).at(0), 9);
+//    monaco.setLetterSpacing(QFont::PercentageSpacing, 120);
+
+//    a.setFont(QFont("Consolas", 9));
+    a.setFont(monaco);
     QFile style(":/style/style.qss");
     style.open(QIODevice::ReadOnly);
     a.setStyleSheet(style.readAll());

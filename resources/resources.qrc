@@ -44,4 +44,8 @@
         <file>jump.png</file>
         <file>run.png</file>
     </qresource>
+    <qresource prefix="/fonts">
+        <file>monaco.ttf</file>
+        <file>consola.ttf</file>
+    </qresource>
 </RCC>

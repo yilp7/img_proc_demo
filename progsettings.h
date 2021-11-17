@@ -1,9 +1,7 @@
 #ifndef PROGSETTINGS_H
 #define PROGSETTINGS_H
 
-#include <QDialog>
-#include <QKeyEvent>
-#include <QDebug>
+#include "utils.h"
 
 namespace Ui {
 class ProgSettings;
@@ -38,38 +36,43 @@ private slots:
 
     void on_MAX_DIST_EDT_editingFinished();
 
+    void toggle_laser(int id, bool on);
+
 signals:
     void rep_freq_unit_changed(int);
     void base_unit_changed(int);
     void max_dist_changed(int);
+    void laser_toggled(int);
 
 public:
     Ui::ProgSettings *ui;
 
-    bool   pressed;
-    QPoint prev_pos;
+    bool             pressed;
+    QPoint           prev_pos;
 
-    int    start_pos;
-    int    end_pos;
-    int    frame_count;
-    float  step_size;
-    float  rep_freq;
-    bool   save_scan_ori;
-    bool   save_scan_res;
+    int              start_pos;
+    int              end_pos;
+    int              frame_count;
+    float            step_size;
+    float            rep_freq;
+    bool             save_scan_ori;
+    bool             save_scan_res;
 
-    int    kernel;
-    float  gamma;
-    float  log;
-    float  low_in;
-    float  high_in;
-    float  low_out;
-    float  high_out;
+    int              kernel;
+    float            gamma;
+    float            log;
+    float            low_in;
+    float            high_in;
+    float            low_out;
+    float            high_out;
 
-    float  dist_ns;
-    bool   auto_rep_freq;
-    int    hz_unit; // 0: kHz, 1:Hz
-    int    base_unit; // 0: ns, 1: μs, 2: m
-    float  max_dist;
+    float            dist_ns;
+    bool             auto_rep_freq;
+    int              hz_unit; // 0: kHz, 1:Hz
+    int              base_unit; // 0: ns, 1: μs, 2: m
+    float            max_dist;
+    QButtonGroup     *laser_grp;
+    int              laser_on;
 
 };
 

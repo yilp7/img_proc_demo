@@ -151,7 +151,10 @@ void Ruler::paintEvent(QPaintEvent *event)
     painter.begin(this);
 
     painter.setRenderHint(QPainter::Antialiasing);
-    painter.setFont(QFont("Consolas", 10, QFont::Light));
+    QFont temp = QFont(monaco);
+    temp.setPointSize(10);
+    temp.setWeight(QFont::Light);
+    painter.setFont(temp);
     draw_mark(&painter);
 
     painter.end();
@@ -188,7 +191,7 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     settings = new TitleButton("", this);
     settings->setObjectName("SETTINGS_BTN");
     QMenu *settings_menu = new QMenu();
-    settings_menu->setFont(QFont("Consolas", 9));
+    settings_menu->setFont(monaco);
     QAction *pref = new QAction("-- preference", this);
     QAction *expt = new QAction(">> export pref.", this);
     QAction *load = new QAction("<< load pref.", this);
@@ -198,6 +201,7 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     connect(prog_settings, SIGNAL(rep_freq_unit_changed(int)), this->parent()->parent(), SLOT(setup_hz(int)));
     connect(prog_settings, SIGNAL(base_unit_changed(int)), this->parent()->parent(), SLOT(setup_stepping(int)));
     connect(prog_settings, SIGNAL(max_dist_changed(int)), this->parent()->parent(), SLOT(setup_max_dist(int)));
+    connect(prog_settings, SIGNAL(laser_toggled(int)), this->parent()->parent(), SLOT(setup_laser(int)));
     settings_menu->addAction(expt);
     connect(expt, SIGNAL(triggered()), this->parent()->parent(), SLOT(export_config()));
     settings_menu->addAction(load);
@@ -308,17 +312,17 @@ void Coordinate::setup(QString name)
     if (coord_y) delete coord_y;
     set_name = new InfoLabel(this);
     set_name->setText(name);
-    set_name->setFont(QFont("Consolas", 10));
+    set_name->setFont(monaco);
     set_name->setStyleSheet("color: #DEC4B0;");
     set_name->setGeometry(0, 0, this->fontMetrics().width(name) + 10, 13);
     coord_x = new InfoLabel(this);
     coord_x->setText("X: xxxx");
-    coord_x->setFont(QFont("Consolas", 10));
+    coord_x->setFont(monaco);
     coord_x->setStyleSheet("color: #DEC4B0;");
     coord_x->setGeometry(set_name->geometry().right() + 10, 0, this->fontMetrics().width("X: xxxx") + 10, 13);
     coord_y = new InfoLabel(this);
     coord_y->setText("Y: yyyy");
-    coord_y->setFont(QFont("Consolas", 10));
+    coord_y->setFont(monaco);
     coord_y->setStyleSheet("color: #DEC4B0;");
     coord_y->setGeometry(set_name->geometry().right() + 10, 17, this->fontMetrics().width("Y: yyyy") + 10, 13);
 

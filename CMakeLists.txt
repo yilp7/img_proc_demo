@@ -44,6 +44,7 @@ link_directories(${OpenCV_DIR}/lib)
 
 add_executable(Demo_param WIN32
 	main.cpp
+	utils.cpp
 	demo.cpp
 	mywidget.cpp
 	progsettings.cpp
@@ -52,6 +53,7 @@ add_executable(Demo_param WIN32
 #	mvcam.cpp
 #	hqvcam.cpp
 #	euresyscam.cpp
+    utils.h
 	demo.h
 	mywidget.h
 	progsettings.h
