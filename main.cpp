@@ -49,14 +49,14 @@ int main(int argc, char *argv[])
 
     QApplication a(argc, argv);
 
-    int id = QFontDatabase::addApplicationFont(":/fonts/monaco.ttf");
-    monaco = QFont(QFontDatabase::applicationFontFamilies(id).at(0));
+    int monaco_id = QFontDatabase::addApplicationFont(":/fonts/monaco.ttf");
+    int consolas_id = QFontDatabase::addApplicationFont(":/fonts/consola.ttf");
+    monaco = QFont(QFontDatabase::applicationFontFamilies(monaco_id).at(0));
     monaco.setPointSizeF(8.6);
 //    monaco.setLetterSpacing(QFont::PercentageSpacing, 120);
-
-    id = QFontDatabase::addApplicationFont(":/fonts/consola.ttf");
-    consolas = QFont(QFontDatabase::applicationFontFamilies(id).at(0), 9);
-//    monaco.setLetterSpacing(QFont::PercentageSpacing, 120);
+    consolas = QFont(QFontDatabase::applicationFontFamilies(consolas_id).at(0));
+    consolas.setPointSizeF(9);
+//    consolas.setLetterSpacing(QFont::PercentageSpacing, 120);
 
 //    a.setFont(QFont("Consolas", 9));
     a.setFont(monaco);

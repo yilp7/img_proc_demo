@@ -151,10 +151,10 @@ void Ruler::paintEvent(QPaintEvent *event)
     painter.begin(this);
 
     painter.setRenderHint(QPainter::Antialiasing);
-    QFont temp = QFont(monaco);
-    temp.setPointSize(10);
-    temp.setWeight(QFont::Light);
-    painter.setFont(temp);
+//    QFont temp = QFont(monaco);
+//    temp.setPointSize(10);
+//    temp.setWeight(QFont::Light);
+    painter.setFont(monaco);
     draw_mark(&painter);
 
     painter.end();

@@ -280,6 +280,7 @@ Demo::Demo(QWidget *parent)
     QFont temp_f(consolas);
     temp_f.setPointSize(8);
     ui->DATA_EXCHANGE->setFont(temp_f);
+    ui->FILE_PATH_EDIT->setFont(consolas);
 
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
