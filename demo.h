@@ -191,7 +191,9 @@ private slots:
     // prepare accu mats
     void on_ENHANCE_OPTIONS_currentIndexChanged(int index);
 
-signals:
+    void on_FILE_PATH_EDIT_editingFinished();
+
+ signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);
 

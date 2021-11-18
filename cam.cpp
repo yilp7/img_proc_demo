@@ -3,6 +3,8 @@
 Cam::Cam() {dev_handle = NULL;}
 Cam::~Cam() {if (dev_handle) CloseHandle(dev_handle), dev_handle = NULL;}
 
+cv::Mat img;
+
 int Cam::search_for_devices()
 {
     device_type = 0;
@@ -98,6 +100,7 @@ void Cam::get_frame_size(int &w, int &h)
         w = int_value.nCurValue;
         MV_CC_GetIntValue(dev_handle, "Height", &int_value);
         h = int_value.nCurValue;
+        img = cv::Mat(h, w, CV_8UC1);
     }
     else if (device_type == 2) {
         HQV_ParamGetValue(dev_handle, PARAM_ID_SFNC_WIDTH, &w, VALUE_INT);
@@ -207,7 +210,7 @@ void Cam::trigger_once()
 
 void Cam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *user_data)
 {
-    static cv::Mat img(frame_info->nHeight, frame_info->nWidth, CV_8UC1);
+//    static cv::Mat img(frame_info->nHeight, frame_info->nWidth, CV_8UC1);
     memcpy(img.data, data, frame_info->nFrameLen);
     ((std::queue<cv::Mat>*)user_data)->push(img.clone());
 }
@@ -218,7 +221,7 @@ DWORD Cam::frame_cb(HANDLE dev, HQV_FRAMEINFO frame_info, void *user_data)
     memcpy(raw_data.data, frame_info.pBufPtr, frame_info.lBufSize);
     cv::cvtColor(raw_data, raw_data, cv::COLOR_BayerGR2GRAY);
     raw_data.convertTo(temp, CV_8UC1, 1.0 / 16);
-    ((std::queue<cv::Mat>*)user_data)->push(temp);
+    ((std::queue<cv::Mat>*)user_data)->push(temp.clone());
 
     return RESULT_OK;
 }

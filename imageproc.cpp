@@ -219,14 +219,12 @@ cv::Mat ImageProc::gated3D(cv::Mat &img1, cv::Mat &img2, double delay, double gw
 
     int bar_gray = 255;
     ptr1 = gray_bar.data;
-    int gap = (BARHEIGHT - 1024) / 2;
+    int color_step = BARHEIGHT / 256;
+    int gap = (BARHEIGHT - 256 * color_step) / 2;
     for (i = 0; i < gap; i++) for (j = 0; j < BARWIDTH; j++) ptr1[i * step_gray + j] = 255;
-    for (i = gap; i < BARHEIGHT - gap; i += 4) {
+    for (i = gap; i < BARHEIGHT - gap; i += color_step) {
         for (j = 0; j < BARWIDTH; j++) {
-            ptr1[i     * step_gray + j] = bar_gray;
-            ptr1[(i+1) * step_gray + j] = bar_gray;
-            ptr1[(i+2) * step_gray + j] = bar_gray;
-            ptr1[(i+3) * step_gray + j] = bar_gray;
+            for (int k = 0; k < color_step; k++) ptr1[(i + k) * step_gray + j] = bar_gray;
         }
         bar_gray--;
     }

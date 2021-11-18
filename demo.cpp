@@ -415,6 +415,7 @@ int Demo::grab_thread_process() {
     ProgSettings *settings = ui->TITLE->prog_settings;
     QImage stream;
     cv::Mat sobel;
+    float weight = h / 1024.0; qDebug() << weight; // font scale & thickness
     while (grab_thread_state) {
         if (img_q.empty()) {
             QThread::msleep(5);
@@ -587,10 +588,10 @@ int Demo::grab_thread_process() {
         prev_img = img_mem.clone();
 
         // put info (dist, dov, time) as text on image
-        if (ui->INFO_CHECK->isChecked()) {
-            if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
-            else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
-            cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+        if (ui->INFO_CHECK->isChecked() && !image_3d) {
+            if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
         }
 
         // image display
@@ -628,16 +629,16 @@ int Demo::grab_thread_process() {
         // image write / video record
         if (save_original) save_to_file(false);
         if (save_modified) save_to_file(true);
-        if (record_original) {
-            if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
-            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
-            cv::putText(img_mem, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+        if (record_original && !image_3d) {
+            if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            cv::putText(img_mem, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), weight * 2);
             vid_out[0].write(img_mem);
         }
-        if (record_modified) {
-            if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
-            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
-            cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+        if (record_modified && !image_3d) {
+            if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             vid_out[1].write(modified_result);
         }
 
@@ -2150,4 +2151,10 @@ void Demo::on_ENHANCE_OPTIONS_currentIndexChanged(int index)
         for (auto& m: accu) m = cv::Mat::zeros(h, w, CV_8U);
         accu_idx = 0;
     }
+}
+
+void Demo::on_FILE_PATH_EDIT_editingFinished()
+{
+    save_location = ui->FILE_PATH_EDIT->text();
+    if (!QDir(save_location).exists()) QDir().mkdir(save_location);
 }
