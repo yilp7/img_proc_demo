@@ -1,9 +1,71 @@
 #include "demo.h"
 
-#include <QApplication>
-#include <QTranslator>
-#include <QTextCodec>
-#include <QStandardPaths>
+#include <tchar.h>
+#include <DbgHelp.h>
+
+#pragma comment(lib, "user32.lib")
+
+int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
+{
+    // define function ptr
+    typedef BOOL(WINAPI * MiniDumpWriteDumpT)(
+        HANDLE,
+        DWORD,
+        HANDLE,
+        MINIDUMP_TYPE,
+        PMINIDUMP_EXCEPTION_INFORMATION,
+        PMINIDUMP_USER_STREAM_INFORMATION,
+        PMINIDUMP_CALLBACK_INFORMATION
+        );
+    // load function MiniDumpWriteDump from DbgHelp.dll
+    MiniDumpWriteDumpT pfnMiniDumpWriteDump = NULL;
+    HMODULE hDbgHelp = LoadLibrary(_T("DbgHelp.dll"));
+    if (NULL == hDbgHelp)
+    {
+        return EXCEPTION_CONTINUE_EXECUTION;
+    }
+    pfnMiniDumpWriteDump = (MiniDumpWriteDumpT)GetProcAddress(hDbgHelp, "MiniDumpWriteDump");
+
+    if (NULL == pfnMiniDumpWriteDump)
+    {
+        FreeLibrary(hDbgHelp);
+        return EXCEPTION_CONTINUE_EXECUTION;
+    }
+    // create dump file
+    TCHAR szFileName[MAX_PATH] = { 0 };
+    TCHAR szVersion[] = "DumpFile";
+    SYSTEMTIME stLocalTime;
+    GetLocalTime(&stLocalTime);
+    sprintf(szFileName, "%s-%04d%02d%02d-%02d%02d%02d.dmp",
+        szVersion, stLocalTime.wYear, stLocalTime.wMonth, stLocalTime.wDay,
+        stLocalTime.wHour, stLocalTime.wMinute, stLocalTime.wSecond);
+    HANDLE hDumpFile = CreateFile(szFileName, GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
+    if (INVALID_HANDLE_VALUE == hDumpFile)
+    {
+        FreeLibrary(hDbgHelp);
+        return EXCEPTION_CONTINUE_EXECUTION;
+    }
+    // write dump file
+    MINIDUMP_EXCEPTION_INFORMATION expParam;
+    expParam.ThreadId = GetCurrentThreadId();
+    expParam.ExceptionPointers = pExceptionPointers;
+    expParam.ClientPointers = FALSE;
+    pfnMiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(),
+        hDumpFile, MiniDumpWithDataSegs, (pExceptionPointers ? &expParam : NULL), NULL, NULL);
+    // release file handle
+    CloseHandle(hDumpFile);
+    FreeLibrary(hDbgHelp);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+LONG WINAPI ExceptionFilter(LPEXCEPTION_POINTERS lpExceptionInfo)
+{
+    if (IsDebuggerPresent()) {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    return GenerateMiniDump(lpExceptionInfo);
+}
 
 void log_message(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
@@ -37,12 +99,6 @@ void log_message(QtMsgType type, const QMessageLogContext &context, const QStrin
     mutex.unlock();
 }
 
-
-int buggyFunc() {
-    delete reinterpret_cast<QString*>(0xFEE1DEAD);
-    return 0;
-}
-
 int main(int argc, char *argv[])
 {
     QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
@@ -58,7 +114,6 @@ int main(int argc, char *argv[])
     consolas.setPointSizeF(9);
 //    consolas.setLetterSpacing(QFont::PercentageSpacing, 120);
 
-//    a.setFont(QFont("Consolas", 9));
     a.setFont(monaco);
     QFile style(":/style/style.qss");
     style.open(QIODevice::ReadOnly);
@@ -66,7 +121,7 @@ int main(int argc, char *argv[])
 
 //    qInstallMessageHandler(log_message);
 
-//    buggyFunc();
+    SetUnhandledExceptionFilter(ExceptionFilter);
 
     Demo w;
     w.show();

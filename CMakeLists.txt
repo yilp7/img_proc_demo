@@ -66,7 +66,6 @@ add_executable(Demo_param WIN32
 	settings.ui
 	resources/resources.qrc
 	icon.rc
-	zh.qm
 )
 target_compile_definitions(Demo_param PRIVATE PARAM=1)
 
@@ -103,7 +102,6 @@ target_link_libraries(Demo_param
 #    demo_rls.ui
 #    resources/resources.qrc
 #    icon.rc
-#    zh.qm
 #)
 
 #qt5_use_modules(Demo_release Widgets SerialPort)
