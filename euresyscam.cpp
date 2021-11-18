@@ -107,7 +107,7 @@ void Cam::get_frame_size(int &w, int &h)
 
 float Cam::communicate(char* out, char* in, uint out_size, uint in_size, bool read) {
     mutex.lock();
-    QString str_s = "s", str_r = "r";
+	QString str_s = "s", str_r = "r", str_d = "d";
     static uint temp_size = 1;
     static char temp = 0;
 //    while(!clSerialRead(serial_ref, &temp, &temp_size, 20)) temp_size = 1;// qDebug() << temp_size;
@@ -120,6 +120,7 @@ float Cam::communicate(char* out, char* in, uint out_size, uint in_size, bool re
 //    clFlushPort(serial_ref);
 
     QByteArray in_buffer;
+	temp_size = 1;
     while(!clSerialRead(serial_ref, &temp, &temp_size, 10)) in_buffer.append(temp), temp_size = 1;
 //    if (in_buffer.size() < (int)in_size) {read = false; goto UNLOCK;}
     static QByteArray ending_r((char*)new uchar[2]{0x55, 0xAA}, 2);
@@ -135,9 +136,10 @@ float Cam::communicate(char* out, char* in, uint out_size, uint in_size, bool re
     if (idx < 0) {read = false; goto UNLOCK;}
     memcpy(in, in_buffer.data() + idx, in_size);
 
+	for (int i = 0; i < in_buffer.size(); i++) str_d += QString::asprintf(" %02X", (uchar)in_buffer[i]);
     for (int i = 0; i < 6; i++) str_r += QString::asprintf(" %02X", i + (int)in_size - 6 < 0 ? 0 : ((uchar*)in)[i + in_size - 6]);
 
-    qDebug() << str_s << str_r;
+	qDebug() << str_s << str_d << str_r;
 
 UNLOCK:
     mutex.unlock();
