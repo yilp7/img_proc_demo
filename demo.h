@@ -69,6 +69,7 @@ public:
 
     // rename vid file in new thread
     static void move_to_dest(QString src, QString dst);
+    static void save_image(cv::Mat img, QString filename);
 
 public slots:
     // signaled by MouseThread

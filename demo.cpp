@@ -5,12 +5,6 @@
     #include "./ui_demo_rls.h"
 #endif
 
-// used when moving temp recorded vid to destination
-void Demo::move_to_dest(QString src, QString dst)
-{
-    QFile::rename(src, dst);
-}
-
 GrabThread::GrabThread(void *info)
 {
     p_info = info;
@@ -415,7 +409,7 @@ int Demo::grab_thread_process() {
     ProgSettings *settings = ui->TITLE->prog_settings;
     QImage stream;
     cv::Mat sobel;
-    float weight = h / 1024.0; qDebug() << weight; // font scale & thickness
+    float weight = h / 1024.0; // font scale & thickness
     while (grab_thread_state) {
         if (img_q.empty()) {
             QThread::msleep(5);
@@ -672,6 +666,18 @@ inline bool Demo::is_maximized()
     return ui->TITLE->is_maximized;
 }
 
+// used when moving temp recorded vid to destination
+void Demo::move_to_dest(QString src, QString dst)
+{
+    QFile::rename(src, dst);
+}
+
+void Demo::save_image(cv::Mat img, QString filename)
+{
+    cv::Mat temp = img.clone();
+    QPixmap::fromImage(QImage(temp.data, temp.cols, temp.rows, temp.step, temp.channels() == 3 ? QImage::Format_RGB888 : QImage::Format_Indexed8)).save(filename, "BMP", 100);
+}
+
 void Demo::draw_cursor(QCursor c)
 {
     setCursor(c);
@@ -766,8 +772,12 @@ void Demo::save_to_file(bool save_result) {
 //            dest = QString(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), save_result ? modified_result : img_mem);
 //    QFile::rename(temp, dest);
+
     cv::Mat *temp = save_result ? &modified_result : &img_mem;
-    QPixmap::fromImage(QImage(temp->data, temp->cols, temp->rows, temp->step, temp->channels() == 3 ? QImage::Format_RGB888 : QImage::Format_Indexed8)).save(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", "BMP", 100);
+//    QPixmap::fromImage(QImage(temp->data, temp->cols, temp->rows, temp->step, temp->channels() == 3 ? QImage::Format_RGB888 : QImage::Format_Indexed8)).save(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", "BMP", 100);
+
+    std::thread t_save(Demo::save_image, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
+    t_save.detach();
 }
 
 void Demo::save_scan_img() {
@@ -1928,7 +1938,7 @@ void Demo::on_SAVE_AVI_BUTTON_clicked()
         vid_out[0].release();
         image_mutex.unlock();
         QString dest = save_location + "/" + raw_avi.section('/', -1, -1);
-        std::thread t(move_to_dest, QString(raw_avi), QString(dest));
+        std::thread t(Demo::move_to_dest, QString(raw_avi), QString(dest));
         t.detach();
 //        QFile::rename(raw_avi, dest);
     }
@@ -2157,6 +2167,6 @@ void Demo::on_FILE_PATH_EDIT_editingFinished()
 {
     QString temp_location = ui->FILE_PATH_EDIT->text();
     if (QDir().mkdir(temp_location)) save_location = temp_location;
-    else QMessageBox::warning(this, "PROMPT", tr("cannot create directory"));
+    else if (!QDir(temp_location).exists()) QMessageBox::warning(this, "PROMPT", tr("cannot create directory"));
     ui->FILE_PATH_EDIT->setText(save_location);
 }
