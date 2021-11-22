@@ -2155,6 +2155,8 @@ void Demo::on_ENHANCE_OPTIONS_currentIndexChanged(int index)
 
 void Demo::on_FILE_PATH_EDIT_editingFinished()
 {
-    save_location = ui->FILE_PATH_EDIT->text();
-    if (!QDir(save_location).exists()) QDir().mkdir(save_location);
+    QString temp_location = ui->FILE_PATH_EDIT->text();
+    if (QDir().mkdir(temp_location)) save_location = temp_location;
+    else QMessageBox::warning(this, "PROMPT", tr("cannot create directory"));
+    ui->FILE_PATH_EDIT->setText(save_location);
 }

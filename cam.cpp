@@ -3,7 +3,8 @@
 Cam::Cam() {dev_handle = NULL;}
 Cam::~Cam() {if (dev_handle) CloseHandle(dev_handle), dev_handle = NULL;}
 
-cv::Mat img;
+cv::Mat img; // hik
+cv::Mat raw_data, temp; // hqv
 
 int Cam::search_for_devices()
 {
@@ -105,6 +106,7 @@ void Cam::get_frame_size(int &w, int &h)
     else if (device_type == 2) {
         HQV_ParamGetValue(dev_handle, PARAM_ID_SFNC_WIDTH, &w, VALUE_INT);
         HQV_ParamGetValue(dev_handle, PARAM_ID_SFNC_HEIGHT, &h, VALUE_INT);
+        raw_data = cv::Mat(h, w, CV_16UC1);
     }
 }
 
@@ -217,7 +219,7 @@ void Cam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *
 
 DWORD Cam::frame_cb(HANDLE dev, HQV_FRAMEINFO frame_info, void *user_data)
 {
-    static cv::Mat raw_data(frame_info.lHeight, frame_info.lWidth, CV_16UC1), temp;
+//    static cv::Mat raw_data(frame_info.lHeight, frame_info.lWidth, CV_16UC1), temp;
     memcpy(raw_data.data, frame_info.pBufPtr, frame_info.lBufSize);
     cv::cvtColor(raw_data, raw_data, cv::COLOR_BayerGR2GRAY);
     raw_data.convertTo(temp, CV_8UC1, 1.0 / 16);

@@ -1,6 +1,5 @@
 #include "demo.h"
 
-#include <tchar.h>
 #include <DbgHelp.h>
 
 #pragma comment(lib, "user32.lib")
@@ -19,7 +18,7 @@ int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
         );
     // load function MiniDumpWriteDump from DbgHelp.dll
     MiniDumpWriteDumpT pfnMiniDumpWriteDump = NULL;
-    HMODULE hDbgHelp = LoadLibrary(_T("DbgHelp.dll"));
+    HMODULE hDbgHelp = LoadLibrary("DbgHelp.dll");
     if (NULL == hDbgHelp)
     {
         return EXCEPTION_CONTINUE_EXECUTION;
@@ -32,8 +31,8 @@ int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
         return EXCEPTION_CONTINUE_EXECUTION;
     }
     // create dump file
-    TCHAR szFileName[MAX_PATH] = { 0 };
-    TCHAR szVersion[] = "DumpFile";
+    char szFileName[MAX_PATH] = { 0 };
+    char szVersion[] = "DumpFile";
     SYSTEMTIME stLocalTime;
     GetLocalTime(&stLocalTime);
     sprintf(szFileName, "%s-%04d%02d%02d-%02d%02d%02d.dmp",
@@ -104,6 +103,14 @@ int main(int argc, char *argv[])
     QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
 
     QApplication a(argc, argv);
+
+//    QPixmap pixmap("screen.png");
+//    QSplashScreen screen(pixmap);
+//    screen.show();
+//    QElapsedTimer timer;
+//    timer.start();
+//    while(timer.elapsed() < (2000)) a.processEvents();
+
 
     int monaco_id = QFontDatabase::addApplicationFont(":/fonts/monaco.ttf");
     int consolas_id = QFontDatabase::addApplicationFont(":/fonts/consola.ttf");
