@@ -65,6 +65,43 @@ void MouseThread::draw_cursor()
     }
 }
 
+RAMDetectThread::RAMDetectThread(void *info) : QThread()
+{
+    p_info = info;
+    t = NULL;
+    curr_process_id = QString::number(GetCurrentProcessId());
+    memory_checked = false;
+    connect(this, SIGNAL(stop_image_writing()), (Demo*)info, SLOT(stop_image_writing()));
+}
+
+inline void RAMDetectThread::check_memory()
+{
+    memory_checked = true;
+}
+
+void RAMDetectThread::run()
+{
+    if (!t) t = new QTimer();
+    connect(t, SIGNAL(timeout()), this, SLOT(detect_used_mem()), Qt::QueuedConnection);
+    t->start(1000);
+    this->exec();
+}
+
+void RAMDetectThread::detect_used_mem()
+{
+    QProcess p;
+    p.start("tasklist /FI \"PID EQ " + curr_process_id + " \"");
+    p.waitForFinished();
+    QString result = QString::fromLocal8Bit(p.readAllStandardOutput()).replace(",", "");
+    p.close();
+    QRegExp rx("(\\d+)(\\s)(K)");
+    if (rx.indexIn(result) == -1) return;
+    // in Mb
+    result = rx.cap(0);
+//    qDebug() << result.left(result.length() - 1).toDouble() / 1024;
+    if (result.left(result.length() - 1).toDouble() > 1280 * 1024 && memory_checked) memory_checked = false, emit stop_image_writing();
+}
+
 Demo* wnd;
 
 Demo::Demo(QWidget *parent)
@@ -112,6 +149,7 @@ Demo::Demo(QWidget *parent)
     h_grab_thread(NULL),
     grab_thread_state(false),
     h_mouse_thread(NULL),
+    h_ram_thread(NULL),
     seq_idx(0),
     accu_idx(0),
     scan(false),
@@ -129,6 +167,8 @@ Demo::Demo(QWidget *parent)
     trans.load("zh.qm");
     h_mouse_thread = new MouseThread(this);
     h_mouse_thread->start();
+    h_ram_thread = new RAMDetectThread(this);
+    h_ram_thread->start();
 
     dist_ns = c * 1e-9 / 2;
 
@@ -612,13 +652,13 @@ int Demo::grab_thread_process() {
 
         // process scan
         if (scan) {
-            emit update_delay_in_thread();
-
             save_scan_img();
             delay_dist += scan_step;
 //            filter_scan();
+
+            emit update_delay_in_thread();
         }
-        if (scan && delay_dist >= scan_farthest) {on_SCAN_BUTTON_clicked();}
+        if (scan && std::round(delay_dist / dist_ns) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
 
         // image write / video record
         if (save_original) save_to_file(false);
@@ -672,15 +712,48 @@ void Demo::move_to_dest(QString src, QString dst)
     QFile::rename(src, dst);
 }
 
-void Demo::save_image(cv::Mat img, QString filename)
+void Demo::save_image_bmp(cv::Mat img, QString filename)
 {
-    cv::Mat temp = img.clone();
-    QPixmap::fromImage(QImage(temp.data, temp.cols, temp.rows, temp.step, temp.channels() == 3 ? QImage::Format_RGB888 : QImage::Format_Indexed8)).save(filename, "BMP", 100);
+//    QPixmap::fromImage(QImage(img.data, img.cols, img.rows, img.step, img.channels() == 3 ? QImage::Format_RGB888 : QImage::Format_Indexed8)).save(filename + "_qt", "BMP", 100);
+
+    if (img.channels() == 3) cv::cvtColor(img, img, cv::COLOR_BGRA2RGB);
+    QFile f(filename);
+    f.open(QIODevice::WriteOnly);
+    if (f.isOpen()) {
+//        qDebug() << filename;
+        QDataStream out(&f);
+        out.setByteOrder(QDataStream::LittleEndian);
+        quint32_le offset((img.channels() == 1 ? 4 * img.channels() * 8 : 0) + 54);
+        // bmp file header
+        out << (quint16_le)'MB' << (quint32_le)(img.total() * img.channels() + offset) << (quint16_le)0 << (quint16_le)0 << offset;
+        //  windows signature,  total file size,                                       reserved1,       reserved2,       offset to data
+        // DIB header
+        out << (quint32_le)40 << (quint32_le)img.cols << (quint32_le)img.rows << (quint16_le)1 << (quint16_le)(img.channels() * 8) << (quint32_le)0 << (quint32_le)(img.total() * img.channels()) << (quint32_le)0 << (quint32_le)0 << (quint32_le)0 << (quint32_le)0;
+        //  dib header size,  width,                  height,                 planes,          bit per pixel,                      compression,     image size,                                   x pixels in meter, y,             color important, color used
+        // color table
+        if (img.channels() == 1) {
+            for (int i = 0; i < 1 << img.channels() * 8; i++) out << (quint8)i << (quint8)i << (quint8)i << (quint8)0;
+        //                                                        rgb blue,    rgb green,   rgb red,     reserved
+        }
+        for(int i = img.rows - 1; i >= 0; i--) f.write((char*)img.data + i * img.step, img.step);
+        f.close();
+    }
 }
 
 void Demo::draw_cursor(QCursor c)
 {
     setCursor(c);
+}
+
+void Demo::stop_image_writing()
+{
+    if (save_original) on_SAVE_BMP_BUTTON_clicked();
+    if (save_modified) on_SAVE_RESULT_BUTTON_clicked();
+    QMessageBox::warning(this, "PROMPT", "too much memory used, stopping writing images");
+//    QElapsedTimer t;
+//    t.start();
+//    while (t.elapsed() < 1000) ((QApplication*)QApplication::instance())->processEvents();
+//    QThread::msleep(1000);
 }
 
 void Demo::switch_language()
@@ -769,27 +842,35 @@ void Demo::enable_controls(bool cam_rdy) {
 
 void Demo::save_to_file(bool save_result) {
 //    QString temp = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"),
-//            dest = QString(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
+//            dest = QString(save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), save_result ? modified_result : img_mem);
 //    QFile::rename(temp, dest);
 
     cv::Mat *temp = save_result ? &modified_result : &img_mem;
-//    QPixmap::fromImage(QImage(temp->data, temp->cols, temp->rows, temp->step, temp->channels() == 3 ? QImage::Format_RGB888 : QImage::Format_Indexed8)).save(save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", "BMP", 100);
+//    QPixmap::fromImage(QImage(temp->data, temp->cols, temp->rows, temp->step, temp->channels() == 3 ? QImage::Format_RGB888 : QImage::Format_Indexed8)).save(save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", "BMP", 100);
 
-    std::thread t_save(Demo::save_image, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/raw_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
+    std::thread t_save(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
     t_save.detach();
 }
 
 void Demo::save_scan_img() {
 //    QString temp = QString(TEMP_SAVE_LOCATION + "/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp"),
-//            dest = QString(save_location + "/" + scan_name + "/raw_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
+//            dest = QString(save_location + "/" + scan_name + "/ori_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), img_mem);
 //    QFile::rename(temp, dest);
-    if (ui->TITLE->prog_settings->save_scan_ori) QPixmap::fromImage(QImage(img_mem.data, img_mem.cols, img_mem.rows, img_mem.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/raw_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
+//    if (ui->TITLE->prog_settings->save_scan_ori) QPixmap::fromImage(QImage(img_mem.data, img_mem.cols, img_mem.rows, img_mem.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
+    if (ui->TITLE->prog_settings->save_scan_ori) {
+        std::thread t_ori(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
+        t_ori.detach();
+    }
 //    dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), modified_result);
 //    QFile::rename(temp, dest);
-    if (ui->TITLE->prog_settings->save_scan_res) QPixmap::fromImage(QImage(modified_result.data, modified_result.cols, modified_result.rows, modified_result.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
+//    if (ui->TITLE->prog_settings->save_scan_res) QPixmap::fromImage(QImage(modified_result.data, modified_result.cols, modified_result.rows, modified_result.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
+    if (ui->TITLE->prog_settings->save_scan_res) {
+        std::thread t_res(save_image_bmp, modified_result, save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
+        t_res.detach();
+    }
 }
 
 void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate) {
@@ -980,8 +1061,9 @@ void Demo::on_STOP_GRABBING_BUTTON_clicked()
 void Demo::on_SAVE_BMP_BUTTON_clicked()
 {
     save_original = !save_original;
-    if (save_original && !QDir(save_location + "/raw_bmp").exists()) QDir().mkdir(save_location + "/raw_bmp");
+    if (save_original && !QDir(save_location + "/ori_bmp").exists()) QDir().mkdir(save_location + "/ori_bmp");
     ui->SAVE_BMP_BUTTON->setText(save_original ? tr("Stop") : tr("ORI"));
+    h_ram_thread->check_memory();
 }
 
 void Demo::on_SAVE_FINAL_BUTTON_clicked()
@@ -1052,7 +1134,7 @@ void Demo::on_FILE_PATH_BROWSE_clicked()
 {
     QString temp = QFileDialog::getExistingDirectory(this, tr("Select folder"), save_location);
     if (!temp.isEmpty()) save_location = temp;
-    if (save_original && !QDir(temp + "/raw_bmp").exists()) QDir().mkdir(temp + "/raw_bmp");
+    if (save_original && !QDir(temp + "/ori_bmp").exists()) QDir().mkdir(temp + "/ori_bmp");
     if (save_modified && !QDir(temp + "/res_bmp").exists()) QDir().mkdir(temp + "/res_bmp");
     data_exchange(false);
 }
@@ -1197,7 +1279,7 @@ QByteArray Demo::communicate_display(QSerialPort *com, QByteArray write, int wri
     if (com == NULL) return QByteArray();
     com->clear();
     com->write(write, write_size);
-    while (com->waitForBytesWritten(10)) ;
+    while (com->waitForBytesWritten(5)) ;
 
 //    if (fb) while (com->waitForReadyRead(100)) ;
 
@@ -1209,7 +1291,7 @@ QByteArray Demo::communicate_display(QSerialPort *com, QByteArray write, int wri
     for (char i = 0; i < 7; i++) str_r += QString::asprintf(" %02X", i + read_size - 7 < 0 ? 0 : (uchar)read[i + read.size() - 7]);
     emit append_text(str_r);
 
-//    QThread().msleep(10);
+    QThread().msleep(5);
     return read;
 }
 
@@ -1960,12 +2042,14 @@ void Demo::on_SCAN_BUTTON_clicked()
 
     if (start_scan) {
         delay_dist = settings->start_pos * dist_ns;
-        scan_farthest = settings->end_pos * dist_ns;
+        scan_stopping_delay = settings->end_pos;
         scan_step = settings->step_size * dist_ns;
+        update_delay();
+
         scan_name = "scan_" + QDateTime::currentDateTime().toString("MMdd_hhmmss");
         if (!QDir(save_location + "/" + scan_name).exists()) {
             QDir().mkdir(save_location + "/" + scan_name);
-            QDir().mkdir(save_location + "/" + scan_name + "/raw_bmp");
+            QDir().mkdir(save_location + "/" + scan_name + "/ori_bmp");
             QDir().mkdir(save_location + "/" + scan_name + "/res_bmp");
         }
 
@@ -1973,14 +2057,14 @@ void Demo::on_SCAN_BUTTON_clicked()
         params.open(QIODevice::WriteOnly);
         params.write(QString::asprintf("starting delay:     %06d ns\n"
                                        "ending delay:       %06d ns\n"
-                                       "frames count:       50\n"
-                                       "stepping size:      2000.00 ns\n"
-                                       "repeated frequency: 000010 Hz\n"
-                                       "laser width:        000500 ns\n"
-                                       "gate width:         000100 ns\n"
-                                       "MCP:                005",
-                                       settings->start_pos, settings->end_pos, settings->frame_count, settings->step_size, rep_freq,
-                                       laser_width_u * 1000 + laser_width_n, gate_width_a_u * 1000, gate_width_a_n, mcp).toUtf8());
+                                       "frames count:       %06d\n"
+                                       "stepping size:      %.2f ns\n"
+                                       "repeated frequency: %06d Hz\n"
+                                       "laser width:        %06d ns\n"
+                                       "gate width:         %06d ns\n"
+                                       "MCP:                %03d",
+                                       settings->start_pos, settings->end_pos, settings->frame_count, settings->step_size, (int)rep_freq,
+                                       laser_width_u * 1000 + laser_width_n, gate_width_a_u * 1000 + gate_width_a_n, mcp).toUtf8());
         params.close();
 
         on_CONTINUE_SCAN_BUTTON_clicked();
@@ -2049,6 +2133,7 @@ void Demo::on_SAVE_RESULT_BUTTON_clicked()
     save_modified = !save_modified;
     if (save_modified && !QDir(save_location + "/res_bmp").exists()) QDir().mkdir(save_location + "/res_bmp");
     ui->SAVE_RESULT_BUTTON->setText(save_modified ? tr("Stop") : tr("RES"));
+    h_ram_thread->check_memory();
 }
 
 void Demo::on_LASER_ZOOM_IN_BTN_pressed()

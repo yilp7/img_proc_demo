@@ -11,10 +11,12 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(Hik_SDK_DIR "${PROJECT_SOURCE_DIR}/sdk32/mvs")
-set(HQV_DIR "${PROJECT_SOURCE_DIR}/sdk32/HQV")
-set(EURESYS_DIR "${PROJECT_SOURCE_DIR}/sdk32/euresys")
-set(OpenCV_DIR "${PROJECT_SOURCE_DIR}/sdk32/opencv")
+set(SDK_DIR "${PROJECT_SOURCE_DIR}/sdk64")
+
+set(Hik_SDK_DIR "${SDK_DIR}/mvs")
+set(HQV_DIR "${SDK_DIR}/HQV")
+set(EURESYS_DIR "${SDK_DIR}/euresys")
+set(OpenCV_DIR "${SDK_DIR}/opencv452")
 
 # QtCreator supports the following variables for Android, which are identical to qmake Android variables.
 # Check http://doc.qt.io/qt-5/deployment-android.html for more information.
@@ -76,9 +78,9 @@ target_link_libraries(Demo_param
 	# mvs
 	MvCameraControl
     # HQV
-	HQV_AVIProcess
-	HQV_DataConvert
-	HQV_SDK
+	HQV_AVIProcess64
+	HQV_DataConvert64
+	HQV_SDK64
     # Euresys
 #	MultiCam
 #	clallserial

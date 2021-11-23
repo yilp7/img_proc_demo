@@ -46,7 +46,29 @@ signals:
 
 };
 
- class Demo : public QMainWindow
+class RAMDetectThread : public QThread {
+    Q_OBJECT
+public:
+    RAMDetectThread(void *info);
+    void check_memory();
+
+protected:
+    void run();
+
+private:
+    void    *p_info;
+    QTimer  *t;
+    QString curr_process_id;
+    bool    memory_checked; // unchecked when memory used > 1024 Mb; checked when img writing restarted
+
+private slots:
+    void detect_used_mem();
+
+signals:
+    void stop_image_writing();
+};
+
+class Demo : public QMainWindow
 {
     Q_OBJECT
 
@@ -69,11 +91,14 @@ public:
 
     // rename vid file in new thread
     static void move_to_dest(QString src, QString dst);
-    static void save_image(cv::Mat img, QString filename);
+    static void save_image_bmp(cv::Mat img, QString filename);
 
 public slots:
     // signaled by MouseThread
     void draw_cursor(QCursor c);
+
+    // signaled by RAMDetectThread
+    void stop_image_writing();
 
     // signaled by Titlebar button
     void switch_language();
@@ -325,7 +350,8 @@ private:
 
     GrabThread*             h_grab_thread;              // img-grab thread handle
     bool                    grab_thread_state;          // whether thread is created
-    MouseThread*            h_mouse_thread;             // process mouse img
+    MouseThread*            h_mouse_thread;             // processes mouse img
+    RAMDetectThread*        h_ram_thread;               // detects current memory used
 
     cv::Mat                 img_mem;                    // right-side img display source (stream)
     cv::Mat                 modified_result;            // right-side img display modified (stream)
@@ -346,7 +372,7 @@ private:
     bool                    scan;                       // auto-scan for object detection
     float                   scan_distance;              // curr distance of scanning
     float                   scan_step;                  // stepping size when scanning
-    float                   scan_farthest;              // upper limit for scanning
+    float                   scan_stopping_delay;              // upper limit for scanning
     QString                 scan_name;
 
     float                   c;                          // light speed

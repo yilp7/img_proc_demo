@@ -31,15 +31,8 @@ int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
         return EXCEPTION_CONTINUE_EXECUTION;
     }
     // create dump file
-    char szFileName[MAX_PATH] = { 0 };
-    char szVersion[] = "DumpFile";
-    SYSTEMTIME stLocalTime;
-    GetLocalTime(&stLocalTime);
-    sprintf(szFileName, "%s-%04d%02d%02d-%02d%02d%02d.dmp",
-        szVersion, stLocalTime.wYear, stLocalTime.wMonth, stLocalTime.wDay,
-        stLocalTime.wHour, stLocalTime.wMinute, stLocalTime.wSecond);
-    HANDLE hDumpFile = CreateFile(szFileName, GENERIC_READ | GENERIC_WRITE,
-        FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
+    HANDLE hDumpFile = CreateFile(("DumpFile" + QDateTime::currentDateTime().toString("-yyyyMMdd-hhmmss")).toUtf8().constData(),
+                                  GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
     if (INVALID_HANDLE_VALUE == hDumpFile)
     {
         FreeLibrary(hDbgHelp);
