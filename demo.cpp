@@ -65,43 +65,6 @@ void MouseThread::draw_cursor()
     }
 }
 
-RAMDetectThread::RAMDetectThread(void *info) : QThread()
-{
-    p_info = info;
-    t = NULL;
-    curr_process_id = QString::number(GetCurrentProcessId());
-    memory_checked = false;
-    connect(this, SIGNAL(stop_image_writing()), (Demo*)info, SLOT(stop_image_writing()));
-}
-
-inline void RAMDetectThread::check_memory()
-{
-    memory_checked = true;
-}
-
-void RAMDetectThread::run()
-{
-    if (!t) t = new QTimer();
-    connect(t, SIGNAL(timeout()), this, SLOT(detect_used_mem()), Qt::QueuedConnection);
-    t->start(1000);
-    this->exec();
-}
-
-void RAMDetectThread::detect_used_mem()
-{
-    QProcess p;
-    p.start("tasklist /FI \"PID EQ " + curr_process_id + " \"");
-    p.waitForFinished();
-    QString result = QString::fromLocal8Bit(p.readAllStandardOutput()).replace(",", "");
-    p.close();
-    QRegExp rx("(\\d+)(\\s)(K)");
-    if (rx.indexIn(result) == -1) return;
-    // in Mb
-    result = rx.cap(0);
-//    qDebug() << result.left(result.length() - 1).toDouble() / 1024;
-    if (result.left(result.length() - 1).toDouble() > 1280 * 1024 && memory_checked) memory_checked = false, emit stop_image_writing();
-}
-
 Demo* wnd;
 
 Demo::Demo(QWidget *parent)
@@ -149,7 +112,6 @@ Demo::Demo(QWidget *parent)
     h_grab_thread(NULL),
     grab_thread_state(false),
     h_mouse_thread(NULL),
-    h_ram_thread(NULL),
     seq_idx(0),
     accu_idx(0),
     scan(false),
@@ -158,7 +120,8 @@ Demo::Demo(QWidget *parent)
     frame_a_3d(false),
     hide_left(false),
     resize_place(22),
-    en(false)
+    en(false),
+    tp(40)
 {
     ui->setupUi(this);
     wnd = this;
@@ -167,8 +130,8 @@ Demo::Demo(QWidget *parent)
     trans.load("zh.qm");
     h_mouse_thread = new MouseThread(this);
     h_mouse_thread->start();
-    h_ram_thread = new RAMDetectThread(this);
-    h_ram_thread->start();
+
+    tp.start();
 
     dist_ns = c * 1e-9 / 2;
 
@@ -337,10 +300,12 @@ Demo::Demo(QWidget *parent)
 
 Demo::~Demo()
 {
-    delete ui;
-
     h_mouse_thread->quit();
     h_mouse_thread->wait();
+
+    tp.stop();
+
+    delete ui;
 }
 
 void Demo::data_exchange(bool read){
@@ -604,12 +569,14 @@ int Demo::grab_thread_process() {
         if (!image_3d && ui->SP_CHECK->isChecked()) ImageProc::plateau_equl_hist(&modified_result, &modified_result, ui->SP_OPTIONS->currentIndex());
 
         // brightness & contrast
-        int val = ui->BRIGHTNESS_SLIDER->value() * 12.8;
-        modified_result *= ui->CONTRAST_SLIDER->value() / 10.0;
-        modified_result += val;
-        // do not change pixel of value 0 when adjusting brightness
-        for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) {
-            if (modified_result.at<uchar>(i, j) == val) modified_result.at<uchar>(i, j) = 0;
+        if (!image_3d) {
+            int val = ui->BRIGHTNESS_SLIDER->value() * 12.8;
+            modified_result *= ui->CONTRAST_SLIDER->value() / 10.0;
+            modified_result += val;
+            // do not change pixel of value 0 when adjusting brightness
+            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) {
+                if (modified_result.data[i * w + j] == val) modified_result.data[i * w + j] = 0;
+            }
         }
 
         // process 3d image construction from ABN frames
@@ -717,13 +684,15 @@ void Demo::save_image_bmp(cv::Mat img, QString filename)
 //    QPixmap::fromImage(QImage(img.data, img.cols, img.rows, img.step, img.channels() == 3 ? QImage::Format_RGB888 : QImage::Format_Indexed8)).save(filename + "_qt", "BMP", 100);
 
     if (img.channels() == 3) cv::cvtColor(img, img, cv::COLOR_BGRA2RGB);
+/*
+    // using qt file io
     QFile f(filename);
     f.open(QIODevice::WriteOnly);
     if (f.isOpen()) {
 //        qDebug() << filename;
         QDataStream out(&f);
         out.setByteOrder(QDataStream::LittleEndian);
-        quint32_le offset((img.channels() == 1 ? 4 * img.channels() * 8 : 0) + 54);
+        quint32_le offset((img.channels() == 1 ? 4 * (1 << img.channels() * 8) : 0) + 54);
         // bmp file header
         out << (quint16_le)'MB' << (quint32_le)(img.total() * img.channels() + offset) << (quint16_le)0 << (quint16_le)0 << offset;
         //  windows signature,  total file size,                                       reserved1,       reserved2,       offset to data
@@ -738,6 +707,52 @@ void Demo::save_image_bmp(cv::Mat img, QString filename)
         for(int i = img.rows - 1; i >= 0; i--) f.write((char*)img.data + i * img.step, img.step);
         f.close();
     }
+*/
+    // using std io
+    FILE *f = fopen(filename.toUtf8().constData(), "wb");
+    if (f) {
+        static ushort signature = 'MB';
+        fwrite(&signature, 2, 1, f);
+        uint offset = (img.channels() == 1 ? 4 * (1 << img.channels() * 8) : 0) + 54;
+        uint file_size = img.total() * img.channels() + offset;
+        fwrite(&file_size, 4, 1, f);
+        static ushort reserved1 = 0, reserved2 = 0;
+        fwrite(&reserved1, 2, 1, f);
+        fwrite(&reserved2, 2, 1, f);
+        fwrite(&offset, 4, 1, f);
+        static uint dib_size = 40;
+        fwrite(&dib_size, 4, 1, f);
+        uint w = img.cols, h = img.rows;
+        fwrite(&w, 4, 1, f);
+        fwrite(&h, 4, 1, f);
+        static ushort planes = 1;
+        fwrite(&planes, 2, 1, f);
+        ushort bit_per_pixel = 8 * img.channels();
+        fwrite(&bit_per_pixel, 2, 1, f);
+        static uint compression = 0;
+        fwrite(&compression, 4, 1, f);
+        uint img_size = img.total() * img.channels();
+        fwrite(&img_size, 4, 1, f);
+        static uint pixels_in_meter_x = 0, pixels_in_meter_y = 0;
+        fwrite(&pixels_in_meter_x, 4, 1, f);
+        fwrite(&pixels_in_meter_y, 4, 1, f);
+        static uint colors_important = 0, colors_used = 0;
+        fwrite(&colors_important, 4, 1, f);
+        fwrite(&colors_used, 4, 1, f);
+
+        // color table
+        static uchar empty = 0;
+        if (img.channels() == 1) {
+            for (int i = 0; i < 1 << img.channels() * 8; i++) {
+                fwrite(&i, 1, 1, f);     // r
+                fwrite(&i, 1, 1, f);     // g
+                fwrite(&i, 1, 1, f);     // b
+                fwrite(&empty, 1, 1, f); // null
+            }
+        }
+        for(int i = img.rows - 1; i >= 0; i--) fwrite(img.data + i * img.step, 1, img.step, f);
+        fclose(f);
+    }
 }
 
 void Demo::draw_cursor(QCursor c)
@@ -749,7 +764,7 @@ void Demo::stop_image_writing()
 {
     if (save_original) on_SAVE_BMP_BUTTON_clicked();
     if (save_modified) on_SAVE_RESULT_BUTTON_clicked();
-    QMessageBox::warning(this, "PROMPT", "too much memory used, stopping writing images");
+    QMessageBox::warning(wnd, "PROMPT", "too much memory used, stopping writing images");
 //    QElapsedTimer t;
 //    t.start();
 //    while (t.elapsed() < 1000) ((QApplication*)QApplication::instance())->processEvents();
@@ -849,8 +864,10 @@ void Demo::save_to_file(bool save_result) {
     cv::Mat *temp = save_result ? &modified_result : &img_mem;
 //    QPixmap::fromImage(QImage(temp->data, temp->cols, temp->rows, temp->step, temp->channels() == 3 ? QImage::Format_RGB888 : QImage::Format_Indexed8)).save(save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", "BMP", 100);
 
-    std::thread t_save(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
-    t_save.detach();
+//    std::thread t_save(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
+//    t_save.detach();
+
+    if (!tp.append_task(std::bind(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) stop_image_writing();
 }
 
 void Demo::save_scan_img() {
@@ -967,6 +984,10 @@ void Demo::on_START_BUTTON_clicked()
 void Demo::on_SHUTDOWN_BUTTON_clicked()
 {
     shut_down();
+    ui->IMG_ENHANCE_CHECK->setChecked(false);
+    ui->SP_CHECK->setChecked(false);
+    ui->FRAME_AVG_CHECK->setChecked(false);
+    ui->IMG_3D_CHECK->setChecked(false);
     on_ENUM_BUTTON_clicked();
     clean();
 }
@@ -1063,7 +1084,6 @@ void Demo::on_SAVE_BMP_BUTTON_clicked()
     save_original = !save_original;
     if (save_original && !QDir(save_location + "/ori_bmp").exists()) QDir().mkdir(save_location + "/ori_bmp");
     ui->SAVE_BMP_BUTTON->setText(save_original ? tr("Stop") : tr("ORI"));
-    h_ram_thread->check_memory();
 }
 
 void Demo::on_SAVE_FINAL_BUTTON_clicked()
@@ -1524,6 +1544,7 @@ void Demo::on_IMG_3D_CHECK_stateChanged(int arg1)
     w = arg1 ? w + 104 : w - 104;
     image_mutex.unlock();
     resizeEvent(new QResizeEvent(this->size(), this->size()));
+    if (!arg1) frame_a_3d = 0, prev_3d.release();
 
     data_exchange(true);
 }
@@ -2133,7 +2154,6 @@ void Demo::on_SAVE_RESULT_BUTTON_clicked()
     save_modified = !save_modified;
     if (save_modified && !QDir(save_location + "/res_bmp").exists()) QDir().mkdir(save_location + "/res_bmp");
     ui->SAVE_RESULT_BUTTON->setText(save_modified ? tr("Stop") : tr("RES"));
-    h_ram_thread->check_memory();
 }
 
 void Demo::on_LASER_ZOOM_IN_BTN_pressed()

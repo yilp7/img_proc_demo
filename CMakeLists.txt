@@ -48,6 +48,7 @@ add_executable(Demo_param WIN32
 	main.cpp
 	utils.cpp
 	demo.cpp
+	threadpool.cpp
 	mywidget.cpp
 	progsettings.cpp
 	imageproc.cpp
@@ -57,6 +58,7 @@ add_executable(Demo_param WIN32
 #	euresyscam.cpp
     utils.h
 	demo.h
+	threadpool.h
 	mywidget.h
 	progsettings.h
 	imageproc.h

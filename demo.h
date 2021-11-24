@@ -4,6 +4,7 @@
 #include <QSerialPort>
 #include <windows.h>
 
+#include "threadpool.h"
 #include "mywidget.h"
 #include "imageproc.h"
 #include "cam.h"
@@ -16,6 +17,7 @@ namespace Ui { class Demo; }
 QT_END_NAMESPACE
 
 class GrabThread : public QThread {
+    Q_OBJECT
 public:
     GrabThread(void *info);
 
@@ -24,6 +26,9 @@ protected:
 
 private:
     void *p_info;
+
+signals:
+    void stop_image_writing();
 };
 
 class MouseThread : public QThread {
@@ -44,28 +49,6 @@ private slots:
 signals:
     void set_cursor(QCursor);
 
-};
-
-class RAMDetectThread : public QThread {
-    Q_OBJECT
-public:
-    RAMDetectThread(void *info);
-    void check_memory();
-
-protected:
-    void run();
-
-private:
-    void    *p_info;
-    QTimer  *t;
-    QString curr_process_id;
-    bool    memory_checked; // unchecked when memory used > 1024 Mb; checked when img writing restarted
-
-private slots:
-    void detect_used_mem();
-
-signals:
-    void stop_image_writing();
 };
 
 class Demo : public QMainWindow
@@ -97,7 +80,6 @@ public slots:
     // signaled by MouseThread
     void draw_cursor(QCursor c);
 
-    // signaled by RAMDetectThread
     void stop_image_writing();
 
     // signaled by Titlebar button
@@ -351,7 +333,6 @@ private:
     GrabThread*             h_grab_thread;              // img-grab thread handle
     bool                    grab_thread_state;          // whether thread is created
     MouseThread*            h_mouse_thread;             // processes mouse img
-    RAMDetectThread*        h_ram_thread;               // detects current memory used
 
     cv::Mat                 img_mem;                    // right-side img display source (stream)
     cv::Mat                 modified_result;            // right-side img display modified (stream)
@@ -385,6 +366,8 @@ private:
 
     bool                    en;                         // for language switching
     QTranslator             trans;
+
+    ThreadPool              tp;
 
  };
 #endif // DEMO_H
