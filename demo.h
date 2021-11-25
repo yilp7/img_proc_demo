@@ -80,8 +80,6 @@ public slots:
     // signaled by MouseThread
     void draw_cursor(QCursor c);
 
-    void stop_image_writing();
-
     // signaled by Titlebar button
     void switch_language();
     void screenshot();
@@ -131,6 +129,7 @@ private slots:
 
     // customize the savepath through a file dialog
     void on_FILE_PATH_BROWSE_clicked();
+    void on_FILE_PATH_EDIT_editingFinished();
 
     // update distance, repeated freq, delay and gate width
     void on_DIST_BTN_clicked();
@@ -199,7 +198,8 @@ private slots:
     // prepare accu mats
     void on_ENHANCE_OPTIONS_currentIndexChanged(int index);
 
-    void on_FILE_PATH_EDIT_editingFinished();
+    // too much memory occupied (too many unfinished tasks in thread pool)
+    void stop_image_writing();
 
  signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
@@ -210,6 +210,9 @@ private slots:
 
     // queue update_delay in thread
     void update_delay_in_thread();
+
+    // task queue full in thread pool
+    void task_queue_full();
 
 protected:
 //  overload

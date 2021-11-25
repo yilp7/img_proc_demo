@@ -219,6 +219,9 @@ Demo::Demo(QWidget *parent)
 //    connect(this, &Demo::appendText, &Demo::append_data);
     connect(this, SIGNAL(update_delay_in_thread()), SLOT(update_delay()), Qt::QueuedConnection);
 
+    // register signal when thread pool full
+    connect(this, SIGNAL(task_queue_full()), SLOT(stop_image_writing()), Qt::UniqueConnection);
+
     ui->BRIGHTNESS_SLIDER->setMinimum(-10);
     ui->BRIGHTNESS_SLIDER->setMaximum(10);
     ui->BRIGHTNESS_SLIDER->setSingleStep(1);
@@ -867,7 +870,7 @@ void Demo::save_to_file(bool save_result) {
 //    std::thread t_save(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
 //    t_save.detach();
 
-    if (!tp.append_task(std::bind(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) stop_image_writing();
+    if (!tp.append_task(std::bind(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
 }
 
 void Demo::save_scan_img() {
@@ -2271,7 +2274,7 @@ void Demo::on_ENHANCE_OPTIONS_currentIndexChanged(int index)
 void Demo::on_FILE_PATH_EDIT_editingFinished()
 {
     QString temp_location = ui->FILE_PATH_EDIT->text();
-    if (QDir().mkdir(temp_location)) save_location = temp_location;
-    else if (!QDir(temp_location).exists()) QMessageBox::warning(this, "PROMPT", tr("cannot create directory"));
+    if (QDir(temp_location).exists() || QDir().mkdir(temp_location)) save_location = temp_location;
+    else QMessageBox::warning(this, "PROMPT", tr("cannot create directory"));
     ui->FILE_PATH_EDIT->setText(save_location);
 }

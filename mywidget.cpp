@@ -43,6 +43,7 @@ void Display::mousePressEvent(QMouseEvent *event)
     if (!grab) return;
     pressed = true;
     prev_pos = event->pos();
+    ori_pos = lefttop;
     if (drag) return;
     selection_v2.x = selection_v1.x = event->pos().x();
     selection_v2.y = selection_v1.y = event->pos().y();
@@ -60,8 +61,8 @@ void Display::mouseMoveEvent(QMouseEvent *event)
 //    qDebug("pos: %d, %d\n", event->globalX(), event->globalY());
 //    qDebug("%s selecting\n", qPrintable(this->objectName()));
 
-    if (drag) update_roi(lefttop + QPoint((int)(scale[curr_scale] * this->width()), (int)(scale[curr_scale] * this->height())) / 2 - (event->pos() - prev_pos));
-    prev_pos = event->pos();
+    if (drag) update_roi(ori_pos + QPoint((int)(scale[curr_scale] * this->width()), (int)(scale[curr_scale] * this->height())) / 2 - (event->pos() - prev_pos) * scale[curr_scale]);
+//    prev_pos = event->pos();
     if (drag) return;
     selection_v2.x = event->pos().x();
     selection_v2.y = event->pos().y();

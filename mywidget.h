@@ -28,7 +28,8 @@ signals:
 public:
     QPoint    lefttop;
     QPoint    center;
-    QPoint    prev_pos;
+    QPoint    prev_pos; // start position of mouse when image is dragged
+    QPoint    ori_pos;  // start position of roi when image is dragged
     bool      grab;
     bool      drag;
     int       curr_scale;
