@@ -119,6 +119,7 @@ int main(int argc, char *argv[])
     QFile style(":/style/style.qss");
     style.open(QIODevice::ReadOnly);
     a.setStyleSheet(style.readAll());
+    style.close();
 
 //    qInstallMessageHandler(log_message);
 

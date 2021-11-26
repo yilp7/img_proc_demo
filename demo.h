@@ -255,6 +255,7 @@ private:
     QByteArray convert_to_send_tcu(uchar num, unsigned int send);
 
     // update data to data-display; fb: whether reading feedback from com
+    QByteArray generate_ba(uchar *data, int len);
     QByteArray communicate_display(QSerialPort *com, QByteArray write, int write_size, int read_size, bool fb);
 
     // update gate width

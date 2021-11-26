@@ -248,26 +248,26 @@ Demo::Demo(QWidget *parent)
     ui->SHAPE_INFO->setup("size");
     connect(ui->SOURCE_DISPLAY, SIGNAL(shape_size(QPoint)), ui->SHAPE_INFO, SLOT(display_pos(QPoint)));
 
-    QTableWidget *roi_table = ui->ROI_TABLE;
-    QStringList header_str;
-    header_str << "operation" << "apply";
-    QFont f = font();
-    f.setBold(true);
-    for (int i = 0; i < 2; i++) {
-        QTableWidgetItem *h = new QTableWidgetItem(header_str[i]);
-        h->setFont(f);
-        roi_table->setHorizontalHeaderItem(i, h);
-    }
-    roi_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
-    roi_table->setColumnWidth(0, 134);
-    roi_table->setColumnWidth(1, 39);
-    roi_table->verticalHeader()->setMaximumWidth(16);
-    roi_table->verticalHeader()->setMinimumWidth(16);
-    for (int i = 0; i < 5; i++) {
-        QTableWidgetItem *h = new QTableWidgetItem(QString::number(i + 1));
-        h->setFont(f);
-        roi_table->setVerticalHeaderItem(i, h);
-    }
+//    QTableWidget *roi_table = ui->ROI_TABLE;
+//    QStringList header_str;
+//    header_str << "operation" << "apply";
+//    QFont f = font();
+//    f.setBold(true);
+//    for (int i = 0; i < 2; i++) {
+//        QTableWidgetItem *h = new QTableWidgetItem(header_str[i]);
+//        h->setFont(f);
+//        roi_table->setHorizontalHeaderItem(i, h);
+//    }
+//    roi_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
+//    roi_table->setColumnWidth(0, 134);
+//    roi_table->setColumnWidth(1, 39);
+//    roi_table->verticalHeader()->setMaximumWidth(16);
+//    roi_table->verticalHeader()->setMinimumWidth(16);
+//    for (int i = 0; i < 5; i++) {
+//        QTableWidgetItem *h = new QTableWidgetItem(QString::number(i + 1));
+//        h->setFont(f);
+//        roi_table->setVerticalHeaderItem(i, h);
+//    }
 
     scan_q.push_back(-1);
 //    setup_stepping(0);
@@ -812,6 +812,7 @@ int Demo::shut_down() {
     if (!img_q.empty()) std::queue<cv::Mat>().swap(img_q);
 
     if (curr_cam) curr_cam->shut_down();
+    if (curr_cam) delete curr_cam, curr_cam = NULL;
 
     start_grabbing = false;
     device_on = false;
@@ -880,16 +881,18 @@ void Demo::save_scan_img() {
 //    QFile::rename(temp, dest);
 //    if (ui->TITLE->prog_settings->save_scan_ori) QPixmap::fromImage(QImage(img_mem.data, img_mem.cols, img_mem.rows, img_mem.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
     if (ui->TITLE->prog_settings->save_scan_ori) {
-        std::thread t_ori(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
-        t_ori.detach();
+//        std::thread t_ori(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
+//        t_ori.detach();
+        tp.append_task(std::bind(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp"));
     }
 //    dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), modified_result);
 //    QFile::rename(temp, dest);
 //    if (ui->TITLE->prog_settings->save_scan_res) QPixmap::fromImage(QImage(modified_result.data, modified_result.cols, modified_result.rows, modified_result.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
     if (ui->TITLE->prog_settings->save_scan_res) {
-        std::thread t_res(save_image_bmp, modified_result, save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
-        t_res.detach();
+//        std::thread t_res(save_image_bmp, modified_result, save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
+//        t_res.detach();
+        tp.append_task(std::bind(save_image_bmp, modified_result, save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp"));
     }
 }
 
@@ -1292,6 +1295,13 @@ QByteArray Demo::convert_to_send_tcu(uchar num, unsigned int send) {
     return out;
 }
 
+inline QByteArray Demo::generate_ba(uchar *data, int len)
+{
+    QByteArray ba((char*)data, len);
+    delete[] data;
+    return ba;
+}
+
 // send and receive data from COM, and display
 QByteArray Demo::communicate_display(QSerialPort *com, QByteArray write, int write_size, int read_size, bool fb) {
     QString str_s("sent    "), str_r("received");
@@ -1512,7 +1522,7 @@ void Demo::on_DIST_BTN_clicked() {
 //        qDebug("%s", read_dist.toLatin1().data());
 
         read.clear();
-        read = communicate_display(com[1], QByteArray((char*)new uchar[6]{0xEE, 0x16, 0x02, 0x03, 0x02, 0x05}, 6), 6, 10, true);
+        read = communicate_display(com[1], generate_ba(new uchar[6]{0xEE, 0x16, 0x02, 0x03, 0x02, 0x05}, 6), 6, 10, true);
 //        qDebug("%s", read_dist.toLatin1().data());
 //        communicate_display(com[1], 7, 7, true);
 //        QString ascii;
@@ -1556,14 +1566,14 @@ void Demo::on_ZOOM_IN_BTN_pressed()
 {
     ui->ZOOM_IN_BTN->setText("x");
 
-    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
+    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
 }
 
 void Demo::on_ZOOM_OUT_BTN_pressed()
 {
     ui->ZOOM_OUT_BTN->setText("x");
 
-    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
+    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
 }
 
 void Demo::on_FOCUS_NEAR_BTN_pressed()
@@ -1574,7 +1584,7 @@ void Demo::on_FOCUS_NEAR_BTN_pressed()
 
 inline void Demo::focus_near()
 {
-    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
+    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
 }
 
 void Demo::on_FOCUS_FAR_BTN_pressed()
@@ -1585,11 +1595,11 @@ void Demo::on_FOCUS_FAR_BTN_pressed()
 
 inline void Demo::focus_far()
 {
-    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), 7, 1, false);
+    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), 7, 1, false);
 }
 
 inline void Demo::lens_stop() {
-    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
+    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 }
 
 void Demo::set_zoom()
@@ -1631,7 +1641,7 @@ void Demo::set_focus()
 
 void Demo::start_laser()
 {
-    communicate_display(com[0], QByteArray((char*)new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
+    communicate_display(com[0], generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
     QTimer::singleShot(100000, this, SLOT(init_laser()));
 }
 
@@ -2163,14 +2173,14 @@ void Demo::on_LASER_ZOOM_IN_BTN_pressed()
 {
     ui->LASER_ZOOM_IN_BTN->setText("x");
 
-    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
 }
 
 void Demo::on_LASER_ZOOM_OUT_BTN_pressed()
 {
     ui->LASER_ZOOM_OUT_BTN->setText("x");
 
-    communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
+    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
 }
 
 void Demo::on_LASER_ZOOM_IN_BTN_released()
@@ -2189,11 +2199,11 @@ void Demo::on_LASER_BTN_clicked()
 {
     if (ui->LASER_BTN->text() == "ON") {
         ui->LASER_BTN->setEnabled(false);
-        communicate_display(com[0], QByteArray((char*)new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
+        communicate_display(com[0], generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
         QTimer::singleShot(4000, this, SLOT(start_laser()));
     }
     else {
-        communicate_display(com[0], QByteArray((char*)new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 7, 0, false);
+        communicate_display(com[0], generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 7, 0, false);
 
         ui->LASER_BTN->setText(tr("ON"));
         ui->CURRENT_EDIT->setEnabled(false);
@@ -2202,10 +2212,10 @@ void Demo::on_LASER_BTN_clicked()
 
 void Demo::on_GET_LENS_PARAM_BTN_clicked()
 {
-    QByteArray read = communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
+    QByteArray read = communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
     zoom = (read[4] << 8) + read[5];
 
-    read = communicate_display(com[2], QByteArray((char*)new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
+    read = communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
     focus = (in_buffer[4] << 8) + in_buffer[5];
 
     data_exchange(false);
