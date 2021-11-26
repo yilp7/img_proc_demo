@@ -2110,7 +2110,7 @@ void Demo::on_SCAN_BUTTON_clicked()
 //        for (uint i = scan_q.size(); i; i--) qDebug("dist %f", scan_q.front()), scan_q.pop_front();
     }
 
-    ui->SCAN_BUTTON->setText(start_scan ? tr("Stop") : tr("Scan"));
+    ui->SCAN_BUTTON->setText(start_scan ? tr("Pause") : tr("Scan"));
 }
 
 void Demo::on_CONTINUE_SCAN_BUTTON_clicked()
