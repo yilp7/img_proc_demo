@@ -24,6 +24,9 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event);
     bool eventFilter(QObject *obj, QEvent* event);
 
+private:
+    void send_cmd();
+
 private slots:
     void update_scan();
 
@@ -43,6 +46,7 @@ signals:
     void base_unit_changed(int);
     void max_dist_changed(int);
     void laser_toggled(int);
+    void com_write(int, QByteArray);
 
 public:
     Ui::ProgSettings *ui;
@@ -73,6 +77,8 @@ public:
     float            max_dist;
     QButtonGroup     *laser_grp;
     int              laser_on;
+
+    int              com_idx;
 
 };
 

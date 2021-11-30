@@ -84,14 +84,15 @@ public slots:
     void switch_language();
     void screenshot();
     void clean();
+    void export_config();
+    void load_config();
 
     // signaled in settings ui
     void setup_hz(int hz_unit);
     void setup_stepping(int base_unit);
     void setup_max_dist(int max_dist);
     void setup_laser(int laser_on);
-    void export_config();
-    void load_config();
+    void com_write_data(int com_idx, QByteArray data);
 
 private slots:
     // on clicking enum btn: enumerate devices
@@ -156,6 +157,7 @@ private slots:
     void on_LASER_ZOOM_OUT_BTN_pressed();
     void on_LASER_ZOOM_IN_BTN_released();
     void on_LASER_ZOOM_OUT_BTN_released();
+    void laser_preset_reached();
 
     // slider-controlled slots
     void change_mcp(int val);
@@ -247,6 +249,10 @@ private:
     void focus_far();
     void focus_near();
 
+    // laser preset
+    void set_laser_preset_target(int *pos);
+    void goto_laser_preset(char target);
+
     // save img in buffer to file; or save imgs while scanning
     void save_to_file(bool save_result);
     void save_scan_img();
@@ -313,6 +319,7 @@ private:
     // TODO rewrite auto focus function
     int                     focus_direction;
     int                     clarity[3];
+    char                    curr_laser_idx;
 
     int                     display_option;             // data display option: 1: com data; 2: histogram
 
@@ -373,5 +380,5 @@ private:
 
     ThreadPool              tp;
 
- };
+};
 #endif // DEMO_H

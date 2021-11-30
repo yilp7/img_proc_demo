@@ -203,6 +203,7 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     connect(prog_settings, SIGNAL(base_unit_changed(int)), this->parent()->parent(), SLOT(setup_stepping(int)));
     connect(prog_settings, SIGNAL(max_dist_changed(int)), this->parent()->parent(), SLOT(setup_max_dist(int)));
     connect(prog_settings, SIGNAL(laser_toggled(int)), this->parent()->parent(), SLOT(setup_laser(int)));
+    connect(prog_settings, SIGNAL(com_write(int, QByteArray)), this->parent()->parent(), SLOT(com_write_data(int, QByteArray)));
     settings_menu->addAction(expt);
     connect(expt, SIGNAL(triggered()), this->parent()->parent(), SLOT(export_config()));
     settings_menu->addAction(load);

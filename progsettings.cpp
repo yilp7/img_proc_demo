@@ -24,7 +24,8 @@ ProgSettings::ProgSettings(QWidget *parent) :
     base_unit(0),
     max_dist(15000),
     laser_grp(NULL),
-    laser_on(0)
+    laser_on(0),
+    com_idx(0)
 {
     ui->setupUi(this);
 
@@ -54,6 +55,16 @@ ProgSettings::ProgSettings(QWidget *parent) :
     laser_grp->addButton(ui->LASER_CHK_4, 3);
     laser_grp->setExclusive(false);
     connect(laser_grp, SIGNAL(buttonToggled(int, bool)), SLOT(toggle_laser(int, bool)));
+
+    ui->COM_LIST->addItem("TCU");
+    ui->COM_LIST->addItem("LENS");
+    ui->COM_LIST->addItem("RANGE");
+    ui->COM_LIST->addItem("LASER");
+    ui->COM_LIST->installEventFilter(this);
+
+    QFont temp = QFont(consolas);
+    temp.setPointSize(8);
+    ui->COM_DATA_EDT->setFont(temp);
 
     data_exchange(false);
 
@@ -179,13 +190,18 @@ void ProgSettings::keyPressEvent(QKeyEvent *event)
 
     switch(event->key()) {
     case Qt::Key_Escape:
-        edit ? data_exchange(false) : this->reject(); break;
+        edit ? data_exchange(false), this->focusWidget()->clearFocus() : this->reject();
+        break;
     case Qt::Key_Enter:
     case Qt::Key_Return:
-        edit ? data_exchange(true) : this->accept(); break;
+        if (edit == NULL)                  this->accept();
+        else if (edit == ui->COM_DATA_EDT) send_cmd();
+        else                               data_exchange(true);
+        if (edit) this->focusWidget()->clearFocus();
+//        edit ? data_exchange(true) : this->accept(); break;
     default: break;
     }
-    if (edit) this->focusWidget()->clearFocus(), edit = NULL;
+    edit = NULL;
 }
 
 void ProgSettings::mousePressEvent(QMouseEvent *event)
@@ -273,4 +289,16 @@ void ProgSettings::toggle_laser(int id, bool on)
     if (on) laser_on += 1 << id;
     else    laser_on -= 1 << id;
     emit laser_toggled(laser_on);
+}
+
+void ProgSettings::send_cmd()
+{
+    QString send_str = ui->COM_DATA_EDT->text().simplified();
+    send_str.replace(" ", "");
+//    qDebug("%s\n", send_str.toLatin1().data());
+    bool ok;
+    QByteArray cmd(send_str.length() / 2, 0x00);
+    for (int i = 0; i < send_str.length() / 2; i++) cmd[i] = send_str.mid(i * 2, 2).toInt(&ok, 16);
+
+    emit com_write(ui->COM_LIST->currentIndex(), cmd);
 }

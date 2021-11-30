@@ -640,6 +640,42 @@
     </property>
    </widget>
   </widget>
+  <widget class="QGroupBox" name="SERIAL_COMM_GRP">
+   <property name="geometry">
+    <rect>
+     <x>160</x>
+     <y>210</y>
+     <width>161</width>
+     <height>71</height>
+    </rect>
+   </property>
+   <property name="title">
+    <string>Serial Port comm.</string>
+   </property>
+   <widget class="QLineEdit" name="COM_DATA_EDT">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>45</y>
+      <width>141</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>88 1E 00 00 00 00 99</string>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="COM_LIST">
+    <property name="geometry">
+     <rect>
+      <x>100</x>
+      <y>20</y>
+      <width>51</width>
+      <height>22</height>
+     </rect>
+    </property>
+   </widget>
+  </widget>
  </widget>
  <resources/>
  <connections>
