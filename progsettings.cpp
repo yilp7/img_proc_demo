@@ -147,11 +147,11 @@ void ProgSettings::data_exchange(bool read)
         ui->UNIT_LIST->setCurrentIndex(base_unit);
         switch (base_unit) {
         // ns
-        case 0: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist / dist_ns))); break;
+        case 0: ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns))); break;
         // μs
-        case 1: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist / dist_ns / 1000))); break;
+        case 1: ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns / 1000))); break;
         // m
-        case 2: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist))); break;
+        case 2: ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist))); break;
         default: break;
         }
         ui->LASER_CHK_1->setChecked(laser_on & 0b0001);
@@ -266,11 +266,11 @@ void ProgSettings::on_UNIT_LIST_currentIndexChanged(int index)
     emit base_unit_changed(index);
     switch (base_unit) {
     // ns
-    case 0: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist / dist_ns))); ui->MAX_DIST_UNIT->setText("ns"); break;
+    case 0: ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns))); ui->MAX_DIST_UNIT->setText("ns"); break;
     // μs
-    case 1: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist / dist_ns / 1000))); ui->MAX_DIST_UNIT->setText("μs"); break;
+    case 1: ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns / 1000))); ui->MAX_DIST_UNIT->setText("μs"); break;
     // m
-    case 2: ui->MAX_DIST_EDT->setText(QString::number(round(max_dist))); ui->MAX_DIST_UNIT->setText("m"); break;
+    case 2: ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist))); ui->MAX_DIST_UNIT->setText("m"); break;
     default: break;
     }
 }

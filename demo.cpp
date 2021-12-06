@@ -154,6 +154,7 @@ Demo::Demo(QWidget *parent)
     enhance_options->addItem(tr("Accumulative"));
     enhance_options->addItem(tr("Custom"));
     enhance_options->addItem(tr("Adaptive"));
+    enhance_options->addItem(tr("Dehaze"));
     enhance_options->setCurrentIndex(0);
     sp_options->addItem("1");
     sp_options->addItem("2");
@@ -550,18 +551,26 @@ int Demo::grab_thread_process() {
             }
             // adaptive
             case 7: {
-//                double low = low_in * 255, high = high_in * 255; // (0, 12.75)
-//                double bottom = low_out * 255, top = high_out * 255; // (0, 255)
-                double low = settings->low_in * 255, high = settings->high_in * 255; // (0, 12.75)
-                double bottom = settings->low_out * 255, top = settings->high_out * 255; // (0, 255)
-                double err_in = high - low, err_out = top - bottom; // (12.75, 255)
-                // cv::pow((modified_result - low) / err_in, gamma, modified_result);
-                cv::Mat temp;
-                modified_result.convertTo(temp, CV_32F);
-                cv::pow((temp - low) / err_in, settings->gamma, temp);
-                temp = temp * err_out + bottom;
-                cv::normalize(temp, temp, 0, 255, cv::NORM_MINMAX);
-                cv::convertScaleAbs(temp, modified_result);
+////                double low = low_in * 255, high = high_in * 255; // (0, 12.75)
+////                double bottom = low_out * 255, top = high_out * 255; // (0, 255)
+//                double low = settings->low_in * 255, high = settings->high_in * 255; // (0, 12.75)
+//                double bottom = settings->low_out * 255, top = settings->high_out * 255; // (0, 255)
+//                double err_in = high - low, err_out = top - bottom; // (12.75, 255)
+//                // cv::pow((modified_result - low) / err_in, gamma, modified_result);
+//                cv::Mat temp;
+//                modified_result.convertTo(temp, CV_32F);
+//                cv::pow((temp - low) / err_in, settings->gamma, temp);
+//                temp = temp * err_out + bottom;
+//                cv::normalize(temp, temp, 0, 255, cv::NORM_MINMAX);
+//                cv::convertScaleAbs(temp, modified_result);
+                ImageProc::adaptive_enhance(&modified_result, &modified_result, settings->low_in, settings->high_in, settings->low_out, settings->high_out, settings->gamma);
+                break;
+            }
+            // dehaze
+            case 8: {
+                modified_result = ~modified_result;
+                ImageProc::haze_removal(&modified_result, &modified_result, 7, 0.95, 0.1, 60, 0.01);
+                modified_result = ~modified_result;
                 break;
             }
             // none
@@ -595,7 +604,7 @@ int Demo::grab_thread_process() {
         // put info (dist, dov, time) as text on image
         if (ui->INFO_CHECK->isChecked() && !image_3d) {
             if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
         }
 
@@ -636,13 +645,13 @@ int Demo::grab_thread_process() {
         if (save_modified) save_to_file(true);
         if (record_original && !image_3d) {
             if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             cv::putText(img_mem, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), weight * 2);
             vid_out[0].write(img_mem);
         }
         if (record_modified && !image_3d) {
             if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)round(delay_dist / dist_ns), (int)round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             vid_out[1].write(modified_result);
         }
@@ -984,7 +993,8 @@ void Demo::on_START_BUTTON_clicked()
 //    ui->SOURCE_DISPLAY->setGeometry(region);
 //    qDebug("display region x: %d, y: %d, w: %d, h: %d\n", region.x(), region.y(), region.width(), region.height());
 //    ui->SOURCE_DISPLAY->update_roi(QPoint());
-    resizeEvent(new QResizeEvent(this->size(), this->size()));
+    QResizeEvent e(this->size(), this->size());
+    resizeEvent(&e);
 
 }
 
@@ -1577,7 +1587,8 @@ void Demo::on_IMG_3D_CHECK_stateChanged(int arg1)
     image_mutex.lock();
     w = arg1 ? w + 104 : w - 104;
     image_mutex.unlock();
-    resizeEvent(new QResizeEvent(this->size(), this->size()));
+    QResizeEvent e(this->size(), this->size());
+    resizeEvent(&e);
     if (!arg1) frame_a_3d = 0, prev_3d.release();
 
     data_exchange(true);
@@ -1867,6 +1878,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
         return;
     }
     switch (event->modifiers()) {
+    case Qt::KeypadModifier:
     case Qt::NoModifier:
         switch (event->key()) {
         case Qt::Key_Enter:
