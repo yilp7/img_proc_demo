@@ -1,4 +1,4 @@
-#include "demo.h"
+﻿#include "demo.h"
 #ifdef PARAM
     #include "./ui_demo_dev.h"
 #else
@@ -79,6 +79,7 @@ Demo::Demo(QWidget *parent)
     gain_analog_edit(0),
     frame_rate_edit(10),
     com{NULL},
+    share_serial_port(true),
     out_buffer{0},
     in_buffer{0},
     rep_freq(30),
@@ -114,11 +115,11 @@ Demo::Demo(QWidget *parent)
     grab_thread_state(false),
     h_mouse_thread(NULL),
     seq_idx(0),
-    accu_idx(0),
     scan(false),
     scan_distance(200),
     c(3e8),
     frame_a_3d(false),
+    auto_mcp(false),
     hide_left(false),
     resize_place(22),
     en(false),
@@ -224,18 +225,18 @@ Demo::Demo(QWidget *parent)
     // register signal when thread pool full
     connect(this, SIGNAL(task_queue_full()), SLOT(stop_image_writing()), Qt::UniqueConnection);
 
-    ui->BRIGHTNESS_SLIDER->setMinimum(-10);
-    ui->BRIGHTNESS_SLIDER->setMaximum(10);
+    ui->BRIGHTNESS_SLIDER->setMinimum(-5);
+    ui->BRIGHTNESS_SLIDER->setMaximum(5);
     ui->BRIGHTNESS_SLIDER->setSingleStep(1);
-    ui->BRIGHTNESS_SLIDER->setPageStep(3);
+    ui->BRIGHTNESS_SLIDER->setPageStep(2);
     ui->BRIGHTNESS_SLIDER->setValue(0);
     ui->BRIGHTNESS_SLIDER->setTickInterval(5);
 
-    ui->CONTRAST_SLIDER->setMinimum(0);
-    ui->CONTRAST_SLIDER->setMaximum(20);
+    ui->CONTRAST_SLIDER->setMinimum(-10);
+    ui->CONTRAST_SLIDER->setMaximum(10);
     ui->CONTRAST_SLIDER->setSingleStep(1);
     ui->CONTRAST_SLIDER->setPageStep(3);
-    ui->CONTRAST_SLIDER->setValue(10);
+    ui->CONTRAST_SLIDER->setValue(0);
     ui->CONTRAST_SLIDER->setTickInterval(5);
 
     ui->RULER_V->vertical = true;
@@ -431,6 +432,12 @@ int Demo::grab_thread_process() {
 
         image_mutex.lock();
 
+        if (auto_mcp) {
+            static int mean_i;
+            if ((mean_i = cv::mean(img_mem)[0]) < 30) change_mcp(mcp + 5);
+            else if (mean_i > 50) change_mcp(mcp - 5);
+        }
+
         // tenengrad (sobel) auto-focus
         cv::Sobel(img_mem, sobel, CV_16U, 1, 1);
         clarity[2] = clarity[1], clarity[1] = clarity[0], clarity[0] = cv::mean(sobel)[0] * 1000;
@@ -497,27 +504,23 @@ int Demo::grab_thread_process() {
             // accumulative
             case 5: {
                 uchar *img = modified_result.data;
-                uchar *accu_frame = accu[accu_idx].data;
                 for (int i = 0; i < h; i++) {
                     for (int j = 0; j < w; j++) {
                         uchar p = img[i * modified_result.step + j];
-                        if      (p < 64)  {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.48);}
-                        else if (p < 112) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.36);}
-                        else if (p < 144) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.32);}
-                        else if (p < 160) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.30);}
-                        else if (p < 176) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.28);}
-                        else if (p < 192) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.25);}
-                        else if (p < 200) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.24);}
-                        else if (p < 208) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.23);}
-                        else if (p < 216) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.225);}
-                        else if (p < 224) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.22);}
-                        else if (p < 240) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.21);}
-                        else if (p < 256) {accu_frame[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 0.2);}
+                        if      (p < 64)  {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 2.4);}
+                        else if (p < 112) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.8);}
+                        else if (p < 144) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.6);}
+                        else if (p < 160) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.5);}
+                        else if (p < 176) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.4);}
+                        else if (p < 192) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.25);}
+                        else if (p < 200) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.2);}
+                        else if (p < 208) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.15);}
+                        else if (p < 216) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.125);}
+                        else if (p < 224) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.1);}
+                        else if (p < 240) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.05);}
+                        else if (p < 256) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1);}
                     }
                 }
-                modified_result = cv::Mat::zeros(h, w, CV_8U);
-                for(auto m: accu) modified_result += m;
-                accu_idx = (accu_idx + 1) % 5;
                 break;
             }
             // custom (mergw log w/ 1/(1+exp))
@@ -583,10 +586,13 @@ int Demo::grab_thread_process() {
 
         // brightness & contrast
         if (!image_3d) {
+//            float brightness = ui->BRIGHTNESS_SLIDER->value() / 10., contrast = ui->CONTRAST_SLIDER->value() / 10.;
+//            modified_result = (modified_result - 127.5 * (1 - brightness)) * std::tan((45 - 45 * contrast) / 180. * M_PI) + 127.5 * (1 + brightness);
             int val = ui->BRIGHTNESS_SLIDER->value() * 12.8;
-            modified_result *= ui->CONTRAST_SLIDER->value() / 10.0;
+            modified_result *= std::exp(ui->CONTRAST_SLIDER->value() / 10.);
             modified_result += val;
             // do not change pixel of value 0 when adjusting brightness
+//            int temp = 127.5 * brightness * (1 + std::tan((45 - 45 * contrast) / 180. * M_PI)) + 127.5 * (1 - std::tan((45 - 45 * contrast) / 180. * M_PI));
             for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) {
                 if (modified_result.data[i * w + j] == val) modified_result.data[i * w + j] = 0;
             }
@@ -960,6 +966,7 @@ void Demo::on_START_BUTTON_clicked()
     if (device_on) return;
     data_exchange(true);
 
+    if (ui->TITLE->prog_settings->cameralink) curr_cam->cameralink = true;
     if (curr_cam->start()) {
         QMessageBox::warning(this, "PROMPT", tr("start failed"));
         return;
@@ -1189,8 +1196,6 @@ void Demo::clean()
     prev_3d.release();
     for (auto& m: seq) m.release();
     seq_sum.release();
-    for (auto& m: accu) m.release();
-    accu_sum.release();
 }
 
 void Demo::setup_hz(int hz_unit)
@@ -1235,6 +1240,16 @@ void Demo::setup_laser(int laser_on)
     this->laser_on = laser_on;
 }
 
+void Demo::set_serial_port_share(bool share)
+{
+    share_serial_port = share;
+}
+
+void Demo::set_baudrate(int idx, int baudrate)
+{
+    if (com[idx] && com[idx]->isOpen()) com[idx]->setBaudRate(baudrate);
+}
+
 void Demo::com_write_data(int com_idx, QByteArray data)
 {
     QSerialPort *temp_com = com[com_idx];
@@ -1256,6 +1271,16 @@ void Demo::com_write_data(int com_idx, QByteArray data)
     emit append_text(str_r);
 
     QThread().msleep(5);
+}
+
+void Demo::display_baudrate(int idx)
+{
+    if (com[idx] && com[idx]->isOpen()) ui->TITLE->prog_settings->display_baudrate(com[idx]->baudRate());
+}
+
+void Demo::set_auto_mcp(bool adaptive)
+{
+    this->auto_mcp = adaptive;
 }
 
 void Demo::export_config()
@@ -1598,14 +1623,14 @@ void Demo::on_ZOOM_IN_BTN_pressed()
 {
     ui->ZOOM_IN_BTN->setText("x");
 
-    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
 }
 
 void Demo::on_ZOOM_OUT_BTN_pressed()
 {
     ui->ZOOM_OUT_BTN->setText("x");
 
-    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
 }
 
 void Demo::on_FOCUS_NEAR_BTN_pressed()
@@ -1616,15 +1641,15 @@ void Demo::on_FOCUS_NEAR_BTN_pressed()
 
 inline void Demo::focus_near()
 {
-    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
 }
 
 inline void Demo::set_laser_preset_target(int *pos)
 {
-    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x81, uchar((pos[0] >> 8) & 0xFF), uchar(pos[0] & 0xFF), uchar((((pos[0] >> 8) & 0xFF) + (pos[0] & 0xFF) + 0x82) & 0xFF)}, 7), 7, 1, false);
-    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4F, uchar((pos[1] >> 8) & 0xFF), uchar(pos[1] & 0xFF), uchar((((pos[1] >> 8) & 0xFF) + (pos[1] & 0xFF) + 0x51) & 0xFF)}, 7), 7, 1, false);
-    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4E, uchar((pos[2] >> 8) & 0xFF), uchar(pos[2] & 0xFF), uchar((((pos[2] >> 8) & 0xFF) + (pos[2] & 0xFF) + 0x50) & 0xFF)}, 7), 7, 1, false);
-    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x81, uchar((pos[3] >> 8) & 0xFF), uchar(pos[3] & 0xFF), uchar((((pos[3] >> 8) & 0xFF) + (pos[3] & 0xFF) + 0x83) & 0xFF)}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x81, uchar((pos[0] >> 8) & 0xFF), uchar(pos[0] & 0xFF), uchar((((pos[0] >> 8) & 0xFF) + (pos[0] & 0xFF) + 0x82) & 0xFF)}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4F, uchar((pos[1] >> 8) & 0xFF), uchar(pos[1] & 0xFF), uchar((((pos[1] >> 8) & 0xFF) + (pos[1] & 0xFF) + 0x51) & 0xFF)}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4E, uchar((pos[2] >> 8) & 0xFF), uchar(pos[2] & 0xFF), uchar((((pos[2] >> 8) & 0xFF) + (pos[2] & 0xFF) + 0x50) & 0xFF)}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x81, uchar((pos[3] >> 8) & 0xFF), uchar(pos[3] & 0xFF), uchar((((pos[3] >> 8) & 0xFF) + (pos[3] & 0xFF) + 0x83) & 0xFF)}, 7), 7, 1, false);
     delete[] pos;
 }
 
@@ -1640,22 +1665,22 @@ void Demo::goto_laser_preset(char target)
     if (target > curr_laser_idx) {
         switch(curr_laser_idx | target) {
         case 0x3:
-            set_laser_preset_target(new int[4]{4000, 4000, 4000, 4000});
+            set_laser_preset_target(new int[4]{1008, 1008, 1008, 1008});
             goto quick_break;
         case 0x5:
-            set_laser_preset_target(new int[4]{0});
+            set_laser_preset_target(new int[4]{2016, 2016, 2016, 2016});
             goto quick_break;
         case 0x9:
-            set_laser_preset_target(new int[4]{0});
+            set_laser_preset_target(new int[4]{3024, 3024, 3024, 3024});
             goto quick_break;
         case 0x6:
-            set_laser_preset_target(new int[4]{0});
+            set_laser_preset_target(new int[4]{2016, 2016, 2016, 2016});
             goto quick_break;
         case 0xA:
-            set_laser_preset_target(new int[4]{0});
+            set_laser_preset_target(new int[4]{3024, 3024, 3024, 3024});
             goto quick_break;
         case 0xC:
-            set_laser_preset_target(new int[4]{0});
+            set_laser_preset_target(new int[4]{3024, 3024, 3024, 3024});
             goto quick_break;
         default: return;
         }
@@ -1663,22 +1688,22 @@ void Demo::goto_laser_preset(char target)
     else {
         switch(curr_laser_idx | target) {
         case 0x3:
-            set_laser_preset_target(new int[4]{0});
+            set_laser_preset_target(new int[4]{0000, 0000, 0000, 0000});
             goto quick_break;
         case 0x5:
-            set_laser_preset_target(new int[4]{0});
+            set_laser_preset_target(new int[4]{0000, 0000, 0000, 0000});
             goto quick_break;
         case 0x9:
-            set_laser_preset_target(new int[4]{0});
+            set_laser_preset_target(new int[4]{0000, 0000, 0000, 0000});
             goto quick_break;
         case 0x6:
-            set_laser_preset_target(new int[4]{0});
+            set_laser_preset_target(new int[4]{1008, 1008, 1008, 1008});
             goto quick_break;
         case 0xA:
-            set_laser_preset_target(new int[4]{0});
+            set_laser_preset_target(new int[4]{1008, 1008, 1008, 1008});
             goto quick_break;
         case 0xC:
-            set_laser_preset_target(new int[4]{0});
+            set_laser_preset_target(new int[4]{2016, 2016, 2016, 2016});
             goto quick_break;
         default: return;
         }
@@ -1696,12 +1721,12 @@ void Demo::on_FOCUS_FAR_BTN_pressed()
 
 inline void Demo::focus_far()
 {
-    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), 7, 1, false);
 }
 
 inline void Demo::lens_stop() {
-    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
-    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
 }
 
 void Demo::set_zoom()
@@ -1719,7 +1744,7 @@ void Demo::set_zoom()
         sum += out[i];
     out[6] = sum & 0xFF;
 
-    communicate_display(com[2], QByteArray((char*)out, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], QByteArray((char*)out, 7), 7, 1, false);
 }
 
 void Demo::set_focus()
@@ -1737,7 +1762,7 @@ void Demo::set_focus()
         sum += out[i];
     out[6] = sum & 0xFF;
 
-    communicate_display(com[2], QByteArray((char*)out, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], QByteArray((char*)out, 7), 7, 1, false);
 }
 
 
@@ -1782,6 +1807,7 @@ void Demo::init_laser()
 
 void Demo::change_mcp(int val)
 {
+    if (val < 0 || val > 255) return;
     mcp = val;
 
 //    convert_to_send_tcu(0x0A, mcp);
@@ -1821,7 +1847,8 @@ void Demo::change_delay(int val)
 
 void Demo::change_focus_speed(int val)
 {
-    if (com[2]) com[2]->clear();
+    QSerialPort *temp_com = share_serial_port && com[0] ? com[0] : com[2];
+    if (temp_com) temp_com->clear();
     if (val < 1)  val = 1;
     if (val > 64) val = 64;
     ui->FOCUS_SPEED_EDIT->setText(QString::asprintf("%d", val));
@@ -1839,8 +1866,8 @@ void Demo::change_focus_speed(int val)
 
     out_data[8] = (4 * (uint)val + 0xA2) & 0xFF;
 
-    if (com[2]) com[2]->write(QByteArray((char*)out_data, 9));
-    while (com[2] && com[2]->waitForReadyRead(20)) ;
+    if (temp_com) temp_com->write(QByteArray((char*)out_data, 9));
+    while (temp_com && temp_com->waitForReadyRead(20)) ;
 }
 
 void Demo::on_ZOOM_IN_BTN_released()
@@ -2293,14 +2320,14 @@ void Demo::on_LASER_ZOOM_IN_BTN_pressed()
 {
     ui->LASER_ZOOM_IN_BTN->setText("x");
 
-    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
 }
 
 void Demo::on_LASER_ZOOM_OUT_BTN_pressed()
 {
     ui->LASER_ZOOM_OUT_BTN->setText("x");
 
-    communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
 }
 
 void Demo::on_LASER_ZOOM_IN_BTN_released()
@@ -2338,10 +2365,10 @@ void Demo::on_LASER_BTN_clicked()
 
 void Demo::on_GET_LENS_PARAM_BTN_clicked()
 {
-    QByteArray read = communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
+    QByteArray read = communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
     zoom = (read[4] << 8) + read[5];
 
-    read = communicate_display(com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
+    read = communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
     focus = (read[4] << 8) + read[5];
 
     data_exchange(false);
@@ -2394,17 +2421,6 @@ void Demo::on_SELECT_TOOL_clicked()
 {
     ui->DRAG_TOOL->setChecked(false);
     ui->SOURCE_DISPLAY->drag = false;
-}
-
-void Demo::on_ENHANCE_OPTIONS_currentIndexChanged(int index)
-{
-    if (index == 5) {
-        accu_sum.release();
-        for (auto& m: accu) m.release();
-        accu_sum = cv::Mat::zeros(h, w, CV_8U);
-        for (auto& m: accu) m = cv::Mat::zeros(h, w, CV_8U);
-        accu_idx = 0;
-    }
 }
 
 void Demo::on_FILE_PATH_EDIT_editingFinished()

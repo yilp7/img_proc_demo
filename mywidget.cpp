@@ -1,4 +1,4 @@
-#include "mywidget.h"
+﻿#include "mywidget.h"
 
 Display::Display(QWidget *parent) : QLabel(parent)
   , lefttop(0, 0)
@@ -203,7 +203,11 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     connect(prog_settings, SIGNAL(base_unit_changed(int)), this->parent()->parent(), SLOT(setup_stepping(int)));
     connect(prog_settings, SIGNAL(max_dist_changed(int)), this->parent()->parent(), SLOT(setup_max_dist(int)));
     connect(prog_settings, SIGNAL(laser_toggled(int)), this->parent()->parent(), SLOT(setup_laser(int)));
+    connect(prog_settings, SIGNAL(change_baudrate(int, int)), this->parent()->parent(), SLOT(set_baudrate(int, int)));
     connect(prog_settings, SIGNAL(com_write(int, QByteArray)), this->parent()->parent(), SLOT(com_write_data(int, QByteArray)));
+    connect(prog_settings, SIGNAL(get_baudrate(int)), this->parent()->parent(), SLOT(display_baudrate(int)));
+    connect(prog_settings, SIGNAL(share_serial_port(bool)), this->parent()->parent(), SLOT(set_serial_port_share(bool)));
+    connect(prog_settings, SIGNAL(auto_mcp(bool)), this->parent()->parent(), SLOT(set_auto_mcp(bool)));
     settings_menu->addAction(expt);
     connect(expt, SIGNAL(triggered()), this->parent()->parent(), SLOT(export_config()));
     settings_menu->addAction(load);

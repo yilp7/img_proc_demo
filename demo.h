@@ -1,4 +1,4 @@
-#ifndef DEMO_H
+﻿#ifndef DEMO_H
 #define DEMO_H
 
 #include <QSerialPort>
@@ -92,7 +92,11 @@ public slots:
     void setup_stepping(int base_unit);
     void setup_max_dist(int max_dist);
     void setup_laser(int laser_on);
+    void set_serial_port_share(bool share);
+    void set_baudrate(int idx, int baudrate);
     void com_write_data(int com_idx, QByteArray data);
+    void display_baudrate(int idx);
+    void set_auto_mcp(bool adaptive);
 
 private slots:
     // on clicking enum btn: enumerate devices
@@ -196,10 +200,6 @@ private slots:
     void on_DRAG_TOOL_clicked();
     void on_SELECT_TOOL_clicked();
 
-    // TODO setup another method for initializing accum mats
-    // prepare accu mats
-    void on_ENHANCE_OPTIONS_currentIndexChanged(int index);
-
     // too much memory occupied (too many unfinished tasks in thread pool)
     void stop_image_writing();
 
@@ -296,7 +296,8 @@ private:
     QString                 TEMP_SAVE_LOCATION;         // temp location to save the image
     cv::VideoWriter         vid_out[2];                 // video writer for ORI/RES
 
-    QSerialPort*            com[4];                     // 0: tcu, 1: range, 2: focus, 3: laser
+    QSerialPort*            com[4];                     // 0: tcu, 1: rangefinder, 2: lens, 3: laser
+    bool                    share_serial_port;          // whether using a single comm for serial communication
     uchar                   out_buffer[7];              // write buffer for serial communication
     uchar                   in_buffer[7];               // read buffer for serial communication
     float                   rep_freq;
@@ -352,11 +353,8 @@ private:
     cv::Mat                 prev_3d;                    // previous 3d image
     cv::Mat                 seq[10];                    // for frame average
     cv::Mat                 seq_sum;
-    cv::Mat                 accu[5];                    // for accumulation process
-    cv::Mat                 accu_sum;
     uint                    hist[256];                  // display histogram
     int                     seq_idx;                    // frame-average current index
-    int                     accu_idx;                   // accumulation current index
 
     QLabel*                 com_label[4];               // for com communication
     QLineEdit*              com_edit[4];
@@ -370,6 +368,7 @@ private:
     float                   c;                          // light speed
     float                   dist_ns;                    // dist of light per ns
     bool                    frame_a_3d;                 // skip every second frame
+    bool                    auto_mcp;                   // adaptive mcp
 
     bool                    hide_left;                  // whether left bar is hidden
     int                     resize_place;               // mouse position when resizing or at border

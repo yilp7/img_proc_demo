@@ -1,4 +1,4 @@
-#include "progsettings.h"
+﻿#include "progsettings.h"
 #include "ui_settings.h"
 
 ProgSettings::ProgSettings(QWidget *parent) :
@@ -25,7 +25,8 @@ ProgSettings::ProgSettings(QWidget *parent) :
     max_dist(15000),
     laser_grp(NULL),
     laser_on(0),
-    com_idx(0)
+    com_idx(0),
+    cameralink(false)
 {
     ui->setupUi(this);
 
@@ -56,9 +57,13 @@ ProgSettings::ProgSettings(QWidget *parent) :
     laser_grp->setExclusive(false);
     connect(laser_grp, SIGNAL(buttonToggled(int, bool)), SLOT(toggle_laser(int, bool)));
 
+    ui->BAUDRATE_LIST->addItem("9600");
+    ui->BAUDRATE_LIST->addItem("115200");
+    ui->BAUDRATE_LIST->installEventFilter(this);
+
     ui->COM_LIST->addItem("TCU");
-    ui->COM_LIST->addItem("LENS");
     ui->COM_LIST->addItem("RANGE");
+    ui->COM_LIST->addItem("LENS");
     ui->COM_LIST->addItem("LASER");
     ui->COM_LIST->installEventFilter(this);
 
@@ -159,6 +164,18 @@ void ProgSettings::data_exchange(bool read)
         ui->LASER_CHK_3->setChecked(laser_on & 0b0100);
         ui->LASER_CHK_4->setChecked(laser_on & 0b1000);
     }
+}
+
+void ProgSettings::display_baudrate(int baudrate)
+{
+    int idx = 0;
+    switch (baudrate) {
+    case 9600: idx = 0; break;
+    case 115200: idx = 1; break;
+    default: break;
+    }
+
+    ui->BAUDRATE_LIST->setCurrentIndex(idx);
 }
 
 void ProgSettings::update_scan()
@@ -301,4 +318,29 @@ void ProgSettings::send_cmd()
     for (int i = 0; i < send_str.length() / 2; i++) cmd[i] = send_str.mid(i * 2, 2).toInt(&ok, 16);
 
     emit com_write(ui->COM_LIST->currentIndex(), cmd);
+}
+
+void ProgSettings::on_BAUDRATE_LIST_currentIndexChanged(const QString &arg1)
+{
+    emit change_baudrate(ui->COM_LIST->currentIndex(), arg1.toInt());
+}
+
+void ProgSettings::on_SHARE_CHK_stateChanged(int arg1)
+{
+    emit share_serial_port(arg1);
+}
+
+void ProgSettings::on_COM_LIST_currentIndexChanged(int index)
+{
+    emit get_baudrate(index);
+}
+
+void ProgSettings::on_AUTO_MCP_CHK_stateChanged(int arg1)
+{
+    emit auto_mcp(arg1);
+}
+
+void ProgSettings::on_CAMERALINK_CHK_stateChanged(int arg1)
+{
+    cameralink = arg1;
 }

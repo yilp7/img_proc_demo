@@ -1,4 +1,4 @@
-#ifndef PROGSETTINGS_H
+﻿#ifndef PROGSETTINGS_H
 #define PROGSETTINGS_H
 
 #include "utils.h"
@@ -16,6 +16,7 @@ public:
     ~ProgSettings();
 
     void data_exchange(bool read = false);
+    void display_baudrate(int baudrate);
 
 protected:
     void keyPressEvent(QKeyEvent *event);
@@ -41,12 +42,26 @@ private slots:
 
     void toggle_laser(int id, bool on);
 
+    void on_BAUDRATE_LIST_currentIndexChanged(const QString &arg1);
+
+    void on_SHARE_CHK_stateChanged(int arg1);
+
+    void on_COM_LIST_currentIndexChanged(int index);
+
+    void on_AUTO_MCP_CHK_stateChanged(int arg1);
+
+    void on_CAMERALINK_CHK_stateChanged(int arg1);
+
 signals:
     void rep_freq_unit_changed(int);
     void base_unit_changed(int);
     void max_dist_changed(int);
     void laser_toggled(int);
+    void share_serial_port(bool share);
+    void change_baudrate(int idx, int baudrate);
     void com_write(int, QByteArray);
+    void get_baudrate(int);
+    void auto_mcp(bool);
 
 public:
     Ui::ProgSettings *ui;
@@ -79,6 +94,8 @@ public:
     int              laser_on;
 
     int              com_idx;
+
+    bool             cameralink;
 
 };
 

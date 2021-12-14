@@ -1,4 +1,4 @@
-#include "imageproc.h"
+﻿#include "imageproc.h"
 #include "opencv2/highgui.hpp"
 
 ImageProc::ImageProc()
@@ -327,7 +327,7 @@ void ImageProc::haze_removal(cv::Mat *src, cv::Mat *res, int radius, float omega
     }
     std::vector<uchar*> vec_a;
     for (std::pair<uchar, int> p: max_heap) vec_a.push_back(src->data + (p.second / w * step + p.second % w * src->channels()));
-    if (src->channels() == 3) std::sort(vec_a.begin(), vec_a.end(), [](const uchar* a, const uchar* b) { return std::max(a[0], std::max(a[1], a[2])) > std::max(b[0], std::max(b[1], b[2])); });
+    if (src->channels() == 3) std::sort(vec_a.begin(), vec_a.end(), [](const uchar* a, const uchar* b) { return uint(a[0]) + a[1] + a[2] > uint(b[0]) + b[1] + b[2]; });
     else                      std::sort(vec_a.begin(), vec_a.end(), [](const uchar* a, const uchar* b) { return a[0] > b[0]; });
     for (int i = 0; i < src->channels(); i++) A[i] = vec_a.front()[i];
 
@@ -390,19 +390,6 @@ void ImageProc::dark_channel(cv::Mat *src, cv::Mat *dark, cv::Mat *inter, int r)
     }
 }
 
-struct greaters_dark_channel_pos{
-    bool operator()(const std::pair<uchar, int>& a, const std::pair<uchar, int>& b) const{ return a.first > b.first; }
-};
-
-struct greaters_A_3{
-//    bool operator()(const uchar* a, const uchar* b) const{ return (uint)a[0] + a[1] + a[2] > (uint)b[0] + b[1] + b[2]; }
-    bool operator()(const uchar* a, const uchar* b) const{ return std::max(a[0], std::max(a[1], a[2])) > std::max(b[0], std::max(b[1], b[2])); }
-};
-
-struct greaters_A_1{
-    bool operator()(const uchar* a, const uchar* b) const{ return a[0] > b[0]; }
-};
-
 void ImageProc::guided_filter(cv::Mat *p, cv::Mat *I, int r, float eps)
 {
     cv::Mat I_f, p_f;
@@ -411,8 +398,8 @@ void ImageProc::guided_filter(cv::Mat *p, cv::Mat *I, int r, float eps)
     else I_f = I->clone();
     I_f.convertTo(I_f, CV_32FC1);
     p->convertTo(p_f, CV_32FC1);
-    cv::resize(I_f, I_f, cv::Size(I->cols / 2, I->rows / 2));
-    cv::resize(p_f, p_f, cv::Size(p->cols / 2, p->rows / 2));
+    cv::resize(I_f, I_f, cv::Size(I->cols / 3, I->rows / 3));
+    cv::resize(p_f, p_f, cv::Size(p->cols / 3, p->rows / 3));
     I_f /= 255.0;
 
     cv::boxFilter(I_f, mean_I, CV_32FC1, cv::Size(2 * r + 1, 2 * r + 1));

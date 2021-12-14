@@ -1,4 +1,4 @@
-#ifndef CAM_H
+﻿#ifndef CAM_H
 #define CAM_H
 
 #include "MvCameraControl.h"
@@ -16,6 +16,7 @@ private:
 public:
     // 0: no device; 1: MvCam; 2: HqvCam
     int device_type;
+    bool cameralink; // true if using cameralink -> ethernet converter
 
 public:
     Cam();
@@ -41,6 +42,7 @@ public:
 
     static void __stdcall frame_cb(unsigned char* data, MV_FRAME_OUT_INFO_EX *frame_info, void* user_data);
     static DWORD WINAPI frame_cb(HANDLE dev, HQV_FRAMEINFO frame_info, void* user_data);
+    static DWORD WINAPI frame_cb_cl(HANDLE dev, HQV_FRAMEINFO frame_info, void* user_data);
 };
 
 #endif // CAM_H
