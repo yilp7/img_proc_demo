@@ -11,7 +11,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(SDK_DIR "${PROJECT_SOURCE_DIR}/sdk32")
+set(SDK_DIR "${PROJECT_SOURCE_DIR}/sdk64")
 
 set(Hik_SDK_DIR "${SDK_DIR}/mvs")
 set(HQV_DIR "${SDK_DIR}/HQV")
@@ -80,9 +80,9 @@ target_link_libraries(Demo_param
 	# mvs
 	MvCameraControl
     # HQV
-	HQV_AVIProcess
-	HQV_DataConvert
-	HQV_SDK
+	HQV_AVIProcess64
+	HQV_DataConvert64
+	HQV_SDK64
     # Euresys
 #	MultiCam
 #	clallserial

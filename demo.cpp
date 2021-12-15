@@ -572,7 +572,7 @@ int Demo::grab_thread_process() {
             // dehaze
             case 8: {
                 modified_result = ~modified_result;
-                ImageProc::haze_removal(&modified_result, &modified_result, 7, 0.95, 0.1, 60, 0.01);
+                ImageProc::haze_removal(modified_result, modified_result, 7, 0.95, 0.1, 60, 0.01);
                 modified_result = ~modified_result;
                 break;
             }
