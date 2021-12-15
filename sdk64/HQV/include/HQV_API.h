@@ -1,4 +1,4 @@
-#ifndef __HQV_API_H__
+﻿#ifndef __HQV_API_H__
 #define __HQV_API_H__
 
 #ifdef _MSC_VER
@@ -23,6 +23,7 @@
 	#define CALL_METHOD
 #endif 
 
+#include <windows.h>
 #include "HQV_Common.h"
 
 #ifdef __cplusplus

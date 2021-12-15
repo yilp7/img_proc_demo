@@ -12,8 +12,6 @@
 #define GVSP_PIXEL48BIT  (0x00300000)
 #define GVSP_PIXEL64BIT  (0x00400000)
 
-#include <windows.h>
-
 typedef enum GVSP_PIXEL
 {
 	GVSP_PIXEL_UDEF              = 0,
@@ -114,6 +112,8 @@ typedef enum HQV_DEVPARAM_ID
 	PARAM_ID_COMMON_DISPLAYPOSX							= 0x00000206,		//IInteger R/W - B Set the Display window's position and size(X)
 	PARAM_ID_COMMON_DISPLAYPOSY							= 0x00000207,		//IInteger R/W - B Set the Display window's position and size(Y)
 
+	//Internal ACQUISITION STATUS
+	PARAM_ID_COMMON_ACQUISITIONSTATUS					= 0x00000300,		//IInteger R - B Reads the state of the internal acquisition Status.
 
 	//2.1Device Control Summary(Contains the features related to the control and information of the device)
 	PARAM_ID_SFNC_UNDEFINE								= 0x00001000,		//SFNC Param undefine 
