@@ -958,6 +958,7 @@ void Demo::on_ENUM_BUTTON_clicked()
 {
     if (curr_cam) delete curr_cam;
     curr_cam = new Cam;
+    if (ui->TITLE->prog_settings->cameralink) curr_cam->cameralink = true;
     enable_controls(curr_cam->search_for_devices());
 }
 
@@ -966,7 +967,6 @@ void Demo::on_START_BUTTON_clicked()
     if (device_on) return;
     data_exchange(true);
 
-    if (ui->TITLE->prog_settings->cameralink) curr_cam->cameralink = true;
     if (curr_cam->start()) {
         QMessageBox::warning(this, "PROMPT", tr("start failed"));
         return;

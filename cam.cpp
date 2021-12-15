@@ -9,10 +9,13 @@ cv::Mat raw_data, temp; // hqv
 int Cam::search_for_devices()
 {
     device_type = 0;
-    MV_CC_DEVICE_INFO_LIST st_dev_list;
-    MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
-    if (st_dev_list.nDeviceNum) device_type = 1;
-    if (device_type) return device_type;
+    MV_CC_DEVICE_INFO_LIST st_dev_list = {0};
+    if (!cameralink)
+    {
+        MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
+        if (st_dev_list.nDeviceNum) device_type = 1;
+        if (device_type) return device_type;
+    }
 
     BYTE dev_num = 0;
     HQV_DeviceScan(&dev_num, cameralink ? DEVICE_GEV : DEVICE_USB);
@@ -58,13 +61,17 @@ int Cam::start() {
     }
     case 2: {
         DWORD idx = 0;
+        int ret = HQV_DeviceOpen(&idx, &dev_handle, DEVICE_INDEX, DEVICE_GEV);
         if (cameralink) {
             HQV_RegValueSet(dev_handle, PORT_SERIAL0, 0xFF1E, 1);
             HQV_RegValueSet(dev_handle, PORT_SERIAL0, 0xFF62, 0);
-            char baudrate[25] = {0};
-            HQV_ParamGetValue(dev_handle, PARAM_ID_SFNC_DEVICESERIALPORTBAUDRATE, baudrate, VALUE_STRING);
+            char baudrate_str[32] = {0};
+            sprintf(baudrate_str, "%s", "Uart0BaudRate");
+            HQV_DEVPARAM baudrate(baudrate_str);
+            int val = 6; // 0: 9600, 1: 14400, 2: 19200, 3: 28800, 4: 38400, 5: 57600, 6: 115200;
+            HQV_ParamSetValue(dev_handle, baudrate, &val);
         }
-        return HQV_DeviceOpen(&idx, &dev_handle, DEVICE_INDEX, DEVICE_UDEF);
+        return ret;
     }
     default:
         break;
@@ -168,7 +175,7 @@ void Cam::time_exposure(bool read, float *val)
                 HQV_RegValueGet(dev_handle, PORT_SERIAL0, 0xFF21, &time_expo);
                 *val = time_expo;
                 HQV_RegValueGet(dev_handle, PORT_SERIAL0, 0xFF22, &time_expo);
-                *val += time_expo << 16;
+                *val = time_expo;
             }
             else HQV_RegValueSet(dev_handle, PORT_SERIAL0, 0xFF21, time_expo);
         }
