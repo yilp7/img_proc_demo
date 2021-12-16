@@ -856,6 +856,7 @@ void Demo::enable_controls(bool cam_rdy) {
     ui->SET_PARAMS_BUTTON->setEnabled(device_on);
     ui->CONTINUOUS_RADIO->setEnabled(device_on && !start_grabbing);
     ui->TRIGGER_RADIO->setEnabled(device_on && !start_grabbing);
+    ui->BINNING_CHECK->setEnabled(device_on && !start_grabbing);
     ui->SOFTWARE_CHECK->setEnabled(device_on && !start_grabbing && trigger_mode_on);
     ui->SOFTWARE_TRIGGER_BUTTON->setEnabled(start_grabbing && trigger_mode_on && trigger_by_software);
     ui->IMG_3D_CHECK->setEnabled(start_grabbing);
@@ -1865,9 +1866,21 @@ void Demo::change_focus_speed(int val)
     out_data[7] = val;
 
     out_data[8] = (4 * (uint)val + 0xA2) & 0xFF;
-
     if (temp_com) temp_com->write(QByteArray((char*)out_data, 9));
-    while (temp_com && temp_com->waitForReadyRead(20)) ;
+    while (temp_com && temp_com->waitForReadyRead(10)) ;
+
+    out_data[0] = 0xB0;
+    out_data[1] = 0x02;
+    out_data[2] = 0xA0;
+    out_data[3] = 0x01;
+    out_data[4] = val;
+    out_data[5] = val;
+    out_data[6] = val;
+    out_data[7] = val;
+
+    out_data[8] = (4 * (uint)val + 0xA3) & 0xFF;
+    if (temp_com) temp_com->write(QByteArray((char*)out_data, 9));
+    while (temp_com && temp_com->waitForReadyRead(10)) ;
 }
 
 void Demo::on_ZOOM_IN_BTN_released()
@@ -2321,6 +2334,9 @@ void Demo::on_LASER_ZOOM_IN_BTN_pressed()
     ui->LASER_ZOOM_IN_BTN->setText("x");
 
     communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x40, 0x00, 0x00, 0x42}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x01, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x02, 0x00, 0x00, 0x00, 0x04}, 7), 7, 1, false);
 }
 
 void Demo::on_LASER_ZOOM_OUT_BTN_pressed()
@@ -2328,6 +2344,9 @@ void Demo::on_LASER_ZOOM_OUT_BTN_pressed()
     ui->LASER_ZOOM_OUT_BTN->setText("x");
 
     communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x20, 0x00, 0x00, 0x22}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x80, 0x00, 0x00, 0x82}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x04, 0x00, 0x00, 0x00, 0x06}, 7), 7, 1, false);
 }
 
 void Demo::on_LASER_ZOOM_IN_BTN_released()
@@ -2429,4 +2448,14 @@ void Demo::on_FILE_PATH_EDIT_editingFinished()
     if (QDir(temp_location).exists() || QDir().mkdir(temp_location)) save_location = temp_location;
     else QMessageBox::warning(this, "PROMPT", tr("cannot create directory"));
     ui->FILE_PATH_EDIT->setText(save_location);
+}
+
+void Demo::on_BINNING_CHECK_stateChanged(int arg1)
+{
+    int binning = arg1 ? 2 : 1;
+    curr_cam->binning(false, &binning);
+    curr_cam->get_frame_size(w, h);
+    qInfo("frame w: %d, h: %d", w, h);
+    QResizeEvent e(this->size(), this->size());
+    resizeEvent(&e);
 }

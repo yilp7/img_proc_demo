@@ -3,6 +3,9 @@
 
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
+#include <vector>
+#include <algorithm>
+#include <numeric>
 
 class ImageProc
 {
@@ -19,7 +22,7 @@ private:
     static void equal_interval(uint *eq_hist, uchar *EI_hist, int num);
     static std::vector<uchar> estimate_atmospheric_light(cv::Mat &src, cv::Mat &dark);
     static void dark_channel(cv::Mat &src, cv::Mat &dark, cv::Mat &inter, int r);
-    static void guided_filter(cv::Mat &p, cv::Mat &I, int r, float eps);
+    static void guided_filter(cv::Mat &p, cv::Mat &I, int r, float eps, int fast);
 
 };
 

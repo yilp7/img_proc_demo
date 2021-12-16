@@ -67,7 +67,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>220</y>
+       <y>230</y>
        <width>191</width>
        <height>131</height>
       </rect>
@@ -270,7 +270,7 @@
        <x>10</x>
        <y>120</y>
        <width>191</width>
-       <height>91</height>
+       <height>101</height>
       </rect>
      </property>
      <property name="mouseTracking">
@@ -373,6 +373,19 @@
       </property>
       <property name="text">
        <string>Grab</string>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="BINNING_CHECK">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>80</y>
+        <width>151</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>2 x 2 binning</string>
       </property>
      </widget>
     </widget>
@@ -598,7 +611,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>360</y>
+       <y>370</y>
        <width>191</width>
        <height>61</height>
       </rect>

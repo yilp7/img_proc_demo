@@ -38,6 +38,7 @@ public:
     void gain_analog(bool read, float *val);
     void trigger_mode(bool read, bool *val);
     void trigger_source(bool read, bool *val);
+    void binning(bool read, int *val);
     void trigger_once();
 
     static void __stdcall frame_cb(unsigned char* data, MV_FRAME_OUT_INFO_EX *frame_info, void* user_data);

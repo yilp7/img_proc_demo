@@ -203,7 +203,10 @@ private slots:
     // too much memory occupied (too many unfinished tasks in thread pool)
     void stop_image_writing();
 
- signals:
+    // hik cam binning mode 2x2
+    void on_BINNING_CHECK_stateChanged(int arg1);
+
+signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);
 

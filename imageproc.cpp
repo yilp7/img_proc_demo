@@ -326,7 +326,7 @@ void ImageProc::haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega
     cv::Mat transmission(h, w, CV_32FC1);
     dark.convertTo(transmission, CV_32FC1);
     transmission = 1 - omega * transmission / A_avg;
-    guided_filter(transmission, src, guided_radius, eps);
+    guided_filter(transmission, src, guided_radius, eps, 3);
 //    cv::imwrite("res/transmission.bmp", transmission * 255.0);
 
 //    QueryPerformanceCounter(&t2);
@@ -351,17 +351,22 @@ void ImageProc::haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega
 
 std::vector<uchar> ImageProc::estimate_atmospheric_light(cv::Mat &src, cv::Mat &dark)
 {
-    int w = src.cols, step = src.step;
-    std::vector<uchar> A(src.channels());
-    uchar *ptr = dark.data;
+//    LARGE_INTEGER t1, t2, tc;
+//    QueryPerformanceFrequency(&tc);
+//    QueryPerformanceCounter(&t1);
+
+    int w = src.cols, step = src.step, ch = src.channels();
+    std::vector<uint> _A(ch);
+    std::vector<uchar> A(ch);
+    uchar *ptr1 = src.data, *ptr2 = dark.data;
 
     int heap_size = src.total() / 1000;
     std::vector<std::pair<uchar, int>> max_heap;
-    for (int i = 0; i < heap_size; i++) max_heap.push_back(std::make_pair(ptr[i], i));
+    for (int i = 0; i < heap_size; i++) max_heap.push_back(std::make_pair(ptr2[i], i));
     std::make_heap(max_heap.begin(), max_heap.end(), [](const std::pair<uchar, int>& a, const std::pair<uchar, int>& b) { return a.first > b.first; });
-    for (int i = dark.total(); i > heap_size; i--) {
-        if(ptr[i] > max_heap.front().first) {
-            max_heap.push_back(std::make_pair(ptr[i], i));
+    for (int i = dark.total() - 1; i >= heap_size; i--) {
+        if(ptr2[i] > max_heap.front().first) {
+            max_heap.push_back(std::make_pair(ptr2[i], i));
             std::push_heap(max_heap.begin(), max_heap.end());
             std::pop_heap(max_heap.begin(), max_heap.end());
             max_heap.pop_back();
@@ -370,8 +375,36 @@ std::vector<uchar> ImageProc::estimate_atmospheric_light(cv::Mat &src, cv::Mat &
     std::vector<uchar*> vec_a;
     for (std::pair<uchar, int> p: max_heap) vec_a.push_back(src.data + (p.second / w * step + p.second % w * src.channels()));
     if (src.channels() == 3) std::sort(vec_a.begin(), vec_a.end(), [](const uchar* a, const uchar* b) { return uint(a[0]) + a[1] + a[2] > uint(b[0]) + b[1] + b[2]; });
-    else                      std::sort(vec_a.begin(), vec_a.end(), [](const uchar* a, const uchar* b) { return a[0] > b[0]; });
+    else                     std::sort(vec_a.begin(), vec_a.end(), [](const uchar* a, const uchar* b) { return a[0] > b[0]; });
     for (int i = 0; i < src.channels(); i++) A[i] = vec_a.front()[i];
+
+//    if (ch == 3) {
+//        for (int k = 0; k < 3; k++) _A[k] = std::accumulate(max_heap.begin(), max_heap.end(), (uint)0, [ptr1, w, ch, step, k](uint res, const std::pair<uchar, int>& a){ return res + ptr1[a.second / w * step + a.second % w * ch + k]; });
+//        for (int k = 0; k < 3; k++) A[k] = _A[k] / heap_size + 10;
+//    }
+
+//    uchar *ptr = dark.data;
+//    int hash[256] = {0};
+//    for (int i = dark.total() - 1; i >= 0; i--) hash[ptr[i]]++;
+//    int h = src.rows, w = src.cols, step = src.step, ch = src.channels();
+//    int count = 0, top = dark.total() / 1000, threshold = 255;
+//    for (; count < top && threshold; threshold--) count += hash[threshold];
+
+//    std::vector<uint> _A(ch);
+//    for (int k = 0; k < ch; k++) _A[k] = 0;
+//    std::vector<uchar> A(ch);
+//    uchar *ptr1 = src.data, *ptr2 = dark.data;
+//    for (int i = 0; i < h; i++) {
+//        for (int j = 0; j < w; j++) {
+//            if (ptr2[i * w + j] <= threshold) continue;
+//            for (int k = 0; k < ch; k++) _A[k] += ptr1[i * step + j * ch + k];
+//        }
+//    }
+//    for (int k = 0; k < ch; k++) A[k] = _A[k] / count;
+//    qDebug() << A;
+
+//    QueryPerformanceCounter(&t2);
+//    printf("- total: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
 
     return A;
 }
@@ -400,7 +433,7 @@ void ImageProc::dark_channel(cv::Mat &src, cv::Mat &dark, cv::Mat &inter, int r)
     }
 }
 
-void ImageProc::guided_filter(cv::Mat &p, cv::Mat &I, int r, float eps)
+void ImageProc::guided_filter(cv::Mat &p, cv::Mat &I, int r, float eps, int fast)
 {
     cv::Mat I_f, p_f;
     cv::Mat mean_p, mean_I, corr_I, corr_Ip, var_I, cov_Ip, a, b, mean_a, mean_b;
@@ -408,8 +441,8 @@ void ImageProc::guided_filter(cv::Mat &p, cv::Mat &I, int r, float eps)
     else I_f = I.clone();
     I_f.convertTo(I_f, CV_32FC1);
     p.convertTo(p_f, CV_32FC1);
-    cv::resize(I_f, I_f, cv::Size(I.cols / 3, I.rows / 3));
-    cv::resize(p_f, p_f, cv::Size(p.cols / 3, p.rows / 3));
+    cv::resize(I_f, I_f, cv::Size(I.cols / fast, I.rows / fast));
+    cv::resize(p_f, p_f, cv::Size(p.cols / fast, p.rows / fast));
     I_f /= 255.0;
 
     cv::boxFilter(I_f, mean_I, CV_32FC1, cv::Size(2 * r + 1, 2 * r + 1));

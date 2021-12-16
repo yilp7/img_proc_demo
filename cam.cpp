@@ -56,6 +56,8 @@ int Cam::start() {
         MV_CC_SetEnumValue(dev_handle, "ExposureAuto", MV_EXPOSURE_AUTO_MODE_OFF);
         MV_CC_SetEnumValue(dev_handle, "GainAuto", 0);
         MV_CC_SetBoolValue(dev_handle, "AcquisitionFrameRateEnable", true);
+        MV_CC_SetEnumValue(dev_handle, "BinningHorizontal", 1);
+        MV_CC_SetEnumValue(dev_handle, "BinningVertical", 1);
 
         return ret;
     }
@@ -310,6 +312,27 @@ void Cam::trigger_source(bool read, bool *val)
     }
     default:
         break;
+    }
+}
+
+void Cam::binning(bool read, int *val)
+{
+    switch (device_type) {
+    case 1: {
+        if (read) {
+            MVCC_ENUMVALUE enum_val;
+            MV_CC_GetEnumValue(dev_handle, "BinningHorizontal", &enum_val);
+            MV_CC_GetEnumValue(dev_handle, "BinningVertical", &enum_val);
+            *val = enum_val.nCurValue;
+        }
+        else {
+            MV_CC_SetEnumValue(dev_handle, "BinningHorizontal", *val);
+            MV_CC_SetEnumValue(dev_handle, "BinningVertical", *val);
+        }
+        break;
+    }
+    case 2: break;
+    default: break;
     }
 }
 
