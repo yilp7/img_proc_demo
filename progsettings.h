@@ -16,7 +16,7 @@ public:
     ~ProgSettings();
 
     void data_exchange(bool read = false);
-    void display_baudrate(int baudrate);
+    void display_baudrate(int id, int baudrate);
 
 protected:
     void keyPressEvent(QKeyEvent *event);
@@ -42,7 +42,7 @@ private slots:
 
     void toggle_laser(int id, bool on);
 
-    void on_BAUDRATE_LIST_currentIndexChanged(const QString &arg1);
+    void on_BAUDRATE_LIST_activated(const QString &arg1);
 
     void on_SHARE_CHK_stateChanged(int arg1);
 
@@ -51,6 +51,8 @@ private slots:
     void on_AUTO_MCP_CHK_stateChanged(int arg1);
 
     void on_CAMERALINK_CHK_stateChanged(int arg1);
+
+    void on_FAST_GF_EDIT_editingFinished();
 
 signals:
     void rep_freq_unit_changed(int);
@@ -80,10 +82,14 @@ public:
     int              kernel;
     float            gamma;
     float            log;
+    float            accu_base;
     float            low_in;
     float            high_in;
     float            low_out;
     float            high_out;
+    float            dehaze_pct;
+    float            sky_tolerance;
+    int              fast_gf;
 
     float            dist_ns;
     bool             auto_rep_freq;

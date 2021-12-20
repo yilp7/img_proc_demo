@@ -1,4 +1,4 @@
-#include "demo.h"
+﻿#include "demo.h"
 
 #include <DbgHelp.h>
 
@@ -94,7 +94,7 @@ void log_message(QtMsgType type, const QMessageLogContext &context, const QStrin
 int main(int argc, char *argv[])
 {
     setlocale(LC_ALL, ".65001");
-    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
+//    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
 
     QApplication a(argc, argv);
 

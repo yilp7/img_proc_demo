@@ -14,10 +14,14 @@ ProgSettings::ProgSettings(QWidget *parent) :
     kernel(3),
     gamma(1.2),
     log(1.2),
+    accu_base(1),
     low_in(0),
     high_in(0.05),
     low_out(0),
     high_out(1),
+    dehaze_pct(0.95),
+    sky_tolerance(40),
+    fast_gf(1),
     dist_ns(3e8 / 2e9),
     auto_rep_freq(true),
     hz_unit(0),
@@ -101,10 +105,14 @@ void ProgSettings::data_exchange(bool read)
         kernel = ui->KERNEL_EDIT->text().toInt();
         gamma = ui->GAMMA_EDIT->text().toFloat();
         log = ui->LOG_EDIT->text().toFloat();
+        accu_base = ui->ACCU_BASE_EDIT->text().toFloat();
         low_in = ui->LOW_IN_EDIT->text().toFloat();
         high_in = ui->HIGH_IN_EDIT->text().toFloat();
         low_out = ui->LOW_OUT_EDIT->text().toFloat();
         high_out = ui->HIGH_OUT_EDIT->text().toFloat();
+        dehaze_pct = ui->DEHAZE_PCT_EDIT->text().toFloat();
+        sky_tolerance = ui->SKY_TOLERANCE_EDIT->text().toFloat();
+        fast_gf = ui->FAST_GF_EDIT->text().toInt();
 
         auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
         base_unit = ui->UNIT_LIST->currentIndex();
@@ -143,10 +151,14 @@ void ProgSettings::data_exchange(bool read)
         ui->KERNEL_EDIT->setText(QString::number(kernel));
         ui->GAMMA_EDIT->setText(QString::number(gamma, 'f', 2));
         ui->LOG_EDIT->setText(QString::number(log, 'f', 2));
+        ui->ACCU_BASE_EDIT->setText(QString::number(accu_base, 'f', 2));
         ui->LOW_IN_EDIT->setText(QString::number(low_in, 'f', 2));
         ui->HIGH_IN_EDIT->setText(QString::number(high_in, 'f', 2));
         ui->LOW_OUT_EDIT->setText(QString::number(low_out, 'f', 2));
         ui->HIGH_OUT_EDIT->setText(QString::number(high_out, 'f', 2));
+        ui->DEHAZE_PCT_EDIT->setText(QString::number(dehaze_pct, 'f', 2));
+        ui->SKY_TOLERANCE_EDIT->setText(QString::number(sky_tolerance, 'f', 2));
+        ui->FAST_GF_EDIT->setText(QString::number(fast_gf));
 
         ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
         ui->UNIT_LIST->setCurrentIndex(base_unit);
@@ -166,8 +178,9 @@ void ProgSettings::data_exchange(bool read)
     }
 }
 
-void ProgSettings::display_baudrate(int baudrate)
+void ProgSettings::display_baudrate(int id, int baudrate)
 {
+    if (id != ui->COM_LIST->currentIndex()) return;
     int idx = 0;
     switch (baudrate) {
     case 9600: idx = 0; break;
@@ -320,7 +333,7 @@ void ProgSettings::send_cmd()
     emit com_write(ui->COM_LIST->currentIndex(), cmd);
 }
 
-void ProgSettings::on_BAUDRATE_LIST_currentIndexChanged(const QString &arg1)
+void ProgSettings::on_BAUDRATE_LIST_activated(const QString &arg1)
 {
     emit change_baudrate(ui->COM_LIST->currentIndex(), arg1.toInt());
 }
@@ -344,3 +357,12 @@ void ProgSettings::on_CAMERALINK_CHK_stateChanged(int arg1)
 {
     cameralink = arg1;
 }
+
+void ProgSettings::on_FAST_GF_EDIT_editingFinished()
+{
+    int val = ui->FAST_GF_EDIT->text().toInt();
+    if (val <  1) val = 1;
+    if (val > 10) val = 10;
+    ui->FAST_GF_EDIT->setText(QString::number(val));
+}
+

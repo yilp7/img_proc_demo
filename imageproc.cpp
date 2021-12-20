@@ -313,7 +313,7 @@ void ImageProc::haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega
 //    t1 = t2;
 
     uchar A_avg;
-    std::vector<uchar> A = estimate_atmospheric_light(src, dark);
+    std::vector<uchar> A = estimate_atmospheric_light_avg(src, dark);
 
     if (src.channels() == 3) A_avg = (uint(A[0]) + A[1] + A[2]) / 3;
     else A_avg = A[0];
@@ -349,12 +349,32 @@ void ImageProc::haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega
 //    printf("- reconstruct: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
 }
 
-std::vector<uchar> ImageProc::estimate_atmospheric_light(cv::Mat &src, cv::Mat &dark)
+std::vector<uchar> ImageProc::estimate_atmospheric_light_avg(cv::Mat &src, cv::Mat &dark)
 {
-//    LARGE_INTEGER t1, t2, tc;
-//    QueryPerformanceFrequency(&tc);
-//    QueryPerformanceCounter(&t1);
+    uchar *ptr = dark.data;
+    int hash[256] = {0};
+    for (int i = dark.total() - 1; i >= 0; i--) hash[ptr[i]]++;
+    int h = src.rows, w = src.cols, step = src.step, ch = src.channels();
+    int count = 0, top = dark.total() / 1000, threshold = 255;
+    for (; count < top && threshold; threshold--) count += hash[threshold];
 
+    std::vector<uint> _A(ch);
+    for (int k = 0; k < ch; k++) _A[k] = 0;
+    std::vector<uchar> A(ch);
+    uchar *ptr1 = src.data, *ptr2 = dark.data;
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            if (ptr2[i * w + j] <= threshold) continue;
+            for (int k = 0; k < ch; k++) _A[k] += ptr1[i * step + j * ch + k];
+        }
+    }
+    for (int k = 0; k < ch; k++) A[k] = _A[k] / count;
+
+    return A;
+}
+
+std::vector<uchar> ImageProc::estimate_atmospheric_light_brightest(cv::Mat &src, cv::Mat &dark)
+{
     int w = src.cols, step = src.step, ch = src.channels();
     std::vector<uint> _A(ch);
     std::vector<uchar> A(ch);
@@ -380,33 +400,8 @@ std::vector<uchar> ImageProc::estimate_atmospheric_light(cv::Mat &src, cv::Mat &
 
 //    if (ch == 3) {
 //        for (int k = 0; k < 3; k++) _A[k] = std::accumulate(max_heap.begin(), max_heap.end(), (uint)0, [ptr1, w, ch, step, k](uint res, const std::pair<uchar, int>& a){ return res + ptr1[a.second / w * step + a.second % w * ch + k]; });
-//        for (int k = 0; k < 3; k++) A[k] = _A[k] / heap_size + 10;
+//        for (int k = 0; k < 3; k++) A[k] = _A[k] / heap_size;
 //    }
-
-//    uchar *ptr = dark.data;
-//    int hash[256] = {0};
-//    for (int i = dark.total() - 1; i >= 0; i--) hash[ptr[i]]++;
-//    int h = src.rows, w = src.cols, step = src.step, ch = src.channels();
-//    int count = 0, top = dark.total() / 1000, threshold = 255;
-//    for (; count < top && threshold; threshold--) count += hash[threshold];
-
-//    std::vector<uint> _A(ch);
-//    for (int k = 0; k < ch; k++) _A[k] = 0;
-//    std::vector<uchar> A(ch);
-//    uchar *ptr1 = src.data, *ptr2 = dark.data;
-//    for (int i = 0; i < h; i++) {
-//        for (int j = 0; j < w; j++) {
-//            if (ptr2[i * w + j] <= threshold) continue;
-//            for (int k = 0; k < ch; k++) _A[k] += ptr1[i * step + j * ch + k];
-//        }
-//    }
-//    for (int k = 0; k < ch; k++) A[k] = _A[k] / count;
-//    qDebug() << A;
-
-//    QueryPerformanceCounter(&t2);
-//    printf("- total: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
-
-    return A;
 }
 
 void ImageProc::dark_channel(cv::Mat &src, cv::Mat &dark, cv::Mat &inter, int r)

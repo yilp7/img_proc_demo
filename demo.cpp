@@ -141,7 +141,7 @@ Demo::Demo(QWidget *parent)
     // - default save path
     save_location += QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
 //    qDebug() << QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section('/', 0, -1);
-    TEMP_SAVE_LOCATION = QString(save_location);
+    TEMP_SAVE_LOCATION = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
 
     // - image operations
     QComboBox *enhance_options = ui->ENHANCE_OPTIONS;
@@ -153,7 +153,7 @@ Demo::Demo(QWidget *parent)
     enhance_options->addItem(tr("Log-based"));
     enhance_options->addItem(tr("Gamma-based"));
     enhance_options->addItem(tr("Accumulative"));
-    enhance_options->addItem(tr("Custom"));
+    enhance_options->addItem(tr("Sigmoid-based"));
     enhance_options->addItem(tr("Adaptive"));
     enhance_options->addItem(tr("Dehaze"));
     enhance_options->setCurrentIndex(0);
@@ -442,7 +442,6 @@ int Demo::grab_thread_process() {
         cv::Sobel(img_mem, sobel, CV_16U, 1, 1);
         clarity[2] = clarity[1], clarity[1] = clarity[0], clarity[0] = cv::mean(sobel)[0] * 1000;
         if (focus_direction) {
-//            qDebug() << "qqqq" << focus_direction;
             if (clarity[2] > clarity[1] && clarity[1] > clarity[0]) {
                 focus_direction *= -2;
                 // TODO not yet well implemented
@@ -507,30 +506,30 @@ int Demo::grab_thread_process() {
                 for (int i = 0; i < h; i++) {
                     for (int j = 0; j < w; j++) {
                         uchar p = img[i * modified_result.step + j];
-                        if      (p < 64)  {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 2.4);}
-                        else if (p < 112) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.8);}
-                        else if (p < 144) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.6);}
-                        else if (p < 160) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.5);}
-                        else if (p < 176) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.4);}
-                        else if (p < 192) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.25);}
-                        else if (p < 200) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.2);}
-                        else if (p < 208) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.15);}
-                        else if (p < 216) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.125);}
-                        else if (p < 224) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.1);}
-                        else if (p < 240) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1.05);}
-                        else if (p < 256) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * 1);}
+                        if      (p < 64)  {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 2.4);}
+                        else if (p < 112) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.8);}
+                        else if (p < 144) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.6);}
+                        else if (p < 160) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.5);}
+                        else if (p < 176) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.4);}
+                        else if (p < 192) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.25);}
+                        else if (p < 200) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.2);}
+                        else if (p < 208) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.15);}
+                        else if (p < 216) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.125);}
+                        else if (p < 224) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.1);}
+                        else if (p < 240) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.05);}
+                        else if (p < 256) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1);}
                     }
                 }
                 break;
             }
-            // custom (mergw log w/ 1/(1+exp))
+            // sigmoid (nonlinear) (mergw log w/ 1/(1+exp))
             case 6: {
                 uchar *img = modified_result.data;
                 cv::Mat img_log, img_nonLT = cv::Mat(h, w, CV_8U);
                 modified_result.convertTo(img_log, CV_32F);
                 modified_result += 1.0;
                 cv::log(img_log, img_log);
-                img_log *= 8;
+                img_log *= settings->log;
                 double m = 0, kv = 0, mean = cv::mean(modified_result)[0];
                 uchar p;
                 for (int i = 0; i < h; i++) {
@@ -540,7 +539,7 @@ int Demo::grab_thread_process() {
                             img_nonLT.data[i * img_nonLT.step + j] = 0;
                             continue;
                         }
-                        if (p <= 60) kv = 7;
+                        if      (p <=  60) kv = 7;
                         else if (p <= 200) kv = 7 + (p - 60) / 70;
                         else if (p <= 255) kv = 9 + (p - 200) / 55;
                         m = kv * (p / (p + mean));
@@ -554,8 +553,6 @@ int Demo::grab_thread_process() {
             }
             // adaptive
             case 7: {
-////                double low = low_in * 255, high = high_in * 255; // (0, 12.75)
-////                double bottom = low_out * 255, top = high_out * 255; // (0, 255)
 //                double low = settings->low_in * 255, high = settings->high_in * 255; // (0, 12.75)
 //                double bottom = settings->low_out * 255, top = settings->high_out * 255; // (0, 255)
 //                double err_in = high - low, err_out = top - bottom; // (12.75, 255)
@@ -572,7 +569,7 @@ int Demo::grab_thread_process() {
             // dehaze
             case 8: {
                 modified_result = ~modified_result;
-                ImageProc::haze_removal(modified_result, modified_result, 7, 0.95, 0.1, 60, 0.01);
+                ImageProc::haze_removal(modified_result, modified_result, 7, settings->dehaze_pct, 0.1, 60, 0.01);
                 modified_result = ~modified_result;
                 break;
             }
@@ -728,7 +725,7 @@ void Demo::save_image_bmp(cv::Mat img, QString filename)
     }
 */
     // using std io
-    FILE *f = fopen(filename.toUtf8().constData(), "wb");
+    FILE *f = fopen(filename.toLocal8Bit().constData(), "wb");
     if (f) {
         static ushort signature = 'MB';
         fwrite(&signature, 2, 1, f);
@@ -947,6 +944,7 @@ void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate)
         default:
             break;
         }
+        ui->TITLE->prog_settings->display_baudrate(id, baud_rate);
     }
     else {
         com_label[id]->setStyleSheet("color: #CD5C5C;");
@@ -1276,7 +1274,7 @@ void Demo::com_write_data(int com_idx, QByteArray data)
 
 void Demo::display_baudrate(int idx)
 {
-    if (com[idx] && com[idx]->isOpen()) ui->TITLE->prog_settings->display_baudrate(com[idx]->baudRate());
+    if (com[idx] && com[idx]->isOpen()) ui->TITLE->prog_settings->display_baudrate(idx, com[idx]->baudRate());
 }
 
 void Demo::set_auto_mcp(bool adaptive)
@@ -2334,7 +2332,7 @@ void Demo::on_LASER_ZOOM_IN_BTN_pressed()
     ui->LASER_ZOOM_IN_BTN->setText("x");
 
     communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x40, 0x00, 0x00, 0x42}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x20, 0x00, 0x00, 0x22}, 7), 7, 1, false);
     communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x01, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
     communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x02, 0x00, 0x00, 0x00, 0x04}, 7), 7, 1, false);
 }
@@ -2344,7 +2342,7 @@ void Demo::on_LASER_ZOOM_OUT_BTN_pressed()
     ui->LASER_ZOOM_OUT_BTN->setText("x");
 
     communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x20, 0x00, 0x00, 0x22}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x40, 0x00, 0x00, 0x42}, 7), 7, 1, false);
     communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x80, 0x00, 0x00, 0x82}, 7), 7, 1, false);
     communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x04, 0x00, 0x00, 0x00, 0x06}, 7), 7, 1, false);
 }
