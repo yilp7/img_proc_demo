@@ -196,8 +196,8 @@ Demo::Demo(QWidget *parent)
     ui->MCP_SLIDER->setSingleStep(1);
     ui->MCP_SLIDER->setPageStep(10);
     connect(ui->MCP_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_mcp(int)));
-//    change_mcp(5);
-    ui->MCP_SLIDER->setValue(5);
+    change_mcp(5);
+//    ui->MCP_SLIDER->setValue(5);
 
     ui->DELAY_SLIDER->setMinimum(0);
     ui->DELAY_SLIDER->setMaximum(max_dist);
@@ -432,10 +432,16 @@ int Demo::grab_thread_process() {
 
         image_mutex.lock();
 
-        if (auto_mcp) {
-            static int mean_i;
-            if ((mean_i = cv::mean(img_mem)[0]) < 30) change_mcp(mcp + 5);
-            else if (mean_i > 50) change_mcp(mcp - 5);
+        if (auto_mcp && !image_3d) {
+            memset(hist, 0, 256 * sizeof(uint));
+            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * w)[j]]++;
+            int thresh_num = img_mem.total() / 200, thresh = 255;
+            while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
+            if      (thresh > 250) change_mcp(mcp - 5);
+            else if (thresh < 100) change_mcp(mcp + 5);
+//            static int mean_i;
+//            if ((mean_i = cv::mean(img_mem)[0]) < 30) change_mcp(mcp + 5);
+//            else if (mean_i > 40) change_mcp(mcp - 5);
         }
 
         // tenengrad (sobel) auto-focus
@@ -664,8 +670,10 @@ int Demo::grab_thread_process() {
             if (modified_result.channels() != 1) continue;
             uchar *img = modified_result.data;
             int step = modified_result.step;
-            memset(hist, 0, 256 * sizeof(uint));
-            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img + i * step)[j]]++;
+            if (!auto_mcp) {
+                memset(hist, 0, 256 * sizeof(uint));
+                for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img + i * step)[j]]++;
+            }
             uint max = 0;
             for (int i = 1; i < 256; i++) {
                 // discard abnormal value
@@ -1399,9 +1407,9 @@ void Demo::update_delay()
     else {
         // change fps according to delay: fps (kHz) <= 1s / delay (μs)
         if (ui->TITLE->prog_settings->auto_rep_freq) {
-            rep_freq = delay_dist ? 1.0 * 1e6 / (delay_dist / dist_ns + depth_of_vision / dist_ns + 3) : 30;
+            rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_vision / dist_ns + 5) : 30;
             if (rep_freq > 30) rep_freq = 30;
-            if (rep_freq < 10) rep_freq = 10;
+//            if (rep_freq < 10) rep_freq = 10;
         }
 
         communicate_display(com[0], convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
@@ -2233,6 +2241,7 @@ void Demo::on_SCAN_BUTTON_clicked()
     bool start_scan = ui->SCAN_BUTTON->text() == tr("Scan");
 
     if (start_scan) {
+        rep_freq = settings->rep_freq;
         delay_dist = settings->start_pos * dist_ns;
         scan_stopping_delay = settings->end_pos;
         scan_step = settings->step_size * dist_ns;
