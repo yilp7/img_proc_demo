@@ -91,7 +91,7 @@ Demo::Demo(QWidget *parent)
     base_unit(0),
     fps(10),
     duty(5000),
-    mcp(5),
+    mcp(0),
     laser_on(0),
     zoom(0),
     focus(0),
@@ -102,6 +102,7 @@ Demo::Demo(QWidget *parent)
     focus_direction(0),
     curr_laser_idx(-1),
     display_option(1),
+    device_type(0),
     device_on(false),
     start_grabbing(false),
     record_original(false),
@@ -169,10 +170,6 @@ Demo::Demo(QWidget *parent)
     calc_avg_options->addItem("b");
     calc_avg_options->setCurrentIndex(0);
 
-    // - write default params
-    data_exchange(false);
-    enable_controls(false);
-
     // - set-up COMs
 //    foreach (const QSerialPortInfo & info, QSerialPortInfo::availablePorts()) qDebug("%s\n", qPrintable(info.portName()));
     com_label[0] = ui->TCU_COM;
@@ -185,10 +182,12 @@ Demo::Demo(QWidget *parent)
     com_edit[2] = ui->LENS_COM_EDIT;
     com_edit[3] = ui->LASER_COM_EDIT;
 
-    setup_com(com + 0, 0, com_edit[0]->text(), 9600);
-    setup_com(com + 1, 1, com_edit[1]->text(), 115200);
-    setup_com(com + 2, 2, com_edit[2]->text(), 9600);
-    setup_com(com + 3, 3, com_edit[3]->text(), 9600);
+    for (int i = 0; i < 4; i++) com[i] = new QSerialPort, setup_com(com + i, i, com_edit[i]->text(), 9600);
+
+//    setup_com(com + 0, 0, com_edit[0]->text(), 9600);
+//    setup_com(com + 1, 1, com_edit[1]->text(), 115200);
+//    setup_com(com + 2, 2, com_edit[2]->text(), 9600);
+//    setup_com(com + 3, 3, com_edit[3]->text(), 9600);
 
     // - set up sliders
     ui->MCP_SLIDER->setMinimum(0);
@@ -197,7 +196,6 @@ Demo::Demo(QWidget *parent)
     ui->MCP_SLIDER->setPageStep(10);
     connect(ui->MCP_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_mcp(int)));
     change_mcp(5);
-//    ui->MCP_SLIDER->setValue(5);
 
     ui->DELAY_SLIDER->setMinimum(0);
     ui->DELAY_SLIDER->setMaximum(max_dist);
@@ -221,6 +219,7 @@ Demo::Demo(QWidget *parent)
     connect(this, SIGNAL(update_scan(bool)), SLOT(enable_scan_options(bool)), Qt::QueuedConnection);
 //    connect(this, &Demo::appendText, &Demo::append_data);
     connect(this, SIGNAL(update_delay_in_thread()), SLOT(update_delay()), Qt::QueuedConnection);
+    connect(this, SIGNAL(update_mcp_in_thread(int)), SLOT(change_mcp(int)), Qt::QueuedConnection);
 
     // register signal when thread pool full
     connect(this, SIGNAL(task_queue_full()), SLOT(stop_image_writing()), Qt::UniqueConnection);
@@ -275,9 +274,13 @@ Demo::Demo(QWidget *parent)
     scan_q.push_back(-1);
 //    setup_stepping(0);
 
+    // - write default params
+    data_exchange(false);
+    enable_controls(false);
+
     // right before gui display (init state)
     on_ENUM_BUTTON_clicked();
-    if (com[0] && com[3]) on_LASER_BTN_clicked();
+    if (com[0]->isOpen() && com[3]->isOpen()) on_LASER_BTN_clicked();
 
     ui->COM_DATA_RADIO->click();
     QFont temp_f(consolas);
@@ -358,6 +361,7 @@ void Demo::data_exchange(bool read){
         // use toFloat() since float representation in line edit
         fps = ui->CCD_FREQ_EDIT->text().toFloat();
         duty = ui->DUTY_EDIT->text().toFloat() * 1000;
+        mcp = ui->MCP_EDIT->text().toInt();
 
         zoom = ui->ZOOM_EDIT->text().toInt();
         focus = ui->FOCUS_EDIT->text().toInt();
@@ -432,13 +436,13 @@ int Demo::grab_thread_process() {
 
         image_mutex.lock();
 
-        if (auto_mcp && !image_3d) {
+        if (auto_mcp && !image_3d && !ui->MCP_SLIDER->hasFocus()) {
             memset(hist, 0, 256 * sizeof(uint));
             for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * w)[j]]++;
             int thresh_num = img_mem.total() / 200, thresh = 255;
             while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-            if      (thresh > 250) change_mcp(mcp - 5);
-            else if (thresh < 100) change_mcp(mcp + 5);
+            if      (thresh > 250) emit update_mcp_in_thread(mcp - sqrt(thresh - 250));
+            else if (thresh <  80) emit update_mcp_in_thread(mcp + sqrt(80 - thresh));
 //            static int mean_i;
 //            if ((mean_i = cv::mean(img_mem)[0]) < 30) change_mcp(mcp + 5);
 //            else if (mean_i > 40) change_mcp(mcp - 5);
@@ -670,7 +674,7 @@ int Demo::grab_thread_process() {
             if (modified_result.channels() != 1) continue;
             uchar *img = modified_result.data;
             int step = modified_result.step;
-            if (!auto_mcp) {
+            if (!auto_mcp || ui->MCP_SLIDER->hasFocus()) {
                 memset(hist, 0, 256 * sizeof(uint));
                 for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img + i * step)[j]]++;
             }
@@ -919,10 +923,8 @@ void Demo::save_scan_img() {
 }
 
 void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate) {
-    if (*com) delete *com;
-    *com = new QSerialPort;
     (*com)->setPortName("COM" + port_num);
-    qDebug("%p", *com);
+//    qDebug("%p", *com);
 
     if ((*com)->open(QIODevice::ReadWrite)) {
         QThread::msleep(10);
@@ -956,8 +958,6 @@ void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate)
     }
     else {
         com_label[id]->setStyleSheet("color: #CD5C5C;");
-        delete *com;
-        *com = NULL;
     }
 }
 
@@ -966,7 +966,13 @@ void Demo::on_ENUM_BUTTON_clicked()
     if (curr_cam) delete curr_cam;
     curr_cam = new Cam;
     if (ui->TITLE->prog_settings->cameralink) curr_cam->cameralink = true;
-    enable_controls(curr_cam->search_for_devices());
+    enable_controls(device_type = curr_cam->search_for_devices());
+    ui->TITLE->prog_settings->enable_ip_editing(device_type == 1);
+    if (device_type) {
+        int ip, gateway;
+        curr_cam->ip_address(true, &ip, &gateway);
+        ui->TITLE->prog_settings->config_ip(true, ip, gateway);
+    }
 }
 
 void Demo::on_START_BUTTON_clicked()
@@ -1254,7 +1260,7 @@ void Demo::set_serial_port_share(bool share)
 
 void Demo::set_baudrate(int idx, int baudrate)
 {
-    if (com[idx] && com[idx]->isOpen()) com[idx]->setBaudRate(baudrate);
+    if (com[idx]->isOpen()) com[idx]->setBaudRate(baudrate);
 }
 
 void Demo::com_write_data(int com_idx, QByteArray data)
@@ -1282,7 +1288,7 @@ void Demo::com_write_data(int com_idx, QByteArray data)
 
 void Demo::display_baudrate(int idx)
 {
-    if (com[idx] && com[idx]->isOpen()) ui->TITLE->prog_settings->display_baudrate(idx, com[idx]->baudRate());
+    if (com[idx]->isOpen()) ui->TITLE->prog_settings->display_baudrate(idx, com[idx]->baudRate());
 }
 
 void Demo::set_auto_mcp(bool adaptive)
@@ -1290,9 +1296,15 @@ void Demo::set_auto_mcp(bool adaptive)
     this->auto_mcp = adaptive;
 }
 
+void Demo::set_dev_ip(int ip, int gateway)
+{
+    curr_cam->ip_address(false, &ip, &gateway);
+}
+
 void Demo::export_config()
 {
-    QString config_name = QFileDialog::getSaveFileName(this, tr("Save Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/config.ssy", tr("*.ssy"));
+//    QString config_name = QFileDialog::getSaveFileName(this, tr("Save Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/config.ssy", tr("*.ssy"));
+    QString config_name = QFileDialog::getSaveFileName(this, tr("Save Configuration"), save_location + "/config.ssy", tr("YJS config(*.ssy);;All Files()"));
     if (config_name.isEmpty()) return;
     if (!config_name.endsWith(".ssy")) config_name.append(".ssy");
     QFile config(config_name);
@@ -1311,9 +1323,15 @@ void Demo::export_config()
     }
 }
 
-void Demo::load_config()
+void Demo::request_for_config_file()
 {
-    QString config_name = QFileDialog::getOpenFileName(this, tr("Load Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation), tr("*.ssy"));
+//    QString config_name = QFileDialog::getOpenFileName(this, tr("Load Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation), tr("*.ssy"));
+    QString config_name = QFileDialog::getOpenFileName(this, tr("Load Configuration"), save_location, tr("YJS config(*.ssy);;All Files()"));
+    load_config(config_name);
+}
+
+void Demo::load_config(QString config_name)
+{
     if (config_name.isEmpty()) return;
     QFile config(config_name);
     config.open(QIODevice::ReadOnly);
@@ -1371,12 +1389,16 @@ inline QByteArray Demo::generate_ba(uchar *data, int len)
 
 // send and receive data from COM, and display
 QByteArray Demo::communicate_display(QSerialPort *com, QByteArray write, int write_size, int read_size, bool fb) {
+    port_mutex.lock();
     QString str_s("sent    "), str_r("received");
 
     for (char i = 0; i < 7; i++) str_s += QString::asprintf(" %02X", i + write_size - 7 < 0 ? 0 : (uchar)write[i + write_size - 7]);
     emit append_text(str_s);
 
-    if (com == NULL) return QByteArray();
+    if (!com->isOpen()) {
+        port_mutex.unlock();
+        return QByteArray();
+    }
     com->clear();
     com->write(write, write_size);
     while (com->waitForBytesWritten(10)) ;
@@ -1387,6 +1409,7 @@ QByteArray Demo::communicate_display(QSerialPort *com, QByteArray write, int wri
     for (char i = 0; i < 7; i++) str_r += QString::asprintf(" %02X", i + read_size - 7 < 0 ? 0 : (uchar)read[i + read.size() - 7]);
     emit append_text(str_r);
 
+    port_mutex.unlock();
     QThread().msleep(10);
     return read;
 }
@@ -1498,7 +1521,7 @@ void Demo::convert_write(QDataStream &out, const int TYPE)
     case TCU:
     {
         out << "TCU" << uchar('.');
-        out << fps << duty << rep_freq << laser_width_u << laser_width_n << mcp << delay_dist << delay_n_n << depth_of_vision;
+        out << fps << duty << rep_freq << laser_width_u << laser_width_n << mcp << delay_dist << delay_n_n << depth_of_vision << stepping;
     }
     case SCAN:
     {
@@ -1508,7 +1531,7 @@ void Demo::convert_write(QDataStream &out, const int TYPE)
     case IMG:
     {
         out << "IMG" << uchar('.');
-        out << ps->kernel << ps->gamma << ps->log << ps->low_in << ps->low_out << ps->high_in << ps->high_out;
+        out << ps->kernel << ps->gamma << ps->log << ps->low_in << ps->low_out << ps->high_in << ps->high_out << ps->dehaze_pct << ps->sky_tolerance << ps->fast_gf;
     }
     case TCU_PREF:
     {
@@ -1544,7 +1567,7 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
     {
         out >> temp_str; if (std::strcmp(temp_str, "TCU")) return false;
         out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
-        out >> fps >> duty >> rep_freq >> laser_width_u >> laser_width_n >> mcp >> delay_dist >> delay_n_n >> depth_of_vision;
+        out >> fps >> duty >> rep_freq >> laser_width_u >> laser_width_n >> mcp >> delay_dist >> delay_n_n >> depth_of_vision >> stepping;
     }
     case SCAN:
     {
@@ -1560,7 +1583,7 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
     {
         out >> temp_str; if (std::strcmp(temp_str, "IMG")) return false;
         out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
-        out >> ps->kernel >> ps->gamma >> ps->log >> ps->low_in >> ps->low_out >> ps->high_in >> ps->high_out;
+        out >> ps->kernel >> ps->gamma >> ps->log >> ps->low_in >> ps->low_out >> ps->high_in >> ps->high_out >> ps->dehaze_pct >> ps->sky_tolerance >> ps->fast_gf;
     }
     case TCU_PREF:
     {
@@ -1630,14 +1653,14 @@ void Demo::on_ZOOM_IN_BTN_pressed()
 {
     ui->ZOOM_IN_BTN->setText("x");
 
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
 }
 
 void Demo::on_ZOOM_OUT_BTN_pressed()
 {
     ui->ZOOM_OUT_BTN->setText("x");
 
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
 }
 
 void Demo::on_FOCUS_NEAR_BTN_pressed()
@@ -1648,15 +1671,15 @@ void Demo::on_FOCUS_NEAR_BTN_pressed()
 
 inline void Demo::focus_near()
 {
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
 }
 
 inline void Demo::set_laser_preset_target(int *pos)
 {
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x81, uchar((pos[0] >> 8) & 0xFF), uchar(pos[0] & 0xFF), uchar((((pos[0] >> 8) & 0xFF) + (pos[0] & 0xFF) + 0x82) & 0xFF)}, 7), 7, 1, false);
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4F, uchar((pos[1] >> 8) & 0xFF), uchar(pos[1] & 0xFF), uchar((((pos[1] >> 8) & 0xFF) + (pos[1] & 0xFF) + 0x51) & 0xFF)}, 7), 7, 1, false);
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4E, uchar((pos[2] >> 8) & 0xFF), uchar(pos[2] & 0xFF), uchar((((pos[2] >> 8) & 0xFF) + (pos[2] & 0xFF) + 0x50) & 0xFF)}, 7), 7, 1, false);
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x81, uchar((pos[3] >> 8) & 0xFF), uchar(pos[3] & 0xFF), uchar((((pos[3] >> 8) & 0xFF) + (pos[3] & 0xFF) + 0x83) & 0xFF)}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x81, uchar((pos[0] >> 8) & 0xFF), uchar(pos[0] & 0xFF), uchar((((pos[0] >> 8) & 0xFF) + (pos[0] & 0xFF) + 0x82) & 0xFF)}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4F, uchar((pos[1] >> 8) & 0xFF), uchar(pos[1] & 0xFF), uchar((((pos[1] >> 8) & 0xFF) + (pos[1] & 0xFF) + 0x51) & 0xFF)}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4E, uchar((pos[2] >> 8) & 0xFF), uchar(pos[2] & 0xFF), uchar((((pos[2] >> 8) & 0xFF) + (pos[2] & 0xFF) + 0x50) & 0xFF)}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x81, uchar((pos[3] >> 8) & 0xFF), uchar(pos[3] & 0xFF), uchar((((pos[3] >> 8) & 0xFF) + (pos[3] & 0xFF) + 0x83) & 0xFF)}, 7), 7, 1, false);
     delete[] pos;
 }
 
@@ -1728,12 +1751,12 @@ void Demo::on_FOCUS_FAR_BTN_pressed()
 
 inline void Demo::focus_far()
 {
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), 7, 1, false);
 }
 
 inline void Demo::lens_stop() {
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
 }
 
 void Demo::set_zoom()
@@ -1751,7 +1774,7 @@ void Demo::set_zoom()
         sum += out[i];
     out[6] = sum & 0xFF;
 
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], QByteArray((char*)out, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], QByteArray((char*)out, 7), 7, 1, false);
 }
 
 void Demo::set_focus()
@@ -1769,7 +1792,7 @@ void Demo::set_focus()
         sum += out[i];
     out[6] = sum & 0xFF;
 
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], QByteArray((char*)out, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], QByteArray((char*)out, 7), 7, 1, false);
 }
 
 
@@ -1814,7 +1837,9 @@ void Demo::init_laser()
 
 void Demo::change_mcp(int val)
 {
-    if (val < 0 || val > 255) return;
+    if (val < 0) val = 0;
+    if (val > 255) val = 255;
+    if (val == mcp) return;
     mcp = val;
 
 //    convert_to_send_tcu(0x0A, mcp);
@@ -1854,8 +1879,8 @@ void Demo::change_delay(int val)
 
 void Demo::change_focus_speed(int val)
 {
-    QSerialPort *temp_com = share_serial_port && com[0] ? com[0] : com[2];
-    if (temp_com) temp_com->clear();
+    QSerialPort *temp_com = share_serial_port && com[0]->isOpen() ? com[0] : com[2];
+    if (temp_com->isOpen()) temp_com->clear();
     if (val < 1)  val = 1;
     if (val > 64) val = 64;
     ui->FOCUS_SPEED_EDIT->setText(QString::asprintf("%d", val));
@@ -1872,8 +1897,8 @@ void Demo::change_focus_speed(int val)
     out_data[7] = val;
 
     out_data[8] = (4 * (uint)val + 0xA2) & 0xFF;
-    if (temp_com) temp_com->write(QByteArray((char*)out_data, 9));
-    while (temp_com && temp_com->waitForReadyRead(10)) ;
+    if (temp_com->isOpen()) temp_com->write(QByteArray((char*)out_data, 9));
+    while (temp_com->isOpen() && temp_com->waitForReadyRead(10)) ;
 
     out_data[0] = 0xB0;
     out_data[1] = 0x02;
@@ -1885,8 +1910,8 @@ void Demo::change_focus_speed(int val)
     out_data[7] = val;
 
     out_data[8] = (4 * (uint)val + 0xA3) & 0xFF;
-    if (temp_com) temp_com->write(QByteArray((char*)out_data, 9));
-    while (temp_com && temp_com->waitForReadyRead(10)) ;
+    if (temp_com->isOpen()) temp_com->write(QByteArray((char*)out_data, 9));
+    while (temp_com->isOpen() && temp_com->waitForReadyRead(10)) ;
 }
 
 void Demo::on_ZOOM_IN_BTN_released()
@@ -1936,7 +1961,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
             for (int i = 0; i < 4; i++) {
                 if (edit == com_edit[i]) {
                     if (com[i]) com[i]->close();
-                    setup_com(com + i, i, edit->text(), i == 1 ? 115200 : 9600);
+                    setup_com(com + i, i, edit->text(), 9600);
                 }
             }
             if (edit == ui->FREQ_EDIT) {
@@ -2211,6 +2236,21 @@ void Demo::mouseDoubleClickEvent(QMouseEvent *event)
     mouse_pressed = false;
 }
 
+void Demo::dragEnterEvent(QDragEnterEvent *event)
+{
+    QMainWindow::dragEnterEvent(event);
+
+    if (event->mimeData()->urls().length() == 1) event->acceptProposedAction();
+}
+
+void Demo::dropEvent(QDropEvent *event)
+{
+    QMainWindow::dropEvent(event);
+
+    QString config_name = event->mimeData()->urls().first().toLocalFile();
+    load_config(config_name);
+}
+
 void Demo::on_SAVE_AVI_BUTTON_clicked()
 {
     static QString raw_avi;
@@ -2260,7 +2300,7 @@ void Demo::on_SCAN_BUTTON_clicked()
                                        "ending delay:       %06d ns\n"
                                        "frames count:       %06d\n"
                                        "stepping size:      %.2f ns\n"
-                                       "repeated frequency: %06d Hz\n"
+                                       "repeated frequency: %06d kHz\n"
                                        "laser width:        %06d ns\n"
                                        "gate width:         %06d ns\n"
                                        "MCP:                %03d",
@@ -2340,20 +2380,20 @@ void Demo::on_LASER_ZOOM_IN_BTN_pressed()
 {
     ui->LASER_ZOOM_IN_BTN->setText("x");
 
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x20, 0x00, 0x00, 0x22}, 7), 7, 1, false);
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x01, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x02, 0x00, 0x00, 0x00, 0x04}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x20, 0x00, 0x00, 0x22}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x01, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x02, 0x00, 0x00, 0x00, 0x04}, 7), 7, 1, false);
 }
 
 void Demo::on_LASER_ZOOM_OUT_BTN_pressed()
 {
     ui->LASER_ZOOM_OUT_BTN->setText("x");
 
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x40, 0x00, 0x00, 0x42}, 7), 7, 1, false);
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x80, 0x00, 0x00, 0x82}, 7), 7, 1, false);
-    communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x04, 0x00, 0x00, 0x00, 0x06}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x40, 0x00, 0x00, 0x42}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x80, 0x00, 0x00, 0x82}, 7), 7, 1, false);
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x02, 0x04, 0x00, 0x00, 0x00, 0x06}, 7), 7, 1, false);
 }
 
 void Demo::on_LASER_ZOOM_IN_BTN_released()
@@ -2391,10 +2431,10 @@ void Demo::on_LASER_BTN_clicked()
 
 void Demo::on_GET_LENS_PARAM_BTN_clicked()
 {
-    QByteArray read = communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
+    QByteArray read = communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
     zoom = (read[4] << 8) + read[5];
 
-    read = communicate_display(share_serial_port && com[0] ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
+    read = communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
     focus = (read[4] << 8) + read[5];
 
     data_exchange(false);
@@ -2410,7 +2450,7 @@ void Demo::on_HIDE_BTN_clicked()
 {
     hide_left ^= 1;
     ui->LEFT->setGeometry(10, 40, hide_left ? 0 : 210, 631);
-    ui->HIDE_BTN->setText(hide_left ? ">>" : "<<");
+    ui->HIDE_BTN->setText(hide_left ? ">" : "<");
     resizeEvent(new QResizeEvent(this->size(), this->size()));
 }
 

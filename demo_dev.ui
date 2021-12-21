@@ -25,6 +25,9 @@
   <property name="mouseTracking">
    <bool>true</bool>
   </property>
+  <property name="acceptDrops">
+   <bool>true</bool>
+  </property>
   <property name="windowTitle">
    <string> YJS</string>
   </property>
@@ -2447,7 +2450,7 @@
      <string notr="true"/>
     </property>
     <property name="text">
-     <string>&lt;&lt;</string>
+     <string>&lt;</string>
     </property>
    </widget>
    <widget class="TitleBar" name="TITLE">

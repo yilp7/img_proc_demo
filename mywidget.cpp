@@ -208,10 +208,11 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     connect(prog_settings, SIGNAL(get_baudrate(int)), this->parent()->parent(), SLOT(display_baudrate(int)));
     connect(prog_settings, SIGNAL(share_serial_port(bool)), this->parent()->parent(), SLOT(set_serial_port_share(bool)));
     connect(prog_settings, SIGNAL(auto_mcp(bool)), this->parent()->parent(), SLOT(set_auto_mcp(bool)));
+    connect(prog_settings, SIGNAL(set_dev_ip(int, int)), this->parent()->parent(), SLOT(set_dev_ip(int, int)));
     settings_menu->addAction(expt);
     connect(expt, SIGNAL(triggered()), this->parent()->parent(), SLOT(export_config()));
     settings_menu->addAction(load);
-    connect(load, SIGNAL(triggered()), this->parent()->parent(), SLOT(load_config()));
+    connect(load, SIGNAL(triggered()), this->parent()->parent(), SLOT(request_for_config_file()));
     settings->setMenu(settings_menu);
 
     capture = new TitleButton("", this);

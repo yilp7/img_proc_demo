@@ -85,7 +85,8 @@ public slots:
     void screenshot();
     void clean();
     void export_config();
-    void load_config();
+    void request_for_config_file();
+    void load_config(QString config_name);
 
     // signaled in settings ui
     void setup_hz(int hz_unit);
@@ -97,6 +98,7 @@ public slots:
     void com_write_data(int com_idx, QByteArray data);
     void display_baudrate(int idx);
     void set_auto_mcp(bool adaptive);
+    void set_dev_ip(int ip, int gateway);
 
 private slots:
     // on clicking enum btn: enumerate devices
@@ -213,8 +215,9 @@ signals:
     // pause / continue scan
     void update_scan(bool show);
 
-    // queue update_delay in thread
+    // queue update_delay, mcp in thread
     void update_delay_in_thread();
+    void update_mcp_in_thread(int new_mcp);
 
     // task queue full in thread pool
     void task_queue_full();
@@ -228,6 +231,8 @@ protected:
     void mouseMoveEvent(QMouseEvent *event);
     void mouseReleaseEvent(QMouseEvent *event);
     void mouseDoubleClickEvent(QMouseEvent *event);
+    void dragEnterEvent(QDragEnterEvent *event);
+    void dropEvent(QDropEvent *event);
 
 // control functions
 private:
@@ -291,6 +296,7 @@ private:
     bool                    trigger_by_software;        // whether the device gets trigger signal from sw
 
     QMutex                  image_mutex;                // img handle lock
+    QMutex                  port_mutex;                 // port handle lock
     Cam*                    curr_cam;                   // current camera
     float                   time_exposure_edit;
     float                   gain_analog_edit;
@@ -331,6 +337,7 @@ private:
     // TODO add other scan features
     std::deque<float>       scan_q;                     // objects' distance found while scanning
 
+    int                     device_type;                // 1: hik gige
     bool                    device_on;                  // whether curr device is on
     bool                    trigger_mode_on;            // whether img grabbing is on trigger mode
     bool                    start_grabbing;             // whether the device is rdy to grab imgs

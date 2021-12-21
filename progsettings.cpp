@@ -36,6 +36,8 @@ ProgSettings::ProgSettings(QWidget *parent) :
 
     setWindowFlags(Qt::FramelessWindowHint);
 
+    ui->IP_EDIT->setEnabled(false);
+
     ui->HZ_LIST->addItem("kHz");
     ui->HZ_LIST->addItem("Hz");
     ui->HZ_LIST->installEventFilter(this);
@@ -191,6 +193,23 @@ void ProgSettings::display_baudrate(int id, int baudrate)
     ui->BAUDRATE_LIST->setCurrentIndex(idx);
 }
 
+void ProgSettings::enable_ip_editing(bool enable)
+{
+    ui->IP_EDIT->setEnabled(enable);
+}
+
+void ProgSettings::config_ip(bool read, int ip, int gateway)
+{
+    if (read) {
+        ui->IP_EDIT->setText(QString::asprintf("%d.%d.%d.%d", (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF));
+    }
+    else {
+        int ip1, ip2, ip3, ip4;
+        sscanf(ui->IP_EDIT->text().toLatin1().constData(), "%d.%d.%d.%d", &ip1, &ip2, &ip3, &ip4);
+        emit set_dev_ip((ip1 << 24) + (ip2 << 16) + (ip3 << 8) + ip4, (ip1 << 24) + (ip2 << 16) + (ip3 << 8) + 1);
+    }
+}
+
 void ProgSettings::update_scan()
 {
     QLineEdit *source = qobject_cast<QLineEdit*>(sender());
@@ -226,6 +245,7 @@ void ProgSettings::keyPressEvent(QKeyEvent *event)
     case Qt::Key_Return:
         if (edit == NULL)                  this->accept();
         else if (edit == ui->COM_DATA_EDT) send_cmd();
+        else if (edit == ui->IP_EDIT)      config_ip(false);
         else                               data_exchange(true);
         if (edit) this->focusWidget()->clearFocus();
 //        edit ? data_exchange(true) : this->accept(); break;

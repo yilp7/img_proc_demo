@@ -87,10 +87,10 @@ target_link_libraries(Demo_param
 #	MultiCam
 #	clallserial
     # opencv
-	opencv_core452
-	opencv_imgcodecs452
-	opencv_imgproc452
-	opencv_videoio452
+	opencv_core454
+	opencv_imgcodecs454
+	opencv_imgproc454
+	opencv_videoio454
 )
 
 #add_executable(Demo_release WIN32

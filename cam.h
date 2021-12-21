@@ -12,6 +12,7 @@ class Cam
 {
 private:
     void* dev_handle;
+    MV_CC_DEVICE_INFO* mv_dev;
 
 public:
     // 0: no device; 1: MvCam; 2: HqvCam
@@ -39,6 +40,7 @@ public:
     void trigger_mode(bool read, bool *val);
     void trigger_source(bool read, bool *val);
     void binning(bool read, int *val);
+    void ip_address(bool read, int *ip, int *gateway);
     void trigger_once();
 
     static void __stdcall frame_cb(unsigned char* data, MV_FRAME_OUT_INFO_EX *frame_info, void* user_data);
