@@ -43,7 +43,7 @@ ProgSettings::ProgSettings(QWidget *parent) :
     ui->HZ_LIST->installEventFilter(this);
 
     ui->UNIT_LIST->addItem("ns");
-    ui->UNIT_LIST->addItem("μs");
+    ui->UNIT_LIST->addItem(QString::fromLocal8Bit("μs"));
     ui->UNIT_LIST->addItem("m");
     ui->UNIT_LIST->setCurrentIndex(0);
     ui->UNIT_LIST->installEventFilter(this);
@@ -74,7 +74,7 @@ ProgSettings::ProgSettings(QWidget *parent) :
     ui->COM_LIST->installEventFilter(this);
 
     QFont temp = QFont(consolas);
-    temp.setPointSize(8);
+    temp.setPixelSize(11);
     ui->COM_DATA_EDT->setFont(temp);
 
     data_exchange(false);
@@ -89,8 +89,10 @@ ProgSettings::~ProgSettings()
 void ProgSettings::data_exchange(bool read)
 {
     if (read) {
-        start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
-        end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
+        if (ui->START_POS_EDIT_N->text().toInt() > 999) start_pos = ui->START_POS_EDIT_N->text().toInt();
+        else start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
+        if (ui->END_POS_EDIT_N->text().toInt() > 999) end_pos = ui->END_POS_EDIT_N->text().toInt();
+        else end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
         frame_count = ui->FRAME_COUNT_EDIT->text().toInt();
         step_size = ui->STEP_SIZE_EDIT->text().toFloat();
         rep_freq = ui->REP_FREQ_EDIT->text().toFloat();
@@ -112,7 +114,7 @@ void ProgSettings::data_exchange(bool read)
         high_in = ui->HIGH_IN_EDIT->text().toFloat();
         low_out = ui->LOW_OUT_EDIT->text().toFloat();
         high_out = ui->HIGH_OUT_EDIT->text().toFloat();
-        dehaze_pct = ui->DEHAZE_PCT_EDIT->text().toFloat();
+        dehaze_pct = ui->DEHAZE_PCT_EDIT->text().toFloat() / 100;
         sky_tolerance = ui->SKY_TOLERANCE_EDIT->text().toFloat();
         fast_gf = ui->FAST_GF_EDIT->text().toInt();
 
@@ -158,7 +160,7 @@ void ProgSettings::data_exchange(bool read)
         ui->HIGH_IN_EDIT->setText(QString::number(high_in, 'f', 2));
         ui->LOW_OUT_EDIT->setText(QString::number(low_out, 'f', 2));
         ui->HIGH_OUT_EDIT->setText(QString::number(high_out, 'f', 2));
-        ui->DEHAZE_PCT_EDIT->setText(QString::number(dehaze_pct, 'f', 2));
+        ui->DEHAZE_PCT_EDIT->setText(QString::number(dehaze_pct * 100, 'f', 2));
         ui->SKY_TOLERANCE_EDIT->setText(QString::number(sky_tolerance, 'f', 2));
         ui->FAST_GF_EDIT->setText(QString::number(fast_gf));
 
@@ -214,16 +216,20 @@ void ProgSettings::update_scan()
 {
     QLineEdit *source = qobject_cast<QLineEdit*>(sender());
     if (source == ui->STEP_SIZE_EDIT) {
-        start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
-        end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
+        if (ui->START_POS_EDIT_N->text().toInt() > 999) start_pos = ui->START_POS_EDIT_N->text().toInt();
+        else start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
+        if (ui->END_POS_EDIT_N->text().toInt() > 999) end_pos = ui->END_POS_EDIT_N->text().toInt();
+        else end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
         step_size = ui->STEP_SIZE_EDIT->text().toFloat();
         frame_count = step_size ? (end_pos - start_pos) / step_size : 0;
         ui->FRAME_COUNT_EDIT->setText(QString::number(frame_count));
         ui->STEP_SIZE_EDIT->setText(QString::number(step_size, 'f', 2));
     }
     else {
-        start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
-        end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
+        if (ui->START_POS_EDIT_N->text().toInt() > 999) start_pos = ui->START_POS_EDIT_N->text().toInt();
+        else start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
+        if (ui->END_POS_EDIT_N->text().toInt() > 999) end_pos = ui->END_POS_EDIT_N->text().toInt();
+        else end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
         frame_count = ui->FRAME_COUNT_EDIT->text().toInt();
         if (!frame_count) frame_count = 1;
         step_size = 1.0 * (end_pos - start_pos) / frame_count;
@@ -248,7 +254,7 @@ void ProgSettings::keyPressEvent(QKeyEvent *event)
         else if (edit == ui->IP_EDIT)      config_ip(false);
         else                               data_exchange(true);
         if (edit) this->focusWidget()->clearFocus();
-//        edit ? data_exchange(true) : this->accept(); break;
+        data_exchange(false);
     default: break;
     }
     edit = NULL;
@@ -384,5 +390,11 @@ void ProgSettings::on_FAST_GF_EDIT_editingFinished()
     if (val <  1) val = 1;
     if (val > 10) val = 10;
     ui->FAST_GF_EDIT->setText(QString::number(val));
+}
+
+
+void ProgSettings::on_CENTRAL_SYMM_CHK_stateChanged(int arg1)
+{
+    central_symmetry = arg1;
 }
 

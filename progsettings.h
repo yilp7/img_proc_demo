@@ -53,6 +53,7 @@ private slots:
     void on_CAMERALINK_CHK_stateChanged(int arg1);
 
     void on_FAST_GF_EDIT_editingFinished();
+    void on_CENTRAL_SYMM_CHK_stateChanged(int arg1);
 
 signals:
     void rep_freq_unit_changed(int);
@@ -91,6 +92,7 @@ public:
     float            dehaze_pct;
     float            sky_tolerance;
     int              fast_gf;
+    bool             central_symmetry;
 
     float            dist_ns;
     bool             auto_rep_freq;

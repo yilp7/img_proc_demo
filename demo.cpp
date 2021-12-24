@@ -83,8 +83,6 @@ Demo::Demo(QWidget *parent)
     out_buffer{0},
     in_buffer{0},
     rep_freq(30),
-    laser_width_u(0),
-    laser_width_n(500),
     delay_n_n(0),
     stepping(10),
     hz_unit(0),
@@ -97,8 +95,9 @@ Demo::Demo(QWidget *parent)
     focus(0),
     distance(0),
     max_dist(15000),
-    delay_dist(15),
-    depth_of_vision(15),
+    laser_width(500),
+    delay_dist(75),
+    depth_of_vision(75),
     focus_direction(0),
     curr_laser_idx(-1),
     display_option(1),
@@ -284,7 +283,7 @@ Demo::Demo(QWidget *parent)
 
     ui->COM_DATA_RADIO->click();
     QFont temp_f(consolas);
-    temp_f.setPointSize(8);
+    temp_f.setPixelSize(11);
     ui->DATA_EXCHANGE->setFont(temp_f);
     ui->FILE_PATH_EDIT->setFont(consolas);
 
@@ -366,7 +365,7 @@ void Demo::data_exchange(bool read){
         zoom = ui->ZOOM_EDIT->text().toInt();
         focus = ui->FOCUS_EDIT->text().toInt();
 
-//        delay = delay_a_u * 1000 + delay_a_n;
+        laser_width = laser_width_u * 1000 + laser_width_n;
         delay_dist = std::round((delay_a_u * 1000 + delay_a_n) * dist_ns);
         depth_of_vision = std::round((gate_width_a_u * 1000 + gate_width_a_n) * dist_ns);
     }
@@ -382,21 +381,18 @@ void Demo::data_exchange(bool read){
         ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.2f", frame_rate_edit));
         ui->FILE_PATH_EDIT->setText(save_location);
 
+#ifndef PARAM
+        laser_width = std::round(depth_of_vision / dist_ns);
+#endif
         delay_a_u = std::round(delay_dist / dist_ns) / 1000;
         delay_a_n = (int)std::round(delay_dist / dist_ns) % 1000;
         delay_b_u = std::round(delay_dist / dist_ns + delay_n_n) / 1000;
         delay_b_n = (int)std::round(delay_dist / dist_ns + delay_n_n) % 1000;
-//        laser_width_u = gate_width_a_u = gate_width_b_u = (int)(depth_of_vision / dist_ns) / 1000;
-//        laser_width_n = gate_width_a_n = gate_width_b_n = (int)(depth_of_vision / dist_ns) % 1000;
-//        gate_width_a_u = gate_width_b_u = (int)(depth_of_vision / dist_ns) / 1000;
-//        gate_width_a_n = gate_width_b_n = (int)(depth_of_vision / dist_ns) % 1000;
-#ifdef PARAM
         gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
         gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
-#else
-        laser_width_u = gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
-        laser_width_n = gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
-#endif
+        laser_width_u = laser_width / 1000;
+        laser_width_n = laser_width % 1000;
+
         setup_hz(hz_unit);
         ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", laser_width_u));
         ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%d", laser_width_n));
@@ -435,6 +431,8 @@ int Demo::grab_thread_process() {
         img_q.pop();
 
         image_mutex.lock();
+
+        if (settings->central_symmetry) cv::flip(img_mem, img_mem, -1);
 
         if (auto_mcp && !image_3d && !ui->MCP_SLIDER->hasFocus()) {
             memset(hist, 0, 256 * sizeof(uint));
@@ -736,7 +734,7 @@ void Demo::save_image_bmp(cv::Mat img, QString filename)
         f.close();
     }
 */
-    // using std io
+    // using std file io
     FILE *f = fopen(filename.toLocal8Bit().constData(), "wb");
     if (f) {
         static ushort signature = 'MB';
@@ -942,7 +940,7 @@ void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate)
         switch (id) {
         case 0:
 //            convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8);
-            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8), 7, 1, false);
+            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width + 8) / 8), 7, 1, false);
             update_delay();
             update_gate_width();
             change_mcp(5);
@@ -1230,7 +1228,7 @@ void Demo::setup_stepping(int base_unit)
     // ns
     case 0: ui->STEPPING_UNIT->setText("ns"); ui->STEPPING_EDIT->setText(QString::number((int)stepping)); break;
     // μs
-    case 1: ui->STEPPING_UNIT->setText("μs"); ui->STEPPING_EDIT->setText(QString::number((int)(stepping / 1000))); break;
+    case 1: ui->STEPPING_UNIT->setText(QString::fromLocal8Bit("μs")); ui->STEPPING_EDIT->setText(QString::number((int)(stepping / 1000))); break;
     // m
     case 2: ui->STEPPING_UNIT->setText("m"); ui->STEPPING_EDIT->setText(QString::number(stepping * dist_ns, 'f', 2)); break;
     default: break;
@@ -1353,7 +1351,7 @@ void Demo::load_config(QString config_name)
         update_delay();
         update_gate_width();
 #ifdef PARAM
-        communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8), 7, 1, false);
+        communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width + 8) / 8), 7, 1, false);
 #endif
         ui->MCP_SLIDER->setValue(mcp);
         on_SET_PARAMS_BUTTON_clicked();
@@ -1424,6 +1422,12 @@ void Demo::update_delay()
     ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
     ui->DELAY_SLIDER->setValue(delay_dist);
 
+    int delay = std::round(delay_dist / dist_ns);
+    delay_a_u = delay / 1000;
+    delay_a_n = delay % 1000;
+    delay_b_u = (delay + delay_n_n) / 1000;
+    delay_b_n = (delay + delay_n_n) % 1000;
+
     if (scan) {
         rep_freq = ui->TITLE->prog_settings->rep_freq;
     }
@@ -1450,10 +1454,10 @@ void Demo::update_delay()
     communicate_display(com[0], 1, 7);
 */
     // DELAY A
-    communicate_display(com[0], convert_to_send_tcu(0x02, (delay_a_u * 1000 + delay_a_n) + 68), 7, 1, false);
+    communicate_display(com[0], convert_to_send_tcu(0x02, (delay_a_u * 1000 + delay_a_n) + 8), 7, 1, false);
 
     // DELAY B
-    communicate_display(com[0], convert_to_send_tcu(0x04, (delay_b_u * 1000 + delay_b_n) + 68), 7, 1, false);
+    communicate_display(com[0], convert_to_send_tcu(0x04, (delay_b_u * 1000 + delay_b_n) + 8), 7, 1, false);
 
     data_exchange(false);
 
@@ -1521,7 +1525,7 @@ void Demo::convert_write(QDataStream &out, const int TYPE)
     case TCU:
     {
         out << "TCU" << uchar('.');
-        out << fps << duty << rep_freq << laser_width_u << laser_width_n << mcp << delay_dist << delay_n_n << depth_of_vision << stepping;
+        out << fps << duty << rep_freq << laser_width << mcp << delay_dist << delay_n_n << depth_of_vision << stepping;
     }
     case SCAN:
     {
@@ -1567,7 +1571,7 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
     {
         out >> temp_str; if (std::strcmp(temp_str, "TCU")) return false;
         out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
-        out >> fps >> duty >> rep_freq >> laser_width_u >> laser_width_n >> mcp >> delay_dist >> delay_n_n >> depth_of_vision >> stepping;
+        out >> fps >> duty >> rep_freq >> laser_width >> mcp >> delay_dist >> delay_n_n >> depth_of_vision >> stepping;
     }
     case SCAN:
     {
@@ -1979,16 +1983,18 @@ void Demo::keyPressEvent(QKeyEvent *event)
                 update_gate_width();
             }
             else if (edit == ui->LASER_WIDTH_EDIT_U) {
-                laser_width_u = edit->text().toInt();
-                communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8), 7, 1, false);
+                laser_width = edit->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt();
+                communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width + 8) / 8), 7, 1, false);
             }
             else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
-                depth_of_vision = (edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000) * dist_ns;
+                if (edit->text().toInt() > 999) depth_of_vision = edit->text().toInt() * dist_ns;
+                else depth_of_vision = (edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000) * dist_ns;
                 update_gate_width();
             }
             else if (edit == ui->LASER_WIDTH_EDIT_N) {
-                laser_width_n = edit->text().toInt();
-                communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8), 7, 1, false);
+                if (edit->text().toInt() > 999) laser_width = edit->text().toInt();
+                else laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000;
+                communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width + 8) / 8), 7, 1, false);
             }
             else if (edit == ui->DELAY_A_EDIT_U) {
                 delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt()) * dist_ns;
@@ -1999,11 +2005,13 @@ void Demo::keyPressEvent(QKeyEvent *event)
                 update_delay();
             }
             else if (edit == ui->DELAY_A_EDIT_N) {
-                delay_dist = (edit->text().toInt() + ui->DELAY_A_EDIT_U->text().toInt() * 1000) * dist_ns;
+                if (edit->text().toInt() > 999) delay_dist = edit->text().toInt() * dist_ns;
+                else delay_dist = (edit->text().toInt() + ui->DELAY_A_EDIT_U->text().toInt() * 1000) * dist_ns;
                 update_delay();
             }
             else if (edit == ui->DELAY_B_EDIT_N) {
-                delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000 - delay_n_n) * dist_ns;
+                if (edit->text().toInt() > 999) delay_dist = edit->text().toInt() * dist_ns;
+                else delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000 - delay_n_n) * dist_ns;
                 update_delay();
             }
             else if (edit == ui->DELAY_N_EDIT_N) {
@@ -2304,8 +2312,8 @@ void Demo::on_SCAN_BUTTON_clicked()
                                        "laser width:        %06d ns\n"
                                        "gate width:         %06d ns\n"
                                        "MCP:                %03d",
-                                       settings->start_pos, settings->end_pos, settings->frame_count, settings->step_size, (int)rep_freq,
-                                       laser_width_u * 1000 + laser_width_n, gate_width_a_u * 1000 + gate_width_a_n, mcp).toUtf8());
+                                       settings->start_pos, settings->end_pos, settings->frame_count, settings->step_size,
+                                       (int)rep_freq, laser_width, gate_width_a_u * 1000 + gate_width_a_n, mcp).toUtf8());
         params.close();
 
         on_CONTINUE_SCAN_BUTTON_clicked();

@@ -309,7 +309,7 @@
      <rect>
       <x>10</x>
       <y>35</y>
-      <width>41</width>
+      <width>31</width>
       <height>21</height>
      </rect>
     </property>
@@ -335,7 +335,7 @@
      <rect>
       <x>10</x>
       <y>125</y>
-      <width>41</width>
+      <width>51</width>
       <height>21</height>
      </rect>
     </property>
@@ -348,7 +348,7 @@
      <rect>
       <x>90</x>
       <y>125</y>
-      <width>41</width>
+      <width>51</width>
       <height>21</height>
      </rect>
     </property>
@@ -361,7 +361,7 @@
      <rect>
       <x>10</x>
       <y>170</y>
-      <width>41</width>
+      <width>51</width>
       <height>21</height>
      </rect>
     </property>
@@ -374,7 +374,7 @@
      <rect>
       <x>90</x>
       <y>170</y>
-      <width>41</width>
+      <width>51</width>
       <height>21</height>
      </rect>
     </property>
@@ -387,7 +387,7 @@
      <rect>
       <x>10</x>
       <y>80</y>
-      <width>41</width>
+      <width>51</width>
       <height>21</height>
      </rect>
     </property>
@@ -465,7 +465,7 @@
      <rect>
       <x>90</x>
       <y>80</y>
-      <width>41</width>
+      <width>51</width>
       <height>21</height>
      </rect>
     </property>
@@ -504,7 +504,7 @@
      <rect>
       <x>10</x>
       <y>215</y>
-      <width>41</width>
+      <width>51</width>
       <height>24</height>
      </rect>
     </property>
@@ -517,7 +517,7 @@
      <rect>
       <x>10</x>
       <y>260</y>
-      <width>41</width>
+      <width>51</width>
       <height>24</height>
      </rect>
     </property>
@@ -556,7 +556,7 @@
      <rect>
       <x>90</x>
       <y>260</y>
-      <width>41</width>
+      <width>51</width>
       <height>24</height>
      </rect>
     </property>
@@ -569,7 +569,7 @@
      <rect>
       <x>10</x>
       <y>305</y>
-      <width>41</width>
+      <width>31</width>
       <height>24</height>
      </rect>
     </property>
@@ -588,6 +588,19 @@
     </property>
     <property name="text">
      <string>Fast gf</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="CENTRAL_SYMM_CHK">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>335</y>
+      <width>141</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Central Symmetry</string>
     </property>
    </widget>
   </widget>

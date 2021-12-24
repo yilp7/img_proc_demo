@@ -324,6 +324,7 @@ private:
     int                     focus;
     int                     distance;                   // dist read from rangefinder
     float                   max_dist;
+    int                     laser_width;
     float                   delay_dist;                 // estimated distance calculated from delay
     float                   depth_of_vision;
     // TODO rewrite auto focus function

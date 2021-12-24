@@ -93,8 +93,9 @@ void log_message(QtMsgType type, const QMessageLogContext &context, const QStrin
 
 int main(int argc, char *argv[])
 {
-    setlocale(LC_ALL, ".65001");
+//    setlocale(LC_ALL, ".65001");
 //    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
+    qDebug() << QTextCodec::availableCodecs();
 
     QApplication a(argc, argv);
 
@@ -105,14 +106,13 @@ int main(int argc, char *argv[])
 //    timer.start();
 //    while(timer.elapsed() < (2000)) a.processEvents();
 
-
     int monaco_id = QFontDatabase::addApplicationFont(":/fonts/monaco.ttf");
     int consolas_id = QFontDatabase::addApplicationFont(":/fonts/consola.ttf");
     monaco = QFont(QFontDatabase::applicationFontFamilies(monaco_id).at(0));
-    monaco.setPointSizeF(8.6);
+    monaco.setPixelSize(11);
 //    monaco.setLetterSpacing(QFont::PercentageSpacing, 120);
     consolas = QFont(QFontDatabase::applicationFontFamilies(consolas_id).at(0));
-    consolas.setPointSizeF(9);
+    consolas.setPixelSize(12);
 //    consolas.setLetterSpacing(QFont::PercentageSpacing, 120);
 
     a.setFont(monaco);
