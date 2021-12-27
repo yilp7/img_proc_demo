@@ -2300,7 +2300,6 @@ void Demo::on_SCAN_BUTTON_clicked()
         delay_dist = settings->start_pos * dist_ns;
         scan_stopping_delay = settings->end_pos;
         scan_step = settings->step_size * dist_ns;
-        update_delay();
 
         if (ui->TITLE->prog_settings->save_scan_ori || ui->TITLE->prog_settings->save_scan_res) {
             scan_name = "scan_" + QDateTime::currentDateTime().toString("MMdd_hhmmss");
@@ -2342,7 +2341,7 @@ void Demo::on_CONTINUE_SCAN_BUTTON_clicked()
     scan = true;
     emit update_scan(true);
 
-//    convert_to_send_tcu(0x00, (uint)(1.25e5 / rep_freq));
+    update_delay();
     communicate_display(com[0], convert_to_send_tcu(0x00, (uint)(1.25e5 / rep_freq)), 7, 1, false);
 }
 
