@@ -324,7 +324,7 @@ void ProgSettings::on_UNIT_LIST_currentIndexChanged(int index)
     // ns
     case 0: ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns))); ui->MAX_DIST_UNIT->setText("ns"); break;
     // μs
-    case 1: ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns / 1000))); ui->MAX_DIST_UNIT->setText("μs"); break;
+    case 1: ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns / 1000))); ui->MAX_DIST_UNIT->setText(QString::fromLocal8Bit("μs")); break;
     // m
     case 2: ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist))); ui->MAX_DIST_UNIT->setText("m"); break;
     default: break;

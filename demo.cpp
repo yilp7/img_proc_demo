@@ -290,6 +290,12 @@ Demo::Demo(QWidget *parent)
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
+    display_grp = new QButtonGroup();
+    display_grp->addButton(ui->COM_DATA_RADIO);
+    display_grp->addButton(ui->HISTOGRAM_RADIO);
+    display_grp->addButton(ui->ROI_RADIO);
+    display_grp->setExclusive(true);
+
     // for presentation
     ui->CTRL_STATIC->hide();
     ui->ROI_TABLE->hide();
@@ -431,16 +437,21 @@ int Demo::grab_thread_process() {
         img_q.pop();
 
         image_mutex.lock();
+        prev_img = img_mem.clone();
 
+        // calc histogram (grayscale)
+        memset(hist, 0, 256 * sizeof(uint));
+        for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * img_mem.cols)[j]]++;
+
+        // if the cam is installed upside down
         if (settings->central_symmetry) cv::flip(img_mem, img_mem, -1);
 
-        if (auto_mcp && !image_3d && !ui->MCP_SLIDER->hasFocus()) {
-            memset(hist, 0, 256 * sizeof(uint));
-            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * w)[j]]++;
+        // mcp self-adaptive
+        if (auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
             int thresh_num = img_mem.total() / 200, thresh = 255;
             while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-            if      (thresh > 250) emit update_mcp_in_thread(mcp - sqrt(thresh - 250));
-            else if (thresh <  80) emit update_mcp_in_thread(mcp + sqrt(80 - thresh));
+            if      (thresh > 245) emit update_mcp_in_thread(mcp - sqrt(thresh - 245));
+            else if (thresh < 100) emit update_mcp_in_thread(mcp + sqrt(100 - thresh));
 //            static int mean_i;
 //            if ((mean_i = cv::mean(img_mem)[0]) < 30) change_mcp(mcp + 5);
 //            else if (mean_i > 40) change_mcp(mcp - 5);
@@ -475,122 +486,129 @@ int Demo::grab_thread_process() {
         }
         else modified_result = img_mem.clone();
 
-        // process normal image enhance
-        if (!image_3d && ui->IMG_ENHANCE_CHECK->isChecked()) {
-            switch (ui->ENHANCE_OPTIONS->currentIndex()) {
-            // histogram
-            case 1: {
-                cv::equalizeHist(modified_result, modified_result);
-                break;
-            }
-            // laplace
-            case 2: {
-                cv::Mat kernel = (cv::Mat_<float>(3, 3) << 0, -1, 0, 0, 5, 0, 0, -1, 0);
-                cv::filter2D(modified_result, modified_result, CV_8U, kernel);
-                break;
-            }
-            // log
-            case 3: {
-                cv::Mat img_log;
-                modified_result.convertTo(img_log, CV_32F);
-                modified_result += 1.0;
-                cv::log(img_log, img_log);
-                img_log *= settings->log;
-                cv::normalize(img_log, img_log, 0, 255, cv::NORM_MINMAX);
-                cv::convertScaleAbs(img_log, modified_result);
-                break;
-            }
-            // gamma
-            case 4: {
-                cv::Mat img_gamma;
-                modified_result.convertTo(img_gamma, CV_32F, 1.0 / 255, 0);
-                cv::pow(img_gamma, settings->gamma, img_gamma);
-                img_gamma.convertTo(modified_result, CV_8U, 255, 0);
-                break;
-            }
-            // accumulative
-            case 5: {
-                uchar *img = modified_result.data;
-                for (int i = 0; i < h; i++) {
-                    for (int j = 0; j < w; j++) {
-                        uchar p = img[i * modified_result.step + j];
-                        if      (p < 64)  {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 2.4);}
-                        else if (p < 112) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.8);}
-                        else if (p < 144) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.6);}
-                        else if (p < 160) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.5);}
-                        else if (p < 176) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.4);}
-                        else if (p < 192) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.25);}
-                        else if (p < 200) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.2);}
-                        else if (p < 208) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.15);}
-                        else if (p < 216) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.125);}
-                        else if (p < 224) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.1);}
-                        else if (p < 240) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.05);}
-                        else if (p < 256) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1);}
-                    }
-                }
-                break;
-            }
-            // sigmoid (nonlinear) (mergw log w/ 1/(1+exp))
-            case 6: {
-                uchar *img = modified_result.data;
-                cv::Mat img_log, img_nonLT = cv::Mat(h, w, CV_8U);
-                modified_result.convertTo(img_log, CV_32F);
-                modified_result += 1.0;
-                cv::log(img_log, img_log);
-                img_log *= settings->log;
-                double m = 0, kv = 0, mean = cv::mean(modified_result)[0];
-                uchar p;
-                for (int i = 0; i < h; i++) {
-                    for (int j = 0; j < w; j++) {
-                        p = img[i * modified_result.step + j];
-                        if (!p) {
-                            img_nonLT.data[i * img_nonLT.step + j] = 0;
-                            continue;
-                        }
-                        if      (p <=  60) kv = 7;
-                        else if (p <= 200) kv = 7 + (p - 60) / 70;
-                        else if (p <= 255) kv = 9 + (p - 200) / 55;
-                        m = kv * (p / (p + mean));
-                        img_nonLT.data[i * img_nonLT.step + j] = (int)(2 / (1 + exp(-m)) - 1) * 255 - p;
-                    }
-                }
-                cv::normalize(img_log, img_log, 0, 255, cv::NORM_MINMAX);
-                cv::convertScaleAbs(img_log, img_log);
-                modified_result = 0.05 * img_log + 0.05 * img_nonLT + 0.8 * modified_result;
-                break;
-            }
-            // adaptive
-            case 7: {
-//                double low = settings->low_in * 255, high = settings->high_in * 255; // (0, 12.75)
-//                double bottom = settings->low_out * 255, top = settings->high_out * 255; // (0, 255)
-//                double err_in = high - low, err_out = top - bottom; // (12.75, 255)
-//                // cv::pow((modified_result - low) / err_in, gamma, modified_result);
-//                cv::Mat temp;
-//                modified_result.convertTo(temp, CV_32F);
-//                cv::pow((temp - low) / err_in, settings->gamma, temp);
-//                temp = temp * err_out + bottom;
-//                cv::normalize(temp, temp, 0, 255, cv::NORM_MINMAX);
-//                cv::convertScaleAbs(temp, modified_result);
-                ImageProc::adaptive_enhance(&modified_result, &modified_result, settings->low_in, settings->high_in, settings->low_out, settings->high_out, settings->gamma);
-                break;
-            }
-            // dehaze
-            case 8: {
-                modified_result = ~modified_result;
-                ImageProc::haze_removal(modified_result, modified_result, 7, settings->dehaze_pct, 0.1, 60, 0.01);
-                modified_result = ~modified_result;
-                break;
-            }
-            // none
-            default:
-                break;
-            }
+        // process 3d image construction from ABN frames
+        if (image_3d) {
+            range_threshold = ui->RANGE_THRESH_EDIT->text().toFloat();
+            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_vision / dist_ns, range_threshold);
+            if (!frame_a_3d) prev_3d = modified_result.clone();
+            frame_a_3d ^= 1;
         }
-        // process special image enhance
-        if (!image_3d && ui->SP_CHECK->isChecked()) ImageProc::plateau_equl_hist(&modified_result, &modified_result, ui->SP_OPTIONS->currentIndex());
+        // process ordinary image enhance
+        else {
+            if (ui->IMG_ENHANCE_CHECK->isChecked()) {
+                switch (ui->ENHANCE_OPTIONS->currentIndex()) {
+                // histogram
+                case 1: {
+                    cv::equalizeHist(modified_result, modified_result);
+                    break;
+                }
+                // laplace
+                case 2: {
+                    cv::Mat kernel = (cv::Mat_<float>(3, 3) << 0, -1, 0, 0, 5, 0, 0, -1, 0);
+                    cv::filter2D(modified_result, modified_result, CV_8U, kernel);
+                    break;
+                }
+                // log
+                case 3: {
+                    cv::Mat img_log;
+                    modified_result.convertTo(img_log, CV_32F);
+                    modified_result += 1.0;
+                    cv::log(img_log, img_log);
+                    img_log *= settings->log;
+                    cv::normalize(img_log, img_log, 0, 255, cv::NORM_MINMAX);
+                    cv::convertScaleAbs(img_log, modified_result);
+                    break;
+                }
+                // gamma
+                case 4: {
+                    cv::Mat img_gamma;
+                    modified_result.convertTo(img_gamma, CV_32F, 1.0 / 255, 0);
+                    cv::pow(img_gamma, settings->gamma, img_gamma);
+                    img_gamma.convertTo(modified_result, CV_8U, 255, 0);
+                    break;
+                }
+                // accumulative
+                case 5: {
+                    uchar *img = modified_result.data;
+                    for (int i = 0; i < h; i++) {
+                        for (int j = 0; j < w; j++) {
+                            uchar p = img[i * modified_result.step + j];
+                            if      (p < 64)  {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 2.4);}
+                            else if (p < 112) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.8);}
+                            else if (p < 144) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.6);}
+                            else if (p < 160) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.5);}
+                            else if (p < 176) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.4);}
+                            else if (p < 192) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.25);}
+                            else if (p < 200) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.2);}
+                            else if (p < 208) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.15);}
+                            else if (p < 216) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.125);}
+                            else if (p < 224) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.1);}
+                            else if (p < 240) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.05);}
+                            else if (p < 256) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1);}
+                        }
+                    }
+                    break;
+                }
+                // sigmoid (nonlinear) (mergw log w/ 1/(1+exp))
+                case 6: {
+                    uchar *img = modified_result.data;
+                    cv::Mat img_log, img_nonLT = cv::Mat(h, w, CV_8U);
+                    modified_result.convertTo(img_log, CV_32F);
+                    modified_result += 1.0;
+                    cv::log(img_log, img_log);
+                    img_log *= settings->log;
+                    double m = 0, kv = 0, mean = cv::mean(modified_result)[0];
+                    uchar p;
+                    for (int i = 0; i < h; i++) {
+                        for (int j = 0; j < w; j++) {
+                            p = img[i * modified_result.step + j];
+                            if (!p) {
+                                img_nonLT.data[i * img_nonLT.step + j] = 0;
+                                continue;
+                            }
+                            if      (p <=  60) kv = 7;
+                            else if (p <= 200) kv = 7 + (p - 60) / 70;
+                            else if (p <= 255) kv = 9 + (p - 200) / 55;
+                            m = kv * (p / (p + mean));
+                            img_nonLT.data[i * img_nonLT.step + j] = (int)(2 / (1 + exp(-m)) - 1) * 255 - p;
+                        }
+                    }
+                    cv::normalize(img_log, img_log, 0, 255, cv::NORM_MINMAX);
+                    cv::convertScaleAbs(img_log, img_log);
+                    modified_result = 0.05 * img_log + 0.05 * img_nonLT + 0.8 * modified_result;
+                    break;
+                }
+                // adaptive
+                case 7: {
+    //                double low = settings->low_in * 255, high = settings->high_in * 255; // (0, 12.75)
+    //                double bottom = settings->low_out * 255, top = settings->high_out * 255; // (0, 255)
+    //                double err_in = high - low, err_out = top - bottom; // (12.75, 255)
+    //                // cv::pow((modified_result - low) / err_in, gamma, modified_result);
+    //                cv::Mat temp;
+    //                modified_result.convertTo(temp, CV_32F);
+    //                cv::pow((temp - low) / err_in, settings->gamma, temp);
+    //                temp = temp * err_out + bottom;
+    //                cv::normalize(temp, temp, 0, 255, cv::NORM_MINMAX);
+    //                cv::convertScaleAbs(temp, modified_result);
+                    ImageProc::adaptive_enhance(&modified_result, &modified_result, settings->low_in, settings->high_in, settings->low_out, settings->high_out, settings->gamma);
+                    break;
+                }
+                // dehaze
+                case 8: {
+                    modified_result = ~modified_result;
+                    ImageProc::haze_removal(modified_result, modified_result, 7, settings->dehaze_pct, 0.1, 60, 0.01);
+                    modified_result = ~modified_result;
+                    break;
+                }
+                // none
+                default:
+                    break;
+                }
+            }
+            // process special image enhance
+            if (ui->SP_CHECK->isChecked()) ImageProc::plateau_equl_hist(&modified_result, &modified_result, ui->SP_OPTIONS->currentIndex());
 
-        // brightness & contrast
-        if (!image_3d) {
+            // brightness & contrast
 //            float brightness = ui->BRIGHTNESS_SLIDER->value() / 10., contrast = ui->CONTRAST_SLIDER->value() / 10.;
 //            modified_result = (modified_result - 127.5 * (1 - brightness)) * std::tan((45 - 45 * contrast) / 180. * M_PI) + 127.5 * (1 + brightness);
             int val = ui->BRIGHTNESS_SLIDER->value() * 12.8;
@@ -601,22 +619,33 @@ int Demo::grab_thread_process() {
             for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) {
                 if (modified_result.data[i * w + j] == val) modified_result.data[i * w + j] = 0;
             }
-        }
 
-        // process 3d image construction from ABN frames
-        if (image_3d) {
-            range_threshold = ui->RANGE_THRESH_EDIT->text().toFloat();
-            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_vision / dist_ns, range_threshold);
-            if (!frame_a_3d) prev_3d = modified_result.clone();
-            frame_a_3d ^= 1;
-        }
-        prev_img = img_mem.clone();
+            // display grayscale histogram of current image
+            if (ui->HISTOGRAM_RADIO->isChecked()) {
+                if (modified_result.channels() != 1) continue;
+                uchar *img = modified_result.data;
+                int step = modified_result.step;
+                memset(hist, 0, 256 * sizeof(uint));
+                for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img + i * step)[j]]++;
+                uint max = 0;
+                for (int i = 1; i < 256; i++) {
+                    // discard abnormal value
+                    if (hist[i] > 50000) hist[i] = 0;
+                    if (hist[i] > max) max = hist[i];
+                }
+                cv::Mat hist_image = cv::Mat::zeros(200, 256, CV_8UC3);
+                for (int i = 0; i < 256; i++) {
+                    cv::rectangle(hist_image, cv::Point(i, 200), cv::Point(i + 2, 200 - hist[i] * 200.0 / max), cv::Scalar(222, 196, 176));
+                }
+                ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+            }
 
-        // put info (dist, dov, time) as text on image
-        if (ui->INFO_CHECK->isChecked() && !image_3d) {
-            if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            // put info (dist, dov, time) as text on image
+            if (ui->INFO_CHECK->isChecked()) {
+                if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            }
         }
 
         // image display
@@ -630,8 +659,6 @@ int Demo::grab_thread_process() {
         cv::resize(cropped_img, cropped_img, cv::Size(ui->SOURCE_DISPLAY->width(), ui->SOURCE_DISPLAY->height()), 0, 0, cv::INTER_AREA);
         // draw the center cross
         if (!image_3d && ui->CENTER_CHECK->isChecked()) {
-//            for (int i = cropped_img.cols / 2 - 9; i < cropped_img.cols / 2 + 10; i++) cropped_img.at<uchar>(cropped_img.rows / 2, i) = 255 - cropped_img.at<uchar>(cropped_img.rows / 2, i);
-//            for (int i = cropped_img.rows / 2 - 9; i < cropped_img.rows / 2 + 10; i++) cropped_img.at<uchar>(i, cropped_img.cols / 2) = 255 - cropped_img.at<uchar>(i, cropped_img.cols / 2);
             for (int i = cropped_img.cols / 2 - 9; i < cropped_img.cols / 2 + 10; i++) cropped_img.at<uchar>(cropped_img.rows / 2, i) = cropped_img.at<uchar>(cropped_img.rows / 2, i) > 127 ? 0 : 255;
             for (int i = cropped_img.rows / 2 - 9; i < cropped_img.rows / 2 + 10; i++) cropped_img.at<uchar>(i, cropped_img.cols / 2) = cropped_img.at<uchar>(i, cropped_img.cols / 2) > 127 ? 0 : 255;
         }
@@ -654,39 +681,19 @@ int Demo::grab_thread_process() {
         // image write / video record
         if (save_original) save_to_file(false);
         if (save_modified) save_to_file(true);
-        if (record_original && !image_3d) {
+        if (record_original) {
             if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             cv::putText(img_mem, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), weight * 2);
             vid_out[0].write(img_mem);
         }
-        if (record_modified && !image_3d) {
-            if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+        if (record_modified) {
+            if (!image_3d) {
+                if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            }
             vid_out[1].write(modified_result);
-        }
-
-        // display grayscale histogram of current image
-        if (ui->HISTOGRAM_RADIO->isChecked() && !image_3d) {
-            if (modified_result.channels() != 1) continue;
-            uchar *img = modified_result.data;
-            int step = modified_result.step;
-            if (!auto_mcp || ui->MCP_SLIDER->hasFocus()) {
-                memset(hist, 0, 256 * sizeof(uint));
-                for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img + i * step)[j]]++;
-            }
-            uint max = 0;
-            for (int i = 1; i < 256; i++) {
-                // discard abnormal value
-                if (hist[i] > 50000) hist[i] = 0;
-                if (hist[i] > max) max = hist[i];
-            }
-            cv::Mat hist_image = cv::Mat::zeros(200, 256, CV_8UC3);
-            for (int i = 0; i < 256; i++) {
-                cv::rectangle(hist_image, cv::Point(i, 200), cv::Point(i + 2, 200 - hist[i] * 200.0 / max), cv::Scalar(222, 196, 176));
-            }
-            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         }
 
         image_mutex.unlock();
@@ -1139,7 +1146,7 @@ void Demo::on_SAVE_FINAL_BUTTON_clicked()
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         image_mutex.lock();
         res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi");
-        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), false);
+        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), image_3d);
         image_mutex.unlock();
     }
     record_modified = !record_modified;
@@ -1432,7 +1439,7 @@ void Demo::update_delay()
         rep_freq = ui->TITLE->prog_settings->rep_freq;
     }
     else {
-        // change fps according to delay: fps (kHz) <= 1s / delay (μs)
+        // change repeated frequency according to delay: rep frequency (kHz) <= 1s / delay (μs)
         if (ui->TITLE->prog_settings->auto_rep_freq) {
             rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_vision / dist_ns + 5) : 30;
             if (rep_freq > 30) rep_freq = 30;
@@ -2276,7 +2283,7 @@ void Demo::on_SAVE_AVI_BUTTON_clicked()
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         image_mutex.lock();
         raw_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw.avi");
-        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), false);
+        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(image_3d ? w - 104 : w, h), false);
         image_mutex.unlock();
     }
     record_original = !record_original;
@@ -2295,26 +2302,28 @@ void Demo::on_SCAN_BUTTON_clicked()
         scan_step = settings->step_size * dist_ns;
         update_delay();
 
-        scan_name = "scan_" + QDateTime::currentDateTime().toString("MMdd_hhmmss");
-        if (!QDir(save_location + "/" + scan_name).exists()) {
-            QDir().mkdir(save_location + "/" + scan_name);
-            QDir().mkdir(save_location + "/" + scan_name + "/ori_bmp");
-            QDir().mkdir(save_location + "/" + scan_name + "/res_bmp");
-        }
+        if (ui->TITLE->prog_settings->save_scan_ori || ui->TITLE->prog_settings->save_scan_res) {
+            scan_name = "scan_" + QDateTime::currentDateTime().toString("MMdd_hhmmss");
+            if (!QDir(save_location + "/" + scan_name).exists()) {
+                QDir().mkdir(save_location + "/" + scan_name);
+                QDir().mkdir(save_location + "/" + scan_name + "/ori_bmp");
+                QDir().mkdir(save_location + "/" + scan_name + "/res_bmp");
+            }
 
-        QFile params(save_location + "/" + scan_name + "/scan_params");
-        params.open(QIODevice::WriteOnly);
-        params.write(QString::asprintf("starting delay:     %06d ns\n"
-                                       "ending delay:       %06d ns\n"
-                                       "frames count:       %06d\n"
-                                       "stepping size:      %.2f ns\n"
-                                       "repeated frequency: %06d kHz\n"
-                                       "laser width:        %06d ns\n"
-                                       "gate width:         %06d ns\n"
-                                       "MCP:                %03d",
-                                       settings->start_pos, settings->end_pos, settings->frame_count, settings->step_size,
-                                       (int)rep_freq, laser_width, gate_width_a_u * 1000 + gate_width_a_n, mcp).toUtf8());
-        params.close();
+            QFile params(save_location + "/" + scan_name + "/scan_params");
+            params.open(QIODevice::WriteOnly);
+            params.write(QString::asprintf("starting delay:     %06d ns\n"
+                                           "ending delay:       %06d ns\n"
+                                           "frames count:       %06d\n"
+                                           "stepping size:      %.2f ns\n"
+                                           "repeated frequency: %06d kHz\n"
+                                           "laser width:        %06d ns\n"
+                                           "gate width:         %06d ns\n"
+                                           "MCP:                %03d",
+                                           settings->start_pos, settings->end_pos, settings->frame_count, settings->step_size,
+                                           (int)rep_freq, laser_width, gate_width_a_u * 1000 + gate_width_a_n, mcp).toUtf8());
+            params.close();
+        }
 
         on_CONTINUE_SCAN_BUTTON_clicked();
     }
@@ -2333,7 +2342,7 @@ void Demo::on_CONTINUE_SCAN_BUTTON_clicked()
     scan = true;
     emit update_scan(true);
 
-    convert_to_send_tcu(0x00, (uint)(1.25e5 / rep_freq));
+//    convert_to_send_tcu(0x00, (uint)(1.25e5 / rep_freq));
     communicate_display(com[0], convert_to_send_tcu(0x00, (uint)(1.25e5 / rep_freq)), 7, 1, false);
 }
 

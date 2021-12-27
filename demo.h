@@ -333,6 +333,7 @@ private:
     char                    curr_laser_idx;
 
     int                     display_option;             // data display option: 1: com data; 2: histogram
+    QButtonGroup            *display_grp;
 
     std::queue<cv::Mat>     img_q;                      // image queue in grab_thread
     // TODO add other scan features
