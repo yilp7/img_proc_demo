@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
 {
 //    setlocale(LC_ALL, ".65001");
 //    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
-    qDebug() << QTextCodec::availableCodecs();
+//    qDebug() << QTextCodec::availableCodecs();
 
     QApplication a(argc, argv);
 
