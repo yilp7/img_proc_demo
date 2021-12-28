@@ -588,28 +588,6 @@
       </widget>
      </widget>
     </widget>
-    <widget class="QTextEdit" name="DATA_EXCHANGE">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>460</y>
-       <width>191</width>
-       <height>161</height>
-      </rect>
-     </property>
-     <property name="mouseTracking">
-      <bool>false</bool>
-     </property>
-     <property name="verticalScrollBarPolicy">
-      <enum>Qt::ScrollBarAlwaysOff</enum>
-     </property>
-     <property name="horizontalScrollBarPolicy">
-      <enum>Qt::ScrollBarAlwaysOff</enum>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-    </widget>
     <widget class="QGroupBox" name="LASER_STATIC">
      <property name="geometry">
       <rect>
@@ -756,70 +734,107 @@
       </property>
      </widget>
     </widget>
-    <widget class="QRadioButton" name="COM_DATA_RADIO">
+    <widget class="QFrame" name="ALT_DISPLAY">
      <property name="geometry">
       <rect>
        <x>10</x>
        <y>440</y>
-       <width>53</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>data</string>
-     </property>
-    </widget>
-    <widget class="QRadioButton" name="HISTOGRAM_RADIO">
-     <property name="geometry">
-      <rect>
-       <x>70</x>
-       <y>440</y>
-       <width>53</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>hist</string>
-     </property>
-    </widget>
-    <widget class="QLabel" name="HIST_DISPLAY">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>460</y>
        <width>191</width>
-       <height>161</height>
+       <height>181</height>
       </rect>
      </property>
      <property name="frameShape">
       <enum>QFrame::NoFrame</enum>
      </property>
-     <property name="text">
-      <string/>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
      </property>
+     <widget class="QRadioButton" name="COM_DATA_RADIO">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>53</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>data</string>
+      </property>
+     </widget>
+     <widget class="QRadioButton" name="HISTOGRAM_RADIO">
+      <property name="geometry">
+       <rect>
+        <x>60</x>
+        <y>0</y>
+        <width>53</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>hist</string>
+      </property>
+     </widget>
+     <widget class="QRadioButton" name="ROI_RADIO">
+      <property name="geometry">
+       <rect>
+        <x>120</x>
+        <y>0</y>
+        <width>46</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>ROI</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="HIST_DISPLAY">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>20</y>
+        <width>191</width>
+        <height>161</height>
+       </rect>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::NoFrame</enum>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="DATA_EXCHANGE">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>20</y>
+        <width>191</width>
+        <height>161</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="verticalScrollBarPolicy">
+       <enum>Qt::ScrollBarAlwaysOff</enum>
+      </property>
+      <property name="horizontalScrollBarPolicy">
+       <enum>Qt::ScrollBarAlwaysOff</enum>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
     </widget>
-    <widget class="QRadioButton" name="ROI_RADIO">
-     <property name="geometry">
-      <rect>
-       <x>130</x>
-       <y>440</y>
-       <width>46</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>ROI</string>
-     </property>
-    </widget>
-    <zorder>HIST_DISPLAY</zorder>
+    <zorder>ALT_DISPLAY</zorder>
     <zorder>PARAMS_STATIC</zorder>
     <zorder>IMG_GRAB_STATIC</zorder>
     <zorder>INITIALIZATION</zorder>
-    <zorder>DATA_EXCHANGE</zorder>
     <zorder>LASER_STATIC</zorder>
-    <zorder>COM_DATA_RADIO</zorder>
-    <zorder>HISTOGRAM_RADIO</zorder>
-    <zorder>ROI_RADIO</zorder>
    </widget>
    <widget class="QFrame" name="MID">
     <property name="geometry">
@@ -842,73 +857,6 @@
     <property name="frameShadow">
      <enum>QFrame::Plain</enum>
     </property>
-    <widget class="QGroupBox" name="CTRL_STATIC">
-     <property name="geometry">
-      <rect>
-       <x>270</x>
-       <y>530</y>
-       <width>120</width>
-       <height>80</height>
-      </rect>
-     </property>
-     <property name="mouseTracking">
-      <bool>false</bool>
-     </property>
-     <property name="title">
-      <string>GroupBox</string>
-     </property>
-     <widget class="QLabel" name="LOGO1">
-      <property name="geometry">
-       <rect>
-        <x>20</x>
-        <y>40</y>
-        <width>81</width>
-        <height>18</height>
-       </rect>
-      </property>
-      <property name="mouseTracking">
-       <bool>false</bool>
-      </property>
-      <property name="text">
-       <string>TextLabel</string>
-      </property>
-     </widget>
-     <widget class="QLabel" name="NAME">
-      <property name="geometry">
-       <rect>
-        <x>20</x>
-        <y>20</y>
-        <width>81</width>
-        <height>18</height>
-       </rect>
-      </property>
-      <property name="mouseTracking">
-       <bool>false</bool>
-      </property>
-      <property name="locale">
-       <locale language="English" country="UnitedStates"/>
-      </property>
-      <property name="text">
-       <string>TextLabel</string>
-      </property>
-     </widget>
-     <widget class="QLabel" name="LOGO2">
-      <property name="geometry">
-       <rect>
-        <x>20</x>
-        <y>60</y>
-        <width>81</width>
-        <height>18</height>
-       </rect>
-      </property>
-      <property name="mouseTracking">
-       <bool>false</bool>
-      </property>
-      <property name="text">
-       <string>TextLabel</string>
-      </property>
-     </widget>
-    </widget>
     <widget class="Display" name="SOURCE_DISPLAY">
      <property name="geometry">
       <rect>
@@ -1069,7 +1017,7 @@
     <widget class="QTableWidget" name="ROI_TABLE">
      <property name="geometry">
       <rect>
-       <x>20</x>
+       <x>40</x>
        <y>460</y>
        <width>191</width>
        <height>161</height>
@@ -1797,7 +1745,7 @@
        <bool>false</bool>
       </property>
       <property name="text">
-       <string>m</string>
+       <string>ns</string>
       </property>
      </widget>
      <widget class="QLineEdit" name="GATE_WIDTH_A_EDIT_N">
@@ -2238,54 +2186,6 @@
       </property>
      </widget>
     </widget>
-    <widget class="QPushButton" name="RESTART_SCAN_BUTTON">
-     <property name="geometry">
-      <rect>
-       <x>130</x>
-       <y>600</y>
-       <width>80</width>
-       <height>21</height>
-      </rect>
-     </property>
-     <property name="mouseTracking">
-      <bool>false</bool>
-     </property>
-     <property name="text">
-      <string>Restart</string>
-     </property>
-    </widget>
-    <widget class="QPushButton" name="CONTINUE_SCAN_BUTTON">
-     <property name="geometry">
-      <rect>
-       <x>130</x>
-       <y>580</y>
-       <width>80</width>
-       <height>21</height>
-      </rect>
-     </property>
-     <property name="mouseTracking">
-      <bool>false</bool>
-     </property>
-     <property name="text">
-      <string>Continue</string>
-     </property>
-    </widget>
-    <widget class="QPushButton" name="SCAN_BUTTON">
-     <property name="geometry">
-      <rect>
-       <x>30</x>
-       <y>580</y>
-       <width>51</width>
-       <height>21</height>
-      </rect>
-     </property>
-     <property name="mouseTracking">
-      <bool>false</bool>
-     </property>
-     <property name="text">
-      <string>Scan</string>
-     </property>
-    </widget>
     <widget class="QGroupBox" name="IMG_SAVE_STATIC">
      <property name="geometry">
       <rect>
@@ -2433,6 +2333,75 @@
       </property>
      </widget>
     </widget>
+    <widget class="QFrame" name="SCAN_GRP">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>580</y>
+       <width>221</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <widget class="QPushButton" name="SCAN_BUTTON">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>0</y>
+        <width>51</width>
+        <height>21</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="text">
+       <string>Scan</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="CONTINUE_SCAN_BUTTON">
+      <property name="geometry">
+       <rect>
+        <x>120</x>
+        <y>0</y>
+        <width>80</width>
+        <height>21</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="text">
+       <string>Continue</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="RESTART_SCAN_BUTTON">
+      <property name="geometry">
+       <rect>
+        <x>120</x>
+        <y>20</y>
+        <width>80</width>
+        <height>21</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="text">
+       <string>Restart</string>
+      </property>
+     </widget>
+    </widget>
+    <zorder>SCAN_GRP</zorder>
+    <zorder>LENS_STATIC</zorder>
+    <zorder>TCU_STATIC</zorder>
+    <zorder>OPERATION_STATIC</zorder>
+    <zorder>IMG_SAVE_STATIC</zorder>
    </widget>
    <widget class="QPushButton" name="HIDE_BTN">
     <property name="geometry">
@@ -2600,6 +2569,7 @@
   <tabstop>CENTER_CHECK</tabstop>
  </tabstops>
  <resources>
+  <include location="resources/resources.qrc"/>
   <include location="resources/resources.qrc"/>
  </resources>
  <connections/>

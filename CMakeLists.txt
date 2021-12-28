@@ -44,7 +44,7 @@ link_directories(${HQV_DIR}/lib)
 link_directories(${EURESYS_DIR}/lib)
 link_directories(${OpenCV_DIR}/lib)
 
-add_executable(Demo_param WIN32
+set(SOURCE_FILES
 	main.cpp
 	utils.cpp
 	demo.cpp
@@ -71,19 +71,16 @@ add_executable(Demo_param WIN32
 	resources/resources.qrc
 	icon.rc
 )
-target_compile_definitions(Demo_param PRIVATE PARAM=1)
 
-qt5_use_modules(Demo_param Widgets SerialPort)
-
-target_link_libraries(Demo_param
+set(PROJECT_LIBS
 	Qt${QT_VERSION_MAJOR}::Widgets
 	# mvs
 	MvCameraControl
-    # HQV
+	# HQV
 	HQV_AVIProcess64
 	HQV_DataConvert64
 	HQV_SDK64
-    # Euresys
+	# Euresys
 #	MultiCam
 #	clallserial
     # opencv
@@ -93,34 +90,12 @@ target_link_libraries(Demo_param
 	opencv_videoio454
 )
 
-#add_executable(Demo_release WIN32
-#    main.cpp
-#    demo.cpp
-#    mywidget.cpp
-#    imageproc.cpp
-#    cam.cpp
-#    demo.h
-#    mywidget.h
-#    imageproc.h
-#    cam.h
-#    demo_rls.ui
-#    resources/resources.qrc
-#    icon.rc
-#)
+add_executable(Demo_param WIN32 ${SOURCE_FILES})
+target_compile_definitions(Demo_param PRIVATE PARAM=1)
+qt5_use_modules(Demo_param Widgets SerialPort)
+target_link_libraries(Demo_param ${PROJECT_LIBS})
 
-#qt5_use_modules(Demo_release Widgets SerialPort)
-
-#target_link_libraries(Demo_release
-#    Qt${QT_VERSION_MAJOR}::Widgets
-#    # mvs
-#    MvCameraControl
-#    # HQV
-#    HQV_AVIProcess
-#    HQV_DataConvert
-#    HQV_SDK
-#    # opencv
-#    opencv_core452
-#    opencv_imgcodecs452
-#    opencv_imgproc452
-#    opencv_videoio452
-#)
+add_executable(Demo_ICMOS WIN32 ${SOURCE_FILES})
+target_compile_definitions(Demo_ICMOS PRIVATE ICMOS=1)
+qt5_use_modules(Demo_ICMOS Widgets SerialPort)
+target_link_libraries(Demo_ICMOS ${PROJECT_LIBS})

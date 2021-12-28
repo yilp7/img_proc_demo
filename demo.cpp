@@ -1,9 +1,5 @@
 ﻿#include "demo.h"
-#ifdef PARAM
-    #include "./ui_demo_dev.h"
-#else
-    #include "./ui_demo_rls.h"
-#endif
+#include "./ui_demo_dev.h"
 
 GrabThread::GrabThread(void *info)
 {
@@ -297,18 +293,32 @@ Demo::Demo(QWidget *parent)
     display_grp->setExclusive(true);
 
     // for presentation
-    ui->CTRL_STATIC->hide();
     ui->ROI_TABLE->hide();
     ui->ROI_RADIO->hide();
-#ifndef PARAM
-    qDebug("%s\n", "presentation");
-    ui->DISTANCE->hide();
-    ui->TCU_STATIC->hide();
-    ui->CTRL_STATIC->show();
-    ui->LOGO1->show();
-    ui->LOGO2->show();
-    ui->APP_NAME->show();
+
+#ifdef ICMOS
+    ui->ESTIMATED->hide();
+    ui->EST_DIST->hide();
+    ui->ESTIMATED_2->hide();
+    ui->GATE_WIDTH->hide();
+    ui->DELAY_SLIDER->move(30, 153);
+    ui->COM_DATA_RADIO->hide();
     ui->HISTOGRAM_RADIO->click();
+    ui->HISTOGRAM_RADIO->hide();
+
+    ui->LASER_STATIC->hide();
+    ui->ALT_DISPLAY->move(10, 370);
+    ui->LENS_STATIC->hide();
+    ui->IMG_SAVE_STATIC->move(10, 260);
+    ui->OPERATION_STATIC->move(10, 355);
+    ui->SCAN_GRP->move(10, 475);
+    ui->IMG_3D_CHECK->hide();
+    ui->RANGE_THRESH_EDIT->hide();
+
+    max_dist = 5000;
+    ui->TITLE->prog_settings->max_dist = 5000;
+    ui->TITLE->prog_settings->data_exchange(false);
+    ui->TITLE->prog_settings->max_dist_changed(5000);
 #endif
 }
 
@@ -387,9 +397,6 @@ void Demo::data_exchange(bool read){
         ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.2f", frame_rate_edit));
         ui->FILE_PATH_EDIT->setText(save_location);
 
-#ifndef PARAM
-        laser_width = std::round(depth_of_vision / dist_ns);
-#endif
         delay_a_u = std::round(delay_dist / dist_ns) / 1000;
         delay_a_n = (int)std::round(delay_dist / dist_ns) % 1000;
         delay_b_u = std::round(delay_dist / dist_ns + delay_n_n) / 1000;
@@ -450,11 +457,12 @@ int Demo::grab_thread_process() {
         if (auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
             int thresh_num = img_mem.total() / 200, thresh = 255;
             while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-            if      (thresh > 245) emit update_mcp_in_thread(mcp - sqrt(thresh - 245));
-            else if (thresh < 100) emit update_mcp_in_thread(mcp + sqrt(100 - thresh));
-//            static int mean_i;
-//            if ((mean_i = cv::mean(img_mem)[0]) < 30) change_mcp(mcp + 5);
-//            else if (mean_i > 40) change_mcp(mcp - 5);
+            if (thresh > 240) emit update_mcp_in_thread(mcp - sqrt(thresh - 240));
+//            qDebug() << "high" << thresh;
+//            thresh_num = img_mem.total() / 100, thresh = 255;
+//            while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
+            if (thresh < 100) emit update_mcp_in_thread(mcp + sqrt(100 - thresh));
+//            qDebug() << "low" << thresh;
         }
 
         // tenengrad (sobel) auto-focus
@@ -630,12 +638,12 @@ int Demo::grab_thread_process() {
                 uint max = 0;
                 for (int i = 1; i < 256; i++) {
                     // discard abnormal value
-                    if (hist[i] > 50000) hist[i] = 0;
+//                    if (hist[i] > 50000) hist[i] = 0;
                     if (hist[i] > max) max = hist[i];
                 }
-                cv::Mat hist_image = cv::Mat::zeros(200, 256, CV_8UC3);
+                cv::Mat hist_image(225, 256, CV_8UC3, cv::Scalar(56, 64, 72));
                 for (int i = 0; i < 256; i++) {
-                    cv::rectangle(hist_image, cv::Point(i, 200), cv::Point(i + 2, 200 - hist[i] * 200.0 / max), cv::Scalar(222, 196, 176));
+                    cv::rectangle(hist_image, cv::Point(i, 225), cv::Point(i + 2, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
                 }
                 ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
             }
@@ -1157,10 +1165,6 @@ void Demo::on_SET_PARAMS_BUTTON_clicked()
 {
     data_exchange(true);
 
-#ifndef PARAM
-    duty = 1e6 / fps - 1000;
-#endif
-
     // CCD FREQUENCY
     communicate_display(com[0], convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
 
@@ -1357,9 +1361,7 @@ void Demo::load_config(QString config_name)
 //        data_exchange(false);
         update_delay();
         update_gate_width();
-#ifdef PARAM
         communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width + 8) / 8), 7, 1, false);
-#endif
         ui->MCP_SLIDER->setValue(mcp);
         on_SET_PARAMS_BUTTON_clicked();
         ui->TITLE->prog_settings->data_exchange(false);
@@ -1479,16 +1481,8 @@ void Demo::update_gate_width() {
     ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_vision));
 //    gate_width_a_n = gate_width_b_n = laser_width_n = gw % 1000;
 //    gate_width_a_u = gate_width_b_u = laser_width_u = gw / 1000;
-#ifdef PARAM
     gate_width_a_n = gw % 1000;
     gate_width_a_u = gw / 1000;
-#else
-    gate_width_a_n = laser_width_n = gw % 1000;
-    gate_width_a_u = laser_width_u = gw / 1000;
-
-    // LASER WIDTH
-    communicate_display(com[0], convert_to_send_tcu(0x01, (gw - 18) / 8), 7, 1, false);
-#endif
 
     // GATE WIDTH A
     communicate_display(com[0], convert_to_send_tcu(0x03, gw + 8), 7, 1, false);
@@ -2138,9 +2132,6 @@ void Demo::resizeEvent(QResizeEvent *event)
     ui->SHAPE_INFO->move(ui->START_COORD->geometry().right() + 20, 5);
     ui->INFO_CHECK->move(region.right() - 60, 0);
     ui->CENTER_CHECK->move(region.right() - 60, 20);
-#ifndef PARAM
-    ui->APP_NAME->move(region.right() - 160, 0);
-#endif
     ui->HIDE_BTN->setGeometry(hide_left ? 2 : 212, this->geometry().height() / 2 - 10, 16, 16);
     ui->RULER_H->setGeometry(region.left(), region.bottom() - 10, region.width(), 32);
     ui->RULER_V->setGeometry(region.right() - 10, region.top(), 32, region.height());

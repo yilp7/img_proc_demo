@@ -22,6 +22,7 @@ ProgSettings::ProgSettings(QWidget *parent) :
     dehaze_pct(0.95),
     sky_tolerance(40),
     fast_gf(1),
+    central_symmetry(false),
     dist_ns(3e8 / 2e9),
     auto_rep_freq(true),
     hz_unit(0),
