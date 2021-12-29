@@ -25,7 +25,8 @@ protected:
     void mousePressEvent(QMouseEvent *event);
     void mouseMoveEvent(QMouseEvent *event);
     void mouseReleaseEvent(QMouseEvent *event);
-    bool eventFilter(QObject *obj, QEvent* event);
+    bool eventFilter(QObject *obj, QEvent *event);
+    void showEvent(QShowEvent *event);
 
 private:
     void send_cmd();

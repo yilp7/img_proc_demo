@@ -292,7 +292,7 @@ Demo::Demo(QWidget *parent)
     display_grp->addButton(ui->ROI_RADIO);
     display_grp->setExclusive(true);
 
-    // for presentation
+    // in development
     ui->ROI_TABLE->hide();
     ui->ROI_RADIO->hide();
 
@@ -1281,7 +1281,7 @@ void Demo::com_write_data(int com_idx, QByteArray data)
     for (char i = 0; i < write_size; i++) str_s += QString::asprintf(" %02X", i < 0 ? 0 : (uchar)data[i]);
     emit append_text(str_s);
 
-    if (temp_com == NULL) return;
+    if (!temp_com->isOpen()) return;
     temp_com->clear();
     temp_com->write(data, write_size);
     while (temp_com->waitForBytesWritten(5)) ;
@@ -1443,7 +1443,7 @@ void Demo::update_delay()
     else {
         // change repeated frequency according to delay: rep frequency (kHz) <= 1s / delay (μs)
         if (ui->TITLE->prog_settings->auto_rep_freq) {
-            rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_vision / dist_ns + 5) : 30;
+            rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_vision / dist_ns + 1000) : 30;
             if (rep_freq > 30) rep_freq = 30;
 //            if (rep_freq < 10) rep_freq = 10;
         }
@@ -1608,7 +1608,8 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
 }
 
 void Demo::on_DIST_BTN_clicked() {
-    if (com[1]) {
+/*
+    if (com[1]->isOpen()) {
         QByteArray read = communicate_display(com[1], QByteArray(1, 0xA5), 1, 6, true);
 //        qDebug("%s", read_dist.toLatin1().data());
 
@@ -1622,19 +1623,22 @@ void Demo::on_DIST_BTN_clicked() {
 
         distance = read[7] + (read[6] << 8);
     }
-
+*/
+    distance = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", 0, 0, max_dist, 100);
     ui->DISTANCE->setText(QString::asprintf("%d m", distance));
 
     data_exchange(true);
 
     // change delay and gate width according to distance
     delay_dist = distance;
-    depth_of_vision = 300;
-    ui->MCP_SLIDER->setValue(150);
+    rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_vision / dist_ns + 1000) : 30;
+    data_exchange(false);
+    communicate_display(com[0], convert_to_send_tcu(0x1E, distance), 7, 1, true);
+//    depth_of_vision = 300;
 
-    update_delay();
-    update_gate_width();
-    change_mcp(150);
+//    update_delay();
+//    update_gate_width();
+//    change_mcp(150);
 }
 
 void Demo::on_IMG_3D_CHECK_stateChanged(int arg1)
@@ -2089,12 +2093,31 @@ void Demo::keyPressEvent(QKeyEvent *event)
         case Qt::Key_4:
             goto_laser_preset(1 << (event->key() - Qt::Key_1));
             break;
+        case Qt::Key_S:
+            ui->TITLE->prog_settings->show();
+            ui->TITLE->prog_settings->raise();
+            break;
+        case Qt::Key_E:
+            export_config();
+            break;
+        case Qt::Key_R:
+            request_for_config_file();
+            break;
         default: break;
+        }
+    case Qt::ControlModifier:
+        switch (event->key()) {
+        case Qt::Key_1:
+        case Qt::Key_2:
+        case Qt::Key_3:
+        case Qt::Key_4:
+            transparent_transmission_file(event->key() - Qt::Key_1);
+            break;
+        default:break;
         }
 
     default: break;
     }
-
 }
 
 void Demo::resizeEvent(QResizeEvent *event)
@@ -2512,4 +2535,39 @@ void Demo::on_BINNING_CHECK_stateChanged(int arg1)
     qInfo("frame w: %d, h: %d", w, h);
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
+}
+
+void Demo::transparent_transmission_file(int id)
+{
+    QFile f("lens" + QString::number(id));
+    f.open(QIODevice::ReadOnly);
+    QByteArray line;
+    while (!(line = f.readLine(128)).isEmpty()) {
+        QString send_str = line.simplified();
+        send_str.replace(" ", "");
+//        qDebug() << "line" << line;
+        bool ok;
+        QByteArray cmd(send_str.length() / 2, 0x00);
+        for (int i = 0; i < send_str.length() / 2; i++) cmd[i] = send_str.mid(i * 2, 2).toInt(&ok, 16);
+
+        QString str_s("sent    "), str_r("received");
+        int write_size = cmd.length();
+
+        for (char i = 0; i < write_size; i++) str_s += QString::asprintf(" %02X", i < 0 ? 0 : (uchar)cmd[i]);
+        emit append_text(str_s);
+
+        if (!com[0]->isOpen()) continue;
+        com[0]->clear();
+        com[0]->write(cmd, write_size);
+        while (com[0]->waitForBytesWritten(5)) ;
+
+        while (com[0]->waitForReadyRead(100)) ;
+
+        QByteArray read = com[0]->readAll();
+        for (char i = 0; i < read.length(); i++) str_r += QString::asprintf(" %02X", i < 0 ? 0 : (uchar)read[i]);
+        emit append_text(str_r);
+
+        QThread().msleep(5);
+    }
+    f.close();
 }

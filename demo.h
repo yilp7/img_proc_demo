@@ -208,6 +208,9 @@ private slots:
     // hik cam binning mode 2x2
     void on_BINNING_CHECK_stateChanged(int arg1);
 
+    // send customized data to ports
+    void transparent_transmission_file(int id);
+
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);

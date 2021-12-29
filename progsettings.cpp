@@ -79,7 +79,6 @@ ProgSettings::ProgSettings(QWidget *parent) :
     ui->COM_DATA_EDT->setFont(temp);
 
     data_exchange(false);
-
 }
 
 ProgSettings::~ProgSettings()
@@ -246,7 +245,7 @@ void ProgSettings::keyPressEvent(QKeyEvent *event)
 
     switch(event->key()) {
     case Qt::Key_Escape:
-        edit ? data_exchange(false), this->focusWidget()->clearFocus() : this->reject();
+        edit ? data_exchange(false), edit->clearFocus() : this->focusWidget() ? this->focusWidget()->clearFocus() : this->reject();
         break;
     case Qt::Key_Enter:
     case Qt::Key_Return:
@@ -256,6 +255,9 @@ void ProgSettings::keyPressEvent(QKeyEvent *event)
         else                               data_exchange(true);
         if (edit) this->focusWidget()->clearFocus();
         data_exchange(false);
+    case Qt::Key_S:
+        if (event->modifiers() == Qt::AltModifier) this->accept();
+        break;
     default: break;
     }
     edit = NULL;
@@ -292,6 +294,13 @@ bool ProgSettings::eventFilter(QObject *obj, QEvent *event)
 {
     if (qobject_cast<QComboBox*>(obj) && event->type() == QEvent::MouseMove) return true;
     return QDialog::eventFilter(obj, event);
+}
+
+void ProgSettings::showEvent(QShowEvent *event)
+{
+    QDialog::showEvent(event);
+    if (this->focusWidget()) this->focusWidget()->clearFocus();
+    this->setFocus();
 }
 
 void ProgSettings::on_SAVE_SCAN_ORI_CHK_stateChanged(int arg1)

@@ -40,19 +40,19 @@ TitleButton {
 }
 
 #SETTINGS_BTN {
-	image: url(:/tools/settings_on.png);
-}
-
-#SETTINGS_BTN::hover, #SETTINGS_BTN::pressed {
 	image: url(:/tools/settings.png);
 }
 
+#SETTINGS_BTN::hover, #SETTINGS_BTN::pressed {
+	image: url(:/tools/settings_hover.png);
+}
+
 #CAPTURE_BTN {
-	image: url(:/tools/capture_on.png);
+	image: url(:/tools/capture.png);
 }
 
 #CAPTURE_BTN::hover, #CAPTURE_BTN::pressed {
-	image: url(:/tools/capture.png);
+	image: url(:/tools/capture_hover.png);
 }
 
 #LANGUAGE_BTN {
@@ -60,11 +60,11 @@ TitleButton {
 }
 
 #CLS_BTN {
-	image: url(:/tools/brush_on.png);
+	image: url(:/tools/brush.png);
 }
 
 #CLS_BTN::hover, #CLS_BTN::pressed {
-	image: url(:/tools/brush.png);
+	image: url(:/tools/brush_hover.png);
 }
 
 /* menu bar */
