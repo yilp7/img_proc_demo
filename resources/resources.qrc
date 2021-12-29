@@ -4,8 +4,19 @@
         <file>2.png</file>
         <file>3.png</file>
         <file>4.png</file>
-        <file alias="YJS">YJS4.png</file>
+        <file>YJS1.png</file>
+        <file>YJS2.png</file>
+        <file>YJS3.png</file>
+        <file>YJS4.png</file>
+        <file>YJS5.png</file>
+        <file>YJS6.png</file>
+        <file>YJS7.png</file>
+        <file>YJS8.png</file>
+        <file>YJS9.png</file>
         <file>logo.png</file>
+        <file>YJS0.png</file>
+        <file>YJS88.png</file>
+        <file alias="YJS">YJS00.png</file>
     </qresource>
     <qresource prefix="/icon">
         <file>icon.ico</file>
@@ -20,6 +31,8 @@
         <file>capture_hover.png</file>
         <file>check1.png</file>
         <file>dot1.png</file>
+        <file>down.png</file>
+        <file>down_arrow.png</file>
         <file>exit.png</file>
         <file>lang.png</file>
         <file>max.png</file>
@@ -30,6 +43,8 @@
         <file>settings.png</file>
         <file>settings_hover.png</file>
         <file>triangle1.png</file>
+        <file>up.png</file>
+        <file>up_arrow.png</file>
     </qresource>
     <qresource prefix="/cursor">
         <file>cursor.png</file>

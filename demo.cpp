@@ -1624,7 +1624,7 @@ void Demo::on_DIST_BTN_clicked() {
         distance = read[7] + (read[6] << 8);
     }
 */
-    distance = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", 0, 0, max_dist, 100);
+    distance = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", 0, 0, max_dist, 100, nullptr, Qt::FramelessWindowHint);
     ui->DISTANCE->setText(QString::asprintf("%d m", distance));
 
     data_exchange(true);

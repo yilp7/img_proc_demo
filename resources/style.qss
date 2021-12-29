@@ -341,3 +341,34 @@ Tools::hover {
 #CURR_COORD, #START_COORD, #SHAPE_INFO {
 	color: #DEC4B0;
 }
+
+/* spin box */
+QSpinBox {
+	padding-right: 12px;
+	border: 2px solid #3C3C3C;
+	background-color: #323232;
+	color: #B0C4DE;
+	selection-background-color: #A0A0A0;
+	selection-color: #282828;
+	border-radius: 3px;
+}
+
+QSpinBox::focus {
+	border: 2px solid #64648A;
+}
+
+QSpinBox::up-button {
+	subcontrol-origin: border;
+	subcontrol-position: center right;
+	width: 12px;
+	margin-right: 3px;
+	image: url(:/tools/up.png);
+}
+
+QSpinBox::down-button {
+	subcontrol-origin: border;
+	subcontrol-position: center right;
+	width: 12px;
+	image: url(:/tools/down.png);
+	margin-right: 16px;
+}
