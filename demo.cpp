@@ -1332,7 +1332,7 @@ void Demo::export_config()
     }
 }
 
-void Demo::request_for_config_file()
+void Demo::prompt_for_config_file()
 {
 //    QString config_name = QFileDialog::getOpenFileName(this, tr("Load Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation), tr("*.ssy"));
     QString config_name = QFileDialog::getOpenFileName(this, tr("Load Configuration"), save_location, tr("YJS config(*.ssy);;All Files()"));
@@ -1624,19 +1624,23 @@ void Demo::on_DIST_BTN_clicked() {
         distance = read[7] + (read[6] << 8);
     }
 */
-    distance = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", 0, 0, max_dist, 100, nullptr, Qt::FramelessWindowHint);
+    bool ok = false;
+    distance = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", 100, 100, max_dist, 100, &ok, Qt::FramelessWindowHint);
+    if (!ok) return;
     ui->DISTANCE->setText(QString::asprintf("%d m", distance));
 
     data_exchange(true);
 
     // change delay and gate width according to distance
     delay_dist = distance;
-    rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_vision / dist_ns + 1000) : 30;
+    rep_freq = 1e6 / (delay_dist / dist_ns + depth_of_vision / dist_ns + 1000);
     data_exchange(false);
     communicate_display(com[0], convert_to_send_tcu(0x1E, distance), 7, 1, true);
+    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
+//    ui->DELAY_SLIDER->setValue(delay_dist);
 //    depth_of_vision = 300;
 
-//    update_delay();
+    update_delay();
 //    update_gate_width();
 //    change_mcp(150);
 }
@@ -2085,6 +2089,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
             break;
         default: break;
         }
+        break;
     case Qt::AltModifier:
         switch (event->key()) {
         case Qt::Key_1:
@@ -2094,6 +2099,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
             goto_laser_preset(1 << (event->key() - Qt::Key_1));
             break;
         case Qt::Key_S:
+            qDebug() << "1";
             ui->TITLE->prog_settings->show();
             ui->TITLE->prog_settings->raise();
             break;
@@ -2101,7 +2107,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
             export_config();
             break;
         case Qt::Key_R:
-            request_for_config_file();
+            prompt_for_config_file();
             break;
         default: break;
         }
@@ -2115,7 +2121,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
             break;
         default:break;
         }
-
+        break;
     default: break;
     }
 }

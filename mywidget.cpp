@@ -195,7 +195,7 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     settings_menu->setFont(monaco);
     QAction *pref = new QAction("-- preference", this);
     settings_menu->addAction(pref);
-    pref->setShortcut(QKeySequence(Qt::ALT, Qt::Key_S));
+    pref->setShortcut(QKeySequence(Qt::ALT + Qt::Key_S));
     connect(pref, SIGNAL(triggered()), prog_settings, SLOT(show()));
     connect(pref, SIGNAL(triggered()), prog_settings, SLOT(raise()));
     connect(prog_settings, SIGNAL(rep_freq_unit_changed(int)), this->parent()->parent(), SLOT(setup_hz(int)));
@@ -208,8 +208,8 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     connect(prog_settings, SIGNAL(share_serial_port(bool)), this->parent()->parent(), SLOT(set_serial_port_share(bool)));
     connect(prog_settings, SIGNAL(auto_mcp(bool)), this->parent()->parent(), SLOT(set_auto_mcp(bool)));
     connect(prog_settings, SIGNAL(set_dev_ip(int, int)), this->parent()->parent(), SLOT(set_dev_ip(int, int)));
-    settings_menu->addAction(">> export pref.", this->parent()->parent(), SLOT(export_config()), QKeySequence(Qt::ALT, Qt::Key_E));
-    settings_menu->addAction("<< load pref.", this->parent()->parent(), SLOT(request_for_config_file()), QKeySequence(Qt::ALT, Qt::Key_R));
+    settings_menu->addAction(">> export pref.", this->parent()->parent(), SLOT(export_config()), QKeySequence(Qt::ALT + Qt::Key_E));
+    settings_menu->addAction("<< load pref.", this->parent()->parent(), SLOT(prompt_for_config_file()), QKeySequence(Qt::ALT + Qt::Key_R));
     settings->setMenu(settings_menu);
 
     capture = new TitleButton("", this);

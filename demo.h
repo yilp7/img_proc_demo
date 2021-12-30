@@ -85,7 +85,7 @@ public slots:
     void screenshot();
     void clean();
     void export_config();
-    void request_for_config_file();
+    void prompt_for_config_file();
     void load_config(QString config_name);
 
     // signaled in settings ui
