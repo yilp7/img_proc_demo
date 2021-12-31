@@ -93,7 +93,7 @@ Demo::Demo(QWidget *parent)
     max_dist(15000),
     laser_width(500),
     delay_dist(75),
-    depth_of_vision(75),
+    depth_of_view(75),
     focus_direction(0),
     curr_laser_idx(-1),
     display_option(1),
@@ -138,6 +138,8 @@ Demo::Demo(QWidget *parent)
     save_location += QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
 //    qDebug() << QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section('/', 0, -1);
     TEMP_SAVE_LOCATION = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+
+    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 1px; image: url(:/tools/%s.png);", hide_left ? "right" : "left"));
 
     // - image operations
     QComboBox *enhance_options = ui->ENHANCE_OPTIONS;
@@ -383,7 +385,7 @@ void Demo::data_exchange(bool read){
 
         laser_width = laser_width_u * 1000 + laser_width_n;
         delay_dist = std::round((delay_a_u * 1000 + delay_a_n) * dist_ns);
-        depth_of_vision = std::round((gate_width_a_u * 1000 + gate_width_a_n) * dist_ns);
+        depth_of_view = std::round((gate_width_a_u * 1000 + gate_width_a_n) * dist_ns);
     }
     else {
 //        ui->DEVICE_SELECTION->setCurrentIndex(device_idx);
@@ -401,8 +403,8 @@ void Demo::data_exchange(bool read){
         delay_a_n = (int)std::round(delay_dist / dist_ns) % 1000;
         delay_b_u = std::round(delay_dist / dist_ns + delay_n_n) / 1000;
         delay_b_n = (int)std::round(delay_dist / dist_ns + delay_n_n) % 1000;
-        gate_width_a_u = std::round(depth_of_vision / dist_ns) / 1000;
-        gate_width_a_n = (int)std::round(depth_of_vision / dist_ns) % 1000;
+        gate_width_a_u = std::round(depth_of_view / dist_ns) / 1000;
+        gate_width_a_n = (int)std::round(depth_of_view / dist_ns) % 1000;
         laser_width_u = laser_width / 1000;
         laser_width_n = laser_width % 1000;
 
@@ -497,7 +499,7 @@ int Demo::grab_thread_process() {
         // process 3d image construction from ABN frames
         if (image_3d) {
             range_threshold = ui->RANGE_THRESH_EDIT->text().toFloat();
-            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_vision / dist_ns, range_threshold);
+            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
             if (!frame_a_3d) prev_3d = modified_result.clone();
             frame_a_3d ^= 1;
         }
@@ -650,8 +652,8 @@ int Demo::grab_thread_process() {
 
             // put info (dist, dov, time) as text on image
             if (ui->INFO_CHECK->isChecked()) {
-                if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
         }
@@ -690,15 +692,15 @@ int Demo::grab_thread_process() {
         if (save_original) save_to_file(false);
         if (save_modified) save_to_file(true);
         if (record_original) {
-            if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             cv::putText(img_mem, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), weight * 2);
             vid_out[0].write(img_mem);
         }
         if (record_modified) {
             if (!image_3d) {
-                if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_vision).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_vision / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
             vid_out[1].write(modified_result);
@@ -1239,7 +1241,7 @@ void Demo::setup_stepping(int base_unit)
     // ns
     case 0: ui->STEPPING_UNIT->setText("ns"); ui->STEPPING_EDIT->setText(QString::number((int)stepping)); break;
     // μs
-    case 1: ui->STEPPING_UNIT->setText(QString::fromLocal8Bit("μs")); ui->STEPPING_EDIT->setText(QString::number((int)(stepping / 1000))); break;
+    case 1: ui->STEPPING_UNIT->setText(QString::fromLocal8Bit("μs")); ui->STEPPING_EDIT->setText(QString::number(stepping / 1000, 'f', 2)); break;
     // m
     case 2: ui->STEPPING_UNIT->setText("m"); ui->STEPPING_EDIT->setText(QString::number(stepping * dist_ns, 'f', 2)); break;
     default: break;
@@ -1443,7 +1445,7 @@ void Demo::update_delay()
     else {
         // change repeated frequency according to delay: rep frequency (kHz) <= 1s / delay (μs)
         if (ui->TITLE->prog_settings->auto_rep_freq) {
-            rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_vision / dist_ns + 1000) : 30;
+            rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000) : 30;
             if (rep_freq > 30) rep_freq = 30;
 //            if (rep_freq < 10) rep_freq = 10;
         }
@@ -1473,12 +1475,12 @@ void Demo::update_delay()
 }
 
 void Demo::update_gate_width() {
-    if (depth_of_vision < 0) depth_of_vision = 0;
-    if (depth_of_vision > 1500) depth_of_vision = 1500;
+    if (depth_of_view < 0) depth_of_view = 0;
+    if (depth_of_view > 1500) depth_of_view = 1500;
 
-    int gw = std::round(depth_of_vision / dist_ns);
+    int gw = std::round(depth_of_view / dist_ns);
 
-    ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_vision));
+    ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view));
 //    gate_width_a_n = gate_width_b_n = laser_width_n = gw % 1000;
 //    gate_width_a_u = gate_width_b_u = laser_width_u = gw / 1000;
     gate_width_a_n = gw % 1000;
@@ -1526,7 +1528,7 @@ void Demo::convert_write(QDataStream &out, const int TYPE)
     case TCU:
     {
         out << "TCU" << uchar('.');
-        out << fps << duty << rep_freq << laser_width << mcp << delay_dist << delay_n_n << depth_of_vision << stepping;
+        out << fps << duty << rep_freq << laser_width << mcp << delay_dist << delay_n_n << depth_of_view << stepping;
     }
     case SCAN:
     {
@@ -1572,7 +1574,7 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
     {
         out >> temp_str; if (std::strcmp(temp_str, "TCU")) return false;
         out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
-        out >> fps >> duty >> rep_freq >> laser_width >> mcp >> delay_dist >> delay_n_n >> depth_of_vision >> stepping;
+        out >> fps >> duty >> rep_freq >> laser_width >> mcp >> delay_dist >> delay_n_n >> depth_of_view >> stepping;
     }
     case SCAN:
     {
@@ -1608,7 +1610,6 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
 }
 
 void Demo::on_DIST_BTN_clicked() {
-/*
     if (com[1]->isOpen()) {
         QByteArray read = communicate_display(com[1], QByteArray(1, 0xA5), 1, 6, true);
 //        qDebug("%s", read_dist.toLatin1().data());
@@ -1623,26 +1624,33 @@ void Demo::on_DIST_BTN_clicked() {
 
         distance = read[7] + (read[6] << 8);
     }
-*/
-    bool ok = false;
-    distance = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", 100, 100, max_dist, 100, &ok, Qt::FramelessWindowHint);
-    if (!ok) return;
-    ui->DISTANCE->setText(QString::asprintf("%d m", distance));
+    else {
+        bool ok = false;
+        distance = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", 100, 100, max_dist, 100, &ok, Qt::FramelessWindowHint);
+        if (!ok) return;
+    }
 
-    data_exchange(true);
+    if (distance < 100) distance = 100;
+    ui->DISTANCE->setText(QString::asprintf("%d m", distance));
+//    data_exchange(true);
 
     // change delay and gate width according to distance
     delay_dist = distance;
-    rep_freq = 1e6 / (delay_dist / dist_ns + depth_of_vision / dist_ns + 1000);
+    update_delay();
+//    update_gate_width();
+//    change_mcp(150);
+
+    rep_freq = 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000);
+    if (rep_freq > 30) rep_freq = 30;
+    if      (distance < 1000) depth_of_view =  500 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
+    else if (distance < 3000) depth_of_view = 1000 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
+    else if (distance < 6000) depth_of_view = 2000 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
+    else                      depth_of_view = 3500 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
     data_exchange(false);
     communicate_display(com[0], convert_to_send_tcu(0x1E, distance), 7, 1, true);
     ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
 //    ui->DELAY_SLIDER->setValue(delay_dist);
 //    depth_of_vision = 300;
-
-    update_delay();
-//    update_gate_width();
-//    change_mcp(150);
 }
 
 void Demo::on_IMG_3D_CHECK_stateChanged(int arg1)
@@ -1988,7 +1996,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
                 communicate_display(com[0], convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
             }
             else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
-                depth_of_vision = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt()) * dist_ns;
+                depth_of_view = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt()) * dist_ns;
                 update_gate_width();
             }
             else if (edit == ui->LASER_WIDTH_EDIT_U) {
@@ -1996,8 +2004,8 @@ void Demo::keyPressEvent(QKeyEvent *event)
                 communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width + 8) / 8), 7, 1, false);
             }
             else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
-                if (edit->text().toInt() > 999) depth_of_vision = edit->text().toInt() * dist_ns;
-                else depth_of_vision = (edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000) * dist_ns;
+                if (edit->text().toInt() > 999) depth_of_view = edit->text().toInt() * dist_ns;
+                else depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000) * dist_ns;
                 update_gate_width();
             }
             else if (edit == ui->LASER_WIDTH_EDIT_N) {
@@ -2032,7 +2040,12 @@ void Demo::keyPressEvent(QKeyEvent *event)
                 ui->MCP_SLIDER->setValue(mcp);
             }
             else if (edit == ui->STEPPING_EDIT) {
-                stepping = edit->text().toFloat();
+                switch (base_unit) {
+                case 0: stepping = edit->text().toFloat(); break;
+                case 1: stepping = edit->text().toFloat() * 1000; break;
+                case 2: stepping = edit->text().toFloat() / dist_ns; break;
+                default: break;
+                }
                 setup_stepping(base_unit);
             }
             else if (edit == ui->ZOOM_EDIT) {
@@ -2072,19 +2085,19 @@ void Demo::keyPressEvent(QKeyEvent *event)
             break;
         // 50m => 333ns, 5m => 33ns
         case Qt::Key_I:
-            depth_of_vision += stepping * 5 * dist_ns;
+            depth_of_view += stepping * 5 * dist_ns;
             update_gate_width();
             break;
         case Qt::Key_K:
-            depth_of_vision -= stepping * 5 * dist_ns;
+            depth_of_view -= stepping * 5 * dist_ns;
             update_gate_width();
             break;
         case Qt::Key_L:
-            depth_of_vision += stepping * dist_ns;
+            depth_of_view += stepping * dist_ns;
             update_gate_width();
             break;
         case Qt::Key_J:
-            depth_of_vision -= stepping * dist_ns;
+            depth_of_view -= stepping * dist_ns;
             update_gate_width();
             break;
         default: break;
@@ -2161,7 +2174,8 @@ void Demo::resizeEvent(QResizeEvent *event)
     ui->SHAPE_INFO->move(ui->START_COORD->geometry().right() + 20, 5);
     ui->INFO_CHECK->move(region.right() - 60, 0);
     ui->CENTER_CHECK->move(region.right() - 60, 20);
-    ui->HIDE_BTN->setGeometry(hide_left ? 2 : 212, this->geometry().height() / 2 - 10, 16, 16);
+    ui->HIDE_BTN->move(ui->MID->geometry().left() - 8, this->geometry().height() / 2 - 10);
+//    ui->HIDE_BTN->move(ui->LEFT->geometry().right() - 10 + (ui->SOURCE_DISPLAY->geometry().left() + ui->MID->geometry().left() - ui->LEFT->geometry().right() + 10) / 2 + 2, this->geometry().height() / 2 - 10);
     ui->RULER_H->setGeometry(region.left(), region.bottom() - 10, region.width(), 32);
     ui->RULER_V->setGeometry(region.right() - 10, region.top(), 32, region.height());
 
@@ -2284,6 +2298,14 @@ void Demo::dropEvent(QDropEvent *event)
 
     QString config_name = event->mimeData()->urls().first().toLocalFile();
     load_config(config_name);
+}
+
+void Demo::showEvent(QShowEvent *event)
+{
+    QMainWindow::showEvent(event);
+
+    if (this->focusWidget()) this->focusWidget()->clearFocus();
+    this->setFocus();
 }
 
 void Demo::on_SAVE_AVI_BUTTON_clicked()
@@ -2486,8 +2508,10 @@ void Demo::on_HIDE_BTN_clicked()
 {
     hide_left ^= 1;
     ui->LEFT->setGeometry(10, 40, hide_left ? 0 : 210, 631);
-    ui->HIDE_BTN->setText(hide_left ? ">" : "<");
-    resizeEvent(new QResizeEvent(this->size(), this->size()));
+//    ui->HIDE_BTN->setText(hide_left ? ">" : "<");
+    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 1px; image: url(:/tools/%s.png);", hide_left ? "right" : "left"));
+    QResizeEvent e(this->size(), this->size());
+    resizeEvent(&e);
 }
 
 void Demo::on_COM_DATA_RADIO_clicked()

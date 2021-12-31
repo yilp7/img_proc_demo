@@ -236,6 +236,7 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *event);
     void dragEnterEvent(QDragEnterEvent *event);
     void dropEvent(QDropEvent *event);
+    void showEvent(QShowEvent *event);
 
 // control functions
 private:
@@ -329,7 +330,7 @@ private:
     float                   max_dist;
     int                     laser_width;
     float                   delay_dist;                 // estimated distance calculated from delay
-    float                   depth_of_vision;
+    float                   depth_of_view;
     // TODO rewrite auto focus function
     int                     focus_direction;
     int                     clarity[3];

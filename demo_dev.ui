@@ -2419,7 +2419,7 @@
      <string notr="true"/>
     </property>
     <property name="text">
-     <string>&lt;</string>
+     <string/>
     </property>
    </widget>
    <widget class="TitleBar" name="TITLE">

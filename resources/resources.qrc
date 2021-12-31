@@ -17,6 +17,7 @@
         <file>YJS0.png</file>
         <file>YJS88.png</file>
         <file alias="YJS">YJS00.png</file>
+        <file>YJS22.png</file>
     </qresource>
     <qresource prefix="/icon">
         <file>icon.ico</file>
@@ -45,6 +46,8 @@
         <file>triangle1.png</file>
         <file>up.png</file>
         <file>up_arrow.png</file>
+        <file>left.png</file>
+        <file>right.png</file>
     </qresource>
     <qresource prefix="/cursor">
         <file>cursor.png</file>

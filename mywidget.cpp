@@ -172,10 +172,10 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
   , pressed(false)
 {
     icon = new InfoLabel(this);
-    icon->setGeometry(60, 5, 20, 20);
+    icon->setGeometry(10, 5, 20, 20);
     icon->setObjectName("ICON");
     title = new InfoLabel(this);
-    title->setGeometry(90, 0, 80, 30);
+    title->setGeometry(30, 0, 80, 30);
     title->setObjectName("NAME");
     min = new TitleButton(":/tools/min.png", this);
     min->setObjectName("MIN_BTN");
@@ -193,7 +193,7 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     settings->setObjectName("SETTINGS_BTN");
     QMenu *settings_menu = new QMenu();
     settings_menu->setFont(monaco);
-    QAction *pref = new QAction("-- preference", this);
+    QAction *pref = new QAction("-- preferences", this);
     settings_menu->addAction(pref);
     pref->setShortcut(QKeySequence(Qt::ALT + Qt::Key_S));
     connect(pref, SIGNAL(triggered()), prog_settings, SLOT(show()));
