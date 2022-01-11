@@ -2451,7 +2451,7 @@
        <bool>false</bool>
       </property>
       <property name="text">
-       <string>RECORD</string>
+       <string>Record</string>
       </property>
      </widget>
      <widget class="QPushButton" name="SAVE_RESULT_BUTTON">
@@ -2467,7 +2467,7 @@
        <bool>false</bool>
       </property>
       <property name="text">
-       <string>CAPTURE</string>
+       <string>Capture</string>
       </property>
      </widget>
     </widget>

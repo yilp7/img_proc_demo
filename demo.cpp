@@ -75,7 +75,7 @@ Demo::Demo(QWidget *parent)
     range_threshold(0),
     trigger_by_software(false),
     curr_cam(NULL),
-    time_exposure_edit(90000),
+    time_exposure_edit(95000),
     gain_analog_edit(23),
     frame_rate_edit(10),
     com{NULL},
@@ -88,7 +88,7 @@ Demo::Demo(QWidget *parent)
     hz_unit(0),
     base_unit(0),
     fps(10),
-    duty(90000),
+    duty(95000),
     mcp(0),
     laser_on(1),
     zoom(0),
@@ -308,7 +308,6 @@ Demo::Demo(QWidget *parent)
     ui->groupBox->hide();
     ui->LOGO->setPixmap(QPixmap::fromImage(QImage(":/logo/3a.png")));
     ui->EST_DIST->setText("200.00 m");
-    ui->GATE_WIDTH->setText("75.00 m");
 
     connect(ui->CONFIG_BUTTON, SIGNAL(clicked()), ui->TITLE->prog_settings, SLOT(show()));
     connect(ui->CONFIG_BUTTON, SIGNAL(clicked()), ui->TITLE->prog_settings, SLOT(raise()));
@@ -318,6 +317,7 @@ Demo::Demo(QWidget *parent)
     setup_stepping(2);
     stepping = 10 / dist_ns;
 
+    ui->DUTY_EDIT->setEnabled(false);
     ui->START_BUTTON->click();
     QThread::sleep(2);
     ui->START_GRABBING_BUTTON->click();
@@ -398,7 +398,6 @@ void Demo::data_exchange(bool read){
         case 2: stepping = ui->STEPPING_EDIT->text().toFloat() / dist_ns; break;
         default: break;
         }
-        stepping = ui->STEPPING_EDIT->text().toFloat();
         delay_b_u = ui->DELAY_B_EDIT_U->text().toInt();
         delay_b_n = ui->DELAY_B_EDIT_N->text().toInt();
         delay_n_n = ui->DELAY_N_EDIT_N->text().toInt();
@@ -714,11 +713,11 @@ int Demo::grab_thread_process() {
         if (scan) {
             save_scan_img();
             delay_dist += scan_step;
-//            filter_scan();
+            if (ui->TITLE->prog_settings->filter_scan) filter_scan();
 
             emit update_delay_in_thread();
         }
-        if (scan && std::round(delay_dist / dist_ns) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
+        if (scan && std::round(delay_dist) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
 
         // image write / video record
         if (save_original) save_to_file(false);
@@ -730,7 +729,7 @@ int Demo::grab_thread_process() {
             vid_out[0].write(img_mem);
         }
         if (record_modified) {
-            if (!image_3d) {
+            if (!image_3d && !ui->INFO_CHECK->isChecked()) {
                 if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
@@ -1199,6 +1198,9 @@ void Demo::on_SET_PARAMS_BUTTON_clicked()
 {
     data_exchange(true);
 
+    duty = 1e6 / fps - 5000;
+    qDebug() << duty;
+
     // CCD FREQUENCY
     communicate_display(com[0], convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
 
@@ -1211,7 +1213,7 @@ void Demo::on_SET_PARAMS_BUTTON_clicked()
         curr_cam->time_exposure(false, &time_exposure_edit);
         curr_cam->frame_rate(false, &frame_rate_edit);
 //        curr_cam->gain_analog(false, &gain_analog_edit);
-        change_gain(gain_analog_edit);
+//        change_gain(gain_analog_edit);
     }
     data_exchange(false);
 }
@@ -1538,10 +1540,10 @@ void Demo::update_gate_width() {
 
 void Demo::filter_scan()
 {
-    static cv::Mat filter = img_mem.clone();
-    filter = img_mem / 64;
+//    static cv::Mat filter = img_mem.clone();
+//    filter = img_mem / 64;
 //    qDebug("ratio %f\n", cv::countNonZero(filter) / (float)filter.total());
-    if (cv::countNonZero(filter) / (float)filter.total() > 0.3) /*scan = !scan, */emit update_scan(true);
+    if (cv::countNonZero(img_mem / 64) / (float)img_mem.total() > 0.3) /*scan = !scan, */emit update_scan(true);
 }
 
 void Demo::update_current()
@@ -2414,7 +2416,7 @@ void Demo::on_SCAN_BUTTON_clicked()
             scan_name = "scan_" + QDateTime::currentDateTime().toString("MMdd_hhmmss");
             if (!QDir(save_location + "/" + scan_name).exists()) {
                 QDir().mkdir(save_location + "/" + scan_name);
-                QDir().mkdir(save_location + "/" + scan_name + "/ori_bmp");
+//                QDir().mkdir(save_location + "/" + scan_name + "/ori_bmp");
                 QDir().mkdir(save_location + "/" + scan_name + "/res_bmp");
             }
 
@@ -2474,14 +2476,16 @@ void Demo::enable_scan_options(bool show)
     ui->CONTINUE_SCAN_BUTTON->setEnabled(!scan);
     ui->RESTART_SCAN_BUTTON->setEnabled(!scan);
 
-//    if (show) {
+    if (show) {
 //        ui->CONTINUE_SCAN_BUTTON->show();
 //        ui->RESTART_SCAN_BUTTON->show();
-//    }
-//    else {
+    }
+    else {
 //        ui->CONTINUE_SCAN_BUTTON->hide();
 //        ui->RESTART_SCAN_BUTTON->hide();
-//    }
+        ui->CONTINUE_SCAN_BUTTON->setEnabled(false);
+        ui->RESTART_SCAN_BUTTON->setEnabled(false);
+    }
 }
 
 void Demo::on_FRAME_AVG_CHECK_stateChanged(int arg1)

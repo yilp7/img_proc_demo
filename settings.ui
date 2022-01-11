@@ -81,7 +81,7 @@
     <property name="geometry">
      <rect>
       <x>120</x>
-      <y>75</y>
+      <y>60</y>
       <width>95</width>
       <height>20</height>
      </rect>
@@ -140,6 +140,19 @@
     </property>
     <property name="text">
      <string>m</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="FILTER_CHK">
+    <property name="geometry">
+     <rect>
+      <x>120</x>
+      <y>80</y>
+      <width>78</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>filter</string>
     </property>
    </widget>
   </widget>

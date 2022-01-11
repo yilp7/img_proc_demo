@@ -58,6 +58,8 @@ private slots:
 
     void on_LASER_ENERGY_LIST_currentIndexChanged(int index);
 
+    void on_FILTER_CHK_stateChanged(int arg1);
+
 signals:
     void rep_freq_unit_changed(int);
     void base_unit_changed(int);
@@ -83,6 +85,7 @@ public:
     float            rep_freq;
     bool             save_scan_ori;
     bool             save_scan_res;
+    bool             filter_scan;
 
     int              kernel;
     float            gamma;

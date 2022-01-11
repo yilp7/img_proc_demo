@@ -6,11 +6,12 @@ ProgSettings::ProgSettings(QWidget *parent) :
     ui(new Ui::ProgSettings),
     start_pos(200),
     end_pos(12000),
-    frame_count(1),
+    frame_count(100),
     step_size(0),
     rep_freq(10),
-    save_scan_ori(true),
+    save_scan_ori(false),
     save_scan_res(false),
+    filter_scan(false),
     kernel(3),
     gamma(1.2),
     log(1.2),
@@ -249,7 +250,7 @@ void ProgSettings::update_scan()
         end_pos = std::round(ui->END_EDIT->text().toInt());
         frame_count = ui->FRAME_COUNT_EDIT->text().toInt();
         if (!frame_count) frame_count = 1;
-        step_size = 1.0 * (end_pos - start_pos) / frame_count / dist_ns;
+        step_size = 1.0 * (end_pos - start_pos) / dist_ns / frame_count;
         ui->FRAME_COUNT_EDIT->setText(QString::number(frame_count));
         ui->STEP_SIZE_EDIT->setText(QString::number(step_size, 'f', 2));
     }
@@ -435,5 +436,11 @@ void ProgSettings::on_LASER_ENERGY_LIST_currentIndexChanged(int index)
     default: break;
     }
     emit laser_toggled(laser_on);
+}
+
+
+void ProgSettings::on_FILTER_CHK_stateChanged(int arg1)
+{
+    filter_scan = arg1;
 }
 
