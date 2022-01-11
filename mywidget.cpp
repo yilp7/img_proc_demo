@@ -223,6 +223,8 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     lang = new TitleButton("", this);
     lang->setObjectName("LANGUAGE_BTN");
     connect(lang, SIGNAL(clicked()), this->parent()->parent(), SLOT(switch_language()));
+
+    connect(this, SIGNAL(maximize(bool)), this->parent()->parent(), SLOT(display_logo(bool)));
 }
 
 void TitleBar::process_maximize()
@@ -231,6 +233,7 @@ void TitleBar::process_maximize()
     max->setIcon(is_maximized ? QIcon(":/tools/max.png") : QIcon(":/tools/restore.png"));
     is_maximized ? window()->setGeometry(normal_stat) : window()->setGeometry(QApplication::desktop()->availableGeometry());
     is_maximized ^= 1;
+    emit maximize(is_maximized);
 }
 
 void TitleBar::resizeEvent(QResizeEvent *event)

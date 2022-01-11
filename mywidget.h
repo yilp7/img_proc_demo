@@ -90,6 +90,9 @@ public:
 public slots:
     void process_maximize();
 
+signals:
+    void maximize(bool is_maximized);
+
 protected:
     // @override
     void resizeEvent(QResizeEvent *event);

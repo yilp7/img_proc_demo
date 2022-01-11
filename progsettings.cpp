@@ -4,8 +4,8 @@
 ProgSettings::ProgSettings(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::ProgSettings),
-    start_pos(0),
-    end_pos(0),
+    start_pos(200),
+    end_pos(12000),
     frame_count(1),
     step_size(0),
     rep_freq(10),
@@ -29,7 +29,7 @@ ProgSettings::ProgSettings(QWidget *parent) :
     base_unit(0),
     max_dist(15000),
     laser_grp(NULL),
-    laser_on(0),
+    laser_on(1),
     com_idx(0),
     cameralink(false)
 {
@@ -47,12 +47,15 @@ ProgSettings::ProgSettings(QWidget *parent) :
     ui->UNIT_LIST->addItem(QString::fromLocal8Bit("μs"));
     ui->UNIT_LIST->addItem("m");
     ui->UNIT_LIST->setCurrentIndex(0);
+    ui->UNIT_LIST->setCurrentIndex(2);
     ui->UNIT_LIST->installEventFilter(this);
 
-    connect(ui->START_POS_EDIT_U, SIGNAL(editingFinished()), SLOT(update_scan()));
-    connect(ui->START_POS_EDIT_N, SIGNAL(editingFinished()), SLOT(update_scan()));
-    connect(ui->END_POS_EDIT_U, SIGNAL(editingFinished()), SLOT(update_scan()));
-    connect(ui->END_POS_EDIT_N, SIGNAL(editingFinished()), SLOT(update_scan()));
+//    connect(ui->START_POS_EDIT_U, SIGNAL(editingFinished()), SLOT(update_scan()));
+//    connect(ui->START_POS_EDIT_N, SIGNAL(editingFinished()), SLOT(update_scan()));
+//    connect(ui->END_POS_EDIT_U, SIGNAL(editingFinished()), SLOT(update_scan()));
+//    connect(ui->END_POS_EDIT_N, SIGNAL(editingFinished()), SLOT(update_scan()));
+    connect(ui->START_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
+    connect(ui->END_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
     connect(ui->FRAME_COUNT_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
     connect(ui->STEP_SIZE_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
 
@@ -78,6 +81,11 @@ ProgSettings::ProgSettings(QWidget *parent) :
     temp.setPixelSize(11);
     ui->COM_DATA_EDT->setFont(temp);
 
+    ui->LASER_ENERGY_LIST->addItem("0%");
+    ui->LASER_ENERGY_LIST->addItem("50%");
+    ui->LASER_ENERGY_LIST->addItem("100%");
+    ui->LASER_ENERGY_LIST->setCurrentIndex(1);
+
     data_exchange(false);
 }
 
@@ -89,10 +97,12 @@ ProgSettings::~ProgSettings()
 void ProgSettings::data_exchange(bool read)
 {
     if (read) {
-        if (ui->START_POS_EDIT_N->text().toInt() > 999) start_pos = ui->START_POS_EDIT_N->text().toInt();
-        else start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
-        if (ui->END_POS_EDIT_N->text().toInt() > 999) end_pos = ui->END_POS_EDIT_N->text().toInt();
-        else end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
+//        if (ui->START_POS_EDIT_N->text().toInt() > 999) start_pos = ui->START_POS_EDIT_N->text().toInt();
+//        else start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
+//        if (ui->END_POS_EDIT_N->text().toInt() > 999) end_pos = ui->END_POS_EDIT_N->text().toInt();
+//        else end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
+        start_pos = std::round(ui->START_EDIT->text().toInt());
+        end_pos = std::round(ui->END_EDIT->text().toInt());
         frame_count = ui->FRAME_COUNT_EDIT->text().toInt();
         step_size = ui->STEP_SIZE_EDIT->text().toFloat();
         rep_freq = ui->REP_FREQ_EDIT->text().toFloat();
@@ -136,10 +146,12 @@ void ProgSettings::data_exchange(bool read)
         laser_on ^= ui->LASER_CHK_4->isChecked() << 3;
     }
     else {
-        ui->START_POS_EDIT_N->setText(QString::number(start_pos % 1000));
-        ui->START_POS_EDIT_U->setText(QString::number(start_pos / 1000));
-        ui->END_POS_EDIT_N->setText(QString::number(end_pos % 1000));
-        ui->END_POS_EDIT_U->setText(QString::number(end_pos / 1000));
+//        ui->START_POS_EDIT_N->setText(QString::number(start_pos % 1000));
+//        ui->START_POS_EDIT_U->setText(QString::number(start_pos / 1000));
+//        ui->END_POS_EDIT_N->setText(QString::number(end_pos % 1000));
+//        ui->END_POS_EDIT_U->setText(QString::number(end_pos / 1000));
+        ui->START_EDIT->setText(QString::number(start_pos));
+        ui->END_EDIT->setText(QString::number(end_pos));
         ui->FRAME_COUNT_EDIT->setText(QString::number(frame_count));
         ui->STEP_SIZE_EDIT->setText(QString::number(step_size, 'f', 2));
         ui->SAVE_SCAN_ORI_CHK->setChecked(save_scan_ori);
@@ -216,23 +228,27 @@ void ProgSettings::update_scan()
 {
     QLineEdit *source = qobject_cast<QLineEdit*>(sender());
     if (source == ui->STEP_SIZE_EDIT) {
-        if (ui->START_POS_EDIT_N->text().toInt() > 999) start_pos = ui->START_POS_EDIT_N->text().toInt();
-        else start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
-        if (ui->END_POS_EDIT_N->text().toInt() > 999) end_pos = ui->END_POS_EDIT_N->text().toInt();
-        else end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
+//        if (ui->START_POS_EDIT_N->text().toInt() > 999) start_pos = ui->START_POS_EDIT_N->text().toInt();
+//        else start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
+//        if (ui->END_POS_EDIT_N->text().toInt() > 999) end_pos = ui->END_POS_EDIT_N->text().toInt();
+//        else end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
+        start_pos = std::round(ui->START_EDIT->text().toInt());
+        end_pos = std::round(ui->END_EDIT->text().toInt());
         step_size = ui->STEP_SIZE_EDIT->text().toFloat();
-        frame_count = step_size ? (end_pos - start_pos) / step_size : 0;
+        frame_count = step_size ? (end_pos - start_pos) / dist_ns / step_size : 0;
         ui->FRAME_COUNT_EDIT->setText(QString::number(frame_count));
         ui->STEP_SIZE_EDIT->setText(QString::number(step_size, 'f', 2));
     }
     else {
-        if (ui->START_POS_EDIT_N->text().toInt() > 999) start_pos = ui->START_POS_EDIT_N->text().toInt();
-        else start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
-        if (ui->END_POS_EDIT_N->text().toInt() > 999) end_pos = ui->END_POS_EDIT_N->text().toInt();
-        else end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
+//        if (ui->START_POS_EDIT_N->text().toInt() > 999) start_pos = ui->START_POS_EDIT_N->text().toInt();
+//        else start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
+//        if (ui->END_POS_EDIT_N->text().toInt() > 999) end_pos = ui->END_POS_EDIT_N->text().toInt();
+//        else end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
+        start_pos = std::round(ui->START_EDIT->text().toInt());
+        end_pos = std::round(ui->END_EDIT->text().toInt());
         frame_count = ui->FRAME_COUNT_EDIT->text().toInt();
         if (!frame_count) frame_count = 1;
-        step_size = 1.0 * (end_pos - start_pos) / frame_count;
+        step_size = 1.0 * (end_pos - start_pos) / frame_count / dist_ns;
         ui->FRAME_COUNT_EDIT->setText(QString::number(frame_count));
         ui->STEP_SIZE_EDIT->setText(QString::number(step_size, 'f', 2));
     }
@@ -406,5 +422,17 @@ void ProgSettings::on_FAST_GF_EDIT_editingFinished()
 void ProgSettings::on_CENTRAL_SYMM_CHK_stateChanged(int arg1)
 {
     central_symmetry = arg1;
+}
+
+
+void ProgSettings::on_LASER_ENERGY_LIST_currentIndexChanged(int index)
+{
+    switch (index) {
+    case 0: laser_on = 0; break;
+    case 1: laser_on = 1; break;
+    case 2: laser_on = 3; break;
+    default: break;
+    }
+    emit laser_toggled(laser_on);
 }
 

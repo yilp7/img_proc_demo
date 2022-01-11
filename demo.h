@@ -100,6 +100,8 @@ public slots:
     void set_auto_mcp(bool adaptive);
     void set_dev_ip(int ip, int gateway);
 
+    void display_logo(bool show);
+
 private slots:
     // on clicking enum btn: enumerate devices
     void on_ENUM_BUTTON_clicked();
@@ -257,6 +259,7 @@ private:
     // set zoom & focus value
     void set_zoom();
     void set_focus();
+    void set_laser_zoom();
     // inline function for auto-focus
     void focus_far();
     void focus_near();
@@ -326,6 +329,7 @@ private:
     int                     laser_on;
     int                     zoom;
     int                     focus;
+    int                     laser_zoom;
     int                     distance;                   // dist read from rangefinder
     float                   max_dist;
     int                     laser_width;

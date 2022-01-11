@@ -56,6 +56,8 @@ private slots:
     void on_FAST_GF_EDIT_editingFinished();
     void on_CENTRAL_SYMM_CHK_stateChanged(int arg1);
 
+    void on_LASER_ENERGY_LIST_currentIndexChanged(int index);
+
 signals:
     void rep_freq_unit_changed(int);
     void base_unit_changed(int);

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>515</width>
-    <height>402</height>
+    <width>426</width>
+    <height>150</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,29 +18,13 @@
     <rect>
      <x>20</x>
      <y>20</y>
-     <width>121</width>
-     <height>261</height>
+     <width>221</width>
+     <height>106</height>
     </rect>
    </property>
    <property name="title">
     <string>Scan Options</string>
    </property>
-   <widget class="QLineEdit" name="START_POS_EDIT_N">
-    <property name="geometry">
-     <rect>
-      <x>65</x>
-      <y>35</y>
-      <width>31</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
    <widget class="QLabel" name="START_LBL">
     <property name="geometry">
      <rect>
@@ -67,24 +51,11 @@
      <string>Ending delay</string>
     </property>
    </widget>
-   <widget class="QLineEdit" name="END_POS_EDIT_N">
-    <property name="geometry">
-     <rect>
-      <x>65</x>
-      <y>75</y>
-      <width>31</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
    <widget class="QLabel" name="FRAME_LBL">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>100</y>
+      <x>120</x>
+      <y>20</y>
       <width>86</width>
       <height>14</height>
      </rect>
@@ -96,467 +67,35 @@
    <widget class="QLineEdit" name="FRAME_COUNT_EDIT">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>115</y>
-      <width>61</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="STEP_LBL">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>140</y>
-      <width>86</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Stepping</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="STEP_SIZE_EDIT">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>155</y>
-      <width>61</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="UNIT_NS">
-    <property name="geometry">
-     <rect>
-      <x>100</x>
-      <y>40</y>
-      <width>21</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>ns</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="UNIT_NS_2">
-    <property name="geometry">
-     <rect>
-      <x>100</x>
-      <y>80</y>
-      <width>21</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>ns</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="UNIT_NS_3">
-    <property name="geometry">
-     <rect>
-      <x>75</x>
-      <y>160</y>
-      <width>21</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>ns</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="FREQ_UNIT">
-    <property name="geometry">
-     <rect>
-      <x>74</x>
-      <y>200</y>
-      <width>21</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>kHz</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="REP_FREQ_EDIT">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>195</y>
-      <width>61</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="FREQ_LBL">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>180</y>
-      <width>86</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Rep. freq.</string>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="SAVE_SCAN_ORI_CHK">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>220</y>
-      <width>109</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>original img</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="UNIT_US">
-    <property name="geometry">
-     <rect>
-      <x>45</x>
-      <y>40</y>
-      <width>21</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>μs</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="START_POS_EDIT_U">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
+      <x>120</x>
       <y>35</y>
-      <width>31</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="END_POS_EDIT_U">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>75</y>
-      <width>31</width>
+      <width>51</width>
       <height>21</height>
      </rect>
     </property>
     <property name="alignment">
      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="UNIT_US_2">
-    <property name="geometry">
-     <rect>
-      <x>45</x>
-      <y>80</y>
-      <width>21</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>μs</string>
     </property>
    </widget>
    <widget class="QCheckBox" name="SAVE_SCAN_RES_CHK">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>240</y>
+      <x>120</x>
+      <y>75</y>
       <width>95</width>
       <height>20</height>
      </rect>
     </property>
     <property name="text">
-     <string>result img</string>
+     <string>save img</string>
     </property>
    </widget>
-  </widget>
-  <widget class="QGroupBox" name="ENHANCE_GROUP">
-   <property name="geometry">
-    <rect>
-     <x>320</x>
-     <y>20</y>
-     <width>171</width>
-     <height>361</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>Img Enhance Options</string>
-   </property>
-   <widget class="QLineEdit" name="KERNEL_EDIT">
+   <widget class="QLineEdit" name="START_EDIT">
     <property name="geometry">
      <rect>
       <x>10</x>
       <y>35</y>
-      <width>31</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="KERNEL_SIZE">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>20</y>
-      <width>80</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Kernel size</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="LOW_IN_EDIT">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>125</y>
-      <width>51</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="LOW_OUT_EDIT">
-    <property name="geometry">
-     <rect>
-      <x>90</x>
-      <y>125</y>
-      <width>51</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="HIGH_IN_EDIT">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>170</y>
-      <width>51</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="HIGH_OUT_EDIT">
-    <property name="geometry">
-     <rect>
-      <x>90</x>
-      <y>170</y>
-      <width>51</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="GAMMA_EDIT">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>80</y>
-      <width>51</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="LOW_IN">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>110</y>
-      <width>60</width>
-      <height>13</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>low in</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="HIGH_IN">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>155</y>
-      <width>60</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>high in</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="LOW_OUT">
-    <property name="geometry">
-     <rect>
-      <x>90</x>
-      <y>110</y>
-      <width>60</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>low out</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="HIGH_OUT">
-    <property name="geometry">
-     <rect>
-      <x>90</x>
-      <y>155</y>
-      <width>60</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>high out</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="GAMMA">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>65</y>
-      <width>60</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Gamma</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="LOG_EDIT">
-    <property name="geometry">
-     <rect>
-      <x>90</x>
-      <y>80</y>
-      <width>51</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="LOG">
-    <property name="geometry">
-     <rect>
-      <x>90</x>
-      <y>65</y>
-      <width>60</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Log</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="ACCU_BASE">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>200</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Accu. base</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="ACCU_BASE_EDIT">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>215</y>
-      <width>51</width>
-      <height>24</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="DEHAZE_PCT_EDIT">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>260</y>
-      <width>51</width>
-      <height>24</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="DEHAZE_PCT">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>245</y>
-      <width>71</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Dehaze %</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="SKY_TOLERANCE">
-    <property name="geometry">
-     <rect>
-      <x>90</x>
-      <y>245</y>
       <width>61</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Sky Tol.</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="SKY_TOLERANCE_EDIT">
-    <property name="geometry">
-     <rect>
-      <x>90</x>
-      <y>260</y>
-      <width>51</width>
       <height>24</height>
      </rect>
     </property>
@@ -564,37 +103,76 @@
      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
     </property>
    </widget>
-   <widget class="QLineEdit" name="FAST_GF_EDIT">
+   <widget class="QLineEdit" name="END_EDIT">
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>305</y>
-      <width>31</width>
-      <height>24</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="FAST_GF">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>290</y>
+      <y>75</y>
       <width>61</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="START_UNIT">
+    <property name="geometry">
+     <rect>
+      <x>75</x>
+      <y>40</y>
+      <width>21</width>
       <height>16</height>
      </rect>
     </property>
     <property name="text">
-     <string>Fast gf</string>
+     <string>m</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="END_UNIT">
+    <property name="geometry">
+     <rect>
+      <x>75</x>
+      <y>80</y>
+      <width>21</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>m</string>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QGroupBox" name="TCU_GRP">
+   <property name="geometry">
+    <rect>
+     <x>250</x>
+     <y>20</y>
+     <width>151</width>
+     <height>106</height>
+    </rect>
+   </property>
+   <property name="title">
+    <string>Device options</string>
+   </property>
+   <widget class="QCheckBox" name="AUTO_MCP_CHK">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>25</y>
+      <width>91</width>
+      <height>19</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Auto gain</string>
     </property>
    </widget>
    <widget class="QCheckBox" name="CENTRAL_SYMM_CHK">
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>335</y>
+      <y>50</y>
       <width>141</width>
       <height>22</height>
      </rect>
@@ -603,128 +181,716 @@
      <string>Central Symmetry</string>
     </property>
    </widget>
-  </widget>
-  <widget class="QGroupBox" name="SERIAL_COMM_GRP">
-   <property name="geometry">
-    <rect>
-     <x>20</x>
-     <y>310</y>
-     <width>281</width>
-     <height>71</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>Serial Port comm.</string>
-   </property>
-   <widget class="QComboBox" name="COM_LIST">
+   <widget class="QLabel" name="LASER">
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>20</y>
-      <width>61</width>
-      <height>22</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="SHARE_CHK">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>45</y>
-      <width>101</width>
-      <height>22</height>
+      <y>80</y>
+      <width>35</width>
+      <height>14</height>
      </rect>
     </property>
     <property name="text">
-     <string>Share Ports</string>
+     <string>Laser</string>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="LASER_ENERGY_LIST">
+    <property name="geometry">
+     <rect>
+      <x>60</x>
+      <y>75</y>
+      <width>72</width>
+      <height>24</height>
+     </rect>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QGroupBox" name="groupBox">
+   <property name="geometry">
+    <rect>
+     <x>140</x>
+     <y>170</y>
+     <width>191</width>
+     <height>211</height>
+    </rect>
+   </property>
+   <property name="title">
+    <string>GroupBox</string>
+   </property>
+   <widget class="QGroupBox" name="ENHANCE_GROUP">
+    <property name="geometry">
+     <rect>
+      <x>-10</x>
+      <y>40</y>
+      <width>171</width>
+      <height>361</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>Img Enhance Options</string>
+    </property>
+    <widget class="QLineEdit" name="KERNEL_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>35</y>
+       <width>31</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="KERNEL_SIZE">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>20</y>
+       <width>80</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Kernel size</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="LOW_IN_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>125</y>
+       <width>51</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="LOW_OUT_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>125</y>
+       <width>51</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="HIGH_IN_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>170</y>
+       <width>51</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="HIGH_OUT_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>170</y>
+       <width>51</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="GAMMA_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>80</y>
+       <width>51</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="LOW_IN">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>110</y>
+       <width>60</width>
+       <height>13</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>low in</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="HIGH_IN">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>155</y>
+       <width>60</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>high in</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="LOW_OUT">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>110</y>
+       <width>60</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>low out</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="HIGH_OUT">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>155</y>
+       <width>60</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>high out</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="GAMMA">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>65</y>
+       <width>60</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Gamma</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="LOG_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>80</y>
+       <width>51</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="LOG">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>65</y>
+       <width>60</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Log</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="ACCU_BASE">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>200</y>
+       <width>81</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Accu. base</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="ACCU_BASE_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>215</y>
+       <width>51</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="DEHAZE_PCT_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>260</y>
+       <width>51</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="DEHAZE_PCT">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>245</y>
+       <width>71</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Dehaze %</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="SKY_TOLERANCE">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>245</y>
+       <width>61</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Sky Tol.</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="SKY_TOLERANCE_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>260</y>
+       <width>51</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="FAST_GF_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>305</y>
+       <width>31</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="FAST_GF">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>290</y>
+       <width>61</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Fast gf</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="REP_FREQ_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>70</y>
+       <width>61</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="SAVE_SCAN_ORI_CHK">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>95</y>
+       <width>109</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>original img</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="FREQ_LBL">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>55</y>
+       <width>86</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Rep. freq.</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="FREQ_UNIT">
+     <property name="geometry">
+      <rect>
+       <x>94</x>
+       <y>75</y>
+       <width>21</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>kHz</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="UNIT_NS_3">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>140</y>
+       <width>21</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>ns</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="STEP_LBL">
+     <property name="geometry">
+      <rect>
+       <x>25</x>
+       <y>120</y>
+       <width>86</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Stepping</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="STEP_SIZE_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>25</x>
+       <y>135</y>
+       <width>61</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="UNIT_NS_2">
+     <property name="geometry">
+      <rect>
+       <x>130</x>
+       <y>100</y>
+       <width>21</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>ns</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="START_POS_EDIT_N">
+     <property name="geometry">
+      <rect>
+       <x>95</x>
+       <y>55</y>
+       <width>31</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="UNIT_US">
+     <property name="geometry">
+      <rect>
+       <x>75</x>
+       <y>60</y>
+       <width>21</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>μs</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="START_POS_EDIT_U">
+     <property name="geometry">
+      <rect>
+       <x>40</x>
+       <y>55</y>
+       <width>31</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="END_POS_EDIT_U">
+     <property name="geometry">
+      <rect>
+       <x>40</x>
+       <y>95</y>
+       <width>31</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="END_POS_EDIT_N">
+     <property name="geometry">
+      <rect>
+       <x>95</x>
+       <y>95</y>
+       <width>31</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="UNIT_NS">
+     <property name="geometry">
+      <rect>
+       <x>130</x>
+       <y>60</y>
+       <width>21</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>ns</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="UNIT_US_2">
+     <property name="geometry">
+      <rect>
+       <x>75</x>
+       <y>100</y>
+       <width>21</width>
+       <height>14</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>μs</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QGroupBox" name="SERIAL_COMM_GRP">
+    <property name="geometry">
+     <rect>
+      <x>-20</x>
+      <y>20</y>
+      <width>281</width>
+      <height>71</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>Serial Port comm.</string>
+    </property>
+    <widget class="QComboBox" name="COM_LIST">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>20</y>
+       <width>61</width>
+       <height>22</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="SHARE_CHK">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>45</y>
+       <width>101</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Share Ports</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="BAUDRATE_LIST">
+     <property name="geometry">
+      <rect>
+       <x>190</x>
+       <y>45</y>
+       <width>72</width>
+       <height>20</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QLabel" name="BAUDRATE">
+     <property name="geometry">
+      <rect>
+       <x>130</x>
+       <y>47</y>
+       <width>61</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Baudrate</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="COM_DATA_EDT">
+     <property name="geometry">
+      <rect>
+       <x>100</x>
+       <y>20</y>
+       <width>161</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>88 1E 00 00 00 00 99</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QGroupBox" name="DEVICE_GRP">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>0</y>
+       <width>141</width>
+       <height>71</height>
+      </rect>
+     </property>
+     <property name="title">
+      <string>Device</string>
+     </property>
+     <widget class="QCheckBox" name="CAMERALINK_CHK">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>20</y>
+        <width>91</width>
+        <height>19</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Cameralink</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="IP_EDIT">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>40</y>
+        <width>101</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>192.168.1.159</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>45</y>
+        <width>21</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>IP</string>
+      </property>
+     </widget>
+    </widget>
+   </widget>
+   <widget class="QCheckBox" name="LASER_CHK_1">
+    <property name="geometry">
+     <rect>
+      <x>140</x>
+      <y>160</y>
+      <width>32</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>1</string>
     </property>
     <property name="checked">
      <bool>true</bool>
     </property>
    </widget>
-   <widget class="QComboBox" name="BAUDRATE_LIST">
+   <widget class="QComboBox" name="HZ_LIST">
     <property name="geometry">
      <rect>
-      <x>190</x>
-      <y>45</y>
-      <width>72</width>
-      <height>20</height>
+      <x>175</x>
+      <y>60</y>
+      <width>45</width>
+      <height>22</height>
      </rect>
     </property>
    </widget>
-   <widget class="QLabel" name="BAUDRATE">
+   <widget class="QCheckBox" name="LASER_CHK_3">
     <property name="geometry">
      <rect>
-      <x>130</x>
-      <y>47</y>
-      <width>61</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Baudrate</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="COM_DATA_EDT">
-    <property name="geometry">
-     <rect>
-      <x>100</x>
-      <y>20</y>
-      <width>161</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>88 1E 00 00 00 00 99</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-  </widget>
-  <widget class="QGroupBox" name="TCU_GRP">
-   <property name="geometry">
-    <rect>
-     <x>160</x>
-     <y>20</y>
-     <width>141</width>
-     <height>201</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>TCU Options</string>
-   </property>
-   <widget class="QCheckBox" name="AUTO_REP_FREQ_CHK">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>20</y>
-      <width>130</width>
+      <x>140</x>
+      <y>180</y>
+      <width>32</width>
       <height>20</height>
      </rect>
     </property>
     <property name="text">
-     <string>Auto rep. freq.</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="MAX_DIST_EDT">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>115</y>
-      <width>101</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     <string>3</string>
     </property>
    </widget>
    <widget class="QLabel" name="MAX_DIST">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>100</y>
+      <x>100</x>
+      <y>120</y>
       <width>126</width>
       <height>14</height>
      </rect>
@@ -736,8 +902,8 @@
    <widget class="QLabel" name="MAX_DIST_UNIT">
     <property name="geometry">
      <rect>
-      <x>115</x>
-      <y>120</y>
+      <x>205</x>
+      <y>140</y>
       <width>21</width>
       <height>14</height>
      </rect>
@@ -746,96 +912,11 @@
      <string>ns</string>
     </property>
    </widget>
-   <widget class="QLabel" name="BASE_UNIT">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>73</y>
-      <width>70</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Base unit</string>
-    </property>
-   </widget>
-   <widget class="QComboBox" name="UNIT_LIST">
-    <property name="geometry">
-     <rect>
-      <x>85</x>
-      <y>70</y>
-      <width>45</width>
-      <height>22</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QComboBox" name="HZ_LIST">
-    <property name="geometry">
-     <rect>
-      <x>85</x>
-      <y>40</y>
-      <width>45</width>
-      <height>22</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="REP_FREQ_UNIT">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>43</y>
-      <width>70</width>
-      <height>14</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Rep. freq</string>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="LASER_CHK_1">
-    <property name="geometry">
-     <rect>
-      <x>50</x>
-      <y>140</y>
-      <width>32</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>1</string>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="LASER_CHK_2">
-    <property name="geometry">
-     <rect>
-      <x>90</x>
-      <y>140</y>
-      <width>32</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>2</string>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="LASER_CHK_3">
-    <property name="geometry">
-     <rect>
-      <x>50</x>
-      <y>160</y>
-      <width>32</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>3</string>
-    </property>
-   </widget>
    <widget class="QCheckBox" name="LASER_CHK_4">
     <property name="geometry">
      <rect>
-      <x>90</x>
-      <y>160</y>
+      <x>180</x>
+      <y>180</y>
       <width>32</width>
       <height>20</height>
      </rect>
@@ -844,82 +925,79 @@
      <string>4</string>
     </property>
    </widget>
-   <widget class="QLabel" name="LASER">
+   <widget class="QCheckBox" name="LASER_CHK_2">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>143</y>
-      <width>35</width>
+      <x>180</x>
+      <y>160</y>
+      <width>32</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>2</string>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="UNIT_LIST">
+    <property name="geometry">
+     <rect>
+      <x>175</x>
+      <y>90</y>
+      <width>45</width>
+      <height>22</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="MAX_DIST_EDT">
+    <property name="geometry">
+     <rect>
+      <x>100</x>
+      <y>135</y>
+      <width>101</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="REP_FREQ_UNIT">
+    <property name="geometry">
+     <rect>
+      <x>100</x>
+      <y>63</y>
+      <width>70</width>
       <height>14</height>
      </rect>
     </property>
     <property name="text">
-     <string>Laser</string>
+     <string>Rep. freq</string>
     </property>
    </widget>
-   <widget class="QCheckBox" name="AUTO_MCP_CHK">
+   <widget class="QCheckBox" name="AUTO_REP_FREQ_CHK">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>180</y>
-      <width>81</width>
-      <height>19</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Auto MCP</string>
-    </property>
-   </widget>
-  </widget>
-  <widget class="QGroupBox" name="DEVICE_GRP">
-   <property name="geometry">
-    <rect>
-     <x>160</x>
-     <y>230</y>
-     <width>141</width>
-     <height>71</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>Device</string>
-   </property>
-   <widget class="QCheckBox" name="CAMERALINK_CHK">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>20</y>
-      <width>91</width>
-      <height>19</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Cameralink</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="IP_EDIT">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
+      <x>100</x>
       <y>40</y>
-      <width>101</width>
-      <height>24</height>
+      <width>130</width>
+      <height>20</height>
      </rect>
     </property>
     <property name="text">
-     <string>192.168.1.159</string>
+     <string>Auto rep. freq.</string>
     </property>
    </widget>
-   <widget class="QLabel" name="label">
+   <widget class="QLabel" name="BASE_UNIT">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>45</y>
-      <width>21</width>
-      <height>16</height>
+      <x>100</x>
+      <y>93</y>
+      <width>70</width>
+      <height>14</height>
      </rect>
     </property>
     <property name="text">
-     <string>IP</string>
+     <string>Base unit</string>
     </property>
    </widget>
   </widget>

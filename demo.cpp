@@ -29,7 +29,11 @@ void MouseThread::run()
 void MouseThread::draw_cursor()
 {
     Demo* ptr = (Demo*)p_info;
-    if (QApplication::mouseButtons() == Qt::LeftButton || ptr->is_maximized()) return;
+    if (QApplication::mouseButtons() == Qt::LeftButton) return;
+    if (ptr->is_maximized()) {
+        emit set_cursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+        return;
+    }
 //    QWidget *w = QApplication::widgetAt(ptr->cursor().pos());
     QPoint diff = ptr->cursor().pos() - ptr->pos();
     // cursor in title bar
@@ -71,8 +75,8 @@ Demo::Demo(QWidget *parent)
     range_threshold(0),
     trigger_by_software(false),
     curr_cam(NULL),
-    time_exposure_edit(5000),
-    gain_analog_edit(0),
+    time_exposure_edit(90000),
+    gain_analog_edit(23),
     frame_rate_edit(10),
     com{NULL},
     share_serial_port(true),
@@ -84,15 +88,16 @@ Demo::Demo(QWidget *parent)
     hz_unit(0),
     base_unit(0),
     fps(10),
-    duty(5000),
+    duty(90000),
     mcp(0),
-    laser_on(0),
+    laser_on(1),
     zoom(0),
     focus(0),
+    laser_zoom(0),
     distance(0),
     max_dist(15000),
     laser_width(500),
-    delay_dist(75),
+    delay_dist(200),
     depth_of_view(75),
     focus_direction(0),
     curr_laser_idx(-1),
@@ -208,8 +213,10 @@ Demo::Demo(QWidget *parent)
     ui->FOCUS_SPEED_SLIDER->setValue(5);
     connect(ui->FOCUS_SPEED_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_focus_speed(int)), Qt::QueuedConnection);
 
-    ui->CONTINUE_SCAN_BUTTON->hide();
-    ui->RESTART_SCAN_BUTTON->hide();
+//    ui->CONTINUE_SCAN_BUTTON->hide();
+//    ui->RESTART_SCAN_BUTTON->hide();
+    ui->CONTINUE_SCAN_BUTTON->setEnabled(false);
+    ui->RESTART_SCAN_BUTTON->setEnabled(false);
 
     // connect QLineEdit, QButton signals used in thread
     connect(this, SIGNAL(append_text(QString)), SLOT(append_data(QString)), Qt::QueuedConnection);
@@ -272,8 +279,8 @@ Demo::Demo(QWidget *parent)
 //    setup_stepping(0);
 
     // - write default params
-    data_exchange(false);
-    enable_controls(false);
+//    data_exchange(false);
+//    enable_controls(false);
 
     // right before gui display (init state)
     on_ENUM_BUTTON_clicked();
@@ -297,6 +304,26 @@ Demo::Demo(QWidget *parent)
     // in development
     ui->ROI_TABLE->hide();
     ui->ROI_RADIO->hide();
+
+    ui->groupBox->hide();
+    ui->LOGO->setPixmap(QPixmap::fromImage(QImage(":/logo/3.png")));
+    ui->EST_DIST->setText("200.00 m");
+    ui->GATE_WIDTH->setText("75.00 m");
+
+    connect(ui->CONFIG_BUTTON, SIGNAL(clicked()), ui->TITLE->prog_settings, SLOT(show()));
+    connect(ui->CONFIG_BUTTON, SIGNAL(clicked()), ui->TITLE->prog_settings, SLOT(raise()));
+
+    ui->TITLE->process_maximize();
+    ui->HIDE_BTN->click();
+    setup_stepping(2);
+    stepping = 10 / dist_ns;
+
+    ui->START_BUTTON->click();
+    QThread::sleep(2);
+    ui->START_GRABBING_BUTTON->click();
+
+    data_exchange(false);
+    enable_controls(false);
 
 #ifdef ICMOS
     ui->ESTIMATED->hide();
@@ -382,6 +409,7 @@ void Demo::data_exchange(bool read){
 
         zoom = ui->ZOOM_EDIT->text().toInt();
         focus = ui->FOCUS_EDIT->text().toInt();
+        laser_zoom = ui->LASER_ZOOM_EDIT->text().toInt();
 
         laser_width = laser_width_u * 1000 + laser_width_n;
         delay_dist = std::round((delay_a_u * 1000 + delay_a_n) * dist_ns);
@@ -427,6 +455,7 @@ void Demo::data_exchange(bool read){
 
         ui->ZOOM_EDIT->setText(QString::asprintf("%d", zoom));
         ui->FOCUS_EDIT->setText(QString::asprintf("%d", focus));
+        ui->LASER_ZOOM_EDIT->setText(QString::asprintf("%d", laser_zoom));
     }
 }
 
@@ -1312,6 +1341,11 @@ void Demo::set_dev_ip(int ip, int gateway)
     curr_cam->ip_address(false, &ip, &gateway);
 }
 
+void Demo::display_logo(bool show)
+{
+    show ? ui->LOGO->show() : ui->LOGO->hide();
+}
+
 void Demo::export_config()
 {
 //    QString config_name = QFileDialog::getSaveFileName(this, tr("Save Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/config.ssy", tr("*.ssy"));
@@ -1476,15 +1510,18 @@ void Demo::update_delay()
 
 void Demo::update_gate_width() {
     if (depth_of_view < 0) depth_of_view = 0;
-    if (depth_of_view > 1500) depth_of_view = 1500;
+    if (depth_of_view > 525) depth_of_view = 525;
 
-    int gw = std::round(depth_of_view / dist_ns);
+    int gw = laser_width = std::round(depth_of_view / dist_ns);
 
     ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view));
 //    gate_width_a_n = gate_width_b_n = laser_width_n = gw % 1000;
 //    gate_width_a_u = gate_width_b_u = laser_width_u = gw / 1000;
     gate_width_a_n = gw % 1000;
     gate_width_a_u = gw / 1000;
+
+    // LASER WIDTH
+    communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width + 8) / 8), 7, 1, false);
 
     // GATE WIDTH A
     communicate_display(com[0], convert_to_send_tcu(0x03, gw + 8), 7, 1, false);
@@ -1816,6 +1853,23 @@ void Demo::set_focus()
     communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], QByteArray((char*)out, 7), 7, 1, false);
 }
 
+void Demo::set_laser_zoom()
+{
+    data_exchange(true);
+    unsigned sum = 0;
+    uchar out[7];
+    out[0] = 0xFF;
+    out[1] = 0x01;
+    out[2] = 0x00;
+    out[3] = 0x81;
+    out[4] = (laser_zoom >> 8) & 0xFF;
+    out[5] = laser_zoom & 0xFF;
+    for (int i = 1; i < 6; i++)
+        sum += out[i];
+    out[6] = sum & 0xFF;
+
+    communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], QByteArray((char*)out, 7), 7, 1, false);
+}
 
 void Demo::start_laser()
 {
@@ -2054,8 +2108,12 @@ void Demo::keyPressEvent(QKeyEvent *event)
             else if (edit == ui->FOCUS_EDIT) {
                 set_focus();
             }
+            else if (edit == ui->LASER_ZOOM_EDIT) {
+                set_laser_zoom();
+            }
             else if (edit == ui->CCD_FREQ_EDIT || edit == ui->DUTY_EDIT || edit == ui->GAIN_EDIT) {
                 on_SET_PARAMS_BUTTON_clicked();
+                on_GET_LENS_PARAM_BTN_clicked();
             }
             else if (edit == ui->FOCUS_SPEED_EDIT) {
                 change_focus_speed(edit->text().toInt());
@@ -2178,6 +2236,8 @@ void Demo::resizeEvent(QResizeEvent *event)
 //    ui->HIDE_BTN->move(ui->LEFT->geometry().right() - 10 + (ui->SOURCE_DISPLAY->geometry().left() + ui->MID->geometry().left() - ui->LEFT->geometry().right() + 10) / 2 + 2, this->geometry().height() / 2 - 10);
     ui->RULER_H->setGeometry(region.left(), region.bottom() - 10, region.width(), 32);
     ui->RULER_V->setGeometry(region.right() - 10, region.top(), 32, region.height());
+
+    ui->LOGO->move(this->width() - 210, this->height() - 80);
 
     image_mutex.lock();
     ui->SOURCE_DISPLAY->setGeometry(region);
@@ -2339,9 +2399,9 @@ void Demo::on_SCAN_BUTTON_clicked()
 
     if (start_scan) {
         rep_freq = settings->rep_freq;
-        delay_dist = settings->start_pos * dist_ns;
+        delay_dist = settings->start_pos;
         scan_stopping_delay = settings->end_pos;
-        scan_step = settings->step_size * dist_ns;
+        scan_step = settings->step_size;
 
         if (ui->TITLE->prog_settings->save_scan_ori || ui->TITLE->prog_settings->save_scan_res) {
             scan_name = "scan_" + QDateTime::currentDateTime().toString("MMdd_hhmmss");
@@ -2407,14 +2467,14 @@ void Demo::enable_scan_options(bool show)
     ui->CONTINUE_SCAN_BUTTON->setEnabled(!scan);
     ui->RESTART_SCAN_BUTTON->setEnabled(!scan);
 
-    if (show) {
-        ui->CONTINUE_SCAN_BUTTON->show();
-        ui->RESTART_SCAN_BUTTON->show();
-    }
-    else {
-        ui->CONTINUE_SCAN_BUTTON->hide();
-        ui->RESTART_SCAN_BUTTON->hide();
-    }
+//    if (show) {
+//        ui->CONTINUE_SCAN_BUTTON->show();
+//        ui->RESTART_SCAN_BUTTON->show();
+//    }
+//    else {
+//        ui->CONTINUE_SCAN_BUTTON->hide();
+//        ui->RESTART_SCAN_BUTTON->hide();
+//    }
 }
 
 void Demo::on_FRAME_AVG_CHECK_stateChanged(int arg1)
@@ -2494,6 +2554,9 @@ void Demo::on_GET_LENS_PARAM_BTN_clicked()
 
     read = communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
     focus = (read[4] << 8) + read[5];
+
+    read = communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x57, 0x00, 0x00, 0x57}, 7), 7, 7, true);
+    laser_zoom = (read[4] << 8) + read[5];
 
     data_exchange(false);
 }
