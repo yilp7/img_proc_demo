@@ -1,7 +1,9 @@
 #include "mvcam.h"
 
-Cam::Cam() {dev_handle = NULL;}
+Cam::Cam() {dev_handle = NULL; cameralink = false;}
 Cam::~Cam() {if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;}
+
+cv::Mat img;
 
 int Cam::search_for_devices()
 {
@@ -36,7 +38,7 @@ int Cam::search_for_devices()
     }
     if (st_dev_list.nDeviceNum) device_type = 1;
 
-    return st_dev_list.nDeviceNum;
+    return device_type;
 }
 
 int Cam::start() {
@@ -45,28 +47,13 @@ int Cam::start() {
     // get and store devices list to m_stDevList
     int ret;
     MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
-    for (uint i = 0; i < st_dev_list.nDeviceNum; i++) {
-        ret = MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
-        if (!ret) break;
-    }
-
-    if (!MV_CC_IsDeviceAccessible(st_dev_list.pDeviceInfo[0], MV_ACCESS_Exclusive)) {
-//        MV_GIGE_DEVICE_INFO gige_info = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo;
-        MV_GIGE_ForceIpEx(dev_handle, (192 << 24) + (168 << 16) + (1 << 8) + 179, (255 << 24) + (255 << 16) + (255 << 8), (192 << 24) + (168 << 16) + (1 << 8) + 1);
-
-        MV_CC_DestroyHandle(dev_handle);
-
-        MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
-        for (uint i = 0; i < st_dev_list.nDeviceNum; i++) {
-            ret = MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
-            if (!ret) break;
-        }
-    }
+    ret = MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
 
 	ret = MV_CC_OpenDevice(dev_handle);
 	if (ret != MV_OK) {
 		MV_CC_DestroyHandle(dev_handle);
         dev_handle = NULL;
+        return ret;
 	}
 
     int size = MV_CC_GetOptimalPacketSize(dev_handle);
@@ -77,6 +64,8 @@ int Cam::start() {
     MV_CC_SetEnumValue(dev_handle, "ExposureAuto", MV_EXPOSURE_AUTO_MODE_OFF);
     MV_CC_SetEnumValue(dev_handle, "GainAuto", 0);
     MV_CC_SetBoolValue(dev_handle, "AcquisitionFrameRateEnable", true);
+    MV_CC_SetEnumValue(dev_handle, "BinningHorizontal", 1);
+    MV_CC_SetEnumValue(dev_handle, "BinningVertical", 1);
 
 //    MVCC_ENUMVALUE pix = {0};
 //    MV_CC_GetPixelFormat(dev_handle, &pix);
@@ -131,6 +120,7 @@ void Cam::get_frame_size(int &w, int &h)
     w = int_value.nCurValue;
     MV_CC_GetIntValue(dev_handle, "Height", &int_value);
     h = int_value.nCurValue;
+    img = cv::Mat(h, w, CV_8UC1);
 }
 
 void Cam::time_exposure(bool read, float *val)
@@ -186,6 +176,33 @@ void Cam::trigger_source(bool read, bool *val)
     }
 }
 
+void Cam::binning(bool read, int *val)
+{
+    if (read) {
+        MVCC_ENUMVALUE enum_val;
+        MV_CC_GetEnumValue(dev_handle, "BinningHorizontal", &enum_val);
+        MV_CC_GetEnumValue(dev_handle, "BinningVertical", &enum_val);
+        *val = enum_val.nCurValue;
+    }
+    else {
+        MV_CC_SetEnumValue(dev_handle, "BinningHorizontal", *val);
+        MV_CC_SetEnumValue(dev_handle, "BinningVertical", *val);
+    }
+}
+
+void Cam::ip_address(bool read, int *ip, int *gateway)
+{
+    if (read) {
+        MV_CC_DEVICE_INFO_LIST st_dev_list;
+        MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
+        *ip = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nCurrentIp;
+        *gateway = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nDefultGateWay;
+    }
+    else {
+        MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
+    }
+}
+
 void Cam::trigger_once()
 {
     MV_CC_SetCommandValue(dev_handle, "TriggerSoftware");
@@ -193,7 +210,7 @@ void Cam::trigger_once()
 
 void Cam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *user_data)
 {
-    static cv::Mat img(frame_info->nHeight, frame_info->nWidth, CV_8U);
+//    static cv::Mat img(frame_info->nHeight, frame_info->nWidth, CV_8U);
     memcpy(img.data, data, frame_info->nFrameLen);
     ((std::queue<cv::Mat>*)user_data)->push(img.clone());
 }

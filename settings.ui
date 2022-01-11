@@ -35,7 +35,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>Starting delay</string>
+     <string>Starting dist.</string>
     </property>
    </widget>
    <widget class="QLabel" name="END_LBL">
@@ -48,7 +48,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>Ending delay</string>
+     <string>Ending dist.</string>
     </property>
    </widget>
    <widget class="QLabel" name="FRAME_LBL">

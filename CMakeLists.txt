@@ -52,8 +52,8 @@ set(SOURCE_FILES
 	mywidget.cpp
 	progsettings.cpp
 	imageproc.cpp
-	cam.cpp
-#	mvcam.cpp
+#	cam.cpp
+    mvcam.cpp
 #	hqvcam.cpp
 #	euresyscam.cpp
     utils.h
@@ -62,8 +62,8 @@ set(SOURCE_FILES
 	mywidget.h
 	progsettings.h
 	imageproc.h
-	cam.h
-#	mvcam.h
+#	cam.h
+    mvcam.h
 #	hqvcam.h
 #	euresyscam.h
     demo_dev.ui

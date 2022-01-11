@@ -85,6 +85,7 @@ ProgSettings::ProgSettings(QWidget *parent) :
     ui->LASER_ENERGY_LIST->addItem("50%");
     ui->LASER_ENERGY_LIST->addItem("100%");
     ui->LASER_ENERGY_LIST->setCurrentIndex(1);
+    ui->LASER_ENERGY_LIST->installEventFilter(this);
 
     data_exchange(false);
 }
@@ -101,8 +102,8 @@ void ProgSettings::data_exchange(bool read)
 //        else start_pos = ui->START_POS_EDIT_U->text().toInt() * 1000 + ui->START_POS_EDIT_N->text().toInt();
 //        if (ui->END_POS_EDIT_N->text().toInt() > 999) end_pos = ui->END_POS_EDIT_N->text().toInt();
 //        else end_pos = ui->END_POS_EDIT_U->text().toInt() * 1000 + ui->END_POS_EDIT_N->text().toInt();
-        start_pos = std::round(ui->START_EDIT->text().toInt());
-        end_pos = std::round(ui->END_EDIT->text().toInt());
+        start_pos = ui->START_EDIT->text().toInt();
+        end_pos = ui->END_EDIT->text().toInt();
         frame_count = ui->FRAME_COUNT_EDIT->text().toInt();
         step_size = ui->STEP_SIZE_EDIT->text().toFloat();
         rep_freq = ui->REP_FREQ_EDIT->text().toFloat();

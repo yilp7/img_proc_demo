@@ -175,7 +175,7 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     icon->setGeometry(10, 5, 20, 20);
     icon->setObjectName("ICON");
     title = new InfoLabel(this);
-    title->setGeometry(30, 0, 80, 30);
+    title->setGeometry(30, 0, 120, 30);
     title->setObjectName("NAME");
     min = new TitleButton(":/tools/min.png", this);
     min->setObjectName("MIN_BTN");

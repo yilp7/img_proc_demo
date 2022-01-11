@@ -19,7 +19,7 @@ TitleButton {
 }
 */
 #NAME, #APP_NAME {
-	image: url(:/logo/YJS);
+	image: url(:/logo/HNV);
 }
 
 #MIN_BTN::hover, #MAX_BTN::hover {
@@ -371,4 +371,8 @@ QSpinBox::down-button {
 	width: 12px;
 	image: url(:/tools/down.png);
 	margin-right: 16px;
+}
+
+QFrame#IMG_DASH_LINE {
+	border: 2px dashed #3C3C3C;
 }

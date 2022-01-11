@@ -1673,6 +1673,25 @@
        </property>
       </widget>
      </widget>
+     <widget class="QLabel" name="GATE_WIDTH">
+      <property name="geometry">
+       <rect>
+        <x>240</x>
+        <y>250</y>
+        <width>65</width>
+        <height>13</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+      </property>
+     </widget>
     </widget>
    </widget>
    <widget class="QFrame" name="RIGHT">
@@ -1968,7 +1987,7 @@
        <rect>
         <x>115</x>
         <y>147</y>
-        <width>51</width>
+        <width>55</width>
         <height>20</height>
        </rect>
       </property>
@@ -2001,7 +2020,7 @@
      <widget class="QLabel" name="STEPPING_UNIT">
       <property name="geometry">
        <rect>
-        <x>170</x>
+        <x>175</x>
         <y>150</y>
         <width>21</width>
         <height>14</height>
@@ -2084,25 +2103,6 @@
        <set>Qt::AlignCenter</set>
       </property>
      </widget>
-     <widget class="QLabel" name="GATE_WIDTH">
-      <property name="geometry">
-       <rect>
-        <x>20</x>
-        <y>150</y>
-        <width>65</width>
-        <height>13</height>
-       </rect>
-      </property>
-      <property name="mouseTracking">
-       <bool>false</bool>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-      </property>
-     </widget>
      <widget class="QLineEdit" name="MCP_EDIT">
       <property name="geometry">
        <rect>
@@ -2156,7 +2156,7 @@
          <x>20</x>
          <y>0</y>
          <width>51</width>
-         <height>21</height>
+         <height>20</height>
         </rect>
        </property>
        <property name="mouseTracking">
@@ -2172,7 +2172,7 @@
          <x>100</x>
          <y>0</y>
          <width>80</width>
-         <height>21</height>
+         <height>20</height>
         </rect>
        </property>
        <property name="mouseTracking">
@@ -2188,7 +2188,7 @@
          <x>100</x>
          <y>20</y>
          <width>80</width>
-         <height>21</height>
+         <height>20</height>
         </rect>
        </property>
        <property name="mouseTracking">
@@ -2204,13 +2204,39 @@
          <x>20</x>
          <y>20</y>
          <width>51</width>
-         <height>21</height>
+         <height>20</height>
         </rect>
        </property>
        <property name="text">
         <string>Config</string>
        </property>
       </widget>
+     </widget>
+     <widget class="QLineEdit" name="GATE_WIDTH_EDIT">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>145</y>
+        <width>55</width>
+        <height>21</height>
+       </rect>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="GATE_WIDTH_UNIT">
+      <property name="geometry">
+       <rect>
+        <x>80</x>
+        <y>150</y>
+        <width>21</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>m</string>
+      </property>
      </widget>
     </widget>
     <widget class="QGroupBox" name="OPERATION_STATIC">
@@ -2346,6 +2372,22 @@
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="Line" name="IMG_DASH_LINE">
+      <property name="geometry">
+       <rect>
+        <x>92</x>
+        <y>20</y>
+        <width>1</width>
+        <height>61</height>
+       </rect>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Plain</enum>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
       </property>
      </widget>
     </widget>

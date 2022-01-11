@@ -184,7 +184,7 @@ Demo::Demo(QWidget *parent)
     com_edit[2] = ui->LENS_COM_EDIT;
     com_edit[3] = ui->LASER_COM_EDIT;
 
-    for (int i = 0; i < 4; i++) com[i] = new QSerialPort, setup_com(com + i, i, com_edit[i]->text(), 9600);
+    for (int i = 0; i < 4; i++) com[i] = new QSerialPort, setup_com(com + i, i, com_edit[i]->text(), 115200);
 
 //    setup_com(com + 0, 0, com_edit[0]->text(), 9600);
 //    setup_com(com + 1, 1, com_edit[1]->text(), 115200);
@@ -210,8 +210,8 @@ Demo::Demo(QWidget *parent)
     ui->FOCUS_SPEED_SLIDER->setMaximum(64);
     ui->FOCUS_SPEED_SLIDER->setSingleStep(1);
     ui->FOCUS_SPEED_SLIDER->setPageStep(4);
-    ui->FOCUS_SPEED_SLIDER->setValue(5);
     connect(ui->FOCUS_SPEED_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_focus_speed(int)), Qt::QueuedConnection);
+    ui->FOCUS_SPEED_SLIDER->setValue(32);
 
 //    ui->CONTINUE_SCAN_BUTTON->hide();
 //    ui->RESTART_SCAN_BUTTON->hide();
@@ -306,7 +306,7 @@ Demo::Demo(QWidget *parent)
     ui->ROI_RADIO->hide();
 
     ui->groupBox->hide();
-    ui->LOGO->setPixmap(QPixmap::fromImage(QImage(":/logo/3.png")));
+    ui->LOGO->setPixmap(QPixmap::fromImage(QImage(":/logo/3a.png")));
     ui->EST_DIST->setText("200.00 m");
     ui->GATE_WIDTH->setText("75.00 m");
 
@@ -413,7 +413,8 @@ void Demo::data_exchange(bool read){
 
         laser_width = laser_width_u * 1000 + laser_width_n;
         delay_dist = std::round((delay_a_u * 1000 + delay_a_n) * dist_ns);
-        depth_of_view = std::round((gate_width_a_u * 1000 + gate_width_a_n) * dist_ns);
+//        depth_of_view = std::round((gate_width_a_u * 1000 + gate_width_a_n) * dist_ns);
+        depth_of_view = ui->GATE_WIDTH_EDIT->text().toFloat();
     }
     else {
 //        ui->DEVICE_SELECTION->setCurrentIndex(device_idx);
@@ -452,6 +453,7 @@ void Demo::data_exchange(bool read){
         ui->MCP_SLIDER->setValue(mcp);
 
         setup_stepping(base_unit);
+        ui->GATE_WIDTH_EDIT->setText(QString::number(depth_of_view, 'f', 2));
 
         ui->ZOOM_EDIT->setText(QString::asprintf("%d", zoom));
         ui->FOCUS_EDIT->setText(QString::asprintf("%d", focus));
@@ -535,7 +537,8 @@ int Demo::grab_thread_process() {
         // process ordinary image enhance
         else {
             if (ui->IMG_ENHANCE_CHECK->isChecked()) {
-                switch (ui->ENHANCE_OPTIONS->currentIndex()) {
+//                switch (ui->ENHANCE_OPTIONS->currentIndex()) {
+                switch (8) {
                 // histogram
                 case 1: {
                     cv::equalizeHist(modified_result, modified_result);
@@ -1189,7 +1192,7 @@ void Demo::on_SAVE_FINAL_BUTTON_clicked()
         image_mutex.unlock();
     }
     record_modified = !record_modified;
-    ui->SAVE_FINAL_BUTTON->setText(record_modified ? tr("Stop") : tr("RES"));
+    ui->SAVE_FINAL_BUTTON->setText(record_modified ? tr("Stop") : tr("Record"));
 }
 
 void Demo::on_SET_PARAMS_BUTTON_clicked()
@@ -1663,7 +1666,7 @@ void Demo::on_DIST_BTN_clicked() {
     }
     else {
         bool ok = false;
-        distance = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", 100, 100, max_dist, 100, &ok, Qt::FramelessWindowHint);
+        distance = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", 200, 200, max_dist, 100, &ok, Qt::FramelessWindowHint);
         if (!ok) return;
     }
 
@@ -2102,6 +2105,10 @@ void Demo::keyPressEvent(QKeyEvent *event)
                 }
                 setup_stepping(base_unit);
             }
+            else if (edit == ui->GATE_WIDTH_EDIT) {
+                depth_of_view = edit->text().toFloat();
+                update_gate_width();
+            }
             else if (edit == ui->ZOOM_EDIT) {
                 set_zoom();
             }
@@ -2237,7 +2244,7 @@ void Demo::resizeEvent(QResizeEvent *event)
     ui->RULER_H->setGeometry(region.left(), region.bottom() - 10, region.width(), 32);
     ui->RULER_V->setGeometry(region.right() - 10, region.top(), 32, region.height());
 
-    ui->LOGO->move(this->width() - 210, this->height() - 80);
+    ui->LOGO->move(this->width() - 220, this->height() - 80);
 
     image_mutex.lock();
     ui->SOURCE_DISPLAY->setGeometry(region);
@@ -2491,7 +2498,7 @@ void Demo::on_SAVE_RESULT_BUTTON_clicked()
 {
     save_modified = !save_modified;
     if (save_modified && !QDir(save_location + "/res_bmp").exists()) QDir().mkdir(save_location + "/res_bmp");
-    ui->SAVE_RESULT_BUTTON->setText(save_modified ? tr("Stop") : tr("RES"));
+    ui->SAVE_RESULT_BUTTON->setText(save_modified ? tr("Stop") : tr("Capture"));
 }
 
 void Demo::on_LASER_ZOOM_IN_BTN_pressed()

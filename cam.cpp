@@ -336,6 +336,7 @@ void Cam::ip_address(bool read, int *ip, int *gateway)
         else {
             MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
         }
+        break;
     }
     case 2:
         break;
