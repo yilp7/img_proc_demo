@@ -145,7 +145,7 @@
        <bool>false</bool>
       </property>
       <property name="text">
-       <string>CCD Freq</string>
+       <string>CMOS Freq</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
@@ -310,7 +310,7 @@
         </rect>
        </property>
        <property name="text">
-        <string>TCU</string>
+        <string>GATE</string>
        </property>
       </widget>
       <widget class="QLabel" name="RANGE_COM">
@@ -1716,7 +1716,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>340</y>
+       <y>370</y>
        <width>201</width>
        <height>121</height>
       </rect>
@@ -1899,7 +1899,7 @@
        <enum>Qt::Horizontal</enum>
       </property>
      </widget>
-     <widget class="QLabel" name="label">
+     <widget class="QLabel" name="LENS_STEPPING_LABEL">
       <property name="geometry">
        <rect>
         <x>130</x>
@@ -1941,7 +1941,7 @@
        <x>10</x>
        <y>10</y>
        <width>201</width>
-       <height>231</height>
+       <height>181</height>
       </rect>
      </property>
      <property name="mouseTracking">
@@ -1971,7 +1971,7 @@
        <rect>
         <x>20</x>
         <y>20</y>
-        <width>30</width>
+        <width>36</width>
         <height>14</height>
        </rect>
       </property>
@@ -1979,7 +1979,7 @@
        <bool>false</bool>
       </property>
       <property name="text">
-       <string>MCP</string>
+       <string>Gain</string>
       </property>
      </widget>
      <widget class="QLineEdit" name="STEPPING_EDIT">
@@ -2135,83 +2135,6 @@
        <string>Manually set dist.</string>
       </property>
      </widget>
-     <widget class="QFrame" name="SCAN_GRP">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>180</y>
-        <width>201</width>
-        <height>41</height>
-       </rect>
-      </property>
-      <property name="frameShape">
-       <enum>QFrame::NoFrame</enum>
-      </property>
-      <property name="frameShadow">
-       <enum>QFrame::Raised</enum>
-      </property>
-      <widget class="QPushButton" name="SCAN_BUTTON">
-       <property name="geometry">
-        <rect>
-         <x>20</x>
-         <y>0</y>
-         <width>51</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="mouseTracking">
-        <bool>false</bool>
-       </property>
-       <property name="text">
-        <string>Scan</string>
-       </property>
-      </widget>
-      <widget class="QPushButton" name="CONTINUE_SCAN_BUTTON">
-       <property name="geometry">
-        <rect>
-         <x>100</x>
-         <y>0</y>
-         <width>80</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="mouseTracking">
-        <bool>false</bool>
-       </property>
-       <property name="text">
-        <string>Continue</string>
-       </property>
-      </widget>
-      <widget class="QPushButton" name="RESTART_SCAN_BUTTON">
-       <property name="geometry">
-        <rect>
-         <x>100</x>
-         <y>20</y>
-         <width>80</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="mouseTracking">
-        <bool>false</bool>
-       </property>
-       <property name="text">
-        <string>Restart</string>
-       </property>
-      </widget>
-      <widget class="QPushButton" name="CONFIG_BUTTON">
-       <property name="geometry">
-        <rect>
-         <x>20</x>
-         <y>20</y>
-         <width>51</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="text">
-        <string>Config</string>
-       </property>
-      </widget>
-     </widget>
      <widget class="QLineEdit" name="GATE_WIDTH_EDIT">
       <property name="geometry">
        <rect>
@@ -2243,7 +2166,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>470</y>
+       <y>500</y>
        <width>201</width>
        <height>91</height>
       </rect>
@@ -2395,7 +2318,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>250</y>
+       <y>280</y>
        <width>201</width>
        <height>81</height>
       </rect>
@@ -2469,6 +2392,96 @@
       <property name="text">
        <string>Capture</string>
       </property>
+     </widget>
+    </widget>
+    <widget class="QGroupBox" name="SCAN_STATIC">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>200</y>
+       <width>201</width>
+       <height>71</height>
+      </rect>
+     </property>
+     <property name="title">
+      <string>Scan options</string>
+     </property>
+     <widget class="QFrame" name="SCAN_GRP">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>20</y>
+        <width>201</width>
+        <height>41</height>
+       </rect>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::NoFrame</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Raised</enum>
+      </property>
+      <widget class="QPushButton" name="SCAN_BUTTON">
+       <property name="geometry">
+        <rect>
+         <x>20</x>
+         <y>0</y>
+         <width>51</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="mouseTracking">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>Scan</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="CONTINUE_SCAN_BUTTON">
+       <property name="geometry">
+        <rect>
+         <x>100</x>
+         <y>0</y>
+         <width>80</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="mouseTracking">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>Continue</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="RESTART_SCAN_BUTTON">
+       <property name="geometry">
+        <rect>
+         <x>100</x>
+         <y>20</y>
+         <width>80</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="mouseTracking">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>Restart</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="CONFIG_BUTTON">
+       <property name="geometry">
+        <rect>
+         <x>20</x>
+         <y>20</y>
+         <width>51</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Config</string>
+       </property>
+      </widget>
      </widget>
     </widget>
    </widget>

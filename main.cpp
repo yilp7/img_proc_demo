@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
 
 //    qInstallMessageHandler(log_message);
 
-    SetUnhandledExceptionFilter(ExceptionFilter);
+//    SetUnhandledExceptionFilter(ExceptionFilter);
 
     Demo w;
     w.show();

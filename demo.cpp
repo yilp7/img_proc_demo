@@ -184,6 +184,14 @@ Demo::Demo(QWidget *parent)
     com_edit[2] = ui->LENS_COM_EDIT;
     com_edit[3] = ui->LASER_COM_EDIT;
 
+    QFile user_param("user_param");
+    user_param.open(QIODevice::ReadOnly);
+    QDataStream user_param_read(&user_param);
+    uint temp_com;
+    user_param_read >> temp_com;
+    user_param.close();
+    com_edit[0]->setText(QString::number(temp_com));
+
     for (int i = 0; i < 4; i++) com[i] = new QSerialPort, setup_com(com + i, i, com_edit[i]->text(), 115200);
 
 //    setup_com(com + 0, 0, com_edit[0]->text(), 9600);
@@ -280,7 +288,7 @@ Demo::Demo(QWidget *parent)
 
     // - write default params
 //    data_exchange(false);
-//    enable_controls(false);
+    enable_controls(false);
 
     // right before gui display (init state)
     on_ENUM_BUTTON_clicked();
@@ -315,15 +323,15 @@ Demo::Demo(QWidget *parent)
     ui->TITLE->process_maximize();
     ui->HIDE_BTN->click();
     setup_stepping(2);
-    stepping = 10 / dist_ns;
 
     ui->DUTY_EDIT->setEnabled(false);
     ui->START_BUTTON->click();
     QThread::sleep(2);
     ui->START_GRABBING_BUTTON->click();
 
+    stepping = 10 / dist_ns;
     data_exchange(false);
-    enable_controls(false);
+//    qDebug() << stepping;
 
 #ifdef ICMOS
     ui->ESTIMATED->hide();
@@ -1199,7 +1207,6 @@ void Demo::on_SET_PARAMS_BUTTON_clicked()
     data_exchange(true);
 
     duty = 1e6 / fps - 5000;
-    qDebug() << duty;
 
     // CCD FREQUENCY
     communicate_display(com[0], convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
@@ -2041,7 +2048,14 @@ void Demo::keyPressEvent(QKeyEvent *event)
             for (int i = 0; i < 4; i++) {
                 if (edit == com_edit[i]) {
                     if (com[i]) com[i]->close();
-                    setup_com(com + i, i, edit->text(), 9600);
+                    setup_com(com + i, i, edit->text(), 115200);
+                    if (i == 0) {
+                        QFile user_param("user_param");
+                        user_param.open(QIODevice::WriteOnly);
+                        QDataStream user_param_write(&user_param);
+                        user_param_write << edit->text().toUInt();
+                        user_param.close();
+                    }
                 }
             }
             if (edit == ui->FREQ_EDIT) {
@@ -2460,7 +2474,7 @@ void Demo::on_RESTART_SCAN_BUTTON_clicked()
 {
     scan = true;
     emit update_scan(true);
-    delay_dist = 200;
+    delay_dist = ui->TITLE->prog_settings->start_pos;
 
     on_CONTINUE_SCAN_BUTTON_clicked();
 }
