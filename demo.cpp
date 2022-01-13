@@ -371,7 +371,6 @@ void Demo::data_exchange(bool read){
         case 2: stepping = ui->STEPPING_EDIT->text().toFloat() / dist_ns; break;
         default: break;
         }
-        stepping = ui->STEPPING_EDIT->text().toFloat();
         delay_b_u = ui->DELAY_B_EDIT_U->text().toInt();
         delay_b_n = ui->DELAY_B_EDIT_N->text().toInt();
         delay_n_n = ui->DELAY_N_EDIT_N->text().toInt();
