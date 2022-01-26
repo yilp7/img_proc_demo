@@ -4,6 +4,7 @@
 #include <QSerialPort>
 #include <windows.h>
 
+#include "joystick.h"
 #include "threadpool.h"
 #include "mywidget.h"
 #include "imageproc.h"
@@ -99,6 +100,11 @@ public slots:
     void display_baudrate(int idx);
     void set_auto_mcp(bool adaptive);
     void set_dev_ip(int ip, int gateway);
+
+    // signaled by joystick input
+    void joystick_button_pressed(int btn);
+    void joystick_button_released(int btn);
+    void joystick_direction_changed(int direction);
 
 private slots:
     // on clicking enum btn: enumerate devices
@@ -360,7 +366,8 @@ private:
 
     GrabThread*             h_grab_thread;              // img-grab thread handle
     bool                    grab_thread_state;          // whether thread is created
-    MouseThread*            h_mouse_thread;             // processes mouse img
+    MouseThread*            h_mouse_thread;             // draw the mouse icon
+    JoystickThread*         h_joystick_thread;          // process joystick input
 
     cv::Mat                 img_mem;                    // right-side img display source (stream)
     cv::Mat                 modified_result;            // right-side img display modified (stream)
@@ -389,6 +396,15 @@ private:
     bool                    hide_left;                  // whether left bar is hidden
     int                     resize_place;               // mouse position when resizing or at border
     QPoint                  prev_pos;                   // previous window position
+
+    bool                    joybtn_A;                   // joystick button states
+    bool                    joybtn_B;
+    bool                    joybtn_X;
+    bool                    joybtn_Y;
+    bool                    joybtn_L1;
+    bool                    joybtn_L2;
+    bool                    joybtn_R1;
+    bool                    joybtn_R2;
 
     bool                    en;                         // for language switching
     QTranslator             trans;

@@ -110,6 +110,7 @@ Demo::Demo(QWidget *parent)
     h_grab_thread(NULL),
     grab_thread_state(false),
     h_mouse_thread(NULL),
+    h_joystick_thread(NULL),
     seq_idx(0),
     scan(false),
     scan_distance(200),
@@ -118,6 +119,14 @@ Demo::Demo(QWidget *parent)
     auto_mcp(false),
     hide_left(false),
     resize_place(22),
+    joybtn_A(false),
+    joybtn_B(false),
+    joybtn_X(false),
+    joybtn_Y(false),
+    joybtn_L1(false),
+    joybtn_L2(false),
+    joybtn_R1(false),
+    joybtn_R2(false),
     en(false),
     tp(40)
 {
@@ -322,6 +331,13 @@ Demo::Demo(QWidget *parent)
     ui->TITLE->prog_settings->data_exchange(false);
     ui->TITLE->prog_settings->max_dist_changed(5000);
 #endif
+
+    h_joystick_thread = new JoystickThread(this);
+    h_joystick_thread->start();
+
+    connect(h_joystick_thread, SIGNAL(button_pressed(int)), this, SLOT(joystick_button_pressed(int)));
+    connect(h_joystick_thread, SIGNAL(button_released(int)), this, SLOT(joystick_button_released(int)));
+    connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
 }
 
 Demo::~Demo()
@@ -1311,6 +1327,129 @@ void Demo::set_dev_ip(int ip, int gateway)
     curr_cam->ip_address(false, &ip, &gateway);
 }
 
+void Demo::joystick_button_pressed(int btn)
+{
+    switch (btn) {
+    case JoystickThread::BUTTON::A: joybtn_A = true; break;
+    case JoystickThread::BUTTON::B: joybtn_B = true; break;
+    case JoystickThread::BUTTON::X: joybtn_X = true; break;
+    case JoystickThread::BUTTON::Y: joybtn_Y = true; break;
+    case JoystickThread::BUTTON::L1:
+        joybtn_L1 = true;
+        if      (joybtn_X) on_ZOOM_IN_BTN_pressed();
+        else if (joybtn_Y) on_FOCUS_NEAR_BTN_pressed();
+        else if (joybtn_A) on_LASER_ZOOM_IN_BTN_pressed();
+        break;
+    case JoystickThread::BUTTON::L2: joybtn_L2 = true; break;
+    case JoystickThread::BUTTON::R1:
+        joybtn_R1 = true;
+        if      (joybtn_X) on_ZOOM_OUT_BTN_pressed();
+        else if (joybtn_Y) on_FOCUS_FAR_BTN_pressed();
+        else if (joybtn_A) on_LASER_ZOOM_OUT_BTN_pressed();
+        break;
+    case JoystickThread::BUTTON::R2: joybtn_R2 = true; break;
+    case JoystickThread::BUTTON::HOME:
+    case JoystickThread::BUTTON::SELECT:
+    case JoystickThread::BUTTON::MINUS:
+    case JoystickThread::BUTTON::PLUS:
+    default: break;
+    }
+}
+
+void Demo::joystick_button_released(int btn)
+{
+    switch (btn) {
+    case JoystickThread::BUTTON::A: joybtn_A = false; break;
+    case JoystickThread::BUTTON::B: joybtn_B = false; break;
+    case JoystickThread::BUTTON::X: joybtn_X = false; break;
+    case JoystickThread::BUTTON::Y: joybtn_Y = false; break;
+    case JoystickThread::BUTTON::L1:
+        joybtn_L1 = false;
+        on_ZOOM_IN_BTN_released();
+        on_FOCUS_NEAR_BTN_released();
+        on_LASER_ZOOM_IN_BTN_released();
+        break;
+    case JoystickThread::BUTTON::L2: joybtn_L2 = true; break;
+    case JoystickThread::BUTTON::R1:
+        joybtn_R1 = false;
+        on_ZOOM_OUT_BTN_released();
+        on_FOCUS_FAR_BTN_released();
+        on_LASER_ZOOM_OUT_BTN_released();
+        break;
+    case JoystickThread::BUTTON::R2: joybtn_R2 = false; break;
+    case JoystickThread::BUTTON::HOME: ui->SHUTDOWN_BUTTON->click(); ui->ENUM_BUTTON->click(); break;
+    case JoystickThread::BUTTON::SELECT: ui->START_BUTTON->click(); break;
+    case JoystickThread::BUTTON::MINUS:
+        if (joybtn_L1) stepping /= 10, setup_stepping(base_unit);
+        if (joybtn_L2) change_focus_speed(ui->FOCUS_SPEED_EDIT->text().toInt() - 8);
+        break;
+    case JoystickThread::BUTTON::PLUS:
+        if (joybtn_R1) stepping *= 10, setup_stepping(base_unit);
+        if (joybtn_R2) change_focus_speed(ui->FOCUS_SPEED_EDIT->text().toInt() + 8);
+        break;
+    default: break;
+    }
+}
+
+void Demo::joystick_direction_changed(int direction)
+{
+    QKeyEvent e(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+    // DIST
+    if (joybtn_A) {
+        switch (direction) {
+        case JoystickThread::DIRECTION::UP:
+            e = QKeyEvent(QEvent::KeyPress, Qt::Key_W, Qt::NoModifier);
+            keyPressEvent(&e);
+            break;
+        case JoystickThread::DIRECTION::DOWN:
+            e = QKeyEvent(QEvent::KeyPress, Qt::Key_S, Qt::NoModifier);
+            keyPressEvent(&e);
+            break;
+        case JoystickThread::DIRECTION::LEFT:
+            e = QKeyEvent(QEvent::KeyPress, Qt::Key_A, Qt::NoModifier);
+            keyPressEvent(&e);
+            break;
+        case JoystickThread::DIRECTION::RIGHT:
+            e = QKeyEvent(QEvent::KeyPress, Qt::Key_D, Qt::NoModifier);
+            keyPressEvent(&e);
+            break;
+        default: break;
+        }
+    }
+    // DOV
+    else if (joybtn_B) {
+        switch (direction) {
+        case JoystickThread::DIRECTION::UP:
+            e = QKeyEvent(QEvent::KeyPress, Qt::Key_I, Qt::NoModifier);
+            keyPressEvent(&e);
+            break;
+        case JoystickThread::DIRECTION::DOWN:
+            e = QKeyEvent(QEvent::KeyPress, Qt::Key_K, Qt::NoModifier);
+            keyPressEvent(&e);
+            break;
+        case JoystickThread::DIRECTION::LEFT:
+            e = QKeyEvent(QEvent::KeyPress, Qt::Key_J, Qt::NoModifier);
+            keyPressEvent(&e);
+            break;
+        case JoystickThread::DIRECTION::RIGHT:
+            e = QKeyEvent(QEvent::KeyPress, Qt::Key_L, Qt::NoModifier);
+            keyPressEvent(&e);
+            break;
+        default: break;
+        }
+    }
+    // PTZ
+    else if (joybtn_X) {
+        switch (direction) {
+        case JoystickThread::DIRECTION::UP:
+        case JoystickThread::DIRECTION::DOWN:
+        case JoystickThread::DIRECTION::LEFT:
+        case JoystickThread::DIRECTION::RIGHT:
+        default: break;
+        }
+    }
+}
+
 void Demo::export_config()
 {
 //    QString config_name = QFileDialog::getSaveFileName(this, tr("Save Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/config.ssy", tr("*.ssy"));
@@ -1904,6 +2043,7 @@ void Demo::change_focus_speed(int val)
     if (val < 1)  val = 1;
     if (val > 64) val = 64;
     ui->FOCUS_SPEED_EDIT->setText(QString::asprintf("%d", val));
+    ui->FOCUS_SPEED_SLIDER->setValue(val);
     if (val > 1) val -= 1;
 
     uchar out_data[9] = {0};
@@ -2111,7 +2251,6 @@ void Demo::keyPressEvent(QKeyEvent *event)
             goto_laser_preset(1 << (event->key() - Qt::Key_1));
             break;
         case Qt::Key_S:
-            qDebug() << "1";
             ui->TITLE->prog_settings->show();
             ui->TITLE->prog_settings->raise();
             break;

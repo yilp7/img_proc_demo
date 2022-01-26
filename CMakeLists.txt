@@ -46,27 +46,29 @@ link_directories(${OpenCV_DIR}/lib)
 
 set(SOURCE_FILES
 	main.cpp
-	utils.cpp
-	demo.cpp
-	threadpool.cpp
-	mywidget.cpp
-	progsettings.cpp
-	imageproc.cpp
-	cam.cpp
-#	mvcam.cpp
-#	hqvcam.cpp
-#	euresyscam.cpp
     utils.h
+	utils.cpp
 	demo.h
+	demo.cpp
 	threadpool.h
+	threadpool.cpp
 	mywidget.h
+	mywidget.cpp
 	progsettings.h
+	progsettings.cpp
 	imageproc.h
+	imageproc.cpp
 	cam.h
+	cam.cpp
 #	mvcam.h
+#	mvcam.cpp
 #	hqvcam.h
+#	hqvcam.cpp
 #	euresyscam.h
-    demo_dev.ui
+#	euresyscam.cpp
+    joystick.h
+	joystick.cpp
+	demo_dev.ui
 	settings.ui
 	resources/resources.qrc
 	icon.rc
@@ -88,6 +90,8 @@ set(PROJECT_LIBS
 	opencv_imgcodecs454
 	opencv_imgproc454
 	opencv_videoio454
+	# joystick
+	winmm
 )
 
 add_executable(Demo_param WIN32 ${SOURCE_FILES})
