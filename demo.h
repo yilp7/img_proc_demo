@@ -100,6 +100,7 @@ public slots:
     void display_baudrate(int idx);
     void set_auto_mcp(bool adaptive);
     void set_dev_ip(int ip, int gateway);
+    void change_pixel_format(int pixel_format);
 
     // signaled by joystick input
     void joystick_button_pressed(int btn);
@@ -360,6 +361,7 @@ private:
     bool                    save_scan;
     bool                    image_3d;                   // whether to build a 3d image
     int                     trigger_source;             // where the device gets the trigger signal
+    bool                    is_color;                   // display in mono8 or rgb8
 
     int                     w;                          // image width
     int                     h;                          // image height

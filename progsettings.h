@@ -19,6 +19,7 @@ public:
     void display_baudrate(int id, int baudrate);
     void enable_ip_editing(bool enable);
     void config_ip(bool read, int ip = 0, int gateway = 0); // ip and gateway will only be used when requesting ip
+    void set_pixel_format(int idx);
 
 protected:
     void keyPressEvent(QKeyEvent *event);
@@ -56,6 +57,8 @@ private slots:
     void on_FAST_GF_EDIT_editingFinished();
     void on_CENTRAL_SYMM_CHK_stateChanged(int arg1);
 
+    void on_PIXEL_FORMAT_LIST_activated(int index);
+
 signals:
     void rep_freq_unit_changed(int);
     void base_unit_changed(int);
@@ -67,6 +70,7 @@ signals:
     void get_baudrate(int);
     void auto_mcp(bool);
     void set_dev_ip(int ip, int gateway);
+    void change_pixel_format(int format);
 
 public:
     Ui::ProgSettings *ui;

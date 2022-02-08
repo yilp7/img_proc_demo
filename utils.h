@@ -7,6 +7,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/videoio.hpp>
+#include "PixelType.h"
 
 extern QFont monaco, consolas;
 extern QTextCodec *locale_codec;

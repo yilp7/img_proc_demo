@@ -105,6 +105,7 @@ Demo::Demo(QWidget *parent)
     save_original(false),
     save_modified(false),
     image_3d(false),
+    is_color(false),
     w(640),
     h(400),
     h_grab_thread(NULL),
@@ -690,7 +691,7 @@ int Demo::grab_thread_process() {
         if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(cropped_img, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
 
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
-        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, image_3d ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, image_3d || is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
         ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 
         // process scan
@@ -1046,6 +1047,7 @@ void Demo::on_START_BUTTON_clicked()
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
 
+    ui->TITLE->prog_settings->set_pixel_format(0);
 }
 
 void Demo::on_SHUTDOWN_BUTTON_clicked()
@@ -1325,6 +1327,12 @@ void Demo::set_auto_mcp(bool adaptive)
 void Demo::set_dev_ip(int ip, int gateway)
 {
     curr_cam->ip_address(false, &ip, &gateway);
+}
+
+void Demo::change_pixel_format(int pixel_format)
+{
+    int ret = curr_cam->pixel_type(false, &pixel_format);
+    is_color = pixel_format == PixelType_Gvsp_RGB8_Packed;
 }
 
 void Demo::joystick_button_pressed(int btn)

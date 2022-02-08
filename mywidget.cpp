@@ -208,6 +208,7 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     connect(prog_settings, SIGNAL(share_serial_port(bool)), this->parent()->parent(), SLOT(set_serial_port_share(bool)));
     connect(prog_settings, SIGNAL(auto_mcp(bool)), this->parent()->parent(), SLOT(set_auto_mcp(bool)));
     connect(prog_settings, SIGNAL(set_dev_ip(int, int)), this->parent()->parent(), SLOT(set_dev_ip(int, int)));
+    connect(prog_settings, SIGNAL(change_pixel_format(int)), this->parent()->parent(), SLOT(change_pixel_format(int)));
     settings_menu->addAction(">> export pref.", this->parent()->parent(), SLOT(export_config()), QKeySequence(Qt::ALT + Qt::Key_E));
     settings_menu->addAction("<< load pref.", this->parent()->parent(), SLOT(prompt_for_config_file()), QKeySequence(Qt::ALT + Qt::Key_R));
     settings->setMenu(settings_menu);

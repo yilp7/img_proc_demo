@@ -78,6 +78,12 @@ ProgSettings::ProgSettings(QWidget *parent) :
     temp.setPixelSize(11);
     ui->COM_DATA_EDT->setFont(temp);
 
+    ui->PIXEL_FORMAT_LIST->addItem("Mono8");
+    ui->PIXEL_FORMAT_LIST->addItem("Bayer_RG8");
+    ui->PIXEL_FORMAT_LIST->addItem("YUV422");
+    ui->PIXEL_FORMAT_LIST->addItem("RGB8");
+    ui->PIXEL_FORMAT_LIST->installEventFilter(this);
+
     data_exchange(false);
 }
 
@@ -210,6 +216,11 @@ void ProgSettings::config_ip(bool read, int ip, int gateway)
         sscanf(ui->IP_EDIT->text().toLatin1().constData(), "%d.%d.%d.%d", &ip1, &ip2, &ip3, &ip4);
         emit set_dev_ip((ip1 << 24) + (ip2 << 16) + (ip3 << 8) + ip4, (ip1 << 24) + (ip2 << 16) + (ip3 << 8) + 1);
     }
+}
+
+void ProgSettings::set_pixel_format(int idx)
+{
+    ui->PIXEL_FORMAT_LIST->setCurrentIndex(idx);
 }
 
 void ProgSettings::update_scan()
@@ -406,5 +417,12 @@ void ProgSettings::on_FAST_GF_EDIT_editingFinished()
 void ProgSettings::on_CENTRAL_SYMM_CHK_stateChanged(int arg1)
 {
     central_symmetry = arg1;
+}
+
+
+void ProgSettings::on_PIXEL_FORMAT_LIST_activated(int index)
+{
+    static int pixel_format[4] = {PixelType_Gvsp_Mono8, PixelType_Gvsp_BayerRG8, PixelType_Gvsp_YUV422_Packed, PixelType_Gvsp_RGB8_Packed};
+    emit change_pixel_format(pixel_format[index]);
 }
 

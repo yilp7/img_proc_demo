@@ -328,7 +328,7 @@ void Cam::ip_address(bool read, int *ip, int *gateway)
     switch (device_type) {
     case 1: {
         if (read) {
-            MV_CC_DEVICE_INFO_LIST st_dev_list;
+            MV_CC_DEVICE_INFO_LIST st_dev_list = {0};
             MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
             *ip = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nCurrentIp;
             *gateway = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nDefultGateWay;
@@ -342,6 +342,29 @@ void Cam::ip_address(bool read, int *ip, int *gateway)
     default:
         break;
     }
+}
+
+int Cam::pixel_type(bool read, int *val)
+{
+    int ret = 0;
+    switch (device_type) {
+    case 1: {
+        if (read) {
+            MVCC_ENUMVALUE temp = {0};
+            ret = MV_CC_GetPixelFormat(dev_handle, &temp);
+            *val = temp.nCurValue;
+        }
+        else {
+//            MV_CC_SetPixelFormat(dev_handle, PixelType_Gvsp_Mono8);
+            if (*val == PixelType_Gvsp_RGB8_Packed) cv::cvtColor(img, img, cv::COLOR_GRAY2RGB);
+            ret = MV_CC_SetPixelFormat(dev_handle, *val);
+        }
+    }
+    case 2:
+    default:
+        break;
+    }
+    return ret;
 }
 
 void Cam::trigger_once()
@@ -362,6 +385,7 @@ void Cam::trigger_once()
 void Cam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *user_data)
 {
 //    static cv::Mat img(frame_info->nHeight, frame_info->nWidth, CV_8UC1);
+//    img.data = data;
     memcpy(img.data, data, frame_info->nFrameLen);
     ((std::queue<cv::Mat>*)user_data)->push(img.clone());
 }
