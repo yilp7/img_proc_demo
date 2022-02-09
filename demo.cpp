@@ -411,8 +411,8 @@ void Demo::data_exchange(bool read){
         ui->IMG_3D_CHECK->setChecked(image_3d);
 
         ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)gain_analog_edit));
-        ui->DUTY_EDIT->setText(QString::asprintf("%.2f", (time_exposure_edit) / 1000));
-        ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.2f", frame_rate_edit));
+        ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
+        ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
         ui->FILE_PATH_EDIT->setText(save_location);
 
         delay_a_u = std::round(delay_dist / dist_ns) / 1000;
@@ -475,11 +475,11 @@ int Demo::grab_thread_process() {
         if (auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
             int thresh_num = img_mem.total() / 200, thresh = 255;
             while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-            if (thresh > 240) emit update_mcp_in_thread(mcp - sqrt(thresh - 240));
+            if (thresh > 240) emit update_mcp_in_thread(mcp -= sqrt(thresh - 240));
 //            qDebug() << "high" << thresh;
 //            thresh_num = img_mem.total() / 100, thresh = 255;
 //            while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-            if (thresh < 100) emit update_mcp_in_thread(mcp + sqrt(100 - thresh));
+            if (thresh < 100) emit update_mcp_in_thread(mcp += sqrt(100 - thresh));
 //            qDebug() << "low" << thresh;
         }
 
@@ -1577,7 +1577,7 @@ void Demo::update_delay()
 //    qDebug("estimated distance: %f\n", delay_dist);
 
     ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
-    ui->DELAY_SLIDER->setValue(delay_dist);
+    if (!qobject_cast<QSlider*>(sender())) ui->DELAY_SLIDER->setValue(delay_dist);
 
     int delay = std::round(delay_dist / dist_ns);
     delay_a_u = delay / 1000;
@@ -2010,7 +2010,8 @@ void Demo::change_mcp(int val)
     mcp = val;
 
 //    convert_to_send_tcu(0x0A, mcp);
-    communicate_display(com[0], convert_to_send_tcu(0x0A, mcp), 7, 1, false);
+    static QTimer t;
+    if (t.remainingTime() <= 0) communicate_display(com[0], convert_to_send_tcu(0x0A, mcp), 7, 1, false), t.start(fps ? 900 / fps : 100);
 
     ui->MCP_EDIT->setText(QString::number(val));
     ui->MCP_SLIDER->setValue(mcp);

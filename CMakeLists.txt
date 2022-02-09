@@ -58,10 +58,10 @@ set(SOURCE_FILES
 	progsettings.cpp
 	imageproc.h
 	imageproc.cpp
-	cam.h
-	cam.cpp
-#	mvcam.h
-#	mvcam.cpp
+#	cam.h
+#	cam.cpp
+    mvcam.h
+	mvcam.cpp
 #	hqvcam.h
 #	hqvcam.cpp
 #	euresyscam.h
