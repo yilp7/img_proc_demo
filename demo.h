@@ -2,7 +2,7 @@
 #define DEMO_H
 
 #include <QSerialPort>
-#include <windows.h>
+//#include <windows.h>
 
 #include "joystick.h"
 #include "threadpool.h"
@@ -369,7 +369,9 @@ private:
     GrabThread*             h_grab_thread;              // img-grab thread handle
     bool                    grab_thread_state;          // whether thread is created
     MouseThread*            h_mouse_thread;             // draw the mouse icon
+#ifdef WIN32
     JoystickThread*         h_joystick_thread;          // process joystick input
+#endif
 
     cv::Mat                 img_mem;                    // right-side img display source (stream)
     cv::Mat                 modified_result;            // right-side img display modified (stream)
