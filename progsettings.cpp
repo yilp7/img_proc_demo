@@ -64,7 +64,13 @@ ProgSettings::ProgSettings(QWidget *parent) :
     laser_grp->setExclusive(false);
     connect(laser_grp, SIGNAL(buttonToggled(int, bool)), SLOT(toggle_laser(int, bool)));
 
+    ui->BAUDRATE_LIST->addItem("1200");
+    ui->BAUDRATE_LIST->addItem("2400");
+    ui->BAUDRATE_LIST->addItem("4800");
     ui->BAUDRATE_LIST->addItem("9600");
+    ui->BAUDRATE_LIST->addItem("19200");
+    ui->BAUDRATE_LIST->addItem("38400");
+    ui->BAUDRATE_LIST->addItem("57600");
     ui->BAUDRATE_LIST->addItem("115200");
     ui->BAUDRATE_LIST->installEventFilter(this);
 
@@ -193,8 +199,14 @@ void ProgSettings::display_baudrate(int id, int baudrate)
     if (id != ui->COM_LIST->currentIndex()) return;
     int idx = 0;
     switch (baudrate) {
-    case 9600: idx = 0; break;
-    case 115200: idx = 1; break;
+    case 1200:   idx = 0; break;
+    case 2400:   idx = 1; break;
+    case 4800:   idx = 2; break;
+    case 9600:   idx = 3; break;
+    case 19200:  idx = 4; break;
+    case 38400:  idx = 5; break;
+    case 57600:  idx = 6; break;
+    case 115200: idx = 7; break;
     default: break;
     }
 
