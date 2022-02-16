@@ -8,8 +8,8 @@
 #include "threadpool.h"
 #include "mywidget.h"
 #include "imageproc.h"
-#include "cam.h"
-//#include "mvcam.h"
+//#include "cam.h"
+#include "mvcam.h"
 //#include "hqvscam.h"
 //#include "euresyscam.h"
 
@@ -369,9 +369,7 @@ private:
     GrabThread*             h_grab_thread;              // img-grab thread handle
     bool                    grab_thread_state;          // whether thread is created
     MouseThread*            h_mouse_thread;             // draw the mouse icon
-#ifdef WIN32
     JoystickThread*         h_joystick_thread;          // process joystick input
-#endif
 
     cv::Mat                 img_mem;                    // right-side img display source (stream)
     cv::Mat                 modified_result;            // right-side img display modified (stream)

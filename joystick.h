@@ -1,7 +1,9 @@
-#ifndef JOYSTICKTHREAD_H
+﻿#ifndef JOYSTICKTHREAD_H
 #define JOYSTICKTHREAD_H
 
+#ifdef WIN32
 #include <windows.h>
+#endif
 #include <MMSystem.h>
 #include <QThread>
 #include <QTimer>
@@ -57,16 +59,19 @@ signals:
     void pos_ur(int u, int r);
 
 private:
-    void      *p_info;
-    QTimer    *t;
-    JOYINFOEX *joy;
-    MMRESULT  joy_return;
-    DWORD     curr_btn;
-    DWORD     prev_btn;
-    int       curr_direction;
-    int       prev_direction;
-    int       x, y, u, r;
-    bool      pressed[14];
+    void          *p_info;
+    QTimer        *t;
+#ifdef WIN32
+    JOYINFOEX     *joy;
+    MMRESULT      joy_return;
+#endif
+
+    ulong         curr_btn;
+    ulong         prev_btn;
+    int           curr_direction;
+    int           prev_direction;
+    int           x, y, u, r;
+    bool          pressed[14];
 };
 
 #endif // JOYSTICKTHREAD_H

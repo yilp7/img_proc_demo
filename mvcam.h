@@ -14,7 +14,8 @@ private:
 
 public:
     // 0: no device; 1: MvCam; 2: HqvCam
-    int device_type;
+    int  device_type;
+    bool cameralink;
 
 public:
     Cam();

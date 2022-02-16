@@ -111,9 +111,7 @@ Demo::Demo(QWidget *parent)
     h_grab_thread(NULL),
     grab_thread_state(false),
     h_mouse_thread(NULL),
-#ifdef WIN32
     h_joystick_thread(NULL),
-#endif
     seq_idx(0),
     scan(false),
     scan_distance(200),
@@ -306,6 +304,13 @@ Demo::Demo(QWidget *parent)
     display_grp->addButton(ui->ROI_RADIO);
     display_grp->setExclusive(true);
 
+    h_joystick_thread = new JoystickThread(this);
+    h_joystick_thread->start();
+
+    connect(h_joystick_thread, SIGNAL(button_pressed(int)), this, SLOT(joystick_button_pressed(int)));
+    connect(h_joystick_thread, SIGNAL(button_released(int)), this, SLOT(joystick_button_released(int)));
+    connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
+
     // in development
     ui->ROI_TABLE->hide();
     ui->ROI_RADIO->hide();
@@ -333,17 +338,6 @@ Demo::Demo(QWidget *parent)
     ui->TITLE->prog_settings->max_dist = 5000;
     ui->TITLE->prog_settings->data_exchange(false);
     ui->TITLE->prog_settings->max_dist_changed(5000);
-#endif
-
-#ifdef WIN32
-    h_joystick_thread = new JoystickThread(this);
-    h_joystick_thread->start();
-#endif
-
-#ifdef WIN32
-    connect(h_joystick_thread, SIGNAL(button_pressed(int)), this, SLOT(joystick_button_pressed(int)));
-    connect(h_joystick_thread, SIGNAL(button_released(int)), this, SLOT(joystick_button_released(int)));
-    connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
 #endif
 }
 

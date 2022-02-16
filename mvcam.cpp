@@ -1,6 +1,6 @@
 ﻿#include "mvcam.h"
 
-Cam::Cam() {dev_handle = NULL;}
+Cam::Cam() {dev_handle = NULL; cameralink = false;}
 Cam::~Cam() {if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;}
 
 cv::Mat img; // hik

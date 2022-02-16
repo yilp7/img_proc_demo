@@ -1,4 +1,4 @@
-#include "joystick.h"
+﻿#include "joystick.h"
 
 JoystickThread::JoystickThread(void *info) : QThread(),
     t(NULL),
@@ -13,14 +13,18 @@ JoystickThread::JoystickThread(void *info) : QThread(),
     pressed{false}
 {
     p_info = info;
+#ifdef WIN32
     joy = (JOYINFOEX*)malloc(sizeof(JOYINFOEX));
     joy->dwSize = sizeof(JOYINFOEX);
     joy->dwFlags = JOY_RETURNALL;
+#endif
 }
 
 JoystickThread::~JoystickThread()
 {
+#ifdef WIN32
     free(joy);
+#endif
 }
 
 void JoystickThread::run()
@@ -39,6 +43,7 @@ void JoystickThread::process_joyinfo()
 {
     static const int   button_id[14] = {A, X, B, Y, L1, R1, L2, R2, MINUS, PLUS, HANDLE_L, HANDLE_R, HOME, SELECT};
     static const char* button_name[14] = {"A", "X", "B", "Y", "L1", "R1", "L2", "R2", "-", "+", "LEFT HANDLE", "RIGHT HANDLE", "HOME", "SELECT"};
+#ifdef WIN32
     joy_return = joyGetPosEx(JOYSTICKID1, joy);
     switch (joy_return) {
     case JOYERR_PARMS :
@@ -81,4 +86,5 @@ handles:
 //        qDebug("unknown error");
         break;
     }
+#endif
 }
