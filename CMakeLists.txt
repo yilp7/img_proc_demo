@@ -45,54 +45,59 @@ link_directories(${EURESYS_DIR}/lib)
 link_directories(${OpenCV_DIR}/lib)
 
 set(SOURCE_FILES
-	main.cpp
+    main.cpp
     utils.h
-	utils.cpp
-	demo.h
-	demo.cpp
-	threadpool.h
-	threadpool.cpp
-	mywidget.h
-	mywidget.cpp
-	progsettings.h
-	progsettings.cpp
-	imageproc.h
-	imageproc.cpp
-#	cam.h
-#	cam.cpp
+    utils.cpp
+    demo.h
+    demo.cpp
+    threadpool.h
+    threadpool.cpp
+    mywidget.h
+    mywidget.cpp
+    progsettings.h
+    progsettings.cpp
+    imageproc.h
+    imageproc.cpp
+#    cam.h
+#    cam.cpp
     mvcam.h
-	mvcam.cpp
-#	hqvcam.h
-#	hqvcam.cpp
-#	euresyscam.h
-#	euresyscam.cpp
+    mvcam.cpp
+#    hqvcam.h
+#    hqvcam.cpp
+#    euresyscam.h
+#    euresyscam.cpp
     joystick.h
-	joystick.cpp
-	demo_dev.ui
-	settings.ui
-	resources/resources.qrc
-	icon.rc
+    joystick.cpp
+    demo_dev.ui
+    settings.ui
+    resources/resources.qrc
+    icon.rc
 )
 
 set(PROJECT_LIBS
-	Qt${QT_VERSION_MAJOR}::Widgets
-	# mvs
-	MvCameraControl
-	# HQV
-	HQV_AVIProcess64
-	HQV_DataConvert64
-	HQV_SDK64
-	# Euresys
-#	MultiCam
-#	clallserial
+    Qt${QT_VERSION_MAJOR}::Widgets
+    # mvs
+    MvCameraControl
+    # HQV
+#    HQV_AVIProcess64
+#    HQV_DataConvert64
+#    HQV_SDK64
+    # Euresys
+#    MultiCam
+#    clallserial
     # opencv
-	opencv_core454
-	opencv_imgcodecs454
-	opencv_imgproc454
-	opencv_videoio454
-	# joystick
-	winmm
+    opencv_core454
+    opencv_imgcodecs454
+    opencv_imgproc454
+    opencv_videoio454
 )
+if (WIN32)
+    set(PROJECT_LIBS
+        ${PROJECT_LIBS}
+        # joystick
+        winmm
+    )
+endif()
 
 add_executable(Demo_param WIN32 ${SOURCE_FILES})
 target_compile_definitions(Demo_param PRIVATE PARAM=1)
