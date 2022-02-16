@@ -1,7 +1,7 @@
 ﻿#include "demo.h"
 
+#ifdef WIN32
 #include <DbgHelp.h>
-
 #pragma comment(lib, "user32.lib")
 
 int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
@@ -58,6 +58,7 @@ LONG WINAPI ExceptionFilter(LPEXCEPTION_POINTERS lpExceptionInfo)
     }
     return GenerateMiniDump(lpExceptionInfo);
 }
+#endif
 
 void log_message(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
@@ -123,7 +124,9 @@ int main(int argc, char *argv[])
 
 //    qInstallMessageHandler(log_message);
 
+#ifdef WIN32
     SetUnhandledExceptionFilter(ExceptionFilter);
+#endif
 
     Demo w;
     w.show();
