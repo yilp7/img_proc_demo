@@ -1012,8 +1012,9 @@ void Demo::on_START_BUTTON_clicked()
     if (device_on) return;
     data_exchange(true);
 
-    if (curr_cam->start()) {
-        QMessageBox::warning(this, "PROMPT", tr("start failed"));
+    int ret;
+    if (ret = curr_cam->start()) {
+        QMessageBox::warning(this, "PROMPT", "start failed " + QString::number(ret, 16));
         return;
     }
     device_on = true;
@@ -1995,8 +1996,9 @@ void Demo::change_mcp(int val)
     mcp = val;
 
 //    convert_to_send_tcu(0x0A, mcp);
-    static QTimer t;
-    if (t.remainingTime() <= 0) communicate_display(com[0], convert_to_send_tcu(0x0A, mcp), 7, 1, false), t.start(fps ? 900 / fps : 100);
+    static QElapsedTimer t;
+    qDebug() << t.elapsed();
+    if (!h_grab_thread || t.elapsed() > (fps > 9 ? 900 / fps : 100)) communicate_display(com[0], convert_to_send_tcu(0x0A, mcp), 7, 1, false), t.restart();
 
     ui->MCP_EDIT->setText(QString::number(val));
     ui->MCP_SLIDER->setValue(mcp);
@@ -2138,41 +2140,37 @@ void Demo::keyPressEvent(QKeyEvent *event)
                 communicate_display(com[0], convert_to_send_tcu(0x01, laser_width / 8), 7, 1, false);
             }
             else if (edit == ui->DELAY_A_EDIT_U) {
-                int delay_a = edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt();
+                delay_a = edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt();
                 communicate_display(com[0], convert_to_send_tcu(0x02, delay_a), 7, 1, false);
             }
             else if (edit == ui->DELAY_A_EDIT_N) {
-                int delay_a;
                 if (edit->text().toInt() > 999) delay_a = edit->text().toInt();
                 else delay_a = edit->text().toInt() + ui->DELAY_A_EDIT_U->text().toInt() * 1000;
                 communicate_display(com[0], convert_to_send_tcu(0x02, delay_a), 7, 1, false);
             }
             else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
-                int gatewidth_a = edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt();
+                gatewidth_a = edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt();
                 communicate_display(com[0], convert_to_send_tcu(0x03, gatewidth_a), 7, 1, false);
             }
             else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
-                int gatewidth_a;
                 if (edit->text().toInt() > 999) gatewidth_a = edit->text().toInt();
                 else gatewidth_a = edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000;
                 communicate_display(com[0], convert_to_send_tcu(0x03, gatewidth_a), 7, 1, false);
             }
             else if (edit == ui->DELAY_B_EDIT_U) {
-                int delay_b = edit->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt();
+                delay_b = edit->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt();
                 communicate_display(com[0], convert_to_send_tcu(0x04, delay_b), 7, 1, false);
             }
             else if (edit == ui->DELAY_B_EDIT_N) {
-                int delay_b;
                 if (edit->text().toInt() > 999) delay_b = edit->text().toInt();
                 else delay_b = edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000;
                 communicate_display(com[0], convert_to_send_tcu(0x04, delay_b), 7, 1, false);
             }
             else if (edit == ui->GATE_WIDTH_B_EDIT_U) {
-                int gatewidth_b = edit->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt();
+                gatewidth_b = edit->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt();
                 communicate_display(com[0], convert_to_send_tcu(0x05, gatewidth_b), 7, 1, false);
             }
             else if (edit == ui->GATE_WIDTH_B_EDIT_N) {
-                int gatewidth_b;
                 if (edit->text().toInt() > 999) gatewidth_b = edit->text().toInt();
                 else gatewidth_b = edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000;
                 communicate_display(com[0], convert_to_send_tcu(0x05, gatewidth_b), 7, 1, false);

@@ -58,10 +58,10 @@ set(SOURCE_FILES
     progsettings.cpp
     imageproc.h
     imageproc.cpp
-#    cam.h
-#    cam.cpp
-    mvcam.h
-    mvcam.cpp
+    cam.h
+    cam.cpp
+#    mvcam.h
+#    mvcam.cpp
 #    hqvcam.h
 #    hqvcam.cpp
 #    euresyscam.h
@@ -79,23 +79,34 @@ set(PROJECT_LIBS
     # mvs
     MvCameraControl
     # HQV
-#    HQV_AVIProcess64
-#    HQV_DataConvert64
-#    HQV_SDK64
+    HQV_AVIProcess64
+    HQV_DataConvert64
+    HQV_SDK64
     # Euresys
 #    MultiCam
 #    clallserial
-    # opencv
-    opencv_core454
-    opencv_imgcodecs454
-    opencv_imgproc454
-    opencv_videoio454
 )
 if (WIN32)
     set(PROJECT_LIBS
         ${PROJECT_LIBS}
+        # opencv
+        opencv_core454
+        opencv_imgcodecs454
+        opencv_imgproc454
+        opencv_videoio454
         # joystick
         winmm
+    )
+elseif (UNIX)
+    set(PROJECT_LIBS
+        ${PROJECT_LIBS}
+        # thread
+        pthread
+        # opencv
+        opencv_core
+        opencv_imgcodecs
+        opencv_imgproc
+        opencv_videoio
     )
 endif()
 
