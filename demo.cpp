@@ -2179,11 +2179,11 @@ void Demo::keyPressEvent(QKeyEvent *event)
             }
             else if (edit == ui->CCD_FREQ_EDIT) {
                 on_SET_PARAMS_BUTTON_clicked();
-                communicate_display(com[0], convert_to_send_tcu(0x06, 1.25e8 / edit->text().toInt()), 7, 1, false);
+                communicate_display(com[0], convert_to_send_tcu(0x06, 1.25e8 / edit->text().toFloat()), 7, 1, false);
             }
             else if (edit == ui->DUTY_EDIT) {
                 on_SET_PARAMS_BUTTON_clicked();
-                communicate_display(com[0], convert_to_send_tcu(0x07, edit->text().toInt() * 1.25e2), 7, 1, false);
+                communicate_display(com[0], convert_to_send_tcu(0x07, edit->text().toFloat() * 1.25e2), 7, 1, false);
             }
             else if (edit == ui->GAIN_EDIT) {
                 on_SET_PARAMS_BUTTON_clicked();
