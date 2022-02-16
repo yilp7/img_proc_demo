@@ -296,6 +296,8 @@ private:
     void convert_write(QDataStream &out, const int TYPE);
     bool convert_read(QDataStream &out, const int TYPE);
 
+    // read device config by config
+    void read_gatewidth_lookup_table(QFile *fp);
 public:
     bool                    mouse_pressed;
 
@@ -412,6 +414,8 @@ private:
     QTranslator             trans;
 
     ThreadPool              tp;
+
+    int                     gw_lut[1000];               // lookup table for gatewidth config by serial
 
 };
 #endif // DEMO_H

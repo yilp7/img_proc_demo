@@ -1755,6 +1755,16 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
     return true;
 }
 
+void Demo::read_gatewidth_lookup_table(QFile *fp)
+{
+    if (!fp || !fp->isOpen()) return;
+    QList<QByteArray> line_sep;
+    while (!fp->atEnd()) {
+        line_sep = fp->readLine().split(',');
+        gw_lut[line_sep[0].toInt()] = line_sep[1].toInt();
+    }
+}
+
 void Demo::on_DIST_BTN_clicked() {
     if (com[1]->isOpen()) {
         QByteArray read = communicate_display(com[1], QByteArray(1, 0xA5), 1, 6, true);
@@ -2010,8 +2020,8 @@ void Demo::change_mcp(int val)
     mcp = val;
 
 //    convert_to_send_tcu(0x0A, mcp);
-    static QTimer t;
-    if (t.remainingTime() <= 0) communicate_display(com[0], convert_to_send_tcu(0x0A, mcp), 7, 1, false), t.start(fps ? 900 / fps : 100);
+    static QElapsedTimer t;
+    if (!h_grab_thread || t.elapsed() > (fps > 9 ? 900 / fps : 100)) communicate_display(com[0], convert_to_send_tcu(0x0A, mcp), 7, 1, false), t.start();
 
     ui->MCP_EDIT->setText(QString::number(val));
     ui->MCP_SLIDER->setValue(mcp);
