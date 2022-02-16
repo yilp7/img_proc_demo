@@ -91,7 +91,6 @@ public slots:
 
     // signaled in settings ui
     void setup_hz(int hz_unit);
-    void setup_stepping(int base_unit);
     void setup_max_dist(int max_dist);
     void setup_laser(int laser_on);
     void set_serial_port_share(bool share);
@@ -322,7 +321,7 @@ private:
     uchar                   in_buffer[7];               // read buffer for serial communication
     float                   rep_freq;
     int                     laser_width_u, laser_width_n;
-    int                     gate_width_a_u, gate_width_a_n;
+    int                     gate_width_a_u, gate_width_a_n, gate_width_b_u, gate_width_b_n;
     int                     delay_a_u, delay_a_n, delay_b_u, delay_b_n, delay_n_n;
     float                   stepping;
     int                     hz_unit;
@@ -336,6 +335,10 @@ private:
     int                     distance;                   // dist read from rangefinder
     float                   max_dist;
     int                     laser_width;
+    int                     delay_a;
+    int                     delay_b;
+    int                     gatewidth_a;
+    int                     gatewidth_b;
     float                   delay_dist;                 // estimated distance calculated from delay
     float                   depth_of_view;
     // TODO rewrite auto focus function

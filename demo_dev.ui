@@ -1639,7 +1639,7 @@
      <widget class="QLabel" name="GATE_WIDTH_A">
       <property name="geometry">
        <rect>
-        <x>20</x>
+        <x>10</x>
         <y>183</y>
         <width>105</width>
         <height>14</height>
@@ -1658,7 +1658,7 @@
      <widget class="QLineEdit" name="GATE_WIDTH_A_EDIT_U">
       <property name="geometry">
        <rect>
-        <x>20</x>
+        <x>10</x>
         <y>200</y>
         <width>31</width>
         <height>20</height>
@@ -1671,7 +1671,7 @@
      <widget class="QLabel" name="GATE_WIDTH_A_UNIT_U">
       <property name="geometry">
        <rect>
-        <x>48</x>
+        <x>38</x>
         <y>203</y>
         <width>21</width>
         <height>14</height>
@@ -1684,58 +1684,10 @@
        <string> μs</string>
       </property>
      </widget>
-     <widget class="QLineEdit" name="STEPPING_EDIT">
-      <property name="geometry">
-       <rect>
-        <x>140</x>
-        <y>200</y>
-        <width>51</width>
-        <height>20</height>
-       </rect>
-      </property>
-      <property name="mouseTracking">
-       <bool>false</bool>
-      </property>
-     </widget>
      <widget class="QLabel" name="GATE_WIDTH_A_UNIT_N">
       <property name="geometry">
        <rect>
-        <x>104</x>
-        <y>203</y>
-        <width>21</width>
-        <height>14</height>
-       </rect>
-      </property>
-      <property name="mouseTracking">
-       <bool>false</bool>
-      </property>
-      <property name="text">
-       <string>ns</string>
-      </property>
-     </widget>
-     <widget class="QLabel" name="STEPPING">
-      <property name="geometry">
-       <rect>
-        <x>140</x>
-        <y>183</y>
-        <width>65</width>
-        <height>14</height>
-       </rect>
-      </property>
-      <property name="mouseTracking">
-       <bool>false</bool>
-      </property>
-      <property name="text">
-       <string>Stepping</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-     </widget>
-     <widget class="QLabel" name="STEPPING_UNIT">
-      <property name="geometry">
-       <rect>
-        <x>194</x>
+        <x>94</x>
         <y>203</y>
         <width>21</width>
         <height>14</height>
@@ -1751,7 +1703,7 @@
      <widget class="QLineEdit" name="GATE_WIDTH_A_EDIT_N">
       <property name="geometry">
        <rect>
-        <x>70</x>
+        <x>60</x>
         <y>200</y>
         <width>31</width>
         <height>20</height>
@@ -1917,6 +1869,83 @@
        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
       </property>
      </widget>
+     <widget class="QLineEdit" name="GATE_WIDTH_B_EDIT_U">
+      <property name="geometry">
+       <rect>
+        <x>120</x>
+        <y>200</y>
+        <width>31</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+     </widget>
+     <widget class="QLabel" name="GATE_WIDTH_B">
+      <property name="geometry">
+       <rect>
+        <x>120</x>
+        <y>183</y>
+        <width>105</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="text">
+       <string>Gate Width</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="GATE_WIDTH_B_UNIT_N">
+      <property name="geometry">
+       <rect>
+        <x>204</x>
+        <y>203</y>
+        <width>21</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="text">
+       <string>ns</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="GATE_WIDTH_B_EDIT_N">
+      <property name="geometry">
+       <rect>
+        <x>170</x>
+        <y>200</y>
+        <width>31</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+     </widget>
+     <widget class="QLabel" name="GATE_WIDTH_B_UNIT_U">
+      <property name="geometry">
+       <rect>
+        <x>148</x>
+        <y>203</y>
+        <width>21</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="text">
+       <string> μs</string>
+      </property>
+     </widget>
      <zorder>FREQ_EDIT</zorder>
      <zorder>FREQ</zorder>
      <zorder>FREQ_UNIT</zorder>
@@ -1939,10 +1968,7 @@
      <zorder>DELAY_B_EDIT_N</zorder>
      <zorder>GATE_WIDTH_A</zorder>
      <zorder>GATE_WIDTH_A_UNIT_U</zorder>
-     <zorder>STEPPING_EDIT</zorder>
      <zorder>GATE_WIDTH_A_UNIT_N</zorder>
-     <zorder>STEPPING</zorder>
-     <zorder>STEPPING_UNIT</zorder>
      <zorder>GATE_WIDTH_A_EDIT_N</zorder>
      <zorder>ESTIMATED</zorder>
      <zorder>EST_DIST</zorder>
@@ -1956,6 +1982,11 @@
      <zorder>ESTIMATED_2</zorder>
      <zorder>GATE_WIDTH</zorder>
      <zorder>MCP_EDIT</zorder>
+     <zorder>GATE_WIDTH_B_EDIT_U</zorder>
+     <zorder>GATE_WIDTH_B</zorder>
+     <zorder>GATE_WIDTH_B_UNIT_N</zorder>
+     <zorder>GATE_WIDTH_B_EDIT_N</zorder>
+     <zorder>GATE_WIDTH_B_UNIT_U</zorder>
     </widget>
     <widget class="QGroupBox" name="OPERATION_STATIC">
      <property name="geometry">
@@ -2515,7 +2546,6 @@
   <tabstop>MCP_SLIDER</tabstop>
   <tabstop>GATE_WIDTH_A_EDIT_U</tabstop>
   <tabstop>GATE_WIDTH_A_EDIT_N</tabstop>
-  <tabstop>STEPPING_EDIT</tabstop>
   <tabstop>ZOOM_EDIT</tabstop>
   <tabstop>FOCUS_EDIT</tabstop>
   <tabstop>FOCUS_SPEED_EDIT</tabstop>

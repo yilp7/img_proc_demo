@@ -92,6 +92,10 @@ Demo::Demo(QWidget *parent)
     distance(0),
     max_dist(15000),
     laser_width(500),
+    delay_a(50),
+    delay_b(50),
+    gatewidth_a(100),
+    gatewidth_b(100),
     delay_dist(75),
     depth_of_view(75),
     focus_direction(0),
@@ -375,19 +379,12 @@ void Demo::data_exchange(bool read){
         laser_width_n = ui->LASER_WIDTH_EDIT_N->text().toInt();
         gate_width_a_u = ui->GATE_WIDTH_A_EDIT_U->text().toInt();
         gate_width_a_n = ui->GATE_WIDTH_A_EDIT_N->text().toInt();
+        gate_width_b_u = ui->GATE_WIDTH_B_EDIT_U->text().toInt();
+        gate_width_b_n = ui->GATE_WIDTH_B_EDIT_N->text().toInt();
         delay_a_u = ui->DELAY_A_EDIT_U->text().toInt();
         delay_a_n = ui->DELAY_A_EDIT_N->text().toInt();
 //        gate_width_b_u = ui->GATE_WIDTH_B_EDIT_U->text().toInt();
 //        gate_width_b_n = ui->GATE_WIDTH_B_EDIT_N->text().toInt();
-        switch (base_unit) {
-        // ns
-        case 0: stepping = ui->STEPPING_EDIT->text().toFloat(); break;
-        // μs
-        case 1: stepping = ui->STEPPING_EDIT->text().toFloat() * 1000; break;
-        // m
-        case 2: stepping = ui->STEPPING_EDIT->text().toFloat() / dist_ns; break;
-        default: break;
-        }
         delay_b_u = ui->DELAY_B_EDIT_U->text().toInt();
         delay_b_n = ui->DELAY_B_EDIT_N->text().toInt();
         delay_n_n = ui->DELAY_N_EDIT_N->text().toInt();
@@ -400,8 +397,10 @@ void Demo::data_exchange(bool read){
         focus = ui->FOCUS_EDIT->text().toInt();
 
         laser_width = laser_width_u * 1000 + laser_width_n;
-        delay_dist = std::round((delay_a_u * 1000 + delay_a_n) * dist_ns);
-        depth_of_view = std::round((gate_width_a_u * 1000 + gate_width_a_n) * dist_ns);
+        delay_a = delay_a_u * 1000 + delay_a_n;
+        delay_b = delay_b_u * 1000 + delay_b_n;
+        gatewidth_a = gate_width_a_u * 1000 + gate_width_a_n;
+        gatewidth_b = gate_width_b_u * 1000 + gate_width_b_n;
     }
     else {
 //        ui->DEVICE_SELECTION->setCurrentIndex(device_idx);
@@ -415,20 +414,24 @@ void Demo::data_exchange(bool read){
         ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
         ui->FILE_PATH_EDIT->setText(save_location);
 
-        delay_a_u = std::round(delay_dist / dist_ns) / 1000;
-        delay_a_n = (int)std::round(delay_dist / dist_ns) % 1000;
-        delay_b_u = std::round(delay_dist / dist_ns + delay_n_n) / 1000;
-        delay_b_n = (int)std::round(delay_dist / dist_ns + delay_n_n) % 1000;
-        gate_width_a_u = std::round(depth_of_view / dist_ns) / 1000;
-        gate_width_a_n = (int)std::round(depth_of_view / dist_ns) % 1000;
         laser_width_u = laser_width / 1000;
         laser_width_n = laser_width % 1000;
+        delay_a_u = delay_a / 1000;
+        delay_a_n = delay_a % 1000;
+        delay_b_u = delay_b / 1000;
+        delay_b_n = delay_b % 1000;
+        gate_width_a_u = gatewidth_a / 1000;
+        gate_width_a_n = gatewidth_a % 1000;
+        gate_width_b_u = gatewidth_b / 1000;
+        gate_width_b_n = gatewidth_b % 1000;
 
         setup_hz(hz_unit);
         ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", laser_width_u));
         ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%d", laser_width_n));
         ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", gate_width_a_u));
         ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%d", gate_width_a_n));
+        ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf("%d", gate_width_b_u));
+        ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%d", gate_width_b_n));
         ui->DELAY_A_EDIT_U->setText(QString::asprintf("%d", delay_a_u));
         ui->DELAY_A_EDIT_N->setText(QString::asprintf("%d", delay_a_n));
 //        ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf("%d", gate_width_b_u));
@@ -438,8 +441,6 @@ void Demo::data_exchange(bool read){
         ui->DELAY_N_EDIT_N->setText(QString::asprintf("%d", delay_n_n));
         ui->DELAY_SLIDER->setValue(delay_dist);
         ui->MCP_SLIDER->setValue(mcp);
-
-        setup_stepping(base_unit);
 
         ui->ZOOM_EDIT->setText(QString::asprintf("%d", zoom));
         ui->FOCUS_EDIT->setText(QString::asprintf("%d", focus));
@@ -973,10 +974,10 @@ void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate)
         switch (id) {
         case 0:
 //            convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8);
-            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width + 8) / 8), 7, 1, false);
-            update_delay();
-            update_gate_width();
-            change_mcp(5);
+//            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width + 8) / 8), 7, 1, false);
+//            update_delay();
+//            update_gate_width();
+//            change_mcp(5);
             break;
         case 2:
             on_GET_LENS_PARAM_BTN_clicked();
@@ -1184,11 +1185,11 @@ void Demo::on_SET_PARAMS_BUTTON_clicked()
 {
     data_exchange(true);
 
-    // CCD FREQUENCY
-    communicate_display(com[0], convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
+//    // CCD FREQUENCY
+//    communicate_display(com[0], convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
 
-    // DUTY RATIO -> EXPO. TIME
-    communicate_display(com[0], convert_to_send_tcu(0x07, duty * 1.25e2), 7, 1, false);
+//    // DUTY RATIO -> EXPO. TIME
+//    communicate_display(com[0], convert_to_send_tcu(0x07, duty * 1.25e2), 7, 1, false);
 
     time_exposure_edit = duty;
     frame_rate_edit = fps;
@@ -1247,20 +1248,6 @@ void Demo::setup_hz(int hz_unit)
     case 0: ui->FREQ_UNIT->setText("kHz"); ui->FREQ_EDIT->setText(QString::number((int)rep_freq)); break;
     // Hz
     case 1: ui->FREQ_UNIT->setText("Hz"); ui->FREQ_EDIT->setText(QString::number((int)(rep_freq * 1000))); break;
-    default: break;
-    }
-}
-
-void Demo::setup_stepping(int base_unit)
-{
-    this->base_unit = base_unit;
-    switch (base_unit) {
-    // ns
-    case 0: ui->STEPPING_UNIT->setText("ns"); ui->STEPPING_EDIT->setText(QString::number((int)stepping)); break;
-    // μs
-    case 1: ui->STEPPING_UNIT->setText(QString::fromLocal8Bit("μs")); ui->STEPPING_EDIT->setText(QString::number(stepping / 1000, 'f', 2)); break;
-    // m
-    case 2: ui->STEPPING_UNIT->setText("m"); ui->STEPPING_EDIT->setText(QString::number(stepping * dist_ns, 'f', 2)); break;
     default: break;
     }
 }
@@ -1388,11 +1375,9 @@ void Demo::joystick_button_released(int btn)
     case JoystickThread::BUTTON::HOME: ui->SHUTDOWN_BUTTON->click(); ui->ENUM_BUTTON->click(); break;
     case JoystickThread::BUTTON::SELECT: ui->START_BUTTON->click(); break;
     case JoystickThread::BUTTON::MINUS:
-        if (joybtn_L1) stepping /= 10, setup_stepping(base_unit);
         if (joybtn_L2) change_focus_speed(ui->FOCUS_SPEED_EDIT->text().toInt() - 8);
         break;
     case JoystickThread::BUTTON::PLUS:
-        if (joybtn_R1) stepping *= 10, setup_stepping(base_unit);
         if (joybtn_R2) change_focus_speed(ui->FOCUS_SPEED_EDIT->text().toInt() + 8);
         break;
     default: break;
@@ -2143,67 +2128,79 @@ void Demo::keyPressEvent(QKeyEvent *event)
                 }
                 communicate_display(com[0], convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
             }
-            else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
-                depth_of_view = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt()) * dist_ns;
-                update_gate_width();
-            }
             else if (edit == ui->LASER_WIDTH_EDIT_U) {
                 laser_width = edit->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt();
-                communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width + 8) / 8), 7, 1, false);
-            }
-            else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
-                if (edit->text().toInt() > 999) depth_of_view = edit->text().toInt() * dist_ns;
-                else depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000) * dist_ns;
-                update_gate_width();
+                communicate_display(com[0], convert_to_send_tcu(0x01, laser_width / 8), 7, 1, false);
             }
             else if (edit == ui->LASER_WIDTH_EDIT_N) {
                 if (edit->text().toInt() > 999) laser_width = edit->text().toInt();
                 else laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000;
-                communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width + 8) / 8), 7, 1, false);
+                communicate_display(com[0], convert_to_send_tcu(0x01, laser_width / 8), 7, 1, false);
             }
             else if (edit == ui->DELAY_A_EDIT_U) {
-                delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt()) * dist_ns;
-                update_delay();
-            }
-            else if (edit == ui->DELAY_B_EDIT_U) {
-                delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt() - delay_n_n) * dist_ns;
-                update_delay();
+                int delay_a = edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt();
+                communicate_display(com[0], convert_to_send_tcu(0x02, delay_a), 7, 1, false);
             }
             else if (edit == ui->DELAY_A_EDIT_N) {
-                if (edit->text().toInt() > 999) delay_dist = edit->text().toInt() * dist_ns;
-                else delay_dist = (edit->text().toInt() + ui->DELAY_A_EDIT_U->text().toInt() * 1000) * dist_ns;
-                update_delay();
+                int delay_a;
+                if (edit->text().toInt() > 999) delay_a = edit->text().toInt();
+                else delay_a = edit->text().toInt() + ui->DELAY_A_EDIT_U->text().toInt() * 1000;
+                communicate_display(com[0], convert_to_send_tcu(0x02, delay_a), 7, 1, false);
+            }
+            else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
+                int gatewidth_a = edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt();
+                communicate_display(com[0], convert_to_send_tcu(0x03, gatewidth_a), 7, 1, false);
+            }
+            else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
+                int gatewidth_a;
+                if (edit->text().toInt() > 999) gatewidth_a = edit->text().toInt();
+                else gatewidth_a = edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000;
+                communicate_display(com[0], convert_to_send_tcu(0x03, gatewidth_a), 7, 1, false);
+            }
+            else if (edit == ui->DELAY_B_EDIT_U) {
+                int delay_b = edit->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt();
+                communicate_display(com[0], convert_to_send_tcu(0x04, delay_b), 7, 1, false);
             }
             else if (edit == ui->DELAY_B_EDIT_N) {
-                if (edit->text().toInt() > 999) delay_dist = edit->text().toInt() * dist_ns;
-                else delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000 - delay_n_n) * dist_ns;
-                update_delay();
+                int delay_b;
+                if (edit->text().toInt() > 999) delay_b = edit->text().toInt();
+                else delay_b = edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000;
+                communicate_display(com[0], convert_to_send_tcu(0x04, delay_b), 7, 1, false);
+            }
+            else if (edit == ui->GATE_WIDTH_B_EDIT_U) {
+                int gatewidth_b = edit->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt();
+                communicate_display(com[0], convert_to_send_tcu(0x05, gatewidth_b), 7, 1, false);
+            }
+            else if (edit == ui->GATE_WIDTH_B_EDIT_N) {
+                int gatewidth_b;
+                if (edit->text().toInt() > 999) gatewidth_b = edit->text().toInt();
+                else gatewidth_b = edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000;
+                communicate_display(com[0], convert_to_send_tcu(0x05, gatewidth_b), 7, 1, false);
+            }
+            else if (edit == ui->CCD_FREQ_EDIT) {
+                on_SET_PARAMS_BUTTON_clicked();
+                communicate_display(com[0], convert_to_send_tcu(0x06, 1.25e8 / edit->text().toInt()), 7, 1, false);
+            }
+            else if (edit == ui->DUTY_EDIT) {
+                on_SET_PARAMS_BUTTON_clicked();
+                communicate_display(com[0], convert_to_send_tcu(0x07, edit->text().toInt() * 1.25e2), 7, 1, false);
+            }
+            else if (edit == ui->GAIN_EDIT) {
+                on_SET_PARAMS_BUTTON_clicked();
             }
             else if (edit == ui->DELAY_N_EDIT_N) {
                 delay_n_n = edit->text().toInt();
-                update_delay();
+//                update_delay();
             }
             else if (edit == ui->MCP_EDIT) {
                 mcp = ui->MCP_EDIT->text().toInt();
                 ui->MCP_SLIDER->setValue(mcp);
-            }
-            else if (edit == ui->STEPPING_EDIT) {
-                switch (base_unit) {
-                case 0: stepping = edit->text().toFloat(); break;
-                case 1: stepping = edit->text().toFloat() * 1000; break;
-                case 2: stepping = edit->text().toFloat() / dist_ns; break;
-                default: break;
-                }
-                setup_stepping(base_unit);
             }
             else if (edit == ui->ZOOM_EDIT) {
                 set_zoom();
             }
             else if (edit == ui->FOCUS_EDIT) {
                 set_focus();
-            }
-            else if (edit == ui->CCD_FREQ_EDIT || edit == ui->DUTY_EDIT || edit == ui->GAIN_EDIT) {
-                on_SET_PARAMS_BUTTON_clicked();
             }
             else if (edit == ui->FOCUS_SPEED_EDIT) {
                 change_focus_speed(edit->text().toInt());
@@ -2213,40 +2210,6 @@ void Demo::keyPressEvent(QKeyEvent *event)
             }
             this->focusWidget()->clearFocus();
             data_exchange(false);
-            break;
-        // 100m => 667ns, 10m => 67ns
-        case Qt::Key_W:
-            delay_dist += stepping * 5 * dist_ns;
-            update_delay();
-            break;
-        case Qt::Key_S:
-            delay_dist -= stepping * 5 * dist_ns;
-            update_delay();
-            break;
-        case Qt::Key_D:
-            delay_dist += stepping * dist_ns;
-            update_delay();
-            break;
-        case Qt::Key_A:
-            delay_dist -= stepping * dist_ns;
-            update_delay();
-            break;
-        // 50m => 333ns, 5m => 33ns
-        case Qt::Key_I:
-            depth_of_view += stepping * 5 * dist_ns;
-            update_gate_width();
-            break;
-        case Qt::Key_K:
-            depth_of_view -= stepping * 5 * dist_ns;
-            update_gate_width();
-            break;
-        case Qt::Key_L:
-            depth_of_view += stepping * dist_ns;
-            update_gate_width();
-            break;
-        case Qt::Key_J:
-            depth_of_view -= stepping * dist_ns;
-            update_gate_width();
             break;
         default: break;
         }
