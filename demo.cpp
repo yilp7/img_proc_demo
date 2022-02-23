@@ -189,8 +189,6 @@ Demo::Demo(QWidget *parent)
     com_edit[2] = ui->LENS_COM_EDIT;
     com_edit[3] = ui->LASER_COM_EDIT;
 
-    for (int i = 0; i < 4; i++) com[i] = new QSerialPort, setup_com(com + i, i, com_edit[i]->text(), 9600);
-
 //    setup_com(com + 0, 0, com_edit[0]->text(), 9600);
 //    setup_com(com + 1, 1, com_edit[1]->text(), 115200);
 //    setup_com(com + 2, 2, com_edit[2]->text(), 9600);
@@ -202,7 +200,6 @@ Demo::Demo(QWidget *parent)
     ui->MCP_SLIDER->setSingleStep(1);
     ui->MCP_SLIDER->setPageStep(10);
     connect(ui->MCP_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_mcp(int)));
-    change_mcp(5);
 
     ui->DELAY_SLIDER->setMinimum(0);
     ui->DELAY_SLIDER->setMaximum(max_dist);
@@ -285,18 +282,12 @@ Demo::Demo(QWidget *parent)
     data_exchange(false);
     enable_controls(false);
 
-    // right before gui display (init state)
-    on_ENUM_BUTTON_clicked();
-    if (com[0]->isOpen() && com[3]->isOpen()) on_LASER_BTN_clicked();
-
+    // set up display info (left bottom corner)
     ui->COM_DATA_RADIO->click();
     QFont temp_f(consolas);
     temp_f.setPixelSize(11);
     ui->DATA_EXCHANGE->setFont(temp_f);
     ui->FILE_PATH_EDIT->setFont(consolas);
-
-    // - set startup focus
-    (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
     display_grp = new QButtonGroup();
     display_grp->addButton(ui->COM_DATA_RADIO);
@@ -304,12 +295,24 @@ Demo::Demo(QWidget *parent)
     display_grp->addButton(ui->ROI_RADIO);
     display_grp->setExclusive(true);
 
+    // connect title bar to the main window (Demo*)
+    ui->TITLE->setup(this);
+
+    // connect to joystick (windows xbox only)
     h_joystick_thread = new JoystickThread(this);
     h_joystick_thread->start();
 
     connect(h_joystick_thread, SIGNAL(button_pressed(int)), this, SLOT(joystick_button_pressed(int)));
     connect(h_joystick_thread, SIGNAL(button_released(int)), this, SLOT(joystick_button_released(int)));
     connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
+
+    // right before gui display (init state)
+    for (int i = 0; i < 4; i++) com[i] = new QSerialPort, setup_com(com + i, i, com_edit[i]->text(), 9600);
+    on_ENUM_BUTTON_clicked();
+    if (com[0]->isOpen() && com[3]->isOpen()) on_LASER_BTN_clicked();
+
+    // - set startup focus
+    (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
     // in development
     ui->ROI_TABLE->hide();

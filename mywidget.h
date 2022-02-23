@@ -1,4 +1,4 @@
-#ifndef MYWIDGET_H
+﻿#ifndef MYWIDGET_H
 #define MYWIDGET_H
 
 #include "progsettings.h"
@@ -86,6 +86,7 @@ class TitleBar : public QFrame
     Q_OBJECT
 public:
     explicit TitleBar(QWidget *parent = 0);
+    void setup(QObject *ptr);
 
 public slots:
     void process_maximize();
@@ -114,6 +115,8 @@ public:
     QRect        normal_stat;
 
     bool         pressed;
+
+    QObject      *signal_receiver;
 
     ProgSettings *prog_settings;
 

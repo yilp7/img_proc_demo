@@ -167,9 +167,11 @@ TitleButton::TitleButton(QString icon, QWidget *parent) : QPushButton(QIcon(icon
 
 void TitleButton::mouseMoveEvent(QMouseEvent *event) {}
 
-TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
-  , is_maximized(false)
-  , pressed(false)
+TitleBar::TitleBar(QWidget *parent)
+    : QFrame(parent),
+    is_maximized(false),
+    pressed(false),
+    signal_receiver(NULL)
 {
     icon = new InfoLabel(this);
     icon->setGeometry(10, 5, 20, 20);
@@ -186,6 +188,11 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     connect(min, SIGNAL(clicked()), window(), SLOT(showMinimized()));
     connect(max, SIGNAL(clicked()), SLOT(process_maximize()));
     connect(exit, SIGNAL(clicked()), window(), SLOT(close()));
+}
+
+void TitleBar::setup(QObject *ptr)
+{
+    signal_receiver = ptr;
 
     prog_settings = new ProgSettings();
 
@@ -198,32 +205,32 @@ TitleBar::TitleBar(QWidget *parent) : QFrame(parent)
     pref->setShortcut(QKeySequence(Qt::ALT + Qt::Key_S));
     connect(pref, SIGNAL(triggered()), prog_settings, SLOT(show()));
     connect(pref, SIGNAL(triggered()), prog_settings, SLOT(raise()));
-    connect(prog_settings, SIGNAL(rep_freq_unit_changed(int)), this->parent()->parent(), SLOT(setup_hz(int)));
-    connect(prog_settings, SIGNAL(base_unit_changed(int)), this->parent()->parent(), SLOT(setup_stepping(int)));
-    connect(prog_settings, SIGNAL(max_dist_changed(int)), this->parent()->parent(), SLOT(setup_max_dist(int)));
-    connect(prog_settings, SIGNAL(laser_toggled(int)), this->parent()->parent(), SLOT(setup_laser(int)));
-    connect(prog_settings, SIGNAL(change_baudrate(int, int)), this->parent()->parent(), SLOT(set_baudrate(int, int)));
-    connect(prog_settings, SIGNAL(com_write(int, QByteArray)), this->parent()->parent(), SLOT(com_write_data(int, QByteArray)));
-    connect(prog_settings, SIGNAL(get_baudrate(int)), this->parent()->parent(), SLOT(display_baudrate(int)));
-    connect(prog_settings, SIGNAL(share_serial_port(bool)), this->parent()->parent(), SLOT(set_serial_port_share(bool)));
-    connect(prog_settings, SIGNAL(auto_mcp(bool)), this->parent()->parent(), SLOT(set_auto_mcp(bool)));
-    connect(prog_settings, SIGNAL(set_dev_ip(int, int)), this->parent()->parent(), SLOT(set_dev_ip(int, int)));
-    connect(prog_settings, SIGNAL(change_pixel_format(int)), this->parent()->parent(), SLOT(change_pixel_format(int)));
-    settings_menu->addAction(">> export pref.", this->parent()->parent(), SLOT(export_config()), QKeySequence(Qt::ALT + Qt::Key_E));
-    settings_menu->addAction("<< load pref.", this->parent()->parent(), SLOT(prompt_for_config_file()), QKeySequence(Qt::ALT + Qt::Key_R));
+    connect(prog_settings, SIGNAL(rep_freq_unit_changed(int)), signal_receiver, SLOT(setup_hz(int)));
+    connect(prog_settings, SIGNAL(base_unit_changed(int)),     signal_receiver, SLOT(setup_stepping(int)));
+    connect(prog_settings, SIGNAL(max_dist_changed(int)),      signal_receiver, SLOT(setup_max_dist(int)));
+    connect(prog_settings, SIGNAL(laser_toggled(int)),         signal_receiver, SLOT(setup_laser(int)));
+    connect(prog_settings, SIGNAL(change_baudrate(int, int)),  signal_receiver, SLOT(set_baudrate(int, int)));
+    connect(prog_settings, SIGNAL(com_write(int, QByteArray)), signal_receiver, SLOT(com_write_data(int, QByteArray)));
+    connect(prog_settings, SIGNAL(get_baudrate(int)),          signal_receiver, SLOT(display_baudrate(int)));
+    connect(prog_settings, SIGNAL(share_serial_port(bool)),    signal_receiver, SLOT(set_serial_port_share(bool)));
+    connect(prog_settings, SIGNAL(auto_mcp(bool)),             signal_receiver, SLOT(set_auto_mcp(bool)));
+    connect(prog_settings, SIGNAL(set_dev_ip(int, int)),       signal_receiver, SLOT(set_dev_ip(int, int)));
+    connect(prog_settings, SIGNAL(change_pixel_format(int)),   signal_receiver, SLOT(change_pixel_format(int)));
+    settings_menu->addAction(">> export pref.", signal_receiver, SLOT(export_config()), QKeySequence(Qt::ALT + Qt::Key_E));
+    settings_menu->addAction("<< load pref.",   signal_receiver, SLOT(prompt_for_config_file()), QKeySequence(Qt::ALT + Qt::Key_R));
     settings->setMenu(settings_menu);
 
     capture = new TitleButton("", this);
     capture->setObjectName("CAPTURE_BTN");
-    connect(capture, SIGNAL(clicked()), this->parent()->parent(), SLOT(screenshot()));
+    connect(capture, SIGNAL(clicked()), signal_receiver, SLOT(screenshot()));
 
     cls = new TitleButton("", this);
     cls->setObjectName("CLS_BTN");
-    connect(cls, SIGNAL(clicked()), this->parent()->parent(), SLOT(clean()));
+    connect(cls, SIGNAL(clicked()), signal_receiver, SLOT(clean()));
 
     lang = new TitleButton("", this);
     lang->setObjectName("LANGUAGE_BTN");
-    connect(lang, SIGNAL(clicked()), this->parent()->parent(), SLOT(switch_language()));
+    connect(lang, SIGNAL(clicked()), signal_receiver, SLOT(switch_language()));
 }
 
 void TitleBar::process_maximize()
