@@ -85,7 +85,7 @@ Demo::Demo(QWidget *parent)
     base_unit(0),
     fps(10),
     duty(5000),
-    mcp(0),
+    mcp(5),
     laser_on(0),
     zoom(0),
     focus(0),
@@ -199,6 +199,7 @@ Demo::Demo(QWidget *parent)
     ui->MCP_SLIDER->setMaximum(255);
     ui->MCP_SLIDER->setSingleStep(1);
     ui->MCP_SLIDER->setPageStep(10);
+    ui->MCP_SLIDER->setValue(0);
     connect(ui->MCP_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_mcp(int)));
 
     ui->DELAY_SLIDER->setMinimum(0);
@@ -441,6 +442,7 @@ void Demo::data_exchange(bool read){
         ui->DELAY_N_EDIT_N->setText(QString::asprintf("%d", delay_n_n));
         ui->DELAY_SLIDER->setValue(delay_dist);
         ui->MCP_SLIDER->setValue(mcp);
+        ui->MCP_EDIT->setText(QString::number(mcp));
 
         setup_stepping(base_unit);
 
@@ -1012,7 +1014,9 @@ void Demo::on_ENUM_BUTTON_clicked()
 void Demo::on_START_BUTTON_clicked()
 {
     if (device_on) return;
-    data_exchange(true);
+    gain_analog_edit = ui->GAIN_EDIT->text().toFloat();
+    duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
+    fps = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
 
     if (curr_cam->start()) {
         QMessageBox::warning(this, "PROMPT", tr("start failed"));
@@ -1037,7 +1041,9 @@ void Demo::on_START_BUTTON_clicked()
     curr_cam->gain_analog(true, &gain_analog_edit);
     curr_cam->frame_rate(true, &frame_rate_edit);
     ui->GAIN_SLIDER->setValue((int)gain_analog_edit);
-    data_exchange(false);
+    ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)gain_analog_edit));
+    ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
+    ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
 
     // adjust display size according to frame size
     curr_cam->get_frame_size(w, h);
@@ -1066,7 +1072,10 @@ void Demo::on_SHUTDOWN_BUTTON_clicked()
 
 void Demo::on_CONTINUOUS_RADIO_clicked()
 {
-    data_exchange(true);
+    gain_analog_edit = ui->GAIN_EDIT->text().toFloat();
+    duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
+    fps = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
+
     ui->CONTINUOUS_RADIO->setChecked(true);
     ui->TRIGGER_RADIO->setChecked(false);
     ui->SOFTWARE_CHECK->setEnabled(false);
@@ -1078,7 +1087,10 @@ void Demo::on_CONTINUOUS_RADIO_clicked()
 
 void Demo::on_TRIGGER_RADIO_clicked()
 {
-    data_exchange(true);
+    gain_analog_edit = ui->GAIN_EDIT->text().toFloat();
+    duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
+    fps = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
+
     ui->CONTINUOUS_RADIO->setChecked(false);
     ui->TRIGGER_RADIO->setChecked(true);
     ui->SOFTWARE_CHECK->setEnabled(true);
@@ -1185,7 +1197,9 @@ void Demo::on_SAVE_FINAL_BUTTON_clicked()
 
 void Demo::on_SET_PARAMS_BUTTON_clicked()
 {
-    data_exchange(true);
+    gain_analog_edit = ui->GAIN_EDIT->text().toFloat();
+    duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
+    fps = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
 
     // CCD FREQUENCY
     communicate_display(com[0], convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
@@ -1201,7 +1215,9 @@ void Demo::on_SET_PARAMS_BUTTON_clicked()
 //        curr_cam->gain_analog(false, &gain_analog_edit);
         change_gain(gain_analog_edit);
     }
-    data_exchange(false);
+    ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)gain_analog_edit));
+    ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
+    ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
 }
 
 void Demo::on_GET_PARAMS_BUTTON_clicked()
@@ -1215,7 +1231,9 @@ void Demo::on_GET_PARAMS_BUTTON_clicked()
     curr_cam->gain_analog(true, &gain_analog_edit);
     curr_cam->frame_rate(true, &frame_rate_edit);
 
-    data_exchange(false);
+    ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)gain_analog_edit));
+    ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
+    ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
 }
 
 void Demo::on_FILE_PATH_BROWSE_clicked()
@@ -1224,7 +1242,8 @@ void Demo::on_FILE_PATH_BROWSE_clicked()
     if (!temp.isEmpty()) save_location = temp;
     if (save_original && !QDir(temp + "/ori_bmp").exists()) QDir().mkdir(temp + "/ori_bmp");
     if (save_modified && !QDir(temp + "/res_bmp").exists()) QDir().mkdir(temp + "/res_bmp");
-    data_exchange(false);
+
+    ui->FILE_PATH_EDIT->setText(save_location);
 }
 
 void Demo::clean()
@@ -1619,8 +1638,11 @@ void Demo::update_delay()
     // DELAY B
     communicate_display(com[0], convert_to_send_tcu(0x04, (delay_b_u * 1000 + delay_b_n) + 8), 7, 1, false);
 
-    data_exchange(false);
-
+    setup_hz(hz_unit);
+    ui->DELAY_A_EDIT_U->setText(QString::asprintf("%d", delay_a_u));
+    ui->DELAY_A_EDIT_N->setText(QString::asprintf("%d", delay_a_n));
+    ui->DELAY_B_EDIT_U->setText(QString::asprintf("%d", delay_b_u));
+    ui->DELAY_B_EDIT_N->setText(QString::asprintf("%d", delay_b_n));
 }
 
 void Demo::update_gate_width() {
@@ -1642,7 +1664,10 @@ void Demo::update_gate_width() {
 //    send = gw - 18;
     communicate_display(com[0], convert_to_send_tcu(0x05, gw + 8), 7, 1, false);
 
-    data_exchange(false);
+    ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", gate_width_a_u));
+    ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%d", gate_width_a_n));
+//        ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf("%d", gate_width_b_u));
+//        ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%d", gate_width_b_n));
 }
 
 void Demo::filter_scan()
@@ -1805,11 +1830,21 @@ void Demo::on_DIST_BTN_clicked() {
     else if (distance < 3000) depth_of_view = 1000 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
     else if (distance < 6000) depth_of_view = 2000 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
     else                      depth_of_view = 3500 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
-    data_exchange(false);
+
     communicate_display(com[0], convert_to_send_tcu(0x1E, distance), 7, 1, true);
     ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
-//    ui->DELAY_SLIDER->setValue(delay_dist);
-//    depth_of_vision = 300;
+
+    setup_hz(hz_unit);
+    ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", laser_width_u));
+    ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%d", laser_width_n));
+    ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", gate_width_a_u));
+    ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%d", gate_width_a_n));
+    ui->DELAY_A_EDIT_U->setText(QString::asprintf("%d", delay_a_u));
+    ui->DELAY_A_EDIT_N->setText(QString::asprintf("%d", delay_a_n));
+//        ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf("%d", gate_width_b_u));
+//        ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%d", gate_width_b_n));
+    ui->DELAY_B_EDIT_U->setText(QString::asprintf("%d", delay_b_u));
+    ui->DELAY_B_EDIT_N->setText(QString::asprintf("%d", delay_b_n));
 }
 
 void Demo::on_IMG_3D_CHECK_stateChanged(int arg1)
@@ -1826,7 +1861,7 @@ void Demo::on_IMG_3D_CHECK_stateChanged(int arg1)
     resizeEvent(&e);
     if (!arg1) frame_a_3d = 0, prev_3d.release();
 
-    data_exchange(true);
+    image_3d = ui->IMG_3D_CHECK->isChecked();
 }
 
 void Demo::on_ZOOM_IN_BTN_pressed()
@@ -1941,7 +1976,8 @@ inline void Demo::lens_stop() {
 
 void Demo::set_zoom()
 {
-    data_exchange(true);
+    zoom = ui->ZOOM_EDIT->text().toInt();
+
     unsigned sum = 0;
     uchar out[7];
     out[0] = 0xFF;
@@ -1959,7 +1995,8 @@ void Demo::set_zoom()
 
 void Demo::set_focus()
 {
-    data_exchange(true);
+    focus = ui->FOCUS_EDIT->text().toInt();
+
     unsigned sum = 0;
     uchar out[7];
     out[0] = 0xFF;
@@ -2032,7 +2069,6 @@ void Demo::change_mcp(int val)
 
 void Demo::change_gain(int val)
 {
-
     if (val < 0) val = 0;
     switch (curr_cam->device_type) {
     case 1:
@@ -2047,7 +2083,6 @@ void Demo::change_gain(int val)
     curr_cam->gain_analog(false, &gain_analog_edit);
     ui->GAIN_EDIT->setText(QString::number((int)gain_analog_edit));
     ui->GAIN_SLIDER->setValue(gain_analog_edit);
-    data_exchange(false);
 }
 
 void Demo::change_delay(int val)
@@ -2055,7 +2090,6 @@ void Demo::change_delay(int val)
     if (abs(delay_dist - val) < 1) return;
     delay_dist = val;
     update_delay();
-    data_exchange(false);
 }
 
 void Demo::change_focus_speed(int val)
@@ -2225,7 +2259,6 @@ void Demo::keyPressEvent(QKeyEvent *event)
                 update_current();
             }
             this->focusWidget()->clearFocus();
-            data_exchange(false);
             break;
         // 100m => 667ns, 10m => 67ns
         case Qt::Key_W:
@@ -2584,7 +2617,7 @@ void Demo::on_FRAME_AVG_CHECK_stateChanged(int arg1)
         for (int i = 0; i < 10; i++) seq[i].release();
         seq_idx = 0;
     }
-    data_exchange(true);
+    calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 5 + 5;
 }
 
 void Demo::on_SAVE_RESULT_BUTTON_clicked()
@@ -2655,7 +2688,8 @@ void Demo::on_GET_LENS_PARAM_BTN_clicked()
     read = communicate_display(share_serial_port && com[0]->isOpen() ? com[0] : com[2], generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
     focus = (read[4] << 8) + read[5];
 
-    data_exchange(false);
+    ui->ZOOM_EDIT->setText(QString::asprintf("%d", zoom));
+    ui->FOCUS_EDIT->setText(QString::asprintf("%d", focus));
 }
 
 void Demo::on_AUTO_FOCUS_BTN_clicked()
