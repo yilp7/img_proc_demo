@@ -76,7 +76,7 @@ Demo::Demo(QWidget *parent)
     trigger_by_software(false),
     curr_cam(NULL),
     time_exposure_edit(95000),
-    gain_analog_edit(23),
+    gain_analog_edit(400),
     frame_rate_edit(10),
     com{NULL},
     share_serial_port(true),
@@ -326,10 +326,12 @@ Demo::Demo(QWidget *parent)
 
     ui->DUTY_EDIT->setEnabled(false);
     ui->START_BUTTON->click();
+    ui->DUTY_EDIT->setText("95.00");
     QThread::sleep(2);
     ui->START_GRABBING_BUTTON->click();
 
     stepping = 10 / dist_ns;
+    save_location = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
     data_exchange(false);
 //    qDebug() << stepping;
 

@@ -801,7 +801,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>88 1E 00 00 00 00 99</string>
+      <string>88 1F 00 00 00 00 99</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>

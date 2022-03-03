@@ -1,6 +1,6 @@
 ﻿#include "cam.h"
 
-Cam::Cam() {dev_handle = NULL; cameralink = false;}
+Cam::Cam() {dev_handle = NULL; cameralink = true;}
 Cam::~Cam() {if (dev_handle) CloseHandle(dev_handle), dev_handle = NULL;}
 
 cv::Mat img; // hik

@@ -83,9 +83,9 @@ ProgSettings::ProgSettings(QWidget *parent) :
     ui->COM_DATA_EDT->setFont(temp);
 
     ui->LASER_ENERGY_LIST->addItem("0%");
-    ui->LASER_ENERGY_LIST->addItem("50%");
+//    ui->LASER_ENERGY_LIST->addItem("50%");
     ui->LASER_ENERGY_LIST->addItem("100%");
-    ui->LASER_ENERGY_LIST->setCurrentIndex(1);
+    ui->LASER_ENERGY_LIST->setCurrentIndex(0);
     ui->LASER_ENERGY_LIST->installEventFilter(this);
 
     data_exchange(false);
@@ -429,13 +429,15 @@ void ProgSettings::on_CENTRAL_SYMM_CHK_stateChanged(int arg1)
 
 void ProgSettings::on_LASER_ENERGY_LIST_currentIndexChanged(int index)
 {
-    switch (index) {
-    case 0: laser_on = 0; break;
-    case 1: laser_on = 1; break;
-    case 2: laser_on = 3; break;
-    default: break;
-    }
-    emit laser_toggled(laser_on);
+//    switch (index) {
+//    case 0: laser_on = 0; break;
+//    case 1: laser_on = 1; break;
+//    case 2: laser_on = 3; break;
+//    default: break;
+//    }
+//    emit laser_toggled(laser_on);
+
+    send_cmd();
 }
 
 

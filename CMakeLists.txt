@@ -52,20 +52,20 @@ set(SOURCE_FILES
 	mywidget.cpp
 	progsettings.cpp
 	imageproc.cpp
-#	cam.cpp
-    mvcam.cpp
-#	hqvcam.cpp
-#	euresyscam.cpp
+    cam.cpp
+#    mvcam.cpp
+#    hqvcam.cpp
+#    euresyscam.cpp
     utils.h
 	demo.h
 	threadpool.h
 	mywidget.h
 	progsettings.h
 	imageproc.h
-#	cam.h
-    mvcam.h
-#	hqvcam.h
-#	euresyscam.h
+    cam.h
+#    mvcam.h
+    hqvcam.h
+    euresyscam.h
     demo_dev.ui
 	settings.ui
 	resources/resources.qrc
