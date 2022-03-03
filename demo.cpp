@@ -108,6 +108,8 @@ Demo::Demo(QWidget *parent)
     is_color(false),
     w(640),
     h(400),
+    pixel_format(PixelType_Gvsp_Mono8),
+    pixel_depth(8),
     h_grab_thread(NULL),
     grab_thread_state(false),
     h_mouse_thread(NULL),
@@ -487,7 +489,7 @@ int Demo::grab_thread_process() {
             if (thresh < 100) emit update_mcp_in_thread(mcp += sqrt(100 - thresh));
 //            qDebug() << "low" << thresh;
         }
-
+/*
         // tenengrad (sobel) auto-focus
         cv::Sobel(img_mem, sobel, CV_16U, 1, 1);
         clarity[2] = clarity[1], clarity[1] = clarity[0], clarity[0] = cv::mean(sobel)[0] * 1000;
@@ -500,7 +502,7 @@ int Demo::grab_thread_process() {
                 else if (focus_direction < 0) lens_stop(), change_focus_speed(16), focus_near();
             }
         }
-
+*/
         // process frame average
         if (seq_sum.empty()) seq_sum = cv::Mat::zeros(h, w, CV_16U);
         if (ui->FRAME_AVG_CHECK->isChecked()) {
@@ -515,7 +517,9 @@ int Demo::grab_thread_process() {
             seq_sum.convertTo(modified_result, CV_8U, 1.0 / calc_avg_option);
             seq_sum.release();
         }
-        else modified_result = img_mem.clone();
+        else {
+            img_mem.convertTo(modified_result, CV_8U);
+        }
 
         // process 3d image construction from ABN frames
         if (image_3d) {
@@ -819,6 +823,77 @@ void Demo::save_image_bmp(cv::Mat img, QString filename)
     }
 }
 
+// grayscale only
+void Demo::save_image_tif(cv::Mat img, QString filename)
+{
+    // using std file io
+    FILE *f = fopen(filename.toLocal8Bit().constData(), "wb");
+    if (f) {
+        static ushort byte_order = 0x4949, ver_identifier = 0x002A;
+        fwrite(&byte_order, 2, 1, f);
+        fwrite(&ver_identifier, 2, 1, f);
+        static uint offset = 0x00000008; // offset for the first Image File Directory
+        fwrite(&offset, 4, 1, f);
+        static ushort entries = 0x0012; // # of entries in the IFD
+        fwrite(&entries, 2, 1, f);
+        static uchar new_subfile_type[12]  = {0xFE, 0x00, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        fwrite(new_subfile_type, 1, 12, f);
+        static uchar subfile_type[12]      = {0xFF, 0x00, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
+        fwrite(subfile_type, 1, 12, f);
+        static uchar width[12]             = {0x00, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        width[8] = img.cols & 0xFF;
+        width[9] = (img.cols & 0xFF00) >> 16;
+        fwrite(width, 1, 12, f);
+        static uchar height[12]            = {0x01, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        height[8] = img.rows & 0xFF;
+        height[9] = (img.rows & 0xFF00) >> 16;
+        fwrite(height, 1, 12, f);
+        static uchar depth[12]             = {0x02, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00};
+        fwrite(depth, 1, 12, f);
+        static uchar compression[12]       = {0x03, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}; // uncompressed
+        fwrite(compression, 1, 12, f);
+        static uchar photometric[12]       = {0x06, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}; // black is zero
+        fwrite(photometric, 1, 12, f);
+        static uchar strip_offset[12]      = {0x11, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x28, 0x01, 0x00, 0x00}; // 296
+        fwrite(strip_offset, 1, 12, f);
+        static uchar samples_per_pixel[12] = {0x15, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
+        fwrite(samples_per_pixel, 1, 12, f);
+        static uchar rows_per_strip[12]    = {0x16, 0x01, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF}; // 1 strip for the entire image: use 2e32-1 = 4,294,967,295
+        fwrite(rows_per_strip, 1, 12, f);
+        static uchar strip_length[12]      = {0x17, 0x01, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // width * height * 2 (16-bit), in bytes
+        uint len = img.total() * 2;
+        for (int i = 8; i < 12; i++, len >>= 8) strip_length[i] = len & 0xFF;
+        fwrite(strip_length, 1, 12, f);
+        static uchar pixel_min[12]         = {0x18, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        fwrite(pixel_min, 1, 12, f);
+        static uchar pixel_max[12]         = {0x19, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00};
+        fwrite(pixel_max, 1, 12, f);
+        static uchar resolution_x[12]      = {0x1A, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0xE6, 0x00, 0x00, 0x00};
+        fwrite(resolution_x, 1, 12, f);
+        static uchar resolution_y[12]      = {0x1B, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0xEE, 0x00, 0x00, 0x00};
+        fwrite(resolution_y, 1, 12, f);
+        static uchar planar_config[12]     = {0x1C, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}; // chunky format
+        fwrite(planar_config, 1, 12, f);
+        static uchar resolution_unit[12]   = {0x1C, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}; // inches
+        fwrite(resolution_unit, 1, 12, f);
+        static uchar software[12]          = {0x31, 0x01, 0x02, 0x00, 0x32, 0x00, 0x00, 0x00, 0xF6, 0x00, 0x00, 0x00}; // signature: starting idx 246, length 50
+        fwrite(software, 1, 12, f);
+        static uint next_ifd_ofset = 0;
+        fwrite(&next_ifd_ofset, 4, 1, f);
+        static uint resolution_x_n = 300, resolution_x_d = 1;
+        fwrite(&resolution_x_n, 4, 1, f);
+        fwrite(&resolution_x_d, 4, 1, f);
+        static uint resolution_y_n = 300, resolution_y_d = 1;
+        fwrite(&resolution_y_n, 4, 1, f);
+        fwrite(&resolution_y_d, 4, 1, f);
+        static char signature[50] = {0};
+
+        for(int i = img.rows - 1; i >= 0; i--) fwrite(img.data + i * img.step, 1, img.step, f);
+
+        fclose(f);
+    }
+}
+
 void Demo::draw_cursor(QCursor c)
 {
     setCursor(c);
@@ -933,7 +1008,12 @@ void Demo::save_to_file(bool save_result) {
 //    std::thread t_save(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
 //    t_save.detach();
 
-    if (!tp.append_task(std::bind(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
+    cv::Mat tif_16;
+    img_mem.convertTo(tif_16, CV_16UC1, 256);
+    std::vector<int> params; params.push_back(cv::IMWRITE_TIFF_COMPRESSION); params.push_back(1);
+    cv::imwrite((save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif").toLatin1().constData(), tif_16, params);
+//    if (!tp.append_task(std::bind(Demo::save_image_tif, tif_16, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full();
+//    if (!tp.append_task(std::bind(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
 }
 
 void Demo::save_scan_img() {

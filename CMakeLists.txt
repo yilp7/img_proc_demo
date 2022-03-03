@@ -58,10 +58,10 @@ set(SOURCE_FILES
     progsettings.cpp
     imageproc.h
     imageproc.cpp
-    cam.h
-    cam.cpp
-#    mvcam.h
-#    mvcam.cpp
+#    cam.h
+#    cam.cpp
+    mvcam.h
+    mvcam.cpp
 #    hqvcam.h
 #    hqvcam.cpp
 #    euresyscam.h
@@ -79,9 +79,9 @@ set(PROJECT_LIBS
     # mvs
     MvCameraControl
     # HQV
-    HQV_AVIProcess64
-    HQV_DataConvert64
-    HQV_SDK64
+#    HQV_AVIProcess64
+#    HQV_DataConvert64
+#    HQV_SDK64
     # Euresys
 #    MultiCam
 #    clallserial

@@ -76,6 +76,7 @@ public:
     // rename vid file in new thread
     static void move_to_dest(QString src, QString dst);
     static void save_image_bmp(cv::Mat img, QString filename);
+    static void save_image_tif(cv::Mat img, QString filename);
 
 public slots:
     // signaled by MouseThread
@@ -367,6 +368,8 @@ private:
 
     int                     w;                          // image width
     int                     h;                          // image height
+    int                     pixel_format;               // for hik cam, use mono 8 for others
+    int                     pixel_depth;                // pixel depth
 
     GrabThread*             h_grab_thread;              // img-grab thread handle
     bool                    grab_thread_state;          // whether thread is created

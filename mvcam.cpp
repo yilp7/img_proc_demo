@@ -160,7 +160,18 @@ int Cam::pixel_type(bool read, int *val)
         *val = temp.nCurValue;
     }
     else {
-        if (*val == PixelType_Gvsp_RGB8_Packed) cv::cvtColor(img, img, cv::COLOR_GRAY2RGB);
+        switch (*val) {
+        case PixelType_Gvsp_RGB8_Packed:
+            cv::cvtColor(img, img, cv::COLOR_GRAY2RGB);
+            break;
+        case PixelType_Gvsp_Mono8:
+        case PixelType_Gvsp_Mono10:
+        case PixelType_Gvsp_Mono10_Packed:
+        case PixelType_Gvsp_Mono12_Packed:
+            img.convertTo(img, CV_16UC1);
+        default: break;
+        }
+
         ret = MV_CC_SetPixelFormat(dev_handle, *val);
     }
     return ret;
@@ -175,7 +186,21 @@ void Cam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *
 {
 //    static cv::Mat img(frame_info->nHeight, frame_info->nWidth, CV_8UC1);
 //    img.data = data;
-    memcpy(img.data, data, frame_info->nFrameLen);
-    ((std::queue<cv::Mat>*)user_data)->push(img.clone());
+    switch (frame_info->enPixelType) {
+    case PixelType_Gvsp_Mono8:
+    case PixelType_Gvsp_Mono10:
+    case PixelType_Gvsp_Mono12:
+        memcpy(img.data, data, frame_info->nFrameLen);
+        break;
+    case PixelType_Gvsp_Mono10_Packed:
+        break;
+    case PixelType_Gvsp_Mono12_Packed:
+        break;
+    default:
+        img = 0;
+        break;
+    }
+
+    ((std::queue<cv::Mat>*)user_data)->push(img);
 }
 
