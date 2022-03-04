@@ -192,7 +192,7 @@ Demo::Demo(QWidget *parent)
     user_param.close();
     com_edit[0]->setText(QString::number(temp_com));
 
-    for (int i = 0; i < 4; i++) com[i] = new QSerialPort, setup_com(com + i, i, com_edit[i]->text(), 115200);
+    for (int i = 0; i < 4; i++) com[i] = new QSerialPort, setup_com(com + i, i, com_edit[i]->text(), 38400);
 
 //    setup_com(com + 0, 0, com_edit[0]->text(), 9600);
 //    setup_com(com + 1, 1, com_edit[1]->text(), 115200);
@@ -325,8 +325,8 @@ Demo::Demo(QWidget *parent)
     setup_stepping(2);
 
     ui->DUTY_EDIT->setEnabled(false);
-    ui->START_BUTTON->click();
     ui->DUTY_EDIT->setText("95.00");
+    ui->START_BUTTON->click();
     QThread::sleep(2);
     ui->START_GRABBING_BUTTON->click();
 
@@ -1058,7 +1058,7 @@ void Demo::on_START_BUTTON_clicked()
     curr_cam->time_exposure(true, &time_exposure_edit);
     curr_cam->gain_analog(true, &gain_analog_edit);
     curr_cam->frame_rate(true, &frame_rate_edit);
-    ui->GAIN_SLIDER->setValue((int)gain_analog_edit);
+    ui->GAIN_SLIDER->setValue(400);
     data_exchange(false);
 
     // adjust display size according to frame size
@@ -1940,7 +1940,6 @@ void Demo::change_mcp(int val)
 
 void Demo::change_gain(int val)
 {
-
     if (val < 0) val = 0;
     switch (curr_cam->device_type) {
     case 1:
@@ -2050,7 +2049,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
             for (int i = 0; i < 4; i++) {
                 if (edit == com_edit[i]) {
                     if (com[i]) com[i]->close();
-                    setup_com(com + i, i, edit->text(), 115200);
+                    setup_com(com + i, i, edit->text(), 38400);
                     if (i == 0) {
                         QFile user_param("user_param");
                         user_param.open(QIODevice::WriteOnly);
