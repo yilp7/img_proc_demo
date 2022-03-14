@@ -151,7 +151,7 @@ Demo::Demo(QWidget *parent)
 //    qDebug() << QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section('/', 0, -1);
     TEMP_SAVE_LOCATION = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
 
-    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 1px; image: url(:/tools/%s.png);", hide_left ? "right" : "left"));
+    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s.png);", hide_left ? "right" : "left"));
 
     // - image operations
     QComboBox *enhance_options = ui->ENHANCE_OPTIONS;
@@ -257,27 +257,6 @@ Demo::Demo(QWidget *parent)
     ui->SHAPE_INFO->setup("size");
     connect(ui->SOURCE_DISPLAY, SIGNAL(shape_size(QPoint)), ui->SHAPE_INFO, SLOT(display_pos(QPoint)));
 
-//    QTableWidget *roi_table = ui->ROI_TABLE;
-//    QStringList header_str;
-//    header_str << "operation" << "apply";
-//    QFont f = font();
-//    f.setBold(true);
-//    for (int i = 0; i < 2; i++) {
-//        QTableWidgetItem *h = new QTableWidgetItem(header_str[i]);
-//        h->setFont(f);
-//        roi_table->setHorizontalHeaderItem(i, h);
-//    }
-//    roi_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
-//    roi_table->setColumnWidth(0, 134);
-//    roi_table->setColumnWidth(1, 39);
-//    roi_table->verticalHeader()->setMaximumWidth(16);
-//    roi_table->verticalHeader()->setMinimumWidth(16);
-//    for (int i = 0; i < 5; i++) {
-//        QTableWidgetItem *h = new QTableWidgetItem(QString::number(i + 1));
-//        h->setFont(f);
-//        roi_table->setVerticalHeaderItem(i, h);
-//    }
-
     scan_q.push_back(-1);
 //    setup_stepping(0);
 
@@ -295,7 +274,6 @@ Demo::Demo(QWidget *parent)
     display_grp = new QButtonGroup();
     display_grp->addButton(ui->COM_DATA_RADIO);
     display_grp->addButton(ui->HISTOGRAM_RADIO);
-    display_grp->addButton(ui->ROI_RADIO);
     display_grp->setExclusive(true);
 
     // connect title bar to the main window (Demo*)
@@ -318,32 +296,54 @@ Demo::Demo(QWidget *parent)
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
     // in development
-    ui->ROI_TABLE->hide();
-    ui->ROI_RADIO->hide();
+    ui->PTZ_RADIO->hide();
 
 #ifdef ICMOS
+    ui->RANGE_COM->setText("R1");
+    ui->LASER_COM->setText("R2");
+    ui->RANGE_COM_EDIT->setEnabled(false);
+    ui->LASER_COM_EDIT->setEnabled(false);
+
     ui->ESTIMATED->hide();
     ui->EST_DIST->hide();
     ui->ESTIMATED_2->hide();
     ui->GATE_WIDTH->hide();
     ui->DELAY_SLIDER->move(30, 153);
-    ui->COM_DATA_RADIO->hide();
-    ui->HISTOGRAM_RADIO->click();
-    ui->HISTOGRAM_RADIO->hide();
+
+    ui->LOGO->move(10, 0);
+    ui->INITIALIZATION->move(10, ui->INITIALIZATION->y() + 60);
+    ui->IMG_GRAB_STATIC->move(10, ui->IMG_GRAB_STATIC->y() + 60);
+    ui->PARAMS_STATIC->move(10, ui->PARAMS_STATIC->y() + 60);
 
     ui->LASER_STATIC->hide();
-    ui->ALT_DISPLAY->move(10, 370);
+    ui->ALT_DISPLAY->setParent(ui->RIGHT);
+    ui->ALT_DISPLAY->setGeometry(10, 365, ui->OPERATION_STATIC->width(), ui->ALT_DISPLAY->height());
+    QSize temp = ui->DATA_EXCHANGE->size();
+    temp.setWidth(ui->ALT_DISPLAY->width());
+    ui->DATA_EXCHANGE->resize(temp);
+    ui->HIST_DISPLAY->resize(temp);
     ui->LENS_STATIC->hide();
-    ui->IMG_SAVE_STATIC->move(10, 260);
-    ui->OPERATION_STATIC->move(10, 355);
-    ui->SCAN_GRP->move(10, 475);
+    ui->IMG_SAVE_STATIC->move(10, 265);
+    ui->OPERATION_STATIC->hide();
+    ui->SCAN_GRP->move(10, 560);
     ui->IMG_3D_CHECK->hide();
     ui->RANGE_THRESH_EDIT->hide();
 
-    max_dist = 5000;
-    ui->TITLE->prog_settings->max_dist = 5000;
+    ui->DELAY_N->hide();
+    ui->DELAY_N_EDIT_N->hide();
+    ui->DELAY_N_UNIT_N->hide();
+    ui->MCP_SLIDER->resize(ui->MCP_SLIDER->width() + 20, ui->MCP_SLIDER->height());
+    ui->MCP_EDIT->move(170, 65);
+    ui->DELAY_B_EDIT_U->setEnabled(false);
+    ui->DELAY_B_EDIT_N->setEnabled(false);
+
+    max_dist = 6000;
+    ui->TITLE->prog_settings->max_dist = 6000;
     ui->TITLE->prog_settings->data_exchange(false);
-    ui->TITLE->prog_settings->max_dist_changed(5000);
+    ui->TITLE->prog_settings->max_dist_changed(6000);
+
+#else
+    ui->LOGO->hide();
 #endif
 }
 
@@ -480,13 +480,13 @@ int Demo::grab_thread_process() {
 
         // mcp self-adaptive
         if (auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
-            int thresh_num = img_mem.total() / 200, thresh = 255;
+            int thresh_num = img_mem.total() / 200, thresh = 1 << pixel_depth;
             while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-            if (thresh > 240) emit update_mcp_in_thread(mcp -= sqrt(thresh - 240));
+            if (thresh > (1 << pixel_depth) * 0.94) emit update_mcp_in_thread(mcp -= sqrt(thresh - (1 << pixel_depth) * 0.94));
 //            qDebug() << "high" << thresh;
 //            thresh_num = img_mem.total() / 100, thresh = 255;
 //            while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-            if (thresh < 100) emit update_mcp_in_thread(mcp += sqrt(100 - thresh));
+            if (thresh < (1 << pixel_depth) * 0.39) emit update_mcp_in_thread(mcp += sqrt((1 << pixel_depth) * 0.39 - thresh));
 //            qDebug() << "low" << thresh;
         }
 /*
@@ -518,7 +518,7 @@ int Demo::grab_thread_process() {
             seq_sum.release();
         }
         else {
-            img_mem.convertTo(modified_result, CV_8U);
+            img_mem.convertTo(modified_result, CV_8U, 1.0 / (1 << (pixel_depth - 8)));
         }
 
         // process 3d image construction from ABN frames
@@ -670,7 +670,7 @@ int Demo::grab_thread_process() {
                 }
                 cv::Mat hist_image(225, 256, CV_8UC3, cv::Scalar(56, 64, 72));
                 for (int i = 0; i < 256; i++) {
-                    cv::rectangle(hist_image, cv::Point(i, 225), cv::Point(i + 2, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
+                    cv::rectangle(hist_image, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
                 }
                 ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
             }
@@ -826,72 +826,8 @@ void Demo::save_image_bmp(cv::Mat img, QString filename)
 // grayscale only
 void Demo::save_image_tif(cv::Mat img, QString filename)
 {
-    // using std file io
-    FILE *f = fopen(filename.toLocal8Bit().constData(), "wb");
-    if (f) {
-        static ushort byte_order = 0x4949, ver_identifier = 0x002A;
-        fwrite(&byte_order, 2, 1, f);
-        fwrite(&ver_identifier, 2, 1, f);
-        static uint offset = 0x00000008; // offset for the first Image File Directory
-        fwrite(&offset, 4, 1, f);
-        static ushort entries = 0x0012; // # of entries in the IFD
-        fwrite(&entries, 2, 1, f);
-        static uchar new_subfile_type[12]  = {0xFE, 0x00, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-        fwrite(new_subfile_type, 1, 12, f);
-        static uchar subfile_type[12]      = {0xFF, 0x00, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
-        fwrite(subfile_type, 1, 12, f);
-        static uchar width[12]             = {0x00, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-        width[8] = img.cols & 0xFF;
-        width[9] = (img.cols & 0xFF00) >> 16;
-        fwrite(width, 1, 12, f);
-        static uchar height[12]            = {0x01, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-        height[8] = img.rows & 0xFF;
-        height[9] = (img.rows & 0xFF00) >> 16;
-        fwrite(height, 1, 12, f);
-        static uchar depth[12]             = {0x02, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00};
-        fwrite(depth, 1, 12, f);
-        static uchar compression[12]       = {0x03, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}; // uncompressed
-        fwrite(compression, 1, 12, f);
-        static uchar photometric[12]       = {0x06, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}; // black is zero
-        fwrite(photometric, 1, 12, f);
-        static uchar strip_offset[12]      = {0x11, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x28, 0x01, 0x00, 0x00}; // 296
-        fwrite(strip_offset, 1, 12, f);
-        static uchar samples_per_pixel[12] = {0x15, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
-        fwrite(samples_per_pixel, 1, 12, f);
-        static uchar rows_per_strip[12]    = {0x16, 0x01, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF}; // 1 strip for the entire image: use 2e32-1 = 4,294,967,295
-        fwrite(rows_per_strip, 1, 12, f);
-        static uchar strip_length[12]      = {0x17, 0x01, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // width * height * 2 (16-bit), in bytes
-        uint len = img.total() * 2;
-        for (int i = 8; i < 12; i++, len >>= 8) strip_length[i] = len & 0xFF;
-        fwrite(strip_length, 1, 12, f);
-        static uchar pixel_min[12]         = {0x18, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-        fwrite(pixel_min, 1, 12, f);
-        static uchar pixel_max[12]         = {0x19, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00};
-        fwrite(pixel_max, 1, 12, f);
-        static uchar resolution_x[12]      = {0x1A, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0xE6, 0x00, 0x00, 0x00};
-        fwrite(resolution_x, 1, 12, f);
-        static uchar resolution_y[12]      = {0x1B, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0xEE, 0x00, 0x00, 0x00};
-        fwrite(resolution_y, 1, 12, f);
-        static uchar planar_config[12]     = {0x1C, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}; // chunky format
-        fwrite(planar_config, 1, 12, f);
-        static uchar resolution_unit[12]   = {0x1C, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}; // inches
-        fwrite(resolution_unit, 1, 12, f);
-        static uchar software[12]          = {0x31, 0x01, 0x02, 0x00, 0x32, 0x00, 0x00, 0x00, 0xF6, 0x00, 0x00, 0x00}; // signature: starting idx 246, length 50
-        fwrite(software, 1, 12, f);
-        static uint next_ifd_ofset = 0;
-        fwrite(&next_ifd_ofset, 4, 1, f);
-        static uint resolution_x_n = 300, resolution_x_d = 1;
-        fwrite(&resolution_x_n, 4, 1, f);
-        fwrite(&resolution_x_d, 4, 1, f);
-        static uint resolution_y_n = 300, resolution_y_d = 1;
-        fwrite(&resolution_y_n, 4, 1, f);
-        fwrite(&resolution_y_d, 4, 1, f);
-        static char signature[50] = {0};
-
-        for(int i = img.rows - 1; i >= 0; i--) fwrite(img.data + i * img.step, 1, img.step, f);
-
-        fclose(f);
-    }
+    std::vector<int> params; params.push_back(cv::IMWRITE_TIFF_COMPRESSION); params.push_back(1);
+    cv::imwrite(filename.toLatin1().constData(), img, params);
 }
 
 void Demo::draw_cursor(QCursor c)
@@ -1008,12 +944,8 @@ void Demo::save_to_file(bool save_result) {
 //    std::thread t_save(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
 //    t_save.detach();
 
-    cv::Mat tif_16;
-    img_mem.convertTo(tif_16, CV_16UC1, 256);
-    std::vector<int> params; params.push_back(cv::IMWRITE_TIFF_COMPRESSION); params.push_back(1);
-    cv::imwrite((save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif").toLatin1().constData(), tif_16, params);
 //    if (!tp.append_task(std::bind(Demo::save_image_tif, tif_16, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full();
-//    if (!tp.append_task(std::bind(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
+    if (!tp.append_task(std::bind(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
 }
 
 void Demo::save_scan_img() {
@@ -1218,6 +1150,10 @@ void Demo::on_START_GRABBING_BUTTON_clicked()
     start_grabbing = true;
     ui->SOURCE_DISPLAY->grab = true;
     enable_controls(true);
+
+#ifdef ICMOS
+    ui->HIDE_BTN->click();
+#endif
 }
 
 void Demo::on_STOP_GRABBING_BUTTON_clicked()
@@ -1433,8 +1369,13 @@ void Demo::set_dev_ip(int ip, int gateway)
 
 void Demo::change_pixel_format(int pixel_format)
 {
+    this->pixel_format = pixel_format;
     int ret = curr_cam->pixel_type(false, &pixel_format);
     is_color = pixel_format == PixelType_Gvsp_RGB8_Packed;
+    switch (pixel_format) {
+    case PixelType_Gvsp_Mono12: pixel_depth = 16; break;
+    default: pixel_depth = 8; break;
+    }
 }
 
 void Demo::joystick_button_pressed(int btn)
@@ -2783,7 +2724,7 @@ void Demo::on_HIDE_BTN_clicked()
     hide_left ^= 1;
     ui->LEFT->setGeometry(10, 40, hide_left ? 0 : 210, 631);
 //    ui->HIDE_BTN->setText(hide_left ? ">" : "<");
-    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 1px; image: url(:/tools/%s.png);", hide_left ? "right" : "left"));
+    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s.png);", hide_left ? "right" : "left"));
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
 }

@@ -76,8 +76,13 @@ ProgSettings::ProgSettings(QWidget *parent) :
 
     ui->COM_LIST->addItem("TCU");
     ui->COM_LIST->addItem("RANGE");
+#ifdef ICMOS
+    ui->COM_LIST->addItem("R1");
+    ui->COM_LIST->addItem("R2");
+#else
     ui->COM_LIST->addItem("LENS");
     ui->COM_LIST->addItem("LASER");
+#endif
     ui->COM_LIST->installEventFilter(this);
 
     QFont temp = QFont(consolas);
@@ -85,12 +90,32 @@ ProgSettings::ProgSettings(QWidget *parent) :
     ui->COM_DATA_EDT->setFont(temp);
 
     ui->PIXEL_FORMAT_LIST->addItem("Mono8");
-    ui->PIXEL_FORMAT_LIST->addItem("Bayer_RG8");
-    ui->PIXEL_FORMAT_LIST->addItem("YUV422");
+    ui->PIXEL_FORMAT_LIST->addItem("Mono10");
+    ui->PIXEL_FORMAT_LIST->addItem("Mono12");
     ui->PIXEL_FORMAT_LIST->addItem("RGB8");
     ui->PIXEL_FORMAT_LIST->installEventFilter(this);
 
     data_exchange(false);
+
+#ifdef ICMOS
+    ui->CAMERALINK_CHK->hide();
+    ui->PIXEL_FORMAT_LIST->setParent(ui->DEVICE_GRP);
+    ui->PIXEL_FORMAT_LIST->move(10, 45);
+
+    ui->SHARE_CHK->setEnabled(false);
+
+    ui->LASER->hide();
+    ui->LASER_CHK_1->hide();
+    ui->LASER_CHK_2->hide();
+    ui->LASER_CHK_3->hide();
+    ui->LASER_CHK_4->hide();
+    ui->AUTO_MCP_CHK->move(10, 140);
+    ui->TCU_GRP->resize(ui->TCU_GRP->width(), ui->TCU_GRP->height() - 40);
+
+    ui->DEVICE_GRP->move(ui->DEVICE_GRP->x(), ui->DEVICE_GRP->y() - 20);
+
+    this->resize(this->width() - 195, this->height());
+#endif
 }
 
 ProgSettings::~ProgSettings()
@@ -434,7 +459,6 @@ void ProgSettings::on_CENTRAL_SYMM_CHK_stateChanged(int arg1)
 
 void ProgSettings::on_PIXEL_FORMAT_LIST_activated(int index)
 {
-    static int pixel_format[4] = {PixelType_Gvsp_Mono8, PixelType_Gvsp_BayerRG8, PixelType_Gvsp_YUV422_Packed, PixelType_Gvsp_RGB8_Packed};
+    static int pixel_format[4] = {PixelType_Gvsp_Mono8, PixelType_Gvsp_Mono10, PixelType_Gvsp_Mono12, PixelType_Gvsp_RGB8_Packed};
     emit change_pixel_format(pixel_format[index]);
 }
-

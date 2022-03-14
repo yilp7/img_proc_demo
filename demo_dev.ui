@@ -244,7 +244,7 @@
        <bool>false</bool>
       </property>
       <property name="text">
-       <string>CCD Freq</string>
+       <string>CMOS Freq</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
@@ -775,19 +775,6 @@
        <string>hist</string>
       </property>
      </widget>
-     <widget class="QRadioButton" name="ROI_RADIO">
-      <property name="geometry">
-       <rect>
-        <x>120</x>
-        <y>0</y>
-        <width>46</width>
-        <height>20</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>ROI</string>
-      </property>
-     </widget>
      <widget class="QLabel" name="HIST_DISPLAY">
       <property name="geometry">
        <rect>
@@ -829,12 +816,45 @@
        <bool>true</bool>
       </property>
      </widget>
+     <widget class="QRadioButton" name="PTZ_RADIO">
+      <property name="geometry">
+       <rect>
+        <x>120</x>
+        <y>0</y>
+        <width>53</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>PTZ</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QLabel" name="LOGO">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>560</y>
+       <width>191</width>
+       <height>64</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="pixmap">
+      <pixmap resource="resources/resources.qrc">:/logo/3a.png</pixmap>
+     </property>
+     <property name="scaledContents">
+      <bool>true</bool>
+     </property>
     </widget>
     <zorder>ALT_DISPLAY</zorder>
     <zorder>PARAMS_STATIC</zorder>
     <zorder>IMG_GRAB_STATIC</zorder>
     <zorder>INITIALIZATION</zorder>
     <zorder>LASER_STATIC</zorder>
+    <zorder>LOGO</zorder>
    </widget>
    <widget class="QFrame" name="MID">
     <property name="geometry">
@@ -1013,37 +1033,6 @@
      <property name="text">
       <string>info</string>
      </property>
-    </widget>
-    <widget class="QTableWidget" name="ROI_TABLE">
-     <property name="geometry">
-      <rect>
-       <x>40</x>
-       <y>460</y>
-       <width>191</width>
-       <height>161</height>
-      </rect>
-     </property>
-     <property name="verticalScrollBarPolicy">
-      <enum>Qt::ScrollBarAlwaysOff</enum>
-     </property>
-     <property name="horizontalScrollBarPolicy">
-      <enum>Qt::ScrollBarAlwaysOff</enum>
-     </property>
-     <property name="rowCount">
-      <number>4</number>
-     </property>
-     <property name="columnCount">
-      <number>2</number>
-     </property>
-     <attribute name="verticalHeaderVisible">
-      <bool>false</bool>
-     </attribute>
-     <row/>
-     <row/>
-     <row/>
-     <row/>
-     <column/>
-     <column/>
     </widget>
    </widget>
    <widget class="QFrame" name="RIGHT">
@@ -1449,7 +1438,7 @@
        <rect>
         <x>10</x>
         <y>91</y>
-        <width>105</width>
+        <width>90</width>
         <height>14</height>
        </rect>
       </property>
@@ -1468,7 +1457,7 @@
        <rect>
         <x>120</x>
         <y>91</y>
-        <width>105</width>
+        <width>90</width>
         <height>14</height>
        </rect>
       </property>
@@ -1532,7 +1521,7 @@
        <rect>
         <x>10</x>
         <y>103</y>
-        <width>105</width>
+        <width>90</width>
         <height>14</height>
        </rect>
       </property>
@@ -1564,7 +1553,7 @@
        <rect>
         <x>120</x>
         <y>103</y>
-        <width>105</width>
+        <width>90</width>
         <height>14</height>
        </rect>
       </property>

@@ -675,7 +675,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>88 1E 00 00 00 00 99</string>
+     <string>88 1F 00 00 00 00 99</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -883,24 +883,11 @@
    <property name="title">
     <string>Device</string>
    </property>
-   <widget class="QCheckBox" name="CAMERALINK_CHK">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>20</y>
-      <width>91</width>
-      <height>19</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Cameralink</string>
-    </property>
-   </widget>
    <widget class="QLineEdit" name="IP_EDIT">
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>40</y>
+      <y>15</y>
       <width>101</width>
       <height>24</height>
      </rect>
@@ -909,11 +896,11 @@
      <string>192.168.1.159</string>
     </property>
    </widget>
-   <widget class="QLabel" name="label">
+   <widget class="QLabel" name="IP">
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>45</y>
+      <y>20</y>
       <width>21</width>
       <height>16</height>
      </rect>
@@ -922,13 +909,26 @@
      <string>IP</string>
     </property>
    </widget>
+   <widget class="QCheckBox" name="CAMERALINK_CHK">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>45</y>
+      <width>91</width>
+      <height>19</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Cameralink</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QComboBox" name="PIXEL_FORMAT_LIST">
    <property name="geometry">
     <rect>
      <x>20</x>
      <y>290</y>
-     <width>111</width>
+     <width>121</width>
      <height>20</height>
     </rect>
    </property>

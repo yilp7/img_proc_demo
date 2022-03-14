@@ -162,13 +162,17 @@ int Cam::pixel_type(bool read, int *val)
     else {
         switch (*val) {
         case PixelType_Gvsp_RGB8_Packed:
-            cv::cvtColor(img, img, cv::COLOR_GRAY2RGB);
+            img.convertTo(img, CV_8UC3);
             break;
         case PixelType_Gvsp_Mono8:
+            img.convertTo(img, CV_8UC1);
+            break;
         case PixelType_Gvsp_Mono10:
+        case PixelType_Gvsp_Mono12:
         case PixelType_Gvsp_Mono10_Packed:
         case PixelType_Gvsp_Mono12_Packed:
             img.convertTo(img, CV_16UC1);
+            break;
         default: break;
         }
 
@@ -193,7 +197,6 @@ void Cam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *
         memcpy(img.data, data, frame_info->nFrameLen);
         break;
     case PixelType_Gvsp_Mono10_Packed:
-        break;
     case PixelType_Gvsp_Mono12_Packed:
         break;
     default:

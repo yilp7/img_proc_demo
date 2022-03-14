@@ -18,6 +18,7 @@
         <file>YJS88.png</file>
         <file alias="YJS">YJS00.png</file>
         <file>YJS22.png</file>
+        <file>3a.png</file>
     </qresource>
     <qresource prefix="/icon">
         <file>icon.ico</file>
