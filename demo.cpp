@@ -674,6 +674,14 @@ int Demo::grab_thread_process() {
                 }
                 ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
             }
+            // crop the region to display
+//            cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? w + 104 : w) / disp->width(), disp->display_region.br() * (image_3d ? w + 104 : w) / disp->width());
+            cv::Rect region = cv::Rect(disp->display_region.tl() * w / disp->width(), disp->display_region.br() * w / disp->width());
+            if (region.height > h) region.height = h;
+//            qDebug("region x: %d y: %d, w: %d, h: %d\n", region.x, region.y, region.width, region.height);
+//            qDebug("image  w: %d, h: %d\n", modified_result.cols, modified_result.rows);
+            modified_result = modified_result(region);
+            cv::resize(modified_result, modified_result, cv::Size(w, h));
 
             // put info (dist, dov, time) as text on image
             if (ui->INFO_CHECK->isChecked()) {
@@ -681,24 +689,18 @@ int Demo::grab_thread_process() {
                 else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
+
+            // resize to display size
+            cv::resize(modified_result, cropped_img, cv::Size(ui->SOURCE_DISPLAY->width(), ui->SOURCE_DISPLAY->height()), 0, 0, cv::INTER_AREA);
+            // draw the center cross
+            if (!image_3d && ui->CENTER_CHECK->isChecked()) {
+                for (int i = cropped_img.cols / 2 - 9; i < cropped_img.cols / 2 + 10; i++) cropped_img.at<uchar>(cropped_img.rows / 2, i) = cropped_img.at<uchar>(cropped_img.rows / 2, i) > 127 ? 0 : 255;
+                for (int i = cropped_img.rows / 2 - 9; i < cropped_img.rows / 2 + 10; i++) cropped_img.at<uchar>(i, cropped_img.cols / 2) = cropped_img.at<uchar>(i, cropped_img.cols / 2) > 127 ? 0 : 255;
+            }
+            if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(cropped_img, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
         }
 
         // image display
-//        cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? w + 104 : w) / disp->width(), disp->display_region.br() * (image_3d ? w + 104 : w) / disp->width());
-        cv::Rect region = cv::Rect(disp->display_region.tl() * w / disp->width(), disp->display_region.br() * w / disp->width());
-        if (region.height > h) region.height = h;
-//        qDebug("region x: %d y: %d, w: %d, h: %d\n", region.x, region.y, region.width, region.height);
-//        qDebug("image  w: %d, h: %d\n", modified_result.cols, modified_result.rows);
-        cropped_img = modified_result(region);
-        // resize to display size
-        cv::resize(cropped_img, cropped_img, cv::Size(ui->SOURCE_DISPLAY->width(), ui->SOURCE_DISPLAY->height()), 0, 0, cv::INTER_AREA);
-        // draw the center cross
-        if (!image_3d && ui->CENTER_CHECK->isChecked()) {
-            for (int i = cropped_img.cols / 2 - 9; i < cropped_img.cols / 2 + 10; i++) cropped_img.at<uchar>(cropped_img.rows / 2, i) = cropped_img.at<uchar>(cropped_img.rows / 2, i) > 127 ? 0 : 255;
-            for (int i = cropped_img.rows / 2 - 9; i < cropped_img.rows / 2 + 10; i++) cropped_img.at<uchar>(i, cropped_img.cols / 2) = cropped_img.at<uchar>(i, cropped_img.cols / 2) > 127 ? 0 : 255;
-        }
-        if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(cropped_img, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
-
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
         stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, image_3d || is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
         ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
@@ -723,7 +725,7 @@ int Demo::grab_thread_process() {
             vid_out[0].write(img_mem);
         }
         if (record_modified) {
-            if (!image_3d) {
+            if (!image_3d && !ui->INFO_CHECK->isChecked()) {
                 if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);

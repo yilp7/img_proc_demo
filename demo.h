@@ -392,7 +392,7 @@ private:
     bool                    scan;                       // auto-scan for object detection
     float                   scan_distance;              // curr distance of scanning
     float                   scan_step;                  // stepping size when scanning
-    float                   scan_stopping_delay;              // upper limit for scanning
+    float                   scan_stopping_delay;        // upper limit for scanning
     QString                 scan_name;
 
     float                   c;                          // light speed
