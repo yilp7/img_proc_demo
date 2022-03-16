@@ -75,7 +75,7 @@ Demo::Demo(QWidget *parent)
     gain_analog_edit(0),
     frame_rate_edit(10),
     com{NULL},
-    share_serial_port(true),
+    share_serial_port(false),
     out_buffer{0},
     in_buffer{0},
     rep_freq(30),
@@ -691,18 +691,18 @@ int Demo::grab_thread_process() {
             }
 
             // resize to display size
-            cv::resize(modified_result, cropped_img, cv::Size(ui->SOURCE_DISPLAY->width(), ui->SOURCE_DISPLAY->height()), 0, 0, cv::INTER_AREA);
+            cv::resize(modified_result, img_display, cv::Size(ui->SOURCE_DISPLAY->width(), ui->SOURCE_DISPLAY->height()), 0, 0, cv::INTER_AREA);
             // draw the center cross
             if (!image_3d && ui->CENTER_CHECK->isChecked()) {
-                for (int i = cropped_img.cols / 2 - 9; i < cropped_img.cols / 2 + 10; i++) cropped_img.at<uchar>(cropped_img.rows / 2, i) = cropped_img.at<uchar>(cropped_img.rows / 2, i) > 127 ? 0 : 255;
-                for (int i = cropped_img.rows / 2 - 9; i < cropped_img.rows / 2 + 10; i++) cropped_img.at<uchar>(i, cropped_img.cols / 2) = cropped_img.at<uchar>(i, cropped_img.cols / 2) > 127 ? 0 : 255;
+                for (int i = img_display.cols / 2 - 9; i < img_display.cols / 2 + 10; i++) img_display.at<uchar>(img_display.rows / 2, i) = img_display.at<uchar>(img_display.rows / 2, i) > 127 ? 0 : 255;
+                for (int i = img_display.rows / 2 - 9; i < img_display.rows / 2 + 10; i++) img_display.at<uchar>(i, img_display.cols / 2) = img_display.at<uchar>(i, img_display.cols / 2) > 127 ? 0 : 255;
             }
-            if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(cropped_img, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
+            if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(img_display, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
         }
 
         // image display
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
-        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, image_3d || is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+        stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, image_3d || is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
         ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 
         // process scan
@@ -947,7 +947,11 @@ void Demo::save_to_file(bool save_result) {
 //    t_save.detach();
 
 //    if (!tp.append_task(std::bind(Demo::save_image_tif, tif_16, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full();
-    if (!tp.append_task(std::bind(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
+    switch (pixel_depth) {
+    case 8:  if (!tp.append_task(std::bind(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
+    case 16: if (!tp.append_task(std::bind(Demo::save_image_tif, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
+    default: break;
+    }
 }
 
 void Demo::save_scan_img() {
@@ -1272,7 +1276,7 @@ void Demo::clean()
     std::queue<cv::Mat>().swap(img_q);
     img_mem.release();
     modified_result.release();
-    cropped_img.release();
+    img_display.release();
     prev_img.release();
     prev_3d.release();
     for (auto& m: seq) m.release();
@@ -1375,6 +1379,7 @@ void Demo::change_pixel_format(int pixel_format)
     int ret = curr_cam->pixel_type(false, &pixel_format);
     is_color = pixel_format == PixelType_Gvsp_RGB8_Packed;
     switch (pixel_format) {
+    case PixelType_Gvsp_Mono10:
     case PixelType_Gvsp_Mono12: pixel_depth = 16; break;
     default: pixel_depth = 8; break;
     }
@@ -2117,7 +2122,13 @@ void Demo::change_delay(int val)
 
 void Demo::change_focus_speed(int val)
 {
+    static QElapsedTimer t;
+    if (t.elapsed() < 100) return;
+    t.restart();
+    qDebug() << QDateTime::currentDateTime();
+
     QSerialPort *temp_com = share_serial_port && com[0]->isOpen() ? com[0] : com[2];
+    port_mutex.lock();
     if (temp_com->isOpen()) temp_com->clear();
     if (val < 1)  val = 1;
     if (val > 64) val = 64;
@@ -2137,7 +2148,7 @@ void Demo::change_focus_speed(int val)
 
     out_data[8] = (4 * (uint)val + 0xA2) & 0xFF;
     if (temp_com->isOpen()) temp_com->write(QByteArray((char*)out_data, 9));
-    while (temp_com->isOpen() && temp_com->waitForReadyRead(10)) ;
+    while (temp_com->isOpen() && temp_com->waitForBytesWritten(10)) ;
 
     out_data[0] = 0xB0;
     out_data[1] = 0x02;
@@ -2150,7 +2161,10 @@ void Demo::change_focus_speed(int val)
 
     out_data[8] = (4 * (uint)val + 0xA3) & 0xFF;
     if (temp_com->isOpen()) temp_com->write(QByteArray((char*)out_data, 9));
-    while (temp_com->isOpen() && temp_com->waitForReadyRead(10)) ;
+    while (temp_com->isOpen() && temp_com->waitForBytesWritten(10)) ;
+
+    port_mutex.unlock();
+    QThread::msleep(10);
 }
 
 void Demo::on_ZOOM_IN_BTN_released()
@@ -2806,7 +2820,7 @@ void Demo::transparent_transmission_file(int id)
         if (!com[0]->isOpen()) continue;
         com[0]->clear();
         com[0]->write(cmd, write_size);
-        while (com[0]->waitForBytesWritten(5)) ;
+        while (com[0]->waitForBytesWritten(10)) ;
 
         while (com[0]->waitForReadyRead(100)) ;
 
