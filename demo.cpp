@@ -2125,7 +2125,6 @@ void Demo::change_focus_speed(int val)
     static QElapsedTimer t;
     if (t.elapsed() < 100) return;
     t.restart();
-    qDebug() << QDateTime::currentDateTime();
 
     QSerialPort *temp_com = share_serial_port && com[0]->isOpen() ? com[0] : com[2];
     port_mutex.lock();
