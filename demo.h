@@ -2,14 +2,15 @@
 #define DEMO_H
 
 #include <QSerialPort>
+#include <QTcpSocket>
 //#include <windows.h>
 
 #include "joystick.h"
 #include "threadpool.h"
 #include "mywidget.h"
 #include "imageproc.h"
-#include "cam.h"
-//#include "mvcam.h"
+//#include "cam.h"
+#include "mvcam.h"
 //#include "hqvscam.h"
 //#include "euresyscam.h"
 
@@ -257,7 +258,8 @@ private:
     void enable_controls(bool cam_rdy);
 
     // attempt to communicate with 4 COMs
-    void setup_com(QSerialPort **com, int id, QString port_num, int baud_rate);
+    void setup_serial_port(QSerialPort **port, int id, QString port_num, int baud_rate);
+    void setup_tcp_port(QTcpSocket **port);
 
     // stop lens operation (focus / zoom)
     void lens_stop();
@@ -282,7 +284,7 @@ private:
 
     // update data to data-display; fb: whether reading feedback from com
     QByteArray generate_ba(uchar *data, int len);
-    QByteArray communicate_display(QSerialPort *com, QByteArray write, int write_size, int read_size, bool fb);
+    QByteArray communicate_display(int id, QByteArray write, int write_size, int read_size, bool fb);
 
     // update gate width
     void update_gate_width();
@@ -299,6 +301,10 @@ private:
 
     // read device config by config
     void read_gatewidth_lookup_table(QFile *fp);
+
+    // connect to serial port using tcp socket
+    void connect_to_serial_server_tcp();
+    void disconnect_from_serial_server_tcp();
 public:
     bool                    mouse_pressed;
 
@@ -319,10 +325,10 @@ private:
     QString                 TEMP_SAVE_LOCATION;         // temp location to save the image
     cv::VideoWriter         vid_out[2];                 // video writer for ORI/RES
 
-    QSerialPort*            com[4];                     // 0: tcu, 1: rangefinder, 2: lens, 3: laser
+    QSerialPort*            serial_port[4];                     // 0: tcu, 1: rangefinder, 2: lens, 3: laser
+    QTcpSocket*             tcp_port[4];
+    bool                    use_tcp;
     bool                    share_serial_port;          // whether using a single comm for serial communication
-    uchar                   out_buffer[7];              // write buffer for serial communication
-    uchar                   in_buffer[7];               // read buffer for serial communication
     float                   rep_freq;
     int                     laser_width_u, laser_width_n;
     int                     gate_width_a_u, gate_width_a_n;
@@ -419,6 +425,9 @@ private:
     ThreadPool              tp;
 
     int                     gw_lut[1000];               // lookup table for gatewidth config by serial
+    int                     offset_laser_width;
+    int                     offset_delay;
+    int                     offset_gatewidth;
 
 };
 #endif // DEMO_H

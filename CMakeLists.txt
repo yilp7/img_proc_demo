@@ -32,17 +32,27 @@ set(OpenCV_DIR "${SDK_DIR}/opencv")
 #endif()
 
 find_package(QT NAMES Qt5 REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort Network REQUIRED)
 
 include_directories(${Hik_SDK_DIR}/include)
 include_directories(${HQV_DIR}/include)
 include_directories(${EURESYS_DIR}/include)
 include_directories(${OpenCV_DIR}/include)
 
-link_directories(${Hik_SDK_DIR}/lib)
-link_directories(${HQV_DIR}/lib)
-link_directories(${EURESYS_DIR}/lib)
-link_directories(${OpenCV_DIR}/lib)
+if (WIN32)
+	link_directories(${Hik_SDK_DIR}/lib/win64_x64)
+	link_directories(${HQV_DIR}/lib)
+	link_directories(${EURESYS_DIR}/lib)
+	link_directories(${OpenCV_DIR}/lib/win64_x64)
+elseif (APPLE)
+
+# for aarch64 only
+elseif (UNIX)
+	link_directories(${Hik_SDK_DIR}/lib/aarch64)
+	link_directories(${HQV_DIR}/lib)
+	link_directories(${EURESYS_DIR}/lib)
+	link_directories(${OpenCV_DIR}/lib/aarch64)
+endif()
 
 set(SOURCE_FILES
     main.cpp
@@ -58,10 +68,10 @@ set(SOURCE_FILES
     progsettings.cpp
     imageproc.h
     imageproc.cpp
-    cam.h
-    cam.cpp
-#    mvcam.h
-#    mvcam.cpp
+#    cam.h
+#    cam.cpp
+    mvcam.h
+	mvcam.cpp
 #    hqvcam.h
 #    hqvcam.cpp
 #    euresyscam.h
@@ -79,9 +89,9 @@ set(PROJECT_LIBS
     # mvs
     MvCameraControl
     # HQV
-    HQV_AVIProcess64
-    HQV_DataConvert64
-    HQV_SDK64
+#    HQV_AVIProcess64
+#    HQV_DataConvert64
+#    HQV_SDK64
     # Euresys
 #    MultiCam
 #    clallserial
@@ -101,10 +111,10 @@ endif()
 
 add_executable(Demo_param WIN32 ${SOURCE_FILES})
 target_compile_definitions(Demo_param PRIVATE PARAM=1)
-qt5_use_modules(Demo_param Widgets SerialPort)
+qt5_use_modules(Demo_param Widgets SerialPort Network)
 target_link_libraries(Demo_param ${PROJECT_LIBS})
 
 add_executable(Demo_ICMOS WIN32 ${SOURCE_FILES})
 target_compile_definitions(Demo_ICMOS PRIVATE ICMOS=1)
-qt5_use_modules(Demo_ICMOS Widgets SerialPort)
+qt5_use_modules(Demo_ICMOS Widgets SerialPort Network)
 target_link_libraries(Demo_ICMOS ${PROJECT_LIBS})
