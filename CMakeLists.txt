@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.5)
+﻿ cmake_minimum_required(VERSION 3.5)
 
 project(Demo_combined LANGUAGES CXX)
 
@@ -100,17 +100,32 @@ set(PROJECT_LIBS
     # Euresys
 #    MultiCam
 #    clallserial
-    # opencv
-    opencv_core454
-    opencv_imgcodecs454
-    opencv_imgproc454
-    opencv_videoio454
+
 )
 if (WIN32)
     set(PROJECT_LIBS
         ${PROJECT_LIBS}
         # joystick
         winmm
+        # opencv
+        opencv_core454
+        opencv_imgcodecs454
+        opencv_imgproc454
+        opencv_videoio454
+    )
+elseif (APPLE)
+
+# for aarch64 only
+elseif (UNIX)
+    set(PROJECT_LIBS
+        ${PROJECT_LIBS}
+        # opencv
+        opencv_core
+        opencv_imgcodecs
+        opencv_imgproc
+        opencv_videoio
+        # pthread
+        pthread
     )
 endif()
 

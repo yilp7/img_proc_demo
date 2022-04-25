@@ -3,8 +3,8 @@
 
 #ifdef WIN32
 #include <windows.h>
-#endif
 #include <MMSystem.h>
+#endif
 #include <QThread>
 #include <QTimer>
 
