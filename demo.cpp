@@ -2893,9 +2893,7 @@ void Demo::config_gatewidth(QString filename)
         line = line.simplified();
         // ori: user input, res: output to tcu
         int ori = line.left(line.indexOf(',')).toInt();
-        int res = line.right(line.length() - line.indexOf(',')).toInt();
-        qDebug() << line;
-        qDebug() << ori << res;
+        int res = line.right(line.length() - line.indexOf(',') - 1).toInt();
         gw_lut[ori] = res;
     }
 }
