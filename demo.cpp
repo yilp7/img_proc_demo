@@ -725,7 +725,7 @@ int Demo::grab_thread_process() {
 
         // image write / video record
         if (save_original) save_to_file(false);
-        if (save_modified) save_to_file(true);
+        if (save_modified && (!image_3d || frame_a_3d)) save_to_file(true);
         if (record_original) {
             if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
