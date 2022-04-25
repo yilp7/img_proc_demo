@@ -90,6 +90,7 @@ public slots:
     void export_config();
     void prompt_for_config_file();
     void load_config(QString config_name);
+    void prompt_for_serial_file();
 
     // signaled in settings ui
     void setup_hz(int hz_unit);
@@ -220,6 +221,9 @@ private slots:
     // send customized data to ports
     void transparent_transmission_file(int id);
 
+    // config optical gatewidth by file (serial number)
+    void config_gatewidth(QString filename);
+
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);
@@ -305,6 +309,7 @@ private:
     // connect to serial port using tcp socket
     void connect_to_serial_server_tcp();
     void disconnect_from_serial_server_tcp();
+
 public:
     bool                    mouse_pressed;
 
@@ -424,7 +429,7 @@ private:
 
     ThreadPool              tp;
 
-    int                     gw_lut[1000];               // lookup table for gatewidth config by serial
+    int                     gw_lut[100];                // lookup table for gatewidth config by serial
     int                     offset_laser_width;
     int                     offset_delay;
     int                     offset_gatewidth;

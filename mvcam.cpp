@@ -190,10 +190,12 @@ void Cam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *
 {
 //    static cv::Mat img(frame_info->nHeight, frame_info->nWidth, CV_8UC1);
 //    img.data = data;
+    qDebug() << frame_info->enPixelType << PixelType_Gvsp_RGB8_Packed;
     switch (frame_info->enPixelType) {
     case PixelType_Gvsp_Mono8:
     case PixelType_Gvsp_Mono10:
     case PixelType_Gvsp_Mono12:
+    case PixelType_Gvsp_RGB8_Packed:
         memcpy(img.data, data, frame_info->nFrameLen);
         break;
     case PixelType_Gvsp_Mono10_Packed:

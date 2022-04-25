@@ -34,12 +34,12 @@ set(OpenCV_DIR "${SDK_DIR}/opencv")
 find_package(QT NAMES Qt5 REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort Network REQUIRED)
 
-include_directories(${Hik_SDK_DIR}/include)
-include_directories(${HQV_DIR}/include)
-include_directories(${EURESYS_DIR}/include)
-include_directories(${OpenCV_DIR}/include)
-
 if (WIN32)
+	include_directories(${Hik_SDK_DIR}/include/win10_x64)
+	include_directories(${HQV_DIR}/include)
+	include_directories(${EURESYS_DIR}/include)
+	include_directories(${OpenCV_DIR}/include)
+
 	link_directories(${Hik_SDK_DIR}/lib/win64_x64)
 	link_directories(${HQV_DIR}/lib)
 	link_directories(${EURESYS_DIR}/lib)
@@ -48,6 +48,11 @@ elseif (APPLE)
 
 # for aarch64 only
 elseif (UNIX)
+	include_directories(${Hik_SDK_DIR}/include/aarch64)
+	include_directories(${HQV_DIR}/include)
+	include_directories(${EURESYS_DIR}/include)
+	include_directories(${OpenCV_DIR}/include)
+
 	link_directories(${Hik_SDK_DIR}/lib/aarch64)
 	link_directories(${HQV_DIR}/lib)
 	link_directories(${EURESYS_DIR}/lib)

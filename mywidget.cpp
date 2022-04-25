@@ -218,6 +218,7 @@ void TitleBar::setup(QObject *ptr)
     connect(prog_settings, SIGNAL(change_pixel_format(int)),   signal_receiver, SLOT(change_pixel_format(int)));
     settings_menu->addAction(">> export pref.", signal_receiver, SLOT(export_config()), QKeySequence(Qt::ALT + Qt::Key_E));
     settings_menu->addAction("<< load pref.",   signal_receiver, SLOT(prompt_for_config_file()), QKeySequence(Qt::ALT + Qt::Key_R));
+    settings_menu->addAction("## config s.n.",  signal_receiver, SLOT(prompt_for_serial_file()), QKeySequence(Qt::ALT + Qt::Key_C));
     settings->setMenu(settings_menu);
 
     capture = new TitleButton("", this);

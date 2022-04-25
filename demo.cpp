@@ -260,6 +260,9 @@ Demo::Demo(QWidget *parent)
     ui->SHAPE_INFO->setup("size");
     connect(ui->SOURCE_DISPLAY, SIGNAL(shape_size(QPoint)), ui->SHAPE_INFO, SLOT(display_pos(QPoint)));
 
+    // initialize gatewidth lut
+    for (int i = 0; i < 100; i++) gw_lut[i] = i;
+
     scan_q.push_back(-1);
 //    setup_stepping(0);
 
@@ -1559,6 +1562,12 @@ void Demo::load_config(QString config_name)
     }
 }
 
+void Demo::prompt_for_serial_file()
+{
+    QString config_name = QFileDialog::getOpenFileName(this, tr("Load SN Config"), save_location, tr("(*.csv);;All Files()"));
+    config_gatewidth(config_name);
+}
+
 // convert data to be sent to TCU-COM to hex buffer
 QByteArray Demo::convert_to_send_tcu(uchar num, unsigned int send) {
     QByteArray out(7, 0x00);
@@ -1688,6 +1697,14 @@ void Demo::update_gate_width() {
     if (depth_of_view > 1500) depth_of_view = 1500;
 
     int gw = std::round(depth_of_view / dist_ns);
+    if (gw < 100) gw = gw_lut[gw];
+    if (gw == -1) {
+        gw = std::round(depth_of_view / dist_ns);
+        ui->GATE_WIDTH_A_EDIT_U->setText(QString::number(gw / 1000));
+        ui->GATE_WIDTH_A_EDIT_N->setText(QString::number(gw % 1000));
+        QMessageBox::warning(this, "PROMPT", tr("gatewidth not supported"));
+        return;
+    }
 
     ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view));
 //    gate_width_a_n = gate_width_b_n = laser_width_n = gw % 1000;
@@ -2863,4 +2880,22 @@ void Demo::transparent_transmission_file(int id)
         QThread().msleep(5);
     }
     f.close();
+}
+
+void Demo::config_gatewidth(QString filename)
+{
+    for (int i = 0; i < 100; i++) gw_lut[i] = -1;
+    QFile config_file(filename);
+    config_file.open(QIODevice::ReadOnly);
+    if (!config_file.isOpen()) QMessageBox::warning(this, "PROMPT", tr("cannot open config file"));
+    QByteArray line;
+    while (!(line = config_file.readLine(128)).isEmpty()) {
+        line = line.simplified();
+        // ori: user input, res: output to tcu
+        int ori = line.left(line.indexOf(',')).toInt();
+        int res = line.right(line.length() - line.indexOf(',')).toInt();
+        qDebug() << line;
+        qDebug() << ori << res;
+        gw_lut[ori] = res;
+    }
 }
