@@ -1696,28 +1696,26 @@ void Demo::update_gate_width() {
     if (depth_of_view < 0) depth_of_view = 0;
     if (depth_of_view > 1500) depth_of_view = 1500;
 
-    int gw = std::round(depth_of_view / dist_ns);
-    if (gw < 100) gw = gw_lut[gw];
-    if (gw == -1) {
-        gw = std::round(depth_of_view / dist_ns);
-        ui->GATE_WIDTH_A_EDIT_U->setText(QString::number(gw / 1000));
-        ui->GATE_WIDTH_A_EDIT_N->setText(QString::number(gw % 1000));
+    int gw = std::round(depth_of_view / dist_ns), gw_corrected = gw + offset_gatewidth;
+    if (gw < 100) gw_corrected = gw_lut[gw];
+    if (gw_corrected == -1) {
+        ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", gate_width_a_u));
+        ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%d", gate_width_a_n));
         QMessageBox::warning(this, "PROMPT", tr("gatewidth not supported"));
         return;
     }
+    // GATE WIDTH A
+    communicate_display(0, convert_to_send_tcu(0x03, gw_corrected), 7, 1, false);
+
+    // GATE WIDTH B
+//    send = gw - 18;
+    communicate_display(0, convert_to_send_tcu(0x05, gw_corrected), 7, 1, false);
 
     ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view));
 //    gate_width_a_n = gate_width_b_n = laser_width_n = gw % 1000;
 //    gate_width_a_u = gate_width_b_u = laser_width_u = gw / 1000;
     gate_width_a_n = gw % 1000;
     gate_width_a_u = gw / 1000;
-
-    // GATE WIDTH A
-    communicate_display(0, convert_to_send_tcu(0x03, gw + offset_gatewidth), 7, 1, false);
-
-    // GATE WIDTH B
-//    send = gw - 18;
-    communicate_display(0, convert_to_send_tcu(0x05, gw + offset_gatewidth), 7, 1, false);
 
     ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", gate_width_a_u));
     ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%d", gate_width_a_n));
