@@ -76,9 +76,10 @@ Demo::Demo(QWidget *parent)
     frame_rate_edit(10),
     serial_port{NULL},
     tcp_port{NULL},
+    laser_port(NULL),
     use_tcp(false),
     share_serial_port(false),
-    rep_freq(30),
+    rep_freq(0.05),
     delay_n_n(0),
     stepping(10),
     hz_unit(0),
@@ -294,16 +295,27 @@ Demo::Demo(QWidget *parent)
     connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
 
     // right before gui display (init state)
-    for (int i = 0; i < 4; i++) serial_port[i] = new QSerialPort, setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600);
-    for (int i = 0; i < 4; i++) tcp_port[i] = new QTcpSocket;
+    for (int i = 0; i < 3; i++) serial_port[i] = new QSerialPort, setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600);
+    for (int i = 0; i < 3; i++) tcp_port[i] = new QTcpSocket;
+    laser_port = new QTcpSocket;
     on_ENUM_BUTTON_clicked();
-    if (serial_port[0]->isOpen() && serial_port[3]->isOpen()) on_LASER_BTN_clicked();
+//    if (serial_port[0]->isOpen() && serial_port[3]->isOpen()) on_LASER_BTN_clicked();
+    connect(laser_port, &QTcpSocket::readyRead, this, [this](){ this->ui->DATA_EXCHANGE->append(laser_port->readAll()); });
+    com_label[3]->setStyleSheet("color: #CD5C5C;");
+    setup_hz(1);
 
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
     // in development
     ui->PTZ_RADIO->hide();
+    ui->ESTIMATED->hide();
+    ui->ESTIMATED_2->hide();
+    ui->EST_DIST->hide();
+    ui->GATE_WIDTH->hide();
+    ui->DELAY_SLIDER->hide();
+    ui->LASER_WIDTH_EDIT_U->setEnabled(false);
+    ui->LASER_WIDTH_EDIT_N->setEnabled(false);
 
 #ifdef ICMOS
     ui->RANGE_COM->setText("R1");
@@ -1004,10 +1016,6 @@ void Demo::setup_serial_port(QSerialPort **port, int id, QString port_num, int b
         // send initial data
         switch (id) {
         case 0:
-//            convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8);
-            communicate_display(0, convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
-            update_delay();
-            update_gate_width();
             change_mcp(5);
             break;
         case 2:
@@ -1639,7 +1647,7 @@ QByteArray Demo::communicate_display(int id, QByteArray write, int write_size, i
 }
 
 void Demo::update_delay()
-{
+{return;
     // REPEATED FREQUENCY
     if (delay_dist < 0) delay_dist = 0;
     if (delay_dist > max_dist) delay_dist = max_dist;
@@ -1692,7 +1700,7 @@ void Demo::update_delay()
     ui->DELAY_B_EDIT_N->setText(QString::asprintf("%d", delay_b_n));
 }
 
-void Demo::update_gate_width() {
+void Demo::update_gate_width() {return;
     if (depth_of_view < 0) depth_of_view = 0;
     if (depth_of_view > 1500) depth_of_view = 1500;
 
@@ -1733,12 +1741,8 @@ void Demo::filter_scan()
 
 void Demo::update_current()
 {
-    if (!serial_port[3]) return;
-    QString send = "DIOD1:CURR " + ui->CURRENT_EDIT->text() + "\r";
-    serial_port[3]->write(send.toLatin1().data(), send.length());
-    serial_port[3]->waitForBytesWritten(100);
-    serial_port[3]->readAll();
-    qDebug() << send;
+    laser_port->write(("$DCURR " + ui->CURRENT_EDIT->text() + "\r\n").toLatin1().data());
+    while (laser_port->waitForReadyRead(100)) ;
 }
 
 void Demo::convert_write(QDataStream &out, const int TYPE)
@@ -2090,39 +2094,32 @@ void Demo::set_focus()
 
 void Demo::start_laser()
 {
-    communicate_display(0, generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
-    QTimer::singleShot(100000, this, SLOT(init_laser()));
+    laser_port->connectToHost("192.168.103.103", 23);
+    if (!laser_port->waitForConnected(10000)) {
+        QMessageBox::critical(this, "PROMPT", tr("connection to laser failed"));
+        return;
+    }
+    com_label[3]->setStyleSheet("color: #B0C4DE;");
+    ui->LASER_BTN->setEnabled(true);
+    QTimer::singleShot(1000, this, SLOT(init_laser()));
 }
 
 void Demo::init_laser()
 {
     ui->LASER_BTN->setEnabled(true);
-    ui->LASER_BTN->setText(tr("OFF"));
     ui->CURRENT_EDIT->setEnabled(true);
-    if (serial_port[3]) serial_port[3]->close();
-    setup_serial_port(serial_port + 3, 3, com_edit[3]->text(), 9600);
-    if (!serial_port[3]) return;
 
-    // enable laser com
-    serial_port[3]->write("MODE:RMT 1\r", 11);
-    serial_port[3]->waitForBytesWritten(100);
-    QThread::msleep(100);
-    serial_port[3]->readAll();
-    qDebug() << QString("MODE:RMT 1\r");
+    QFile mac_addr("mac_addr");
+    mac_addr.open(QIODevice::ReadOnly);
+    QString mac = mac_addr.readLine().simplified();
+    laser_port->write(("$LOGIN VR" + mac + "\r\n").toLatin1().constData());
 
-    // start
-    serial_port[3]->write("ON\r", 3);
-    serial_port[3]->waitForBytesWritten(100);
-    QThread::msleep(100);
-    serial_port[3]->readAll();
-    qDebug() << QString("ON\r");
-
-    // enable external trigger
-    serial_port[3]->write("QSW:PRF 0\r", 10);
-    serial_port[3]->waitForBytesWritten(100);
-    QThread::msleep(100);
-    serial_port[3]->readAll();
-    qDebug() << QString("QSW:PRF 0\r");
+//    laser_port->write("$ECHO 0\r\n");
+//    while (laser_port->waitForReadyRead(100)) ;
+    laser_port->write("$TRIG EE\r\n");
+    while (laser_port->waitForReadyRead(100)) ;
+    laser_port->write("$STANDBY\r\n");
+    while (laser_port->waitForReadyRead(100)) ;
 
     update_current();
 }
@@ -2251,10 +2248,25 @@ void Demo::keyPressEvent(QKeyEvent *event)
             edit = qobject_cast<QLineEdit*>(this->focusWidget());
             if (!edit) break;
 
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < 3; i++) {
                 if (edit == com_edit[i]) {
                     if (serial_port[i]) serial_port[i]->close();
                     setup_serial_port(serial_port + i, i, edit->text(), 9600);
+                }
+            }
+            if (edit == com_edit[3]) {
+                if (edit->text().isEmpty()) {
+                    laser_port->write("$STOP\r\n");
+                    while (laser_port->waitForReadyRead(100)) ;
+                    laser_port->write("$LOGOUT\r\n");
+                    while (laser_port->waitForReadyRead(100)) ;
+                    laser_port->disconnectFromHost();
+                    while (laser_port->waitForDisconnected(1000)) ;
+                    com_label[3]->setStyleSheet("color: #CD5C5C;");
+                    ui->LASER_BTN->setEnabled(false);
+                }
+                else {
+                    start_laser();
                 }
             }
             if (edit == ui->FREQ_EDIT) {
@@ -2265,55 +2277,55 @@ void Demo::keyPressEvent(QKeyEvent *event)
                 case 1: rep_freq = ui->FREQ_EDIT->text().toFloat() / 1000; break;
                 default: break;
                 }
-                communicate_display(0, convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
-            }
-            else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
-                depth_of_view = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt()) * dist_ns;
-                update_gate_width();
+                communicate_display(0, convert_to_send_tcu(0x15, 1.25e5 / rep_freq), 7, 1, false);
             }
             else if (edit == ui->LASER_WIDTH_EDIT_U) {
                 laser_width = edit->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt();
-                communicate_display(0, convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
-            }
-            else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
-                if (edit->text().toInt() > 999) depth_of_view = edit->text().toInt() * dist_ns;
-                else depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000) * dist_ns;
-                update_gate_width();
+                communicate_display(0, convert_to_send_tcu(0x01, laser_width / 8), 7, 1, false);
             }
             else if (edit == ui->LASER_WIDTH_EDIT_N) {
-                if (edit->text().toInt() > 999) {
-                    laser_width = edit->text().toInt();
-                    ui->LASER_WIDTH_EDIT_U->setText(QString::number(laser_width / 1000));
-                    ui->LASER_WIDTH_EDIT_N->setText(QString::number(laser_width % 1000));
-                }
+                if (edit->text().toInt() > 999) laser_width = edit->text().toInt();
                 else laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000;
-                communicate_display(0, convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+                communicate_display(0, convert_to_send_tcu(0x01, laser_width / 8), 7, 1, false);
             }
+            // d-q
             else if (edit == ui->DELAY_A_EDIT_U) {
-                delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt()) * dist_ns;
-                update_delay();
-            }
-            else if (edit == ui->DELAY_B_EDIT_U) {
-                delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt() - delay_n_n) * dist_ns;
-                update_delay();
+                int delay_a = edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt();
+                communicate_display(0, convert_to_send_tcu(0x01, delay_a), 7, 1, false);
             }
             else if (edit == ui->DELAY_A_EDIT_N) {
-                if (edit->text().toInt() > 999) delay_dist = edit->text().toInt() * dist_ns;
-                else delay_dist = (edit->text().toInt() + ui->DELAY_A_EDIT_U->text().toInt() * 1000) * dist_ns;
-                update_delay();
+                int delay_a;
+                if (edit->text().toInt() > 999) delay_a = edit->text().toInt();
+                else delay_a = edit->text().toInt() + ui->DELAY_A_EDIT_U->text().toInt() * 1000;
+                communicate_display(0, convert_to_send_tcu(0x01, delay_a), 7, 1, false);
+            }
+            else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
+                int gatewidth_a = edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt();
+                communicate_display(0, convert_to_send_tcu(0x03, gatewidth_a), 7, 1, false);
+            }
+            else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
+                int gatewidth_a;
+                if (edit->text().toInt() > 999) gatewidth_a = edit->text().toInt();
+                else gatewidth_a = edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000;
+                communicate_display(0, convert_to_send_tcu(0x03, gatewidth_a), 7, 1, false);
+            }
+            // q-a
+            else if (edit == ui->DELAY_B_EDIT_U) {
+                int delay_b = edit->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt();
+                communicate_display(0, convert_to_send_tcu(0x02, delay_b), 7, 1, false);
             }
             else if (edit == ui->DELAY_B_EDIT_N) {
-                if (edit->text().toInt() > 999) delay_dist = edit->text().toInt() * dist_ns;
-                else delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000 - delay_n_n) * dist_ns;
-                update_delay();
+                int delay_b;
+                if (edit->text().toInt() > 999) delay_b = edit->text().toInt();
+                else delay_b = edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000;
+                communicate_display(0, convert_to_send_tcu(0x02, delay_b), 7, 1, false);
             }
             else if (edit == ui->DELAY_N_EDIT_N) {
                 delay_n_n = edit->text().toInt();
                 update_delay();
             }
             else if (edit == ui->MCP_EDIT) {
-                mcp = ui->MCP_EDIT->text().toInt();
-                ui->MCP_SLIDER->setValue(mcp);
+                ui->MCP_SLIDER->setValue(ui->MCP_EDIT->text().toInt());
             }
             else if (edit == ui->STEPPING_EDIT) {
                 switch (base_unit) {
@@ -2752,15 +2764,14 @@ void Demo::laser_preset_reached()
 void Demo::on_LASER_BTN_clicked()
 {
     if (ui->LASER_BTN->text() == "ON") {
-        ui->LASER_BTN->setEnabled(false);
-        communicate_display(0, generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
-        QTimer::singleShot(4000, this, SLOT(start_laser()));
+        laser_port->write("$FIRE\r\n");
+        while (laser_port->waitForReadyRead(100)) ;
+        ui->LASER_BTN->setText(tr("OFF"));
     }
     else {
-        communicate_display(0, generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 7, 0, false);
-
+        laser_port->write("$STANDBY\r\n");
+        while (laser_port->waitForReadyRead(100)) ;
         ui->LASER_BTN->setText(tr("ON"));
-        ui->CURRENT_EDIT->setEnabled(false);
     }
 }
 

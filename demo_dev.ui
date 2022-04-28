@@ -583,7 +583,7 @@
         <bool>false</bool>
        </property>
        <property name="text">
-        <string>0</string>
+        <string/>
        </property>
       </widget>
      </widget>
@@ -619,7 +619,7 @@
        <bool>false</bool>
       </property>
       <property name="text">
-       <string>18</string>
+       <string>218</string>
       </property>
      </widget>
      <widget class="QPushButton" name="LASER_ZOOM_IN_BTN">
@@ -1446,7 +1446,7 @@
        <bool>false</bool>
       </property>
       <property name="text">
-       <string>A</string>
+       <string>D-Q</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
@@ -1465,7 +1465,7 @@
        <bool>false</bool>
       </property>
       <property name="text">
-       <string>B</string>
+       <string>Q-A</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>

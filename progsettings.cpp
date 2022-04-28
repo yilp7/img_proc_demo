@@ -42,6 +42,8 @@ ProgSettings::ProgSettings(QWidget *parent) :
     ui->HZ_LIST->addItem("kHz");
     ui->HZ_LIST->addItem("Hz");
     ui->HZ_LIST->installEventFilter(this);
+    ui->HZ_LIST->setCurrentIndex(1);
+    on_HZ_LIST_currentIndexChanged(1);
 
     ui->UNIT_LIST->addItem("ns");
     ui->UNIT_LIST->addItem(QString::fromLocal8Bit("μs"));

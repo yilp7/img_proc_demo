@@ -330,8 +330,9 @@ private:
     QString                 TEMP_SAVE_LOCATION;         // temp location to save the image
     cv::VideoWriter         vid_out[2];                 // video writer for ORI/RES
 
-    QSerialPort*            serial_port[4];                     // 0: tcu, 1: rangefinder, 2: lens, 3: laser
+    QSerialPort*            serial_port[4];             // 0: tcu, 1: rangefinder, 2: lens, 3: laser
     QTcpSocket*             tcp_port[4];
+    QTcpSocket*             laser_port;
     bool                    use_tcp;
     bool                    share_serial_port;          // whether using a single comm for serial communication
     float                   rep_freq;
