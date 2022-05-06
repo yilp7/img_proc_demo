@@ -165,7 +165,7 @@ InfoLabel::InfoLabel(QWidget *parent) : QLabel(parent) {}
 
 TitleButton::TitleButton(QString icon, QWidget *parent) : QPushButton(QIcon(icon), "", parent) {}
 
-void TitleButton::mouseMoveEvent(QMouseEvent *event) {}
+void TitleButton::mouseMoveEvent(QMouseEvent *event) { setCursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0)); }
 
 TitleBar::TitleBar(QWidget *parent)
     : QFrame(parent),
@@ -181,10 +181,13 @@ TitleBar::TitleBar(QWidget *parent)
     title->setObjectName("NAME");
     min = new TitleButton(":/tools/min.png", this);
     min->setObjectName("MIN_BTN");
+    min->setMouseTracking(true);
     max = new TitleButton(":/tools/max.png", this);
     max->setObjectName("MAX_BTN");
+    max->setMouseTracking(true);
     exit = new TitleButton(":/tools/exit.png", this);
     exit->setObjectName("EXIT_BTN");
+    exit->setMouseTracking(true);
     connect(min, SIGNAL(clicked()), window(), SLOT(showMinimized()));
     connect(max, SIGNAL(clicked()), SLOT(process_maximize()));
     connect(exit, SIGNAL(clicked()), window(), SLOT(close()));

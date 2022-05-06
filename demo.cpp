@@ -11,56 +11,6 @@ void GrabThread::run()
     ((Demo*)p_info)->grab_thread_process();
 }
 
-MouseThread::MouseThread(void *info) : QThread()
-{
-    p_info = info;
-    t = NULL;
-    connect(this, SIGNAL(set_cursor(QCursor)), (Demo*)info, SLOT(draw_cursor(QCursor)));
-}
-
-void MouseThread::run()
-{
-    if (!t) draw_cursor(), t = new QTimer();
-    connect(t, SIGNAL(timeout()), this, SLOT(draw_cursor()), Qt::QueuedConnection);
-    t->start(20);
-    this->exec();
-}
-
-void MouseThread::draw_cursor()
-{
-    Demo* ptr = (Demo*)p_info;
-    if (QApplication::mouseButtons() == Qt::LeftButton || ptr->is_maximized()) return;
-//    QWidget *w = QApplication::widgetAt(ptr->cursor().pos());
-    QPoint diff = ptr->cursor().pos() - ptr->pos();
-    // cursor in title bar
-    if (diff.y() < 30 && diff.x() > ptr->width() - 5) emit set_cursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
-    // cursor in main window
-    else if (diff.y() < 5) {
-        // cursor @ topleft corner
-        if (diff.x() < 5) emit set_cursor(QCursor(QPixmap(":/cursor/resize_md.png").scaled(16, 16)));
-        // cursor on min, max, exit button
-        else if (diff.x() > ptr->width() - 120) emit set_cursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
-        // cursor @ top border
-        else emit set_cursor(QCursor(QPixmap(":/cursor/resize_v.png").scaled(20, 20)));
-    }
-    else if (diff.y() > ptr->height() - 5) {
-        // cursor @ bottom left corner
-        if (diff.x() < 5) emit set_cursor(QCursor(QPixmap(":/cursor/resize_sd.png").scaled(16, 16)));
-        // cursor @ bottom right corner
-        else if (diff.x() > ptr->width() - 5) emit set_cursor(QCursor(QPixmap(":/cursor/resize_md.png").scaled(16, 16)));
-        // cursor @ bottom border
-        else emit set_cursor(QCursor(QPixmap(":/cursor/resize_v.png").scaled(20, 20)));
-    }
-    else {
-        // cursor @ left border
-        if (diff.x() < 5) emit set_cursor(QCursor(QPixmap(":/cursor/resize_h.png").scaled(20, 20)));
-        // cursor @ right border
-        else if (diff.x() > ptr->width() - 5) emit set_cursor(QCursor(QPixmap(":/cursor/resize_h.png").scaled(20, 20)));
-        // cursor inside window
-        else emit set_cursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
-    }
-}
-
 Demo* wnd;
 
 Demo::Demo(QWidget *parent)
@@ -112,7 +62,6 @@ Demo::Demo(QWidget *parent)
     pixel_depth(8),
     h_grab_thread(NULL),
     grab_thread_state(false),
-    h_mouse_thread(NULL),
     h_joystick_thread(NULL),
     seq_idx(0),
     scan(false),
@@ -141,8 +90,13 @@ Demo::Demo(QWidget *parent)
 
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
     trans.load("zh.qm");
-    h_mouse_thread = new MouseThread(this);
-    h_mouse_thread->start();
+    ui->CENTRAL->setMouseTracking(true);
+    ui->LEFT->setMouseTracking(true);
+    ui->MID->setMouseTracking(true);
+    ui->RIGHT->setMouseTracking(true);
+    ui->TITLE->setMouseTracking(true);
+    setMouseTracking(true);
+    setCursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
 
     tp.start();
 
@@ -356,9 +310,6 @@ Demo::Demo(QWidget *parent)
 
 Demo::~Demo()
 {
-    h_mouse_thread->quit();
-    h_mouse_thread->wait();
-
     tp.stop();
 
     delete ui;
@@ -467,13 +418,15 @@ int Demo::grab_thread_process() {
     cv::Mat sobel;
     float weight = h / 1024.0; // font scale & thickness
     while (grab_thread_state) {
+        while (img_q.size() > 10) img_q.pop();
         if (img_q.empty()) {
             QThread::msleep(5);
-            continue;
+            if (img_mem.empty()) continue;
         }
-        while (img_q.size() > 10) img_q.pop();
-        img_mem = img_q.front();
-        img_q.pop();
+        else {
+            img_mem = img_q.front();
+            img_q.pop();
+        }
 
         image_mutex.lock();
 
@@ -839,11 +792,6 @@ void Demo::save_image_tif(cv::Mat img, QString filename)
 {
     std::vector<int> params; params.push_back(cv::IMWRITE_TIFF_COMPRESSION); params.push_back(1);
     cv::imwrite(filename.toLatin1().constData(), img, params);
-}
-
-void Demo::draw_cursor(QCursor c)
-{
-    setCursor(c);
 }
 
 void Demo::stop_image_writing()
@@ -2492,58 +2440,91 @@ void Demo::mousePressEvent(QMouseEvent *event)
 void Demo::mouseMoveEvent(QMouseEvent *event)
 {
     QMainWindow::mouseMoveEvent(event);
-    if (!mouse_pressed || ui->TITLE->is_maximized) return;
+    if (ui->TITLE->is_maximized) return;
 
-    QPoint displacement;
-    int ww = width(), hh = height(), xx = pos().x(), yy = pos().y();
-    switch (resize_place) {
-    case 11:
-        displacement = event->globalPos() - pos();
-        if (ww - displacement.x() >= minimumWidth()) ww -= displacement.x(), xx += displacement.x();
-        if (hh - displacement.y() >= minimumHeight()) hh -= displacement.y(), yy += displacement.y();
-        ui->TITLE->pressed = false;
-        window()->setGeometry(xx, yy, ww, hh);
-        break;
-    case 21:
-        displacement = event->globalPos() - pos();
-        if (ww - displacement.x() >= minimumWidth()) ww -= displacement.x(), xx += displacement.x();
-        window()->setGeometry(xx, yy, ww, hh);
-        break;
-    case 31:
-        displacement = event->globalPos() - geometry().bottomLeft();
-        if (ww - displacement.x() >= minimumWidth()) ww -= displacement.x(), xx += displacement.x();
-        if (hh + displacement.y() >= minimumHeight()) hh += displacement.y();
-        window()->setGeometry(xx, yy, ww, hh);
-        break;
-    case 12:
-        displacement = event->globalPos() - pos();
-        if (hh - displacement.y() >= minimumHeight()) hh -= displacement.y(), yy += displacement.y();
-        ui->TITLE->pressed = false;
-        window()->setGeometry(xx, yy, ww, hh);
-        break;
-    case 13:
-    case 22:
-        return;
-    case 23:
-        displacement = event->globalPos() - geometry().topRight();
-        if (ww + displacement.x() >= minimumWidth()) ww += displacement.x();
-        window()->resize(QSize(ww, hh));
-        break;
-    case 32:
-        displacement = event->globalPos() - geometry().bottomLeft();
-        if (hh + displacement.y() >= minimumHeight()) hh += displacement.y();
-        window()->resize(QSize(ww, hh));
-        break;
-    case 33:
-        displacement = event->globalPos() - geometry().bottomRight();
-        if (ww + displacement.x() >= minimumWidth()) ww += displacement.x();
-        if (hh + displacement.y() >= minimumHeight()) hh += displacement.y();
-        window()->resize(QSize(ww, hh));
-        break;
-    default:
-        return;
+    if (mouse_pressed) {
+        QPoint displacement;
+        int ww = width(), hh = height(), xx = pos().x(), yy = pos().y();
+        switch (resize_place) {
+        case 11:
+            displacement = event->globalPos() - pos();
+            if (ww - displacement.x() >= minimumWidth()) ww -= displacement.x(), xx += displacement.x();
+            if (hh - displacement.y() >= minimumHeight()) hh -= displacement.y(), yy += displacement.y();
+            ui->TITLE->pressed = false;
+            window()->setGeometry(xx, yy, ww, hh);
+            break;
+        case 21:
+            displacement = event->globalPos() - pos();
+            if (ww - displacement.x() >= minimumWidth()) ww -= displacement.x(), xx += displacement.x();
+            window()->setGeometry(xx, yy, ww, hh);
+            break;
+        case 31:
+            displacement = event->globalPos() - geometry().bottomLeft();
+            if (ww - displacement.x() >= minimumWidth()) ww -= displacement.x(), xx += displacement.x();
+            if (hh + displacement.y() >= minimumHeight()) hh += displacement.y();
+            window()->setGeometry(xx, yy, ww, hh);
+            break;
+        case 12:
+            displacement = event->globalPos() - pos();
+            if (hh - displacement.y() >= minimumHeight()) hh -= displacement.y(), yy += displacement.y();
+            ui->TITLE->pressed = false;
+            window()->setGeometry(xx, yy, ww, hh);
+            break;
+        case 13:
+        case 22:
+            return;
+        case 23:
+            displacement = event->globalPos() - geometry().topRight();
+            if (ww + displacement.x() >= minimumWidth()) ww += displacement.x();
+            window()->resize(QSize(ww, hh));
+            break;
+        case 32:
+            displacement = event->globalPos() - geometry().bottomLeft();
+            if (hh + displacement.y() >= minimumHeight()) hh += displacement.y();
+            window()->resize(QSize(ww, hh));
+            break;
+        case 33:
+            displacement = event->globalPos() - geometry().bottomRight();
+            if (ww + displacement.x() >= minimumWidth()) ww += displacement.x();
+            if (hh + displacement.y() >= minimumHeight()) hh += displacement.y();
+            window()->resize(QSize(ww, hh));
+            break;
+        default:
+            return;
+        }
+        prev_pos = event->globalPos();
     }
-    prev_pos = event->globalPos();
+    // mouse button not pressed
+    else {
+        QPoint diff = cursor().pos() - pos();
+        // cursor in title bar
+        if (diff.y() < 30 && diff.x() > width() - 5) setCursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+        // cursor in main window
+        else if (diff.y() < 5) {
+            // cursor @ topleft corner
+            if (diff.x() < 5) setCursor(QCursor(QPixmap(":/cursor/resize_md.png").scaled(16, 16)));
+            // cursor on min, max, exit button
+            else if (diff.x() > width() - 120) setCursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+            // cursor @ top border
+            else setCursor(QCursor(QPixmap(":/cursor/resize_v.png").scaled(20, 20)));
+        }
+        else if (diff.y() > height() - 5) {
+            // cursor @ bottom left corner
+            if (diff.x() < 5) setCursor(QCursor(QPixmap(":/cursor/resize_sd.png").scaled(16, 16)));
+            // cursor @ bottom right corner
+            else if (diff.x() > width() - 5) setCursor(QCursor(QPixmap(":/cursor/resize_md.png").scaled(16, 16)));
+            // cursor @ bottom border
+            else setCursor(QCursor(QPixmap(":/cursor/resize_v.png").scaled(20, 20)));
+        }
+        else {
+            // cursor @ left border
+            if (diff.x() < 5) setCursor(QCursor(QPixmap(":/cursor/resize_h.png").scaled(20, 20)));
+            // cursor @ right border
+            else if (diff.x() > width() - 5) setCursor(QCursor(QPixmap(":/cursor/resize_h.png").scaled(20, 20)));
+            // cursor inside window
+            else setCursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+        }
+    }
 }
 
 void Demo::mouseReleaseEvent(QMouseEvent *event)

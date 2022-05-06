@@ -4,6 +4,7 @@
 ProgSettings::ProgSettings(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::ProgSettings),
+    pressed(false),
     start_pos(0),
     end_pos(0),
     frame_count(1),
@@ -36,6 +37,8 @@ ProgSettings::ProgSettings(QWidget *parent) :
     ui->setupUi(this);
 
     setWindowFlags(Qt::FramelessWindowHint);
+    setMouseTracking(true);
+    setCursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
 
     ui->IP_EDIT->setEnabled(false);
 
@@ -322,11 +325,14 @@ void ProgSettings::mousePressEvent(QMouseEvent *event)
 
 void ProgSettings::mouseMoveEvent(QMouseEvent *event)
 {
-    if (!pressed) return;
-    // use globalPos instead of pos to prevent window shaking
-    window()->move(window()->pos() + event->globalPos() - prev_pos);
-    prev_pos = event->globalPos();
-
+    if (pressed) {
+        // use globalPos instead of pos to prevent window shaking
+        window()->move(window()->pos() + event->globalPos() - prev_pos);
+        prev_pos = event->globalPos();
+    }
+    else {
+        setCursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+    }
     QDialog::mouseMoveEvent(event);
 }
 

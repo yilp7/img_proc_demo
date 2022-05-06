@@ -162,16 +162,16 @@ int Cam::pixel_type(bool read, int *val)
     else {
         switch (*val) {
         case PixelType_Gvsp_RGB8_Packed:
-            img.convertTo(img, CV_8UC3);
+            img = cv::Mat(img.rows, img.cols, CV_8UC3);
             break;
         case PixelType_Gvsp_Mono8:
-            img.convertTo(img, CV_8UC1);
+            img = cv::Mat(img.rows, img.cols, CV_8UC1);
             break;
         case PixelType_Gvsp_Mono10:
         case PixelType_Gvsp_Mono12:
         case PixelType_Gvsp_Mono10_Packed:
         case PixelType_Gvsp_Mono12_Packed:
-            img.convertTo(img, CV_16UC1);
+            img = cv::Mat(img.rows, img.cols, CV_16UC1);
             break;
         default: break;
         }

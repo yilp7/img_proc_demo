@@ -33,26 +33,6 @@ signals:
     void stop_image_writing();
 };
 
-class MouseThread : public QThread {
-    Q_OBJECT
-public:
-    MouseThread(void *info);
-
-protected:
-    void run();
-
-private:
-    void   *p_info;
-    QTimer *t;
-
-private slots:
-    void draw_cursor();
-
-signals:
-    void set_cursor(QCursor);
-
-};
-
 class Demo : public QMainWindow
 {
     Q_OBJECT
@@ -80,9 +60,6 @@ public:
     static void save_image_tif(cv::Mat img, QString filename);
 
 public slots:
-    // signaled by MouseThread
-    void draw_cursor(QCursor c);
-
     // signaled by Titlebar button
     void switch_language();
     void screenshot();
@@ -384,7 +361,6 @@ private:
 
     GrabThread*             h_grab_thread;              // img-grab thread handle
     bool                    grab_thread_state;          // whether thread is created
-    MouseThread*            h_mouse_thread;             // draw the mouse icon
     JoystickThread*         h_joystick_thread;          // process joystick input
 
     cv::Mat                 img_mem;                    // right-side img display source (stream)
