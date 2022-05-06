@@ -417,15 +417,18 @@ int Demo::grab_thread_process() {
     QImage stream;
     cv::Mat sobel;
     float weight = h / 1024.0; // font scale & thickness
+    bool updated = true;       // whether the program get a new image from stream
     while (grab_thread_state) {
-        while (img_q.size() > 10) img_q.pop();
+        while (img_q.size() > 7) img_q.pop();
         if (img_q.empty()) {
             QThread::msleep(5);
             if (img_mem.empty()) continue;
+            updated = false;
         }
         else {
             img_mem = img_q.front();
             img_q.pop();
+            updated = true;
         }
 
         image_mutex.lock();
@@ -677,8 +680,8 @@ int Demo::grab_thread_process() {
         if (scan && std::round(delay_dist / dist_ns) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
 
         // image write / video record
-        if (save_original) save_to_file(false);
-        if (save_modified && (!image_3d || frame_a_3d)) save_to_file(true);
+        if (updated && save_original) save_to_file(false);
+        if (updated && save_modified && (!image_3d || frame_a_3d)) save_to_file(true);
         if (record_original) {
             if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
