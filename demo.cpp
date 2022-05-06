@@ -905,8 +905,8 @@ void Demo::save_to_file(bool save_result) {
 
 //    if (!tp.append_task(std::bind(Demo::save_image_tif, tif_16, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full();
     switch (pixel_depth) {
-    case 8:  if (!tp.append_task(std::bind(Demo::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
-    case 16: if (!tp.append_task(std::bind(Demo::save_image_tif, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
+    case 8:  if (!tp.append_task(std::bind(Demo::save_image_bmp, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
+    case 16: if (!tp.append_task(std::bind(Demo::save_image_tif, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
     default: break;
     }
 }
@@ -920,7 +920,7 @@ void Demo::save_scan_img() {
     if (ui->TITLE->prog_settings->save_scan_ori) {
 //        std::thread t_ori(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
 //        t_ori.detach();
-        tp.append_task(std::bind(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp"));
+        tp.append_task(std::bind(save_image_bmp, img_mem.clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp"));
     }
 //    dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), modified_result);
@@ -929,7 +929,7 @@ void Demo::save_scan_img() {
     if (ui->TITLE->prog_settings->save_scan_res) {
 //        std::thread t_res(save_image_bmp, modified_result, save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
 //        t_res.detach();
-        tp.append_task(std::bind(save_image_bmp, modified_result, save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp"));
+        tp.append_task(std::bind(save_image_bmp, modified_result.clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp"));
     }
 }
 
