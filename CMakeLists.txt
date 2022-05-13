@@ -32,7 +32,7 @@ set(OpenCV_DIR "${SDK_DIR}/opencv")
 #endif()
 
 find_package(QT NAMES Qt5 REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort Network REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort Network LinguistTools REQUIRED)
 
 if (WIN32)
 	include_directories(${Hik_SDK_DIR}/include/win10_x64)
@@ -129,12 +129,14 @@ elseif (UNIX)
     )
 endif()
 
-add_executable(Demo_param WIN32 ${SOURCE_FILES})
+#qt5_create_translation(TRANSLATE ${SOURCE_FILES} zh.ts)
+
+add_executable(Demo_param WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(Demo_param PRIVATE PARAM=1)
 qt5_use_modules(Demo_param Widgets SerialPort Network)
 target_link_libraries(Demo_param ${PROJECT_LIBS})
 
-add_executable(Demo_ICMOS WIN32 ${SOURCE_FILES})
+add_executable(Demo_ICMOS WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(Demo_ICMOS PRIVATE ICMOS=1)
 qt5_use_modules(Demo_ICMOS Widgets SerialPort Network)
 target_link_libraries(Demo_ICMOS ${PROJECT_LIBS})

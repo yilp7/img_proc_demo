@@ -1946,7 +1946,7 @@
      <zorder>GATE_WIDTH</zorder>
      <zorder>MCP_EDIT</zorder>
     </widget>
-    <widget class="QGroupBox" name="OPERATION_STATIC">
+    <widget class="QGroupBox" name="IMG_PROC_STATIC">
      <property name="geometry">
       <rect>
        <x>10</x>
@@ -1959,7 +1959,7 @@
       <bool>false</bool>
      </property>
      <property name="title">
-      <string>Operations</string>
+      <string>Img processing</string>
      </property>
      <widget class="QCheckBox" name="IMG_ENHANCE_CHECK">
       <property name="geometry">
@@ -2389,7 +2389,7 @@
     <zorder>SCAN_GRP</zorder>
     <zorder>LENS_STATIC</zorder>
     <zorder>TCU_STATIC</zorder>
-    <zorder>OPERATION_STATIC</zorder>
+    <zorder>IMG_PROC_STATIC</zorder>
     <zorder>IMG_SAVE_STATIC</zorder>
    </widget>
    <widget class="QPushButton" name="HIDE_BTN">
@@ -2436,26 +2436,6 @@
    <zorder>TITLE</zorder>
    <zorder>HIDE_BTN</zorder>
   </widget>
-  <action name="ACTION_IMPORT">
-   <property name="text">
-    <string>Import</string>
-   </property>
-  </action>
-  <action name="ACTION_EXPORT">
-   <property name="text">
-    <string>Export</string>
-   </property>
-  </action>
-  <action name="ACTION_DEVICES">
-   <property name="text">
-    <string>Devices</string>
-   </property>
-  </action>
-  <action name="ACTION_SERIAL_PORTS">
-   <property name="text">
-    <string>Serial Ports</string>
-   </property>
-  </action>
  </widget>
  <customwidgets>
   <customwidget>

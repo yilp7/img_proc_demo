@@ -386,6 +386,7 @@ private:
     float                   dist_ns;                    // dist of light per ns
     bool                    frame_a_3d;                 // skip every second frame
     bool                    auto_mcp;                   // adaptive mcp
+    bool                    multi_laser_lenses;         // send additional data to lens com if true
 
     bool                    hide_left;                  // whether left bar is hidden
     int                     resize_place;               // mouse position when resizing or at border

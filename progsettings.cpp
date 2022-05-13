@@ -423,6 +423,12 @@ void ProgSettings::send_cmd()
     emit com_write(ui->COM_LIST->currentIndex(), cmd);
 }
 
+void ProgSettings::switch_language(bool en, QTranslator *trans)
+{
+    en ? (qApp->removeTranslator(trans), qApp->setFont(monaco)) : (qApp->installTranslator(trans), qApp->setFont(consolas));
+    ui->retranslateUi(this);
+}
+
 void ProgSettings::on_BAUDRATE_LIST_activated(const QString &arg1)
 {
     emit change_baudrate(ui->COM_LIST->currentIndex(), arg1.toInt());

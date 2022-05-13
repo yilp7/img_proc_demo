@@ -20,6 +20,7 @@ public:
     void enable_ip_editing(bool enable);
     void config_ip(bool read, int ip = 0, int gateway = 0); // ip and gateway will only be used when requesting ip
     void set_pixel_format(int idx);
+    void switch_language(bool en, QTranslator *trans);
 
 protected:
     void keyPressEvent(QKeyEvent *event);

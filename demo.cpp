@@ -69,6 +69,7 @@ Demo::Demo(QWidget *parent)
     c(3e8),
     frame_a_3d(false),
     auto_mcp(false),
+    multi_laser_lenses(false),
     hide_left(false),
     resize_place(22),
     joybtn_A(false),
@@ -89,7 +90,7 @@ Demo::Demo(QWidget *parent)
     wnd = this;
 
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
-    trans.load("zh.qm");
+    trans.load("project_zh.qm");
     ui->CENTRAL->setMouseTracking(true);
     ui->LEFT->setMouseTracking(true);
     ui->MID->setMouseTracking(true);
@@ -122,7 +123,8 @@ Demo::Demo(QWidget *parent)
     enhance_options->addItem(tr("Accumulative"));
     enhance_options->addItem(tr("Sigmoid-based"));
     enhance_options->addItem(tr("Adaptive"));
-    enhance_options->addItem(tr("Dehaze"));
+    enhance_options->addItem(tr("Dehaze_enh"));
+    enhance_options->addItem(tr("DCP"));
     enhance_options->setCurrentIndex(0);
     sp_options->addItem("1");
     sp_options->addItem("2");
@@ -278,14 +280,14 @@ Demo::Demo(QWidget *parent)
 
     ui->LASER_STATIC->hide();
     ui->ALT_DISPLAY->setParent(ui->RIGHT);
-    ui->ALT_DISPLAY->setGeometry(10, 365, ui->OPERATION_STATIC->width(), ui->ALT_DISPLAY->height());
+    ui->ALT_DISPLAY->setGeometry(10, 365, ui->IMG_PROC_STATIC->width(), ui->ALT_DISPLAY->height());
     QSize temp = ui->DATA_EXCHANGE->size();
     temp.setWidth(ui->ALT_DISPLAY->width());
     ui->DATA_EXCHANGE->resize(temp);
     ui->HIST_DISPLAY->resize(temp);
     ui->LENS_STATIC->hide();
     ui->IMG_SAVE_STATIC->move(10, 265);
-    ui->OPERATION_STATIC->hide();
+    ui->IMG_PROC_STATIC->hide();
     ui->SCAN_GRP->move(10, 560);
     ui->IMG_3D_CHECK->hide();
     ui->RANGE_THRESH_EDIT->hide();
@@ -592,12 +594,16 @@ int Demo::grab_thread_process() {
                     ImageProc::adaptive_enhance(&modified_result, &modified_result, settings->low_in, settings->high_in, settings->low_out, settings->high_out, settings->gamma);
                     break;
                 }
-                // dehaze
+                // enhance_dehaze
                 case 8: {
                     modified_result = ~modified_result;
                     ImageProc::haze_removal(modified_result, modified_result, 7, settings->dehaze_pct, 0.1, 60, 0.01);
                     modified_result = ~modified_result;
                     break;
+                }
+                // dcp
+                case 9: {
+                    ImageProc::haze_removal(modified_result, modified_result, 7, settings->dehaze_pct, 0.1, 60, 0.01);
                 }
                 // none
                 default:
@@ -810,8 +816,9 @@ void Demo::stop_image_writing()
 
 void Demo::switch_language()
 {
-    en ? qApp->removeTranslator(&trans) : qApp->installTranslator(&trans);
+    en ? (qApp->removeTranslator(&trans), qApp->setFont(monaco)) : (qApp->installTranslator(&trans), qApp->setFont(consolas));
     ui->retranslateUi(this);
+    ui->TITLE->prog_settings->switch_language(en, &trans);
 //    int idx = ui->ENHANCE_OPTIONS->currentIndex();
 //    ui->ENHANCE_OPTIONS->clear();
 //    ui->ENHANCE_OPTIONS->addItem(tr("None"));
@@ -1997,7 +2004,7 @@ inline void Demo::focus_far()
 
 inline void Demo::lens_stop() {
     communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
 }
 
 void Demo::set_zoom()
@@ -2700,9 +2707,9 @@ void Demo::on_LASER_ZOOM_IN_BTN_pressed()
     ui->LASER_ZOOM_IN_BTN->setText("x");
 
     communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x20, 0x00, 0x00, 0x22}, 7), 7, 1, false);
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x01, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x02, 0x00, 0x00, 0x00, 0x04}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x20, 0x00, 0x00, 0x22}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x01, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x02, 0x00, 0x00, 0x00, 0x04}, 7), 7, 1, false);
 }
 
 void Demo::on_LASER_ZOOM_OUT_BTN_pressed()
@@ -2710,9 +2717,9 @@ void Demo::on_LASER_ZOOM_OUT_BTN_pressed()
     ui->LASER_ZOOM_OUT_BTN->setText("x");
 
     communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x40, 0x00, 0x00, 0x42}, 7), 7, 1, false);
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x80, 0x00, 0x00, 0x82}, 7), 7, 1, false);
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x04, 0x00, 0x00, 0x00, 0x06}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x40, 0x00, 0x00, 0x42}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x80, 0x00, 0x00, 0x82}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x04, 0x00, 0x00, 0x00, 0x06}, 7), 7, 1, false);
 }
 
 void Demo::on_LASER_ZOOM_IN_BTN_released()
