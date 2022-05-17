@@ -84,7 +84,8 @@ Demo::Demo(QWidget *parent)
     tp(40),
     offset_laser_width(0),
     offset_delay(0),
-    offset_gatewidth(0)
+    offset_gatewidth(0),
+    ptz_grp(NULL)
 {
     ui->setupUi(this);
     wnd = this;
@@ -97,7 +98,7 @@ Demo::Demo(QWidget *parent)
     ui->RIGHT->setMouseTracking(true);
     ui->TITLE->setMouseTracking(true);
     setMouseTracking(true);
-    setCursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+    setCursor(QCursor(QPixmap(":/cursor/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
 
     tp.start();
 
@@ -109,7 +110,7 @@ Demo::Demo(QWidget *parent)
 //    qDebug() << QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section('/', 0, -1);
     TEMP_SAVE_LOCATION = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
 
-    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s.png);", hide_left ? "right" : "left"));
+    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s);", hide_left ? "right" : "left"));
 
     // - image operations
     QComboBox *enhance_options = ui->ENHANCE_OPTIONS;
@@ -205,9 +206,6 @@ Demo::Demo(QWidget *parent)
     ui->CONTRAST_SLIDER->setTickInterval(5);
 
     ui->RULER_V->vertical = true;
-//    ui->label->setup_animation(":/pics/model.png", QSize(700, 400), 500);
-//    ui->label_2->setup_animation(":/pics/wave.png", QSize(512, 512), 100);
-//    ui->label_3->setup_animation(":/pics/run.png", QSize(512, 526), 100);
     ui->DRAG_TOOL->click();
     ui->CURR_COORD->setup("current");
     connect(ui->SOURCE_DISPLAY, SIGNAL(curr_pos(QPoint)), ui->CURR_COORD, SLOT(display_pos(QPoint)));
@@ -215,6 +213,33 @@ Demo::Demo(QWidget *parent)
     connect(ui->SOURCE_DISPLAY, SIGNAL(start_pos(QPoint)), ui->START_COORD, SLOT(display_pos(QPoint)));
     ui->SHAPE_INFO->setup("size");
     connect(ui->SOURCE_DISPLAY, SIGNAL(shape_size(QPoint)), ui->SHAPE_INFO, SLOT(display_pos(QPoint)));
+
+    ptz_grp = new QButtonGroup();
+    ui->UP_LEFT_BTN->setIcon(QIcon(":/directions/up_left"));
+    ptz_grp->addButton(ui->UP_LEFT_BTN, 0);
+    ui->UP_BTN->setIcon(QIcon(":/directions/up"));
+    ptz_grp->addButton(ui->UP_BTN, 1);
+    ui->UP_RIGHT_BTN->setIcon(QIcon(":/directions/up_right"));
+    ptz_grp->addButton(ui->UP_RIGHT_BTN, 2);
+    ui->LEFT_BTN->setIcon(QIcon(":/directions/left"));
+    ptz_grp->addButton(ui->LEFT_BTN, 3);
+    ui->SELF_TEST_BTN->setIcon(QIcon(":/directions/self_test"));
+    ptz_grp->addButton(ui->SELF_TEST_BTN, 4);
+    ui->RIGHT_BTN->setIcon(QIcon(":/directions/right"));
+    ptz_grp->addButton(ui->RIGHT_BTN, 5);
+    ui->DOWN_LEFT_BTN->setIcon(QIcon(":/directions/down_left"));
+    ptz_grp->addButton(ui->DOWN_LEFT_BTN, 6);
+    ui->DOWN_BTN->setIcon(QIcon(":/directions/down"));
+    ptz_grp->addButton(ui->DOWN_BTN, 7);
+    ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/down_right"));
+    ptz_grp->addButton(ui->DOWN_RIGHT_BTN, 8);
+
+    QSlider *speed_slider = ui->PTZ_SPEED_SLIDER;
+    speed_slider->setMinimum(1);
+    speed_slider->setMaximum(64);
+    speed_slider->setSingleStep(1);
+    speed_slider->setValue(16);
+    ui->PTZ_SPEED_EDIT->setText("16");
 
     // initialize gatewidth lut
     for (int i = 0; i < 100; i++) gw_lut[i] = i;
@@ -236,6 +261,7 @@ Demo::Demo(QWidget *parent)
     display_grp = new QButtonGroup();
     display_grp->addButton(ui->COM_DATA_RADIO);
     display_grp->addButton(ui->HISTOGRAM_RADIO);
+    display_grp->addButton(ui->PTZ_RADIO);
     display_grp->setExclusive(true);
 
     // connect title bar to the main window (Demo*)
@@ -1343,6 +1369,7 @@ void Demo::joystick_button_pressed(int btn)
     case JoystickThread::BUTTON::Y: joybtn_Y = true; break;
     case JoystickThread::BUTTON::L1:
         joybtn_L1 = true;
+        qDebug() << joybtn_X << joybtn_Y << joybtn_A;
         if      (joybtn_X) on_ZOOM_IN_BTN_pressed();
         else if (joybtn_Y) on_FOCUS_NEAR_BTN_pressed();
         else if (joybtn_A) on_LASER_ZOOM_IN_BTN_pressed();
@@ -2508,31 +2535,31 @@ void Demo::mouseMoveEvent(QMouseEvent *event)
     else {
         QPoint diff = cursor().pos() - pos();
         // cursor in title bar
-        if (diff.y() < 30 && diff.x() > width() - 5) setCursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+        if (diff.y() < 30 && diff.x() > width() - 5) setCursor(QCursor(QPixmap(":/cursor/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
         // cursor in main window
         else if (diff.y() < 5) {
             // cursor @ topleft corner
-            if (diff.x() < 5) setCursor(QCursor(QPixmap(":/cursor/resize_md.png").scaled(16, 16)));
+            if (diff.x() < 5) setCursor(QCursor(QPixmap(":/cursor/resize_md").scaled(16, 16)));
             // cursor on min, max, exit button
-            else if (diff.x() > width() - 120) setCursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+            else if (diff.x() > width() - 120) setCursor(QCursor(QPixmap(":/cursor/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
             // cursor @ top border
-            else setCursor(QCursor(QPixmap(":/cursor/resize_v.png").scaled(20, 20)));
+            else setCursor(QCursor(QPixmap(":/cursor/resize_v").scaled(20, 20)));
         }
         else if (diff.y() > height() - 5) {
             // cursor @ bottom left corner
-            if (diff.x() < 5) setCursor(QCursor(QPixmap(":/cursor/resize_sd.png").scaled(16, 16)));
+            if (diff.x() < 5) setCursor(QCursor(QPixmap(":/cursor/resize_sd").scaled(16, 16)));
             // cursor @ bottom right corner
-            else if (diff.x() > width() - 5) setCursor(QCursor(QPixmap(":/cursor/resize_md.png").scaled(16, 16)));
+            else if (diff.x() > width() - 5) setCursor(QCursor(QPixmap(":/cursor/resize_md").scaled(16, 16)));
             // cursor @ bottom border
-            else setCursor(QCursor(QPixmap(":/cursor/resize_v.png").scaled(20, 20)));
+            else setCursor(QCursor(QPixmap(":/cursor/resize_v").scaled(20, 20)));
         }
         else {
             // cursor @ left border
-            if (diff.x() < 5) setCursor(QCursor(QPixmap(":/cursor/resize_h.png").scaled(20, 20)));
+            if (diff.x() < 5) setCursor(QCursor(QPixmap(":/cursor/resize_h").scaled(20, 20)));
             // cursor @ right border
-            else if (diff.x() > width() - 5) setCursor(QCursor(QPixmap(":/cursor/resize_h.png").scaled(20, 20)));
+            else if (diff.x() > width() - 5) setCursor(QCursor(QPixmap(":/cursor/resize_h").scaled(20, 20)));
             // cursor inside window
-            else setCursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+            else setCursor(QCursor(QPixmap(":/cursor/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
         }
     }
 }
@@ -2778,7 +2805,7 @@ void Demo::on_HIDE_BTN_clicked()
     hide_left ^= 1;
     ui->LEFT->setGeometry(10, 40, hide_left ? 0 : 210, 631);
 //    ui->HIDE_BTN->setText(hide_left ? ">" : "<");
-    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s.png);", hide_left ? "right" : "left"));
+    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s);", hide_left ? "right" : "left"));
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
 }

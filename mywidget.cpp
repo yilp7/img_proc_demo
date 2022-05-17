@@ -165,7 +165,7 @@ InfoLabel::InfoLabel(QWidget *parent) : QLabel(parent) {}
 
 TitleButton::TitleButton(QString icon, QWidget *parent) : QPushButton(QIcon(icon), "", parent) {}
 
-void TitleButton::mouseMoveEvent(QMouseEvent *event) { setCursor(QCursor(QPixmap(":/cursor/cursor.png").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0)); }
+void TitleButton::mouseMoveEvent(QMouseEvent *event) { setCursor(QCursor(QPixmap(":/cursor/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0)); }
 
 TitleBar::TitleBar(QWidget *parent)
     : QFrame(parent),
@@ -179,13 +179,13 @@ TitleBar::TitleBar(QWidget *parent)
     title = new InfoLabel(this);
     title->setGeometry(30, 0, 80, 30);
     title->setObjectName("NAME");
-    min = new TitleButton(":/tools/min.png", this);
+    min = new TitleButton(":/tools/min", this);
     min->setObjectName("MIN_BTN");
     min->setMouseTracking(true);
-    max = new TitleButton(":/tools/max.png", this);
+    max = new TitleButton(":/tools/max", this);
     max->setObjectName("MAX_BTN");
     max->setMouseTracking(true);
-    exit = new TitleButton(":/tools/exit.png", this);
+    exit = new TitleButton(":/tools/exit", this);
     exit->setObjectName("EXIT_BTN");
     exit->setMouseTracking(true);
     connect(min, SIGNAL(clicked()), window(), SLOT(showMinimized()));
@@ -240,7 +240,7 @@ void TitleBar::setup(QObject *ptr)
 void TitleBar::process_maximize()
 {
     if (!is_maximized) normal_stat = window()->geometry();
-    max->setIcon(is_maximized ? QIcon(":/tools/max.png") : QIcon(":/tools/restore.png"));
+    max->setIcon(is_maximized ? QIcon(":/tools/max") : QIcon(":/tools/restore"));
     is_maximized ? window()->setGeometry(normal_stat) : window()->setGeometry(QApplication::desktop()->availableGeometry());
     is_maximized ^= 1;
 }

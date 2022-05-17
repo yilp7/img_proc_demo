@@ -19,7 +19,7 @@ TitleButton {
 }
 */
 #NAME, #APP_NAME {
-	image: url(:/logo/YJS);
+	image: url(:/title/YJS);
 }
 
 #MIN_BTN::hover, #MAX_BTN::hover {
@@ -40,31 +40,31 @@ TitleButton {
 }
 
 #SETTINGS_BTN {
-	image: url(:/tools/settings.png);
+	image: url(:/tools/settings);
 }
 
 #SETTINGS_BTN::hover, #SETTINGS_BTN::pressed {
-	image: url(:/tools/settings_hover.png);
+	image: url(:/tools/settings_hover);
 }
 
 #CAPTURE_BTN {
-	image: url(:/tools/capture.png);
+	image: url(:/tools/capture);
 }
 
 #CAPTURE_BTN::hover, #CAPTURE_BTN::pressed {
-	image: url(:/tools/capture_hover.png);
+	image: url(:/tools/capture_hover);
 }
 
 #LANGUAGE_BTN {
-	image: url(:/tools/lang.png);
+	image: url(:/tools/lang);
 }
 
 #CLS_BTN {
-	image: url(:/tools/brush.png);
+	image: url(:/tools/brush);
 }
 
 #CLS_BTN::hover, #CLS_BTN::pressed {
-	image: url(:/tools/brush_hover.png);
+	image: url(:/tools/brush_hover);
 }
 
 /* menu bar */
@@ -99,7 +99,7 @@ QLineEdit::focus, QComboBox::focus {
 
 /* combo selection */
 QComboBox::drop-down {
-	image: url(:/tools/triangle1.png);
+	image: url(:/tools/triangle);
 	width: 12px;
 	height: 12px;
 	margin-top: 2px;
@@ -246,11 +246,11 @@ QPushButton::menu-indicator {
 }
 
 .QCheckBox::indicator:checked {
-	image: url(:/tools/check1.png);
+	image: url(:/tools/check);
 }
 
 .QRadioButton::indicator:checked {
-	image: url(:/tools/dot1.png);
+	image: url(:/tools/dot);
 }
 
 .QCheckBox::indicator:disabled, .QRadioButton::indicator:disabled {
@@ -291,7 +291,7 @@ QSlider::handle:horizontal:disabled {
 	background-color: #646464;
 }
 
-#MCP_SLIDER::handle:horizontal, #DELAY_SLIDER::handle:horizontal, #GAIN_SLIDER::handle:horizontal {
+#MCP_SLIDER::handle:horizontal, #DELAY_SLIDER::handle:horizontal, #GAIN_SLIDER::handle:horizontal, #PTZ_SPEED_SLIDER::handle:horizontal {
 	width: 8px;
 	height: 16px;
 	margin-top: -6px;
@@ -315,14 +315,14 @@ Tools {
 	width: 16px;
 	height: 16px;
 	margin-left: 2px;
-	image: url(:/tools/move.png);
+	image: url(:/tools/move);
 }
 
 #SELECT_TOOL::indicator {
 	width: 16px;
 	height: 16px;
 	margin-left: 2px;
-	image: url(:/tools/select.png);
+	image: url(:/tools/select);
 }
 
 Tools::checked {
@@ -362,13 +362,13 @@ QSpinBox::up-button {
 	subcontrol-position: center right;
 	width: 12px;
 	margin-right: 3px;
-	image: url(:/tools/up.png);
+	image: url(:/tools/up);
 }
 
 QSpinBox::down-button {
 	subcontrol-origin: border;
 	subcontrol-position: center right;
 	width: 12px;
-	image: url(:/tools/down.png);
+	image: url(:/tools/down);
 	margin-right: 16px;
 }

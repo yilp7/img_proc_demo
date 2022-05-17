@@ -107,8 +107,8 @@ int main(int argc, char *argv[])
 //    timer.start();
 //    while(timer.elapsed() < (2000)) a.processEvents();
 
-    int monaco_id = QFontDatabase::addApplicationFont(":/fonts/monaco.ttf");
-    int consolas_id = QFontDatabase::addApplicationFont(":/fonts/consola.ttf");
+    int monaco_id = QFontDatabase::addApplicationFont(":/fonts/monaco");
+    int consolas_id = QFontDatabase::addApplicationFont(":/fonts/consolas");
     monaco = QFont(QFontDatabase::applicationFontFamilies(monaco_id).at(0));
     monaco.setPixelSize(11);
 //    monaco.setLetterSpacing(QFont::PercentageSpacing, 120);

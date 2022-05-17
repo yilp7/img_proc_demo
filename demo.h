@@ -411,5 +411,7 @@ private:
     int                     offset_delay;
     int                     offset_gatewidth;
 
+    QButtonGroup            *ptz_grp;
+
 };
 #endif // DEMO_H

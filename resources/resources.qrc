@@ -1,24 +1,11 @@
 <RCC>
     <qresource prefix="/logo">
-        <file>1.png</file>
-        <file>2.png</file>
-        <file>3.png</file>
-        <file>4.png</file>
-        <file>YJS1.png</file>
-        <file>YJS2.png</file>
-        <file>YJS3.png</file>
-        <file>YJS4.png</file>
-        <file>YJS5.png</file>
-        <file>YJS6.png</file>
-        <file>YJS7.png</file>
-        <file>YJS8.png</file>
-        <file>YJS9.png</file>
-        <file>logo.png</file>
-        <file>YJS0.png</file>
-        <file>YJS88.png</file>
-        <file alias="YJS">YJS00.png</file>
-        <file>YJS22.png</file>
-        <file>3a.png</file>
+        <file>logo/1.png</file>
+        <file>logo/2.png</file>
+        <file>logo/3.png</file>
+        <file>logo/3a.png</file>
+        <file>logo/4.png</file>
+        <file>logo/logo.png</file>
     </qresource>
     <qresource prefix="/icon">
         <file>icon.ico</file>
@@ -27,41 +14,56 @@
         <file>style.qss</file>
     </qresource>
     <qresource prefix="/tools">
-        <file>brush.png</file>
-        <file>brush_hover.png</file>
-        <file>capture.png</file>
-        <file>capture_hover.png</file>
-        <file>check1.png</file>
-        <file>dot1.png</file>
-        <file>down.png</file>
-        <file>down_arrow.png</file>
-        <file>exit.png</file>
-        <file>lang.png</file>
-        <file>max.png</file>
-        <file>min.png</file>
-        <file>move.png</file>
-        <file>restore.png</file>
-        <file>select.png</file>
-        <file>settings.png</file>
-        <file>settings_hover.png</file>
-        <file>triangle1.png</file>
-        <file>up.png</file>
-        <file>up_arrow.png</file>
-        <file>left.png</file>
-        <file>right.png</file>
+        <file alias="brush">tools/brush.png</file>
+        <file alias="brush_hover">tools/brush_hover.png</file>
+        <file alias="capture">tools/capture.png</file>
+        <file alias="capture_hover">tools/capture_hover.png</file>
+        <file alias="check">tools/check1.png</file>
+        <file alias="dot">tools/dot1.png</file>
+        <file alias="down">tools/down.png</file>
+        <file alias="down_arrow">tools/down_arrow.png</file>
+        <file alias="exit">tools/exit.png</file>
+        <file alias="lang">tools/lang.png</file>
+        <file alias="left">tools/left.png</file>
+        <file alias="max">tools/max.png</file>
+        <file alias="min">tools/min.png</file>
+        <file alias="move">tools/move.png</file>
+        <file alias="restore">tools/restore.png</file>
+        <file alias="right">tools/right.png</file>
+        <file alias="select">tools/select.png</file>
+        <file alias="settings">tools/settings.png</file>
+        <file alias="settings_hover">tools/settings_hover.png</file>
+        <file alias="triangle">tools/triangle1.png</file>
+        <file alias="up">tools/up.png</file>
+        <file alias="up_arrow">tools/up_arrow.png</file>
     </qresource>
     <qresource prefix="/cursor">
-        <file>cursor.png</file>
-        <file>resize_h.png</file>
-        <file>resize_md.png</file>
-        <file>resize_sd.png</file>
-        <file>resize_v.png</file>
+        <file alias="cursor">cursor/cursor.png</file>
+        <file alias="input">cursor/input.png</file>
+        <file alias="resize_h">cursor/resize_h.png</file>
+        <file alias="resize_md">cursor/resize_md.png</file>
+        <file alias="resize_sd">cursor/resize_sd.png</file>
+        <file alias="resize_v">cursor/resize_v.png</file>
     </qresource>
     <qresource prefix="/fonts">
-        <file>consola.ttf</file>
-        <file>monaco.ttf</file>
+        <file alias="consolas">fonts/consola.ttf</file>
+        <file alias="monaco">fonts/monaco.ttf</file>
     </qresource>
     <qresource prefix="/qt">
         <file>etc/qt.conf</file>
+    </qresource>
+    <qresource prefix="/title">
+        <file alias="YJS">title/YJS00.png</file>
+    </qresource>
+    <qresource prefix="/directions">
+        <file alias="up_left">directions/direction_0.png</file>
+        <file alias="up">directions/direction_1.png</file>
+        <file alias="up_right">directions/direction_2.png</file>
+        <file alias="left">directions/direction_3.png</file>
+        <file alias="self_test">directions/direction_4.png</file>
+        <file alias="right">directions/direction_5.png</file>
+        <file alias="down_left">directions/direction_6.png</file>
+        <file alias="down">directions/direction_7.png</file>
+        <file alias="down_right">directions/direction_8.png</file>
     </qresource>
 </RCC>
