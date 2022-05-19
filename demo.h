@@ -181,9 +181,10 @@ private slots:
     // hide left parameter bar
     void on_HIDE_BTN_clicked();
 
-    // change data display
+    // change misc. display
     void on_COM_DATA_RADIO_clicked();
     void on_HISTOGRAM_RADIO_clicked();
+    void on_PTZ_RADIO_clicked();
 
     // choose how mouse works in DISPLAY
     void on_DRAG_TOOL_clicked();
@@ -200,6 +201,15 @@ private slots:
 
     // config optical gatewidth by file (serial number)
     void config_gatewidth(QString filename);
+
+    void ptz_button_pressed(int id);
+    void ptz_button_released(int id);
+
+    void on_PTZ_SPEED_SLIDER_valueChanged(int value);
+
+    void on_PTZ_SPEED_EDIT_editingFinished();
+
+    void on_STOP_BTN_clicked();
 
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
@@ -287,6 +297,9 @@ private:
     void connect_to_serial_server_tcp();
     void disconnect_from_serial_server_tcp();
 
+    // send ptz control cmd
+    void send_ctrl_cmd(uchar dir);
+
 public:
     bool                    mouse_pressed;
 
@@ -307,8 +320,8 @@ private:
     QString                 TEMP_SAVE_LOCATION;         // temp location to save the image
     cv::VideoWriter         vid_out[2];                 // video writer for ORI/RES
 
-    QSerialPort*            serial_port[4];                     // 0: tcu, 1: rangefinder, 2: lens, 3: laser
-    QTcpSocket*             tcp_port[4];
+    QSerialPort*            serial_port[5];             // 0: tcu, 1: rangefinder, 2: lens, 3: laser
+    QTcpSocket*             tcp_port[5];
     bool                    use_tcp;
     bool                    share_serial_port;          // whether using a single comm for serial communication
     float                   rep_freq;
@@ -373,8 +386,8 @@ private:
     uint                    hist[256];                  // display histogram
     int                     seq_idx;                    // frame-average current index
 
-    QLabel*                 com_label[4];               // for com communication
-    QLineEdit*              com_edit[4];
+    QLabel*                 com_label[5];               // for com communication
+    QLineEdit*              com_edit[5];
 
     bool                    scan;                       // auto-scan for object detection
     float                   scan_distance;              // curr distance of scanning
@@ -400,6 +413,8 @@ private:
     bool                    joybtn_L2;
     bool                    joybtn_R1;
     bool                    joybtn_R2;
+    uint                    lens_adjust_ongoing;
+    bool                    ptz_adjust_ongoing;
 
     bool                    en;                         // for language switching
     QTranslator             trans;
@@ -411,7 +426,8 @@ private:
     int                     offset_delay;
     int                     offset_gatewidth;
 
-    QButtonGroup            *ptz_grp;
+    QButtonGroup            *ptz_grp;                   // ptz button group
+    int                     ptz_speed;
 
 };
 #endif // DEMO_H

@@ -80,12 +80,15 @@ Demo::Demo(QWidget *parent)
     joybtn_L2(false),
     joybtn_R1(false),
     joybtn_R2(false),
+    lens_adjust_ongoing(0),
+    ptz_adjust_ongoing(0),
     en(false),
     tp(40),
     offset_laser_width(0),
     offset_delay(0),
     offset_gatewidth(0),
-    ptz_grp(NULL)
+    ptz_grp(NULL),
+    ptz_speed(16)
 {
     ui->setupUi(this);
     wnd = this;
@@ -145,11 +148,13 @@ Demo::Demo(QWidget *parent)
     com_label[1] = ui->RANGE_COM;
     com_label[2] = ui->LENS_COM;
     com_label[3] = ui->LASER_COM;
+    com_label[4] = ui->PTZ_COM;
 
     com_edit[0] = ui->TCU_COM_EDIT;
     com_edit[1] = ui->RANGE_COM_EDIT;
     com_edit[2] = ui->LENS_COM_EDIT;
     com_edit[3] = ui->LASER_COM_EDIT;
+    com_edit[4] = ui->PTZ_COM_EDIT;
 
 //    setup_com(com + 0, 0, com_edit[0]->text(), 9600);
 //    setup_com(com + 1, 1, com_edit[1]->text(), 115200);
@@ -233,6 +238,8 @@ Demo::Demo(QWidget *parent)
     ptz_grp->addButton(ui->DOWN_BTN, 7);
     ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/down_right"));
     ptz_grp->addButton(ui->DOWN_RIGHT_BTN, 8);
+    connect(ptz_grp, SIGNAL(buttonPressed(int)), this, SLOT(ptz_button_pressed(int)));
+    connect(ptz_grp, SIGNAL(buttonReleased(int)), this, SLOT(ptz_button_released(int)));
 
     QSlider *speed_slider = ui->PTZ_SPEED_SLIDER;
     speed_slider->setMinimum(1);
@@ -276,16 +283,13 @@ Demo::Demo(QWidget *parent)
     connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
 
     // right before gui display (init state)
-    for (int i = 0; i < 4; i++) serial_port[i] = new QSerialPort, setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600);
-    for (int i = 0; i < 4; i++) tcp_port[i] = new QTcpSocket;
+    for (int i = 0; i < 5; i++) serial_port[i] = new QSerialPort, setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600);
+    for (int i = 0; i < 5; i++) tcp_port[i] = new QTcpSocket;
     on_ENUM_BUTTON_clicked();
     if (serial_port[0]->isOpen() && serial_port[3]->isOpen()) on_LASER_BTN_clicked();
 
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
-
-    // in development
-    ui->PTZ_RADIO->hide();
 
 #ifdef ICMOS
     ui->RANGE_COM->setText("R1");
@@ -1363,25 +1367,24 @@ void Demo::change_pixel_format(int pixel_format)
 void Demo::joystick_button_pressed(int btn)
 {
     switch (btn) {
-    case JoystickThread::BUTTON::A: joybtn_A = true; break;
-    case JoystickThread::BUTTON::B: joybtn_B = true; break;
-    case JoystickThread::BUTTON::X: joybtn_X = true; break;
-    case JoystickThread::BUTTON::Y: joybtn_Y = true; break;
-    case JoystickThread::BUTTON::L1:
-        joybtn_L1 = true;
-        qDebug() << joybtn_X << joybtn_Y << joybtn_A;
-        if      (joybtn_X) on_ZOOM_IN_BTN_pressed();
-        else if (joybtn_Y) on_FOCUS_NEAR_BTN_pressed();
-        else if (joybtn_A) on_LASER_ZOOM_IN_BTN_pressed();
+    case JoystickThread::BUTTON::A:  joybtn_A  = true; break;
+    case JoystickThread::BUTTON::B:  joybtn_B  = true; break;
+    case JoystickThread::BUTTON::X:  joybtn_X  = true; break;
+    case JoystickThread::BUTTON::Y:  joybtn_Y  = true; break;
+    case JoystickThread::BUTTON::L1: joybtn_L1 = true; break;
+    case JoystickThread::BUTTON::L2:
+        joybtn_L2 = true;
+        if      (joybtn_X) on_ZOOM_IN_BTN_pressed(),       lens_adjust_ongoing = 0b001;
+        else if (joybtn_Y) on_FOCUS_NEAR_BTN_pressed(),    lens_adjust_ongoing = 0b010;
+        else if (joybtn_A) on_LASER_ZOOM_IN_BTN_pressed(), lens_adjust_ongoing = 0b100;
         break;
-    case JoystickThread::BUTTON::L2: joybtn_L2 = true; break;
-    case JoystickThread::BUTTON::R1:
-        joybtn_R1 = true;
-        if      (joybtn_X) on_ZOOM_OUT_BTN_pressed();
-        else if (joybtn_Y) on_FOCUS_FAR_BTN_pressed();
-        else if (joybtn_A) on_LASER_ZOOM_OUT_BTN_pressed();
+    case JoystickThread::BUTTON::R1: joybtn_R1 = true; break;
+    case JoystickThread::BUTTON::R2:
+        joybtn_R2 = true;
+        if      (joybtn_X) on_ZOOM_OUT_BTN_pressed(),       lens_adjust_ongoing = 0b001;
+        else if (joybtn_Y) on_FOCUS_FAR_BTN_pressed(),      lens_adjust_ongoing = 0b010;
+        else if (joybtn_A) on_LASER_ZOOM_OUT_BTN_pressed(), lens_adjust_ongoing = 0b100;
         break;
-    case JoystickThread::BUTTON::R2: joybtn_R2 = true; break;
     case JoystickThread::BUTTON::HOME:
     case JoystickThread::BUTTON::SELECT:
     case JoystickThread::BUTTON::MINUS:
@@ -1393,33 +1396,38 @@ void Demo::joystick_button_pressed(int btn)
 void Demo::joystick_button_released(int btn)
 {
     switch (btn) {
-    case JoystickThread::BUTTON::A: joybtn_A = false; break;
-    case JoystickThread::BUTTON::B: joybtn_B = false; break;
-    case JoystickThread::BUTTON::X: joybtn_X = false; break;
-    case JoystickThread::BUTTON::Y: joybtn_Y = false; break;
-    case JoystickThread::BUTTON::L1:
-        joybtn_L1 = false;
-        on_ZOOM_IN_BTN_released();
-        on_FOCUS_NEAR_BTN_released();
-        on_LASER_ZOOM_IN_BTN_released();
+    case JoystickThread::BUTTON::A:
+        joybtn_A = false;
+        if (ptz_adjust_ongoing) ptz_button_released(-1), ptz_adjust_ongoing = false;
         break;
-    case JoystickThread::BUTTON::L2: joybtn_L2 = true; break;
-    case JoystickThread::BUTTON::R1:
-        joybtn_R1 = false;
-        on_ZOOM_OUT_BTN_released();
-        on_FOCUS_FAR_BTN_released();
-        on_LASER_ZOOM_OUT_BTN_released();
+    case JoystickThread::BUTTON::B:  joybtn_B  = false; break;
+    case JoystickThread::BUTTON::X:  joybtn_X  = false; break;
+    case JoystickThread::BUTTON::Y:  joybtn_Y  = false; break;
+    case JoystickThread::BUTTON::L1: joybtn_L1 = false; break;
+    case JoystickThread::BUTTON::L2:
+        joybtn_L2 = false;
+        if (lens_adjust_ongoing & 0b001) on_ZOOM_IN_BTN_released(),       lens_adjust_ongoing = 0;
+        if (lens_adjust_ongoing & 0b010) on_FOCUS_NEAR_BTN_released(),    lens_adjust_ongoing = 0;
+        if (lens_adjust_ongoing & 0b100) on_LASER_ZOOM_IN_BTN_released(), lens_adjust_ongoing = 0;
         break;
-    case JoystickThread::BUTTON::R2: joybtn_R2 = false; break;
+    case JoystickThread::BUTTON::R1: joybtn_R1 = false; break;
+    case JoystickThread::BUTTON::R2:
+        joybtn_R2 = false;
+        if (lens_adjust_ongoing & 0b001) on_ZOOM_OUT_BTN_released(),       lens_adjust_ongoing = 0;
+        if (lens_adjust_ongoing & 0b010) on_FOCUS_FAR_BTN_released(),      lens_adjust_ongoing = 0;
+        if (lens_adjust_ongoing & 0b100) on_LASER_ZOOM_OUT_BTN_released(), lens_adjust_ongoing = 0;
+        break;
     case JoystickThread::BUTTON::HOME: ui->SHUTDOWN_BUTTON->click(); ui->ENUM_BUTTON->click(); break;
     case JoystickThread::BUTTON::SELECT: ui->START_BUTTON->click(); break;
     case JoystickThread::BUTTON::MINUS:
         if (joybtn_L1) stepping /= 10, setup_stepping(base_unit);
-        if (joybtn_L2) change_focus_speed(ui->FOCUS_SPEED_EDIT->text().toInt() - 8);
+        if (joybtn_R1) change_focus_speed(ui->FOCUS_SPEED_EDIT->text().toInt() - 8);
+        if (joybtn_L2) ui->PTZ_SPEED_EDIT->setText(QString::number(ptz_speed - 8)), on_PTZ_SPEED_EDIT_editingFinished();
         break;
     case JoystickThread::BUTTON::PLUS:
-        if (joybtn_R1) stepping *= 10, setup_stepping(base_unit);
-        if (joybtn_R2) change_focus_speed(ui->FOCUS_SPEED_EDIT->text().toInt() + 8);
+        if (joybtn_L1) stepping *= 10, setup_stepping(base_unit);
+        if (joybtn_R1) change_focus_speed(ui->FOCUS_SPEED_EDIT->text().toInt() + 8);
+        if (joybtn_L2) ui->PTZ_SPEED_EDIT->setText(QString::number(ptz_speed + 8)), on_PTZ_SPEED_EDIT_editingFinished();
         break;
     default: break;
     }
@@ -1429,7 +1437,7 @@ void Demo::joystick_direction_changed(int direction)
 {
     QKeyEvent e(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
     // DIST
-    if (joybtn_A) {
+    if (joybtn_X) {
         switch (direction) {
         case JoystickThread::DIRECTION::UP:
             e = QKeyEvent(QEvent::KeyPress, Qt::Key_W, Qt::NoModifier);
@@ -1451,7 +1459,7 @@ void Demo::joystick_direction_changed(int direction)
         }
     }
     // DOV
-    else if (joybtn_B) {
+    else if (joybtn_Y) {
         switch (direction) {
         case JoystickThread::DIRECTION::UP:
             e = QKeyEvent(QEvent::KeyPress, Qt::Key_I, Qt::NoModifier);
@@ -1473,13 +1481,18 @@ void Demo::joystick_direction_changed(int direction)
         }
     }
     // PTZ
-    else if (joybtn_X) {
+    else if (joybtn_A) {
         switch (direction) {
-        case JoystickThread::DIRECTION::UP:
-        case JoystickThread::DIRECTION::DOWN:
-        case JoystickThread::DIRECTION::LEFT:
-        case JoystickThread::DIRECTION::RIGHT:
-        default: break;
+        case JoystickThread::DIRECTION::UPLEFT:    ptz_button_pressed(0);   ptz_adjust_ongoing = true;  break;
+        case JoystickThread::DIRECTION::UP:        ptz_button_pressed(1);   ptz_adjust_ongoing = true;  break;
+        case JoystickThread::DIRECTION::UPRIGHT:   ptz_button_pressed(2);   ptz_adjust_ongoing = true;  break;
+        case JoystickThread::DIRECTION::LEFT:      ptz_button_pressed(3);   ptz_adjust_ongoing = true;  break;
+        case JoystickThread::DIRECTION::RIGHT:     ptz_button_pressed(5);   ptz_adjust_ongoing = true;  break;
+        case JoystickThread::DIRECTION::DOWNLEFT:  ptz_button_pressed(6);   ptz_adjust_ongoing = true;  break;
+        case JoystickThread::DIRECTION::DOWN:      ptz_button_pressed(7);   ptz_adjust_ongoing = true;  break;
+        case JoystickThread::DIRECTION::DOWNRIGHT: ptz_button_pressed(8);   ptz_adjust_ongoing = true;  break;
+        case JoystickThread::DIRECTION::STOP:      ptz_button_released(-1); ptz_adjust_ongoing = false; break;
+        default:                                                                                        break;
         }
     }
 }
@@ -2236,7 +2249,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
             edit = qobject_cast<QLineEdit*>(this->focusWidget());
             if (!edit) break;
 
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < 5; i++) {
                 if (edit == com_edit[i]) {
                     if (serial_port[i]) serial_port[i]->close();
                     setup_serial_port(serial_port + i, i, edit->text(), 9600);
@@ -2812,18 +2825,26 @@ void Demo::on_HIDE_BTN_clicked()
 
 void Demo::on_COM_DATA_RADIO_clicked()
 {
-    display_option = 1;
-    ui->HISTOGRAM_RADIO->setChecked(false);
+    display_option = 0;
     ui->DATA_EXCHANGE->show();
     ui->HIST_DISPLAY->hide();
+    ui->PTZ_GRP->hide();
 }
 
 void Demo::on_HISTOGRAM_RADIO_clicked()
 {
-    display_option = 2;
-    ui->COM_DATA_RADIO->setChecked(false);
+    display_option = 1;
     ui->DATA_EXCHANGE->hide();
     ui->HIST_DISPLAY->show();
+    ui->PTZ_GRP->hide();
+}
+
+void Demo::on_PTZ_RADIO_clicked()
+{
+    display_option = 2;
+    ui->DATA_EXCHANGE->hide();
+    ui->HIST_DISPLAY->hide();
+    ui->PTZ_GRP->show();
 }
 
 void Demo::screenshot()
@@ -2913,3 +2934,62 @@ void Demo::config_gatewidth(QString filename)
         gw_lut[ori] = res;
     }
 }
+
+void Demo::send_ctrl_cmd(uchar dir)
+{
+    uchar buffer_out[7];
+    buffer_out[0] = 0xFF;
+    buffer_out[1] = 0x01;
+    buffer_out[2] = 0x00;
+    buffer_out[3] = dir;
+    buffer_out[4] = dir < 5 ? ptz_speed : 0x00;
+    buffer_out[5] = dir > 5 ? ptz_speed : 0x00;
+    int sum = 0;
+    for (int i = 1; i < 6; i++) sum += buffer_out[i];
+    buffer_out[6] = sum & 0xFF;
+
+    communicate_display(4, QByteArray((char*)buffer_out, 7), 7, 1, false);
+}
+
+void Demo::ptz_button_pressed(int id) {
+//    qDebug("%dp", id);
+    switch(id){
+    case 0: send_ctrl_cmd(0x08); send_ctrl_cmd(0x04); break;
+    case 1: send_ctrl_cmd(0x08);                      break;
+    case 2: send_ctrl_cmd(0x08); send_ctrl_cmd(0x02); break;
+    case 3: send_ctrl_cmd(0x04);                      break;
+//    case 4: send_ctrl_cmd(0x00); break;
+    case 5: send_ctrl_cmd(0x02);                      break;
+    case 6: send_ctrl_cmd(0x10); send_ctrl_cmd(0x04); break;
+    case 7: send_ctrl_cmd(0x10);                      break;
+    case 8: send_ctrl_cmd(0x10); send_ctrl_cmd(0x02); break;
+    default:                                          break;
+    }
+}
+
+void Demo::ptz_button_released(int id) {
+//    qDebug("%dr", id);
+    if (id == 4) return;
+    communicate_display(4, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
+}
+
+void Demo::on_PTZ_SPEED_SLIDER_valueChanged(int value)
+{
+    ptz_speed = value;
+    ui->PTZ_SPEED_EDIT->setText(QString::number(ptz_speed));
+}
+
+void Demo::on_PTZ_SPEED_EDIT_editingFinished()
+{
+    ptz_speed = ui->PTZ_SPEED_EDIT->text().toInt();
+    if (ptz_speed > 64) ptz_speed = 64;
+    if (ptz_speed < 1)  ptz_speed = 1;
+    ui->PTZ_SPEED_SLIDER->setValue(ptz_speed);
+    ui->PTZ_SPEED_EDIT->setText(QString::number(ptz_speed));
+}
+
+void Demo::on_STOP_BTN_clicked()
+{
+    communicate_display(4, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
+}
+
