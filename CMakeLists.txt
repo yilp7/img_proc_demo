@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(Demo_combined LANGUAGES CXX VERSION 0.1.0.0)
+project(Demo_combined LANGUAGES CXX VERSION 0.0.0.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -60,6 +60,7 @@ elseif (UNIX)
 endif()
 
 if (MSVC)
+    set(VER_PRELEASE 1)
     configure_file("${CMAKE_SOURCE_DIR}/src/gist.rc.in" "${CMAKE_SOURCE_DIR}/resources/gist.rc" NEWLINE_STYLE WIN32)
 endif()
 
