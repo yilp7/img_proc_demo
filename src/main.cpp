@@ -1,4 +1,4 @@
-﻿#include "demo.h"
+#include "demo.h"
 
 #ifdef WIN32
 #include <DbgHelp.h>
@@ -121,6 +121,8 @@ int main(int argc, char *argv[])
     style.open(QIODevice::ReadOnly);
     a.setStyleSheet(style.readAll());
     style.close();
+
+    a.setWindowIcon(QIcon(":/tools/brush"));
 
 //    qInstallMessageHandler(log_message);
 

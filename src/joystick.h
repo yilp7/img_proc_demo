@@ -1,4 +1,4 @@
-﻿#ifndef JOYSTICKTHREAD_H
+#ifndef JOYSTICKTHREAD_H
 #define JOYSTICKTHREAD_H
 
 #ifdef WIN32

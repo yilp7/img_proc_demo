@@ -1,6 +1,6 @@
-﻿ cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.5)
 
-project(Demo_combined LANGUAGES CXX)
+project(Demo_combined LANGUAGES CXX VERSION 0.1.0.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -59,34 +59,39 @@ elseif (UNIX)
 	link_directories(${OpenCV_DIR}/lib/aarch64)
 endif()
 
+if (MSVC)
+    configure_file("${CMAKE_SOURCE_DIR}/src/gist.rc.in" "${CMAKE_SOURCE_DIR}/resources/gist.rc" NEWLINE_STYLE WIN32)
+endif()
+
+# for now
 set(SOURCE_FILES
-    main.cpp
-    utils.h
-    utils.cpp
-    demo.h
-    demo.cpp
-    threadpool.h
-    threadpool.cpp
-    mywidget.h
-    mywidget.cpp
-    progsettings.h
-    progsettings.cpp
-    imageproc.h
-    imageproc.cpp
-#    cam.h
-#    cam.cpp
-    mvcam.h
-	mvcam.cpp
-#    hqvcam.h
-#    hqvcam.cpp
-#    euresyscam.h
-#    euresyscam.cpp
-    joystick.h
-    joystick.cpp
-    demo_dev.ui
-    settings.ui
+    src/main.cpp
+    src/utils.h
+    src/utils.cpp
+    src/demo.h
+    src/demo.cpp
+    src/threadpool.h
+    src/threadpool.cpp
+    src/mywidget.h
+    src/mywidget.cpp
+    src/progsettings.h
+    src/progsettings.cpp
+    src/imageproc.h
+    src/imageproc.cpp
+#    src/cam.h
+#    src/cam.cpp
+    src/mvcam.h
+    src/mvcam.cpp
+#    src/hqvcam.h
+#    src/hqvcam.cpp
+#    src/euresyscam.h
+#    src/euresyscam.cpp
+    src/joystick.h
+    src/joystick.cpp
+    src/demo_dev.ui
+    src/settings.ui
     resources/resources.qrc
-    icon.rc
+    resources/gist.rc
 )
 
 set(PROJECT_LIBS

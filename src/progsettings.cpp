@@ -1,4 +1,4 @@
-﻿#include "progsettings.h"
+#include "progsettings.h"
 #include "ui_settings.h"
 
 ProgSettings::ProgSettings(QWidget *parent) :

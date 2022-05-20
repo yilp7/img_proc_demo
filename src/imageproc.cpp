@@ -1,4 +1,4 @@
-﻿#include "imageproc.h"
+#include "imageproc.h"
 #include "opencv2/highgui.hpp"
 
 ImageProc::ImageProc()

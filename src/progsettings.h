@@ -1,4 +1,4 @@
-﻿#ifndef PROGSETTINGS_H
+#ifndef PROGSETTINGS_H
 #define PROGSETTINGS_H
 
 #include "utils.h"

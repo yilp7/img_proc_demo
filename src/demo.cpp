@@ -1,4 +1,4 @@
-﻿#include "demo.h"
+#include "demo.h"
 #include "./ui_demo_dev.h"
 
 GrabThread::GrabThread(void *info)

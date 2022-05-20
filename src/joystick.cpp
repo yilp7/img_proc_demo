@@ -1,4 +1,4 @@
-﻿#include "joystick.h"
+#include "joystick.h"
 
 JoystickThread::JoystickThread(void *info) : QThread(),
     t(NULL),

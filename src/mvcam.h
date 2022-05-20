@@ -1,4 +1,4 @@
-﻿#ifndef MVCAM_H
+#ifndef MVCAM_H
 #define MVCAM_H
 
 #include "MvCameraControl.h"

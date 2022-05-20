@@ -1,4 +1,4 @@
-﻿#include "mywidget.h"
+#include "mywidget.h"
 
 Display::Display(QWidget *parent) : QLabel(parent)
   , lefttop(0, 0)

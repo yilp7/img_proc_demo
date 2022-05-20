@@ -1,4 +1,4 @@
-﻿#ifndef MYWIDGET_H
+#ifndef MYWIDGET_H
 #define MYWIDGET_H
 
 #include "progsettings.h"
