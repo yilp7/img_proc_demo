@@ -180,7 +180,7 @@ Demo::Demo(QWidget *parent)
     ui->FOCUS_SPEED_SLIDER->setMaximum(64);
     ui->FOCUS_SPEED_SLIDER->setSingleStep(1);
     ui->FOCUS_SPEED_SLIDER->setPageStep(4);
-    ui->FOCUS_SPEED_SLIDER->setValue(5);
+    ui->FOCUS_SPEED_SLIDER->setValue(32);
     connect(ui->FOCUS_SPEED_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_focus_speed(int)), Qt::QueuedConnection);
 
     ui->CONTINUE_SCAN_BUTTON->hide();
@@ -219,7 +219,7 @@ Demo::Demo(QWidget *parent)
     ui->SHAPE_INFO->setup("size");
     connect(ui->SOURCE_DISPLAY, SIGNAL(shape_size(QPoint)), ui->SHAPE_INFO, SLOT(display_pos(QPoint)));
 
-    ptz_grp = new QButtonGroup();
+    ptz_grp = new QButtonGroup(this);
     ui->UP_LEFT_BTN->setIcon(QIcon(":/directions/up_left"));
     ptz_grp->addButton(ui->UP_LEFT_BTN, 0);
     ui->UP_BTN->setIcon(QIcon(":/directions/up"));
@@ -265,7 +265,7 @@ Demo::Demo(QWidget *parent)
     ui->DATA_EXCHANGE->setFont(temp_f);
     ui->FILE_PATH_EDIT->setFont(consolas);
 
-    display_grp = new QButtonGroup();
+    display_grp = new QButtonGroup(this);
     display_grp->addButton(ui->COM_DATA_RADIO);
     display_grp->addButton(ui->HISTOGRAM_RADIO);
     display_grp->addButton(ui->PTZ_RADIO);
@@ -283,8 +283,8 @@ Demo::Demo(QWidget *parent)
     connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
 
     // right before gui display (init state)
-    for (int i = 0; i < 5; i++) serial_port[i] = new QSerialPort, setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600);
-    for (int i = 0; i < 5; i++) tcp_port[i] = new QTcpSocket;
+    for (int i = 0; i < 5; i++) serial_port[i] = new QSerialPort(this), setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600);
+    for (int i = 0; i < 5; i++) tcp_port[i] = new QTcpSocket(this);
     on_ENUM_BUTTON_clicked();
     if (serial_port[0]->isOpen() && serial_port[3]->isOpen()) on_LASER_BTN_clicked();
 
@@ -448,6 +448,7 @@ int Demo::grab_thread_process() {
     ProgSettings *settings = ui->TITLE->prog_settings;
     QImage stream;
     cv::Mat sobel;
+    int ww, hh;
     float weight = h / 1024.0; // font scale & thickness
     bool updated = true;       // whether the program get a new image from stream
     while (grab_thread_state) {
@@ -516,16 +517,23 @@ int Demo::grab_thread_process() {
         }
 
         // process 3d image construction from ABN frames
-        if (image_3d) {
+        if (ui->IMG_3D_CHECK->isChecked()) {
+            ww = w + 104;
+            hh = h;
             range_threshold = ui->RANGE_THRESH_EDIT->text().toFloat();
-            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
-            if (!frame_a_3d) prev_3d = modified_result.clone();
+//            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
+            if (prev_3d.empty()) cv::cvtColor(img_mem, prev_3d, cv::COLOR_GRAY2RGB);
+            if (updated) prev_3d = modified_result = ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
+            else modified_result = prev_3d;
+//            if (!frame_a_3d) prev_3d = modified_result.clone();
             frame_a_3d ^= 1;
 
             cv::resize(modified_result, img_display, cv::Size(ui->SOURCE_DISPLAY->width(), ui->SOURCE_DISPLAY->height()), 0, 0, cv::INTER_AREA);
         }
         // process ordinary image enhance
         else {
+            ww = w;
+            hh = h;
             if (ui->IMG_ENHANCE_CHECK->isChecked()) {
                 switch (ui->ENHANCE_OPTIONS->currentIndex()) {
                 // histogram
@@ -651,8 +659,8 @@ int Demo::grab_thread_process() {
             modified_result += val;
             // do not change pixel of value 0 when adjusting brightness
 //            int temp = 127.5 * brightness * (1 + std::tan((45 - 45 * contrast) / 180. * M_PI)) + 127.5 * (1 - std::tan((45 - 45 * contrast) / 180. * M_PI));
-            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) {
-                if (modified_result.data[i * w + j] == val) modified_result.data[i * w + j] = 0;
+            for (int i = 0; i < hh; i++) for (int j = 0; j < ww; j++) {
+                if (modified_result.data[i * ww + j] == val) modified_result.data[i * ww + j] = 0;
             }
 
             // display grayscale histogram of current image
@@ -661,7 +669,7 @@ int Demo::grab_thread_process() {
                 uchar *img = modified_result.data;
                 int step = modified_result.step;
                 memset(hist, 0, 256 * sizeof(uint));
-                for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img + i * step)[j]]++;
+                for (int i = 0; i < hh; i++) for (int j = 0; j < ww; j++) hist[(img + i * step)[j]]++;
                 uint max = 0;
                 for (int i = 1; i < 256; i++) {
                     // discard abnormal value
@@ -675,19 +683,19 @@ int Demo::grab_thread_process() {
                 ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
             }
             // crop the region to display
-//            cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? w + 104 : w) / disp->width(), disp->display_region.br() * (image_3d ? w + 104 : w) / disp->width());
-            cv::Rect region = cv::Rect(disp->display_region.tl() * w / disp->width(), disp->display_region.br() * w / disp->width());
-            if (region.height > h) region.height = h;
+//            cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? ww + 104 : ww) / disp->width(), disp->display_region.br() * (image_3d ? ww + 104 : ww) / disp->width());
+            cv::Rect region = cv::Rect(disp->display_region.tl() * ww / disp->width(), disp->display_region.br() * ww / disp->width());
+            if (region.height > hh) region.height = hh;
 //            qDebug("region x: %d y: %d, w: %d, h: %d\n", region.x, region.y, region.width, region.height);
 //            qDebug("image  w: %d, h: %d\n", modified_result.cols, modified_result.rows);
             modified_result = modified_result(region);
-            cv::resize(modified_result, modified_result, cv::Size(w, h));
+            cv::resize(modified_result, modified_result, cv::Size(ww, hh));
 
             // put info (dist, dov, time) as text on image
             if (ui->INFO_CHECK->isChecked()) {
                 if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
 
             // resize to display size
@@ -721,19 +729,19 @@ int Demo::grab_thread_process() {
         if (record_original) {
             if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            cv::putText(img_mem, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), weight * 2);
+            cv::putText(img_mem, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), weight * 2);
             vid_out[0].write(img_mem);
         }
         if (record_modified) {
             if (!image_3d && !ui->INFO_CHECK->isChecked()) {
                 if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
             vid_out[1].write(modified_result);
         }
 
-        prev_img = img_mem.clone();
+        if (updated) prev_img = img_mem.clone();
         image_mutex.unlock();
     }
     return 0;
@@ -1638,6 +1646,10 @@ QByteArray Demo::communicate_display(int id, QByteArray write, int write_size, i
 
 void Demo::update_delay()
 {
+    static QElapsedTimer t;
+    if (t.elapsed() < (fps > 9 ? 900 / fps : 100)) return;
+    t.start();
+
     // REPEATED FREQUENCY
     if (delay_dist < 0) delay_dist = 0;
     if (delay_dist > max_dist) delay_dist = max_dist;
@@ -1691,6 +1703,10 @@ void Demo::update_delay()
 }
 
 void Demo::update_gate_width() {
+    static QElapsedTimer t;
+    if (t.elapsed() < (fps > 9 ? 900 / fps : 100)) return;
+    t.start();
+
     if (depth_of_view < 0) depth_of_view = 0;
     if (depth_of_view > 1500) depth_of_view = 1500;
 
@@ -1927,14 +1943,15 @@ void Demo::on_IMG_3D_CHECK_stateChanged(int arg1)
 //    ui->SOURCE_DISPLAY->setGeometry(region);
 //    qDebug("display region x: %d, y: %d, w: %d, h: %d\n", region.x(), region.y(), region.width(), region.height());
 //    ui->SOURCE_DISPLAY->update_roi(QPoint());
-    image_mutex.lock();
-    w = arg1 ? w + 104 : w - 104;
-    image_mutex.unlock();
+
+//    image_mutex.lock();
+//    w = arg1 ? w + 104 : w - 104;
+//    image_mutex.unlock();
+    image_3d = ui->IMG_3D_CHECK->isChecked();
+
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
     if (!arg1) frame_a_3d = 0, prev_3d.release();
-
-    image_3d = ui->IMG_3D_CHECK->isChecked();
 }
 
 void Demo::on_ZOOM_IN_BTN_pressed()
@@ -2416,6 +2433,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
 
 void Demo::resizeEvent(QResizeEvent *event)
 {
+    int ww = ui->IMG_3D_CHECK->isChecked() ? w + 104 : w;
     QRect window = this->geometry();
 //    qDebug() << window;
     int grp_width = ui->RIGHT->width();
@@ -2427,12 +2445,12 @@ void Demo::resizeEvent(QResizeEvent *event)
 
     int mid_width = window.width() - 12 - grp_width - 10 - ui->LEFT->width();
     ui->MID->setGeometry(10 + ui->LEFT->width(), 40, mid_width, window.height() - 50);
-    int width = mid_width - 20, height = width * h / w;
+    int width = mid_width - 20, height = width * h / ww;
 //    qDebug("width %d, height %d\n", width, height);
     int height_constraint = window.height() - 30 - 50 - 32,
-        width_constraint = height_constraint * w / h;
+        width_constraint = height_constraint * ww / h;
 //    qDebug("width_constraint %d, height_constraint %d\n", width_constraint, height_constraint);
-    if (width < width_constraint) width_constraint = width, height_constraint = width_constraint * h / w;
+    if (width < width_constraint) width_constraint = width, height_constraint = width_constraint * h / ww;
     if (height > height_constraint) {
         center = center * width_constraint / region.width();
         region.setRect(10 + (width - width_constraint) / 2, 40, width_constraint, height_constraint);
@@ -2492,6 +2510,12 @@ void Demo::mouseMoveEvent(QMouseEvent *event)
     QMainWindow::mouseMoveEvent(event);
     if (ui->TITLE->is_maximized) return;
 
+    static QCursor pointer = QCursor(QPixmap(":/cursor/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0),
+                   resize_h = QCursor(QPixmap(":/cursor/resize_h").scaled(20, 20)),
+                   resize_v = QCursor(QPixmap(":/cursor/resize_v").scaled(20, 20)),
+                   resize_md = QCursor(QPixmap(":/cursor/resize_md").scaled(16, 16)),
+                   resize_sd = QCursor(QPixmap(":/cursor/resize_sd").scaled(16, 16));
+
     if (mouse_pressed) {
         QPoint displacement;
         int ww = width(), hh = height(), xx = pos().x(), yy = pos().y();
@@ -2548,31 +2572,31 @@ void Demo::mouseMoveEvent(QMouseEvent *event)
     else {
         QPoint diff = cursor().pos() - pos();
         // cursor in title bar
-        if (diff.y() < 30 && diff.x() > width() - 5) setCursor(QCursor(QPixmap(":/cursor/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+        if (diff.y() < 30 && diff.x() > width() - 5) setCursor(pointer);
         // cursor in main window
         else if (diff.y() < 5) {
             // cursor @ topleft corner
-            if (diff.x() < 5) setCursor(QCursor(QPixmap(":/cursor/resize_md").scaled(16, 16)));
+            if (diff.x() < 5) setCursor(resize_md);
             // cursor on min, max, exit button
-            else if (diff.x() > width() - 120) setCursor(QCursor(QPixmap(":/cursor/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+            else if (diff.x() > width() - 120) setCursor(pointer);
             // cursor @ top border
-            else setCursor(QCursor(QPixmap(":/cursor/resize_v").scaled(20, 20)));
+            else setCursor(resize_v);
         }
         else if (diff.y() > height() - 5) {
             // cursor @ bottom left corner
-            if (diff.x() < 5) setCursor(QCursor(QPixmap(":/cursor/resize_sd").scaled(16, 16)));
+            if (diff.x() < 5) setCursor(resize_sd);
             // cursor @ bottom right corner
-            else if (diff.x() > width() - 5) setCursor(QCursor(QPixmap(":/cursor/resize_md").scaled(16, 16)));
+            else if (diff.x() > width() - 5) setCursor(resize_md);
             // cursor @ bottom border
-            else setCursor(QCursor(QPixmap(":/cursor/resize_v").scaled(20, 20)));
+            else setCursor(resize_v);
         }
         else {
             // cursor @ left border
-            if (diff.x() < 5) setCursor(QCursor(QPixmap(":/cursor/resize_h").scaled(20, 20)));
+            if (diff.x() < 5) setCursor(resize_h);
             // cursor @ right border
-            else if (diff.x() > width() - 5) setCursor(QCursor(QPixmap(":/cursor/resize_h").scaled(20, 20)));
+            else if (diff.x() > width() - 5) setCursor(resize_h);
             // cursor inside window
-            else setCursor(QCursor(QPixmap(":/cursor/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0));
+            else setCursor(pointer);
         }
     }
 }
