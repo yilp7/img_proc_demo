@@ -466,23 +466,25 @@ int Demo::grab_thread_process() {
 
         image_mutex.lock();
 
-        // calc histogram (grayscale)
-        memset(hist, 0, 256 * sizeof(uint));
-        for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * img_mem.cols)[j]]++;
+        if (updated) {
+            // calc histogram (grayscale)
+            memset(hist, 0, 256 * sizeof(uint));
+            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * img_mem.cols)[j]]++;
 
-        // if the cam is installed upside down
-        if (settings->central_symmetry) cv::flip(img_mem, img_mem, -1);
+            // if the cam is installed upside down
+            if (settings->central_symmetry) cv::flip(img_mem, img_mem, -1);
 
-        // mcp self-adaptive
-        if (auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
-            int thresh_num = img_mem.total() / 200, thresh = 1 << pixel_depth;
-            while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-            if (thresh > (1 << pixel_depth) * 0.94) emit update_mcp_in_thread(mcp -= sqrt(thresh - (1 << pixel_depth) * 0.94));
-//            qDebug() << "high" << thresh;
-//            thresh_num = img_mem.total() / 100, thresh = 255;
-//            while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-            if (thresh < (1 << pixel_depth) * 0.39) emit update_mcp_in_thread(mcp += sqrt((1 << pixel_depth) * 0.39 - thresh));
-//            qDebug() << "low" << thresh;
+            // mcp self-adaptive
+            if (auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
+                int thresh_num = img_mem.total() / 200, thresh = 1 << pixel_depth;
+                while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
+                if (thresh > (1 << pixel_depth) * 0.94) emit update_mcp_in_thread(mcp - sqrt(thresh - (1 << pixel_depth) * 0.94));
+//                qDebug() << "high" << thresh;
+//                thresh_num = img_mem.total() / 100, thresh = 255;
+//                while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
+                if (thresh < (1 << pixel_depth) * 0.39) emit update_mcp_in_thread(mcp + sqrt((1 << pixel_depth) * 0.39 - thresh));
+//                qDebug() << "low" << thresh;
+            }
         }
 /*
         // tenengrad (sobel) auto-focus
@@ -501,16 +503,18 @@ int Demo::grab_thread_process() {
         // process frame average
         if (seq_sum.empty()) seq_sum = cv::Mat::zeros(h, w, CV_16U);
         if (ui->FRAME_AVG_CHECK->isChecked()) {
-            calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 5 + 5;
-            if (seq[9].empty()) for (auto& m: seq) m = cv::Mat::zeros(h, w, CV_16U);
+            if (updated) {
+                calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 5 + 5;
+                if (seq[9].empty()) for (auto& m: seq) m = cv::Mat::zeros(h, w, CV_16U);
 
-            img_mem.convertTo(seq[seq_idx], CV_16U);
-            for(int i = 0; i < calc_avg_option; i++) seq_sum += seq[i];
+                seq_sum -= seq[seq_idx];
+                img_mem.convertTo(seq[seq_idx], CV_16U);
+                seq_sum += seq[seq_idx];
+//                for(int i = 0; i < calc_avg_option; i++) seq_sum += seq[i];
 
-            seq_idx = (seq_idx + 1) % calc_avg_option;
-
+                seq_idx = (seq_idx + 1) % calc_avg_option;
+            }
             seq_sum.convertTo(modified_result, CV_8U, 1.0 / calc_avg_option);
-            seq_sum.release();
         }
         else {
             img_mem.convertTo(modified_result, CV_8U, 1.0 / (1 << (pixel_depth - 8)));
@@ -1646,9 +1650,9 @@ QByteArray Demo::communicate_display(int id, QByteArray write, int write_size, i
 
 void Demo::update_delay()
 {
-    static QElapsedTimer t;
-    if (t.elapsed() < (fps > 9 ? 900 / fps : 100)) return;
-    t.start();
+//    static QElapsedTimer t;
+//    if (t.elapsed() < (fps > 9 ? 900 / fps : 100)) return;
+//    t.start();
 
     // REPEATED FREQUENCY
     if (delay_dist < 0) delay_dist = 0;
@@ -2150,8 +2154,9 @@ void Demo::change_mcp(int val)
     mcp = val;
 
 //    convert_to_send_tcu(0x0A, mcp);
-    static QElapsedTimer t;
-    if (!h_grab_thread || t.elapsed() > (fps > 9 ? 900 / fps : 100)) communicate_display(0, convert_to_send_tcu(0x0A, mcp), 7, 1, false), t.start();
+//    static QElapsedTimer t;
+//    if (!h_grab_thread || t.elapsed() > (fps > 9 ? 900 / fps : 100)) communicate_display(0, convert_to_send_tcu(0x0A, mcp), 7, 1, false), t.start();
+    communicate_display(0, convert_to_send_tcu(0x0A, mcp), 7, 1, false);
 
     ui->MCP_EDIT->setText(QString::number(val));
     ui->MCP_SLIDER->setValue(mcp);
@@ -2638,6 +2643,7 @@ void Demo::showEvent(QShowEvent *event)
 
     if (this->focusWidget()) this->focusWidget()->clearFocus();
     this->setFocus();
+    qDebug() << this->focusWidget();
 }
 
 void Demo::on_SAVE_AVI_BUTTON_clicked()
