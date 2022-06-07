@@ -309,18 +309,21 @@ Demo::Demo(QWidget *parent)
     ui->PARAMS_STATIC->move(10, ui->PARAMS_STATIC->y() + 60);
 
     ui->LASER_STATIC->hide();
+    ui->TCU_STATIC->hide();
     ui->ALT_DISPLAY->setParent(ui->RIGHT);
     ui->ALT_DISPLAY->setGeometry(10, 365, ui->IMG_PROC_STATIC->width(), ui->ALT_DISPLAY->height());
     QSize temp = ui->DATA_EXCHANGE->size();
     temp.setWidth(ui->ALT_DISPLAY->width());
     ui->DATA_EXCHANGE->resize(temp);
     ui->HIST_DISPLAY->resize(temp);
-    ui->LENS_STATIC->hide();
-    ui->IMG_SAVE_STATIC->move(10, 265);
-    ui->IMG_PROC_STATIC->hide();
-    ui->SCAN_GRP->move(10, 560);
-    ui->IMG_3D_CHECK->hide();
-    ui->RANGE_THRESH_EDIT->hide();
+    ui->PTZ_GRP->resize(temp);
+//    ui->LENS_STATIC->hide();
+    ui->IMG_SAVE_STATIC->move(10, 165);
+    ui->IMG_PROC_STATIC->move(10, 30);
+//    ui->SCAN_GRP->move(10, 560);
+    ui->SCAN_GRP->hide();
+//    ui->IMG_3D_CHECK->hide();
+//    ui->RANGE_THRESH_EDIT->hide();
 
     ui->DELAY_N->hide();
     ui->DELAY_N_EDIT_N->hide();
