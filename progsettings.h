@@ -38,6 +38,10 @@ private slots:
 
     void toggle_laser(int id, bool on);
 
+    void on_FISHNET_RECOG_stateChanged(int arg1);
+
+    void on_FISHNET_THRESH_EDIT_editingFinished();
+
 signals:
     void rep_freq_unit_changed(int);
     void base_unit_changed(int);
@@ -65,6 +69,8 @@ public:
     float            high_in;
     float            low_out;
     float            high_out;
+    float            fishnet_recog;
+    float            fishnet_threshold;
 
     float            dist_ns;
     bool             auto_rep_freq;

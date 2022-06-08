@@ -446,7 +446,7 @@ int Demo::grab_thread_process() {
             }
         }
 
-        if (true) {
+        if (ui->TITLE->prog_settings->fishnet_recog) {
             cv::cvtColor(img_mem, fishnet_res, cv::COLOR_GRAY2RGB);
             fishnet_res.convertTo(fishnet_res, CV_32FC3, 1.0 / 255);
             cv::resize(fishnet_res, fishnet_res, cv::Size(224, 224));
@@ -454,17 +454,19 @@ int Demo::grab_thread_process() {
             cv::Mat blob = cv::dnn::blobFromImage(fishnet_res, 1.0, cv::Size(224, 224));
             net.setInput(blob);
             cv::Mat prob = net.forward("195");
-//            std::cout << cv::format(prob, cv::Formatter::FMT_C) << std::endl;
 
             double min, max;
             cv::minMaxLoc(prob, &min, &max);
 
     //        prob -=max;
-    //        double is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
-            double is_net = exp(prob.at<float>(1)) / exp(prob.at<float>(0) + prob.at<float>(1));
+            double is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
+//            double is_net = exp(prob.at<float>(1)) / exp(prob.at<float>(0) + prob.at<float>(1));
 
-            if (is_net > threshold) ui->FISHNET_RESULT->setText("FISHNET<br>EXISTS"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");
-            else                    ui->FISHNET_RESULT->setText("FISHNET<br>DOES NOT EXIST"), ui->FISHNET_RESULT->setStyleSheet("color: #CD5C5C;");
+            if (is_net > ui->TITLE->prog_settings->fishnet_recog) ui->FISHNET_RESULT->setText("FISHNET<br>EXISTS"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");
+            else                                                  ui->FISHNET_RESULT->setText("FISHNET<br>DOES NOT EXIST"), ui->FISHNET_RESULT->setStyleSheet("color: #CD5C5C;");
+        }
+        else {
+            ui->FISHNET_RESULT->setText("FISHNET<br>???"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");
         }
 
         // process frame average

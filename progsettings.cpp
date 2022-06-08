@@ -18,6 +18,8 @@ ProgSettings::ProgSettings(QWidget *parent) :
     high_in(0.05),
     low_out(0),
     high_out(1),
+    fishnet_recog(false),
+    fishnet_threshold(0.99),
     dist_ns(3e8 / 2e9),
     auto_rep_freq(true),
     hz_unit(0),
@@ -90,6 +92,9 @@ void ProgSettings::data_exchange(bool read)
         low_out = ui->LOW_OUT_EDIT->text().toFloat();
         high_out = ui->HIGH_OUT_EDIT->text().toFloat();
 
+        fishnet_recog = ui->FISHNET_RECOG->isChecked();
+        fishnet_threshold = ui->FISHNET_THRESH_EDIT->text().toFloat();
+
         auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
         base_unit = ui->UNIT_LIST->currentIndex();
         switch (base_unit) {
@@ -131,6 +136,9 @@ void ProgSettings::data_exchange(bool read)
         ui->HIGH_IN_EDIT->setText(QString::number(high_in, 'f', 2));
         ui->LOW_OUT_EDIT->setText(QString::number(low_out, 'f', 2));
         ui->HIGH_OUT_EDIT->setText(QString::number(high_out, 'f', 2));
+
+        ui->FISHNET_RECOG->setChecked(fishnet_recog);
+        ui->FISHNET_THRESH_EDIT->setText(QString::number(fishnet_threshold, 'f', 2));
 
         ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
         ui->UNIT_LIST->setCurrentIndex(base_unit);
@@ -274,3 +282,15 @@ void ProgSettings::toggle_laser(int id, bool on)
     else    laser_on -= 1 << id;
     emit laser_toggled(laser_on);
 }
+
+void ProgSettings::on_FISHNET_RECOG_stateChanged(int arg1)
+{
+    fishnet_recog = arg1;
+}
+
+void ProgSettings::on_FISHNET_THRESH_EDIT_editingFinished()
+{
+    fishnet_recog = ui->FISHNET_THRESH_EDIT->text().toFloat();
+    ui->FISHNET_THRESH_EDIT->setText(QString::number(fishnet_recog, 'f', 2));
+}
+
