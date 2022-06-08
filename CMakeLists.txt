@@ -87,6 +87,7 @@ target_link_libraries(Demo_param
 	opencv_imgcodecs452
 	opencv_imgproc452
 	opencv_videoio452
+    opencv_dnn452
 )
 
 #add_executable(Demo_release WIN32

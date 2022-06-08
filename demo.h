@@ -7,6 +7,7 @@
 #include "mywidget.h"
 #include "imageproc.h"
 #include "cam.h"
+#include <opencv2/opencv.hpp>
 //#include "mvcam.h"
 //#include "hqvscam.h"
 //#include "euresyscam.h"

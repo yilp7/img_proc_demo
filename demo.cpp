@@ -289,6 +289,9 @@ Demo::Demo(QWidget *parent)
     ui->CTRL_STATIC->hide();
     ui->ROI_TABLE->hide();
     ui->ROI_RADIO->hide();
+
+//    ui->FISHNET_RESULT->setText("");
+
 #ifndef PARAM
     qDebug("%s\n", "presentation");
     ui->DISTANCE->hide();
@@ -414,8 +417,10 @@ int Demo::grab_thread_process() {
     Display *disp = ui->SOURCE_DISPLAY;
     ProgSettings *settings = ui->TITLE->prog_settings;
     QImage stream;
-    cv::Mat sobel;
-    float weight = h / 1024.0; qDebug() << weight; // font scale & thickness
+    cv::Mat sobel, fishnet_res;
+    cv::dnn::Net net = cv::dnn::readNet("model/resnet18.onnx");
+    double threshold = 0.99;
+    float weight = h / 1024.0;// qDebug() << weight; // font scale & thickness
     while (grab_thread_state) {
         if (img_q.empty()) {
             QThread::msleep(5);
@@ -439,6 +444,27 @@ int Demo::grab_thread_process() {
                 else if (focus_direction > 0) lens_stop(), change_focus_speed(8), focus_far();
                 else if (focus_direction < 0) lens_stop(), change_focus_speed(16), focus_near();
             }
+        }
+
+        if (true) {
+            cv::cvtColor(img_mem, fishnet_res, cv::COLOR_GRAY2RGB);
+            fishnet_res.convertTo(fishnet_res, CV_32FC3, 1.0 / 255);
+            cv::resize(fishnet_res, fishnet_res, cv::Size(224, 224));
+
+            cv::Mat blob = cv::dnn::blobFromImage(fishnet_res, 1.0, cv::Size(224, 224));
+            net.setInput(blob);
+            cv::Mat prob = net.forward("195");
+//            std::cout << cv::format(prob, cv::Formatter::FMT_C) << std::endl;
+
+            double min, max;
+            cv::minMaxLoc(prob, &min, &max);
+
+    //        prob -=max;
+    //        double is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
+            double is_net = exp(prob.at<float>(1)) / exp(prob.at<float>(0) + prob.at<float>(1));
+
+            if (is_net > threshold) ui->FISHNET_RESULT->setText("FISHNET<br>EXISTS"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");
+            else                    ui->FISHNET_RESULT->setText("FISHNET<br>DOES NOT EXIST"), ui->FISHNET_RESULT->setStyleSheet("color: #CD5C5C;");
         }
 
         // process frame average
@@ -804,7 +830,7 @@ void Demo::setup_com(QSerialPort **com, int id, QString port_num, int baud_rate)
         switch (id) {
         case 0:
 //            convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8);
-            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8), 7, 1, false);
+            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n) / 8), 7, 1, false);
             update_delay();
             update_gate_width();
             change_mcp(5);
@@ -1150,7 +1176,7 @@ void Demo::load_config()
         update_delay();
         update_gate_width();
 #ifdef PARAM
-        communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8), 7, 1, false);
+        communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n) / 8), 7, 1, false);
 #endif
         ui->MCP_SLIDER->setValue(mcp);
         on_SET_PARAMS_BUTTON_clicked();
@@ -1239,10 +1265,10 @@ void Demo::update_delay()
     communicate_display(com[0], 1, 7);
 */
     // DELAY A
-    communicate_display(com[0], convert_to_send_tcu(0x02, (delay_a_u * 1000 + delay_a_n) + 68), 7, 1, false);
+    communicate_display(com[0], convert_to_send_tcu(0x02, delay_a_u * 1000 + delay_a_n), 7, 1, false);
 
     // DELAY B
-    communicate_display(com[0], convert_to_send_tcu(0x04, (delay_b_u * 1000 + delay_b_n) + 68), 7, 1, false);
+    communicate_display(com[0], convert_to_send_tcu(0x04, delay_b_u * 1000 + delay_b_n), 7, 1, false);
 
     data_exchange(false);
 
@@ -1269,11 +1295,11 @@ void Demo::update_gate_width() {
 #endif
 
     // GATE WIDTH A
-    communicate_display(com[0], convert_to_send_tcu(0x03, gw + 8), 7, 1, false);
+    communicate_display(com[0], convert_to_send_tcu(0x03, gw), 7, 1, false);
 
     // GATE WIDTH B
 //    send = gw - 18;
-    communicate_display(com[0], convert_to_send_tcu(0x05, gw + 8), 7, 1, false);
+    communicate_display(com[0], convert_to_send_tcu(0x05, gw), 7, 1, false);
 
     data_exchange(false);
 }
@@ -1677,7 +1703,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
         }
         else if (edit == ui->LASER_WIDTH_EDIT_U) {
             laser_width_u = edit->text().toInt();
-            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8), 7, 1, false);
+            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n) / 8), 7, 1, false);
         }
         else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
             depth_of_vision = (edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000) * dist_ns;
@@ -1685,7 +1711,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
         }
         else if (edit == ui->LASER_WIDTH_EDIT_N) {
             laser_width_n = edit->text().toInt();
-            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8), 7, 1, false);
+            communicate_display(com[0], convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n) / 8), 7, 1, false);
         }
         else if (edit == ui->DELAY_A_EDIT_U) {
             delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt()) * dist_ns;
@@ -1806,6 +1832,8 @@ void Demo::resizeEvent(QResizeEvent *event)
     ui->SHAPE_INFO->move(ui->START_COORD->geometry().right() + 20, 5);
     ui->INFO_CHECK->move(region.right() - 60, 0);
     ui->CENTER_CHECK->move(region.right() - 60, 20);
+    ui->FISHNET_RESULT->move(region.right() - 170, 5);
+
 #ifndef PARAM
     ui->APP_NAME->move(region.right() - 160, 0);
 #endif

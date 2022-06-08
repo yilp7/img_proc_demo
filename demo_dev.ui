@@ -1081,6 +1081,22 @@
      <column/>
      <column/>
     </widget>
+    <widget class="QLabel" name="FISHNET_RESULT">
+     <property name="geometry">
+      <rect>
+       <x>480</x>
+       <y>5</y>
+       <width>101</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>FISHNET&lt;br&gt;???</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
    </widget>
    <widget class="QFrame" name="RIGHT">
     <property name="geometry">
