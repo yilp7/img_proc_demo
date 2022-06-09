@@ -112,6 +112,9 @@
       <property name="mouseTracking">
        <bool>false</bool>
       </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
+      </property>
       <property name="text">
        <string>0</string>
       </property>
@@ -176,6 +179,9 @@
       <property name="mouseTracking">
        <bool>false</bool>
       </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
+      </property>
       <property name="text">
        <string>5</string>
       </property>
@@ -191,6 +197,9 @@
       </property>
       <property name="mouseTracking">
        <bool>false</bool>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
       </property>
       <property name="text">
        <string>10</string>
@@ -534,6 +543,9 @@
        <property name="mouseTracking">
         <bool>false</bool>
        </property>
+       <property name="focusPolicy">
+        <enum>Qt::ClickFocus</enum>
+       </property>
        <property name="text">
         <string>3</string>
        </property>
@@ -549,6 +561,9 @@
        </property>
        <property name="mouseTracking">
         <bool>false</bool>
+       </property>
+       <property name="focusPolicy">
+        <enum>Qt::ClickFocus</enum>
        </property>
        <property name="text">
         <string>0</string>
@@ -566,6 +581,9 @@
        <property name="mouseTracking">
         <bool>false</bool>
        </property>
+       <property name="focusPolicy">
+        <enum>Qt::ClickFocus</enum>
+       </property>
        <property name="text">
         <string>8</string>
        </property>
@@ -581,6 +599,9 @@
        </property>
        <property name="mouseTracking">
         <bool>false</bool>
+       </property>
+       <property name="focusPolicy">
+        <enum>Qt::ClickFocus</enum>
        </property>
        <property name="text">
         <string>0</string>
@@ -617,6 +638,9 @@
       </property>
       <property name="mouseTracking">
        <bool>false</bool>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
       </property>
       <property name="text">
        <string>18</string>
@@ -863,6 +887,9 @@
          <height>20</height>
         </rect>
        </property>
+       <property name="focusPolicy">
+        <enum>Qt::ClickFocus</enum>
+       </property>
        <property name="text">
         <string>000.00</string>
        </property>
@@ -979,6 +1006,9 @@
          <width>26</width>
          <height>20</height>
         </rect>
+       </property>
+       <property name="focusPolicy">
+        <enum>Qt::ClickFocus</enum>
        </property>
        <property name="alignment">
         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -1098,6 +1128,9 @@
          <height>20</height>
         </rect>
        </property>
+       <property name="focusPolicy">
+        <enum>Qt::ClickFocus</enum>
+       </property>
        <property name="text">
         <string>00.00</string>
        </property>
@@ -1183,6 +1216,9 @@
          <width>41</width>
          <height>20</height>
         </rect>
+       </property>
+       <property name="focusPolicy">
+        <enum>Qt::ClickFocus</enum>
        </property>
        <property name="text">
         <string>6</string>
@@ -1567,6 +1603,9 @@
       <property name="mouseTracking">
        <bool>false</bool>
       </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
+      </property>
       <property name="text">
        <string>32</string>
       </property>
@@ -1583,6 +1622,9 @@
       <property name="mouseTracking">
        <bool>false</bool>
       </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
+      </property>
      </widget>
      <widget class="QLineEdit" name="FOCUS_EDIT">
       <property name="geometry">
@@ -1595,6 +1637,9 @@
       </property>
       <property name="mouseTracking">
        <bool>false</bool>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
       </property>
      </widget>
      <widget class="QPushButton" name="GET_LENS_PARAM_BTN">
@@ -1656,6 +1701,9 @@
       </property>
       <property name="mouseTracking">
        <bool>false</bool>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
       </property>
      </widget>
      <widget class="QLabel" name="FREQ">
@@ -1724,6 +1772,9 @@
       <property name="mouseTracking">
        <bool>false</bool>
       </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
+      </property>
      </widget>
      <widget class="QLineEdit" name="LASER_WIDTH_EDIT_N">
       <property name="geometry">
@@ -1736,6 +1787,9 @@
       </property>
       <property name="mouseTracking">
        <bool>false</bool>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
       </property>
      </widget>
      <widget class="QLabel" name="LASER_WIDTH_U_UNIT">
@@ -1868,6 +1922,9 @@
       <property name="mouseTracking">
        <bool>false</bool>
       </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
+      </property>
      </widget>
      <widget class="QLabel" name="DELAY_A_UNIT_U">
       <property name="geometry">
@@ -1916,6 +1973,9 @@
       <property name="mouseTracking">
        <bool>false</bool>
       </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
+      </property>
      </widget>
      <widget class="QLabel" name="DELAY_B">
       <property name="geometry">
@@ -1947,6 +2007,9 @@
       </property>
       <property name="mouseTracking">
        <bool>false</bool>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
       </property>
      </widget>
      <widget class="QLabel" name="DELAY_B_UNIT_U">
@@ -1993,6 +2056,9 @@
       <property name="mouseTracking">
        <bool>false</bool>
       </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
+      </property>
      </widget>
      <widget class="QLabel" name="GATE_WIDTH_A">
       <property name="geometry">
@@ -2025,6 +2091,9 @@
       <property name="mouseTracking">
        <bool>false</bool>
       </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
+      </property>
      </widget>
      <widget class="QLabel" name="GATE_WIDTH_A_UNIT_U">
       <property name="geometry">
@@ -2053,6 +2122,9 @@
       </property>
       <property name="mouseTracking">
        <bool>false</bool>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
       </property>
      </widget>
      <widget class="QLabel" name="GATE_WIDTH_A_UNIT_N">
@@ -2117,6 +2189,9 @@
       </property>
       <property name="mouseTracking">
        <bool>false</bool>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
       </property>
      </widget>
      <widget class="QLabel" name="ESTIMATED">
@@ -2184,6 +2259,9 @@
       </property>
       <property name="mouseTracking">
        <bool>false</bool>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
       </property>
      </widget>
      <widget class="QLabel" name="DELAY_N_UNIT_N">
@@ -2267,6 +2345,9 @@
         <width>31</width>
         <height>21</height>
        </rect>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
       </property>
       <property name="text">
        <string>255</string>
@@ -2445,6 +2526,9 @@
       <property name="mouseTracking">
        <bool>false</bool>
       </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
+      </property>
       <property name="layoutDirection">
        <enum>Qt::LeftToRight</enum>
       </property>
@@ -2586,6 +2670,9 @@
       </property>
       <property name="mouseTracking">
        <bool>false</bool>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
       </property>
      </widget>
      <widget class="QToolButton" name="FILE_PATH_BROWSE">

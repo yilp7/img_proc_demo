@@ -6,6 +6,10 @@
 
 int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
 {
+    // check if dmp folder exists
+    DWORD dwStatus = GetFileAttributesA("dmp");
+    if ((dwStatus == INVALID_FILE_ATTRIBUTES) || !(dwStatus & FILE_ATTRIBUTE_DIRECTORY)) return EXCEPTION_EXECUTE_HANDLER;
+
     // define function ptr
     typedef BOOL(WINAPI * MiniDumpWriteDumpT)(
         HANDLE,
@@ -31,7 +35,7 @@ int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
         return EXCEPTION_CONTINUE_EXECUTION;
     }
     // create dump file
-    HANDLE hDumpFile = CreateFile(("DumpFile" + QDateTime::currentDateTime().toString("-yyyyMMdd-hhmmss") + ".dmp").toUtf8().constData(),
+    HANDLE hDumpFile = CreateFile(("dmp/DumpFile" + QDateTime::currentDateTime().toString("-yyyyMMdd-hhmmss") + ".dmp").toUtf8().constData(),
                                   GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
     if (INVALID_HANDLE_VALUE == hDumpFile)
     {

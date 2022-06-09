@@ -1,4 +1,4 @@
-﻿#ifndef DEMO_H
+#ifndef DEMO_H
 #define DEMO_H
 
 #include <QSerialPort>
@@ -13,6 +13,7 @@
 #include "mvcam.h"
 //#include "hqvscam.h"
 //#include "euresyscam.h"
+#include "preferences.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class Demo; }
@@ -335,8 +336,8 @@ private:
     int                     duty;
     int                     mcp;
     int                     laser_on;
-    int                     zoom;
-    int                     focus;
+    uint                    zoom;
+    uint                    focus;
     int                     distance;                   // dist read from rangefinder
     float                   max_dist;
     int                     laser_width;

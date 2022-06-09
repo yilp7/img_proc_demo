@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(Demo_combined LANGUAGES CXX VERSION 0.1.0.0)
+project(Demo_combined LANGUAGES CXX VERSION 0.1.1.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -93,6 +93,9 @@ set(SOURCE_FILES
     src/settings.ui
     resources/resources.qrc
     resources/gist.rc
+#    preferences.h
+#    preferences.cpp
+#    preferences.ui
 )
 
 set(PROJECT_LIBS

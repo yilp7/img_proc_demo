@@ -291,6 +291,9 @@ Demo::Demo(QWidget *parent)
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
+//    Preferences *preferences = new Preferences;
+//    preferences->show();
+
 #ifdef ICMOS
     ui->RANGE_COM->setText("R1");
     ui->LASER_COM->setText("R2");
@@ -1650,6 +1653,7 @@ QByteArray Demo::communicate_display(int id, QByteArray write, int write_size, i
 
 void Demo::update_delay()
 {
+//    qDebug() << sender();
 //    static QElapsedTimer t;
 //    if (t.elapsed() < (fps > 9 ? 900 / fps : 100)) return;
 //    t.start();
@@ -2306,7 +2310,10 @@ void Demo::keyPressEvent(QKeyEvent *event)
                     ui->LASER_WIDTH_EDIT_U->setText(QString::number(laser_width / 1000));
                     ui->LASER_WIDTH_EDIT_N->setText(QString::number(laser_width % 1000));
                 }
-                else laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000;
+                else {
+                    laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000;
+                    ui->LASER_WIDTH_EDIT_N->setText(QString::number(laser_width % 1000));
+                }
                 communicate_display(0, convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
             }
             else if (edit == ui->DELAY_A_EDIT_U) {
@@ -2332,8 +2339,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
                 update_delay();
             }
             else if (edit == ui->MCP_EDIT) {
-                mcp = ui->MCP_EDIT->text().toInt();
-                ui->MCP_SLIDER->setValue(mcp);
+                ui->MCP_SLIDER->setValue(ui->MCP_EDIT->text().toInt());
             }
             else if (edit == ui->STEPPING_EDIT) {
                 switch (base_unit) {
@@ -2643,7 +2649,7 @@ void Demo::showEvent(QShowEvent *event)
 
     if (this->focusWidget()) this->focusWidget()->clearFocus();
     this->setFocus();
-    qDebug() << this->focusWidget();
+//    qDebug() << this->focusWidget();
 }
 
 void Demo::on_SAVE_AVI_BUTTON_clicked()
@@ -2828,10 +2834,10 @@ void Demo::on_LASER_BTN_clicked()
 void Demo::on_GET_LENS_PARAM_BTN_clicked()
 {
     QByteArray read = communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
-    zoom = (read[4] << 8) + read[5];
+    zoom = ((read[4] & 0xFF) << 8) + read[5] & 0xFF;
 
     read = communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
-    focus = (read[4] << 8) + read[5];
+    focus = ((read[4] & 0xFF) << 8) + read[5] & 0xFF;
 
     ui->ZOOM_EDIT->setText(QString::asprintf("%d", zoom));
     ui->FOCUS_EDIT->setText(QString::asprintf("%d", focus));
