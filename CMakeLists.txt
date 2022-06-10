@@ -93,9 +93,9 @@ set(SOURCE_FILES
     src/settings.ui
     resources/resources.qrc
     resources/gist.rc
-#    preferences.h
-#    preferences.cpp
-#    preferences.ui
+    preferences.h
+    preferences.cpp
+    preferences.ui
 )
 
 set(PROJECT_LIBS

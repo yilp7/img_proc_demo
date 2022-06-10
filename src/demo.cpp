@@ -294,8 +294,8 @@ Demo::Demo(QWidget *parent)
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
-//    Preferences *preferences = new Preferences;
-//    preferences->show();
+    Preferences *preferences = new Preferences;
+    preferences->show();
 
 #ifdef ICMOS
     ui->RANGE_COM->setText("R1");
