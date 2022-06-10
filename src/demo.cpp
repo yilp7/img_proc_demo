@@ -47,6 +47,7 @@ Demo::Demo(QWidget *parent)
     focus_direction(0),
     curr_laser_idx(-1),
     display_option(1),
+    updated(false),
     device_type(0),
     device_on(false),
     start_grabbing(false),
@@ -114,6 +115,8 @@ Demo::Demo(QWidget *parent)
     TEMP_SAVE_LOCATION = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
 
     ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s);", hide_left ? "right" : "left"));
+
+    connect(this, SIGNAL(set_pixmap(QPixmap)), ui->SOURCE_DISPLAY, SLOT(setPixmap(QPixmap)), Qt::QueuedConnection);
 
     // - image operations
     QComboBox *enhance_options = ui->ENHANCE_OPTIONS;
@@ -453,11 +456,10 @@ int Demo::grab_thread_process() {
     cv::Mat sobel;
     int ww, hh;
     float weight = h / 1024.0; // font scale & thickness
-    bool updated = true;       // whether the program get a new image from stream
     while (grab_thread_state) {
         while (img_q.size() > 7) img_q.pop();
         if (img_q.empty()) {
-            QThread::msleep(5);
+            QThread::msleep(10);
             if (img_mem.empty()) continue;
             updated = false;
         }
@@ -718,15 +720,18 @@ int Demo::grab_thread_process() {
         // image display
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
         stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, image_3d || is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
-        ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+//        ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+        // use signal->slot instead of directly call
+        emit set_pixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 
         // process scan
-        if (scan) {
+        if (scan && updated) {
             save_scan_img();
             delay_dist += scan_step;
 //            filter_scan();
 
             emit update_delay_in_thread();
+//            update_delay();
         }
         if (scan && std::round(delay_dist / dist_ns) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
 
@@ -1605,6 +1610,7 @@ inline QByteArray Demo::generate_ba(uchar *data, int len)
 // send and receive data from serial port, and display
 QByteArray Demo::communicate_display(int id, QByteArray write, int write_size, int read_size, bool fb) {
     port_mutex.lock();
+//    image_mutex.lock();
     QByteArray read;
     if (!use_tcp) {
         QString str_s("sent    "), str_r("received");
@@ -1614,6 +1620,7 @@ QByteArray Demo::communicate_display(int id, QByteArray write, int write_size, i
 
         if (!serial_port[id]->isOpen()) {
             port_mutex.unlock();
+//            image_mutex.unlock();
             return QByteArray();
         }
         serial_port[id]->clear();
@@ -1634,6 +1641,7 @@ QByteArray Demo::communicate_display(int id, QByteArray write, int write_size, i
 
         if (!tcp_port[id]->isOpen()) {
             port_mutex.unlock();
+//            image_mutex.unlock();
             return QByteArray();
         }
         tcp_port[id]->write(write, write_size);
@@ -1647,6 +1655,7 @@ QByteArray Demo::communicate_display(int id, QByteArray write, int write_size, i
     }
 
     port_mutex.unlock();
+//    image_mutex.unlock();
     QThread().msleep(10);
     return read;
 }
@@ -2680,6 +2689,8 @@ void Demo::on_SCAN_BUTTON_clicked()
 {
     static ProgSettings *settings = ui->TITLE->prog_settings;
     bool start_scan = ui->SCAN_BUTTON->text() == tr("Scan");
+
+    while (updated);
 
     if (start_scan) {
         rep_freq = settings->rep_freq;

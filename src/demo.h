@@ -216,6 +216,9 @@ signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);
 
+    // tell SOURCE_DISPLAY to display an image
+    void set_pixmap(QPixmap pm);
+
     // pause / continue scan
     void update_scan(bool show);
 
@@ -352,6 +355,7 @@ private:
     QButtonGroup            *display_grp;
 
     std::queue<cv::Mat>     img_q;                      // image queue in grab_thread
+    bool                    updated;                    // whether the program get a new image from stream
     // TODO add other scan features
     std::deque<float>       scan_q;                     // objects' distance found while scanning
 

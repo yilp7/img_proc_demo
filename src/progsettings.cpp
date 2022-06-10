@@ -365,7 +365,7 @@ void ProgSettings::on_SAVE_SCAN_ORI_CHK_stateChanged(int arg1)
 
 void ProgSettings::on_SAVE_SCAN_RES_CHK_stateChanged(int arg1)
 {
-    save_scan_ori = arg1;
+    save_scan_res = arg1;
 }
 
 void ProgSettings::on_HZ_LIST_currentIndexChanged(int index)
