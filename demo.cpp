@@ -221,6 +221,7 @@ Demo::Demo(QWidget *parent)
     connect(this, SIGNAL(update_scan(bool)), SLOT(enable_scan_options(bool)), Qt::QueuedConnection);
 //    connect(this, &Demo::appendText, &Demo::append_data);
     connect(this, SIGNAL(update_delay_in_thread()), SLOT(update_delay()), Qt::QueuedConnection);
+    connect(this, SIGNAL(update_fishnet_result(int)), SLOT(display_fishnet_result(int)), Qt::QueuedConnection);
 
     ui->BRIGHTNESS_SLIDER->setMinimum(-10);
     ui->BRIGHTNESS_SLIDER->setMaximum(10);
@@ -462,11 +463,10 @@ int Demo::grab_thread_process() {
             double is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
 //            double is_net = exp(prob.at<float>(1)) / exp(prob.at<float>(0) + prob.at<float>(1));
 
-            if (is_net > ui->TITLE->prog_settings->fishnet_recog) ui->FISHNET_RESULT->setText("FISHNET<br>EXISTS"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");
-            else                                                  ui->FISHNET_RESULT->setText("FISHNET<br>DOES NOT EXIST"), ui->FISHNET_RESULT->setStyleSheet("color: #CD5C5C;");
+            emit update_fishnet_result(is_net > ui->TITLE->prog_settings->fishnet_recog);
         }
         else {
-            ui->FISHNET_RESULT->setText("FISHNET<br>???"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");
+            emit update_fishnet_result(-1);
         }
 
         // process frame average
@@ -1317,7 +1317,8 @@ void Demo::filter_scan()
 void Demo::update_current()
 {
     if (!com[3]) return;
-    QString send = "DIOD1:CURR " + ui->CURRENT_EDIT->text() + "\r";
+//    QString send = "DIOD1:CURR " + ui->CURRENT_EDIT->text() + "\r";
+    QString send = "PCUR " + ui->CURRENT_EDIT->text() + "\r";
     com[3]->write(send.toLatin1().data(), send.length());
     com[3]->waitForBytesWritten(100);
     com[3]->readAll();
@@ -2105,6 +2106,13 @@ void Demo::on_LASER_BTN_clicked()
         QTimer::singleShot(4000, this, SLOT(start_laser()));
     }
     else {
+        if (com[3] && com[3]->isOpen()) {
+            com[3]->write("OFF\r", 10);
+            com[3]->waitForBytesWritten(100);
+            QThread::msleep(100);
+            com[3]->readAll();
+        }
+
         communicate_display(com[0], QByteArray((char*)new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 7, 0, false);
 
         ui->LASER_BTN->setText(tr("ON"));
@@ -2187,4 +2195,14 @@ void Demo::on_FILE_PATH_EDIT_editingFinished()
 {
     save_location = ui->FILE_PATH_EDIT->text();
     if (!QDir(save_location).exists()) QDir().mkdir(save_location);
+}
+
+void Demo::display_fishnet_result(int result)
+{
+    switch (result) {
+    case -1: ui->FISHNET_RESULT->setText("FISHNET<br>???"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");            break;
+    case  0: ui->FISHNET_RESULT->setText("FISHNET<br>DOES NOT EXIST"), ui->FISHNET_RESULT->setStyleSheet("color: #CD5C5C;"); break;
+    case  1: ui->FISHNET_RESULT->setText("FISHNET<br>EXISTS"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");         break;
+    default: return;
+    }
 }

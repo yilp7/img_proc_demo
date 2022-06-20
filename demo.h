@@ -194,6 +194,9 @@ private slots:
 
     void on_FILE_PATH_EDIT_editingFinished();
 
+    // display fishnet result
+    void display_fishnet_result(int result);
+
  signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);
@@ -203,6 +206,9 @@ private slots:
 
     // queue update_delay in thread
     void update_delay_in_thread();
+
+    // update fishnet result in thread
+    void update_fishnet_result(int res);
 
 protected:
 //  overload
