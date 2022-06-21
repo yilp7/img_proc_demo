@@ -519,7 +519,7 @@ int Demo::grab_thread_process() {
 
                 seq_idx = (seq_idx + 1) % calc_avg_option;
             }
-            seq_sum.convertTo(modified_result, CV_8U, 1.0 / calc_avg_option);
+            seq_sum.convertTo(modified_result, CV_8U, 1.0 / (calc_avg_option * (1 << (pixel_depth - 8))));
         }
         else {
             img_mem.convertTo(modified_result, CV_8U, 1.0 / (1 << (pixel_depth - 8)));
@@ -532,7 +532,7 @@ int Demo::grab_thread_process() {
             range_threshold = ui->RANGE_THRESH_EDIT->text().toFloat();
 //            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
             if (prev_3d.empty()) cv::cvtColor(img_mem, prev_3d, cv::COLOR_GRAY2RGB);
-            if (updated) prev_3d = modified_result = ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
+            if (updated) ImageProc::gated3D(prev_img, img_mem, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold), prev_3d = modified_result;
             else modified_result = prev_3d;
 //            if (!frame_a_3d) prev_3d = modified_result.clone();
             frame_a_3d ^= 1;
@@ -577,24 +577,25 @@ int Demo::grab_thread_process() {
                 }
                 // accumulative
                 case 5: {
-                    uchar *img = modified_result.data;
-                    for (int i = 0; i < h; i++) {
-                        for (int j = 0; j < w; j++) {
-                            uchar p = img[i * modified_result.step + j];
-                            if      (p < 64)  {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 2.4);}
-                            else if (p < 112) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.8);}
-                            else if (p < 144) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.6);}
-                            else if (p < 160) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.5);}
-                            else if (p < 176) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.4);}
-                            else if (p < 192) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.25);}
-                            else if (p < 200) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.2);}
-                            else if (p < 208) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.15);}
-                            else if (p < 216) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.125);}
-                            else if (p < 224) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.1);}
-                            else if (p < 240) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.05);}
-                            else if (p < 256) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1);}
-                        }
-                    }
+//                    uchar *img = modified_result.data;
+//                    for (int i = 0; i < h; i++) {
+//                        for (int j = 0; j < w; j++) {
+//                            uchar p = img[i * modified_result.step + j];
+//                            if      (p < 64)  {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 2.4);}
+//                            else if (p < 112) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.8);}
+//                            else if (p < 144) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.6);}
+//                            else if (p < 160) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.5);}
+//                            else if (p < 176) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.4);}
+//                            else if (p < 192) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.25);}
+//                            else if (p < 200) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.2);}
+//                            else if (p < 208) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.15);}
+//                            else if (p < 216) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.125);}
+//                            else if (p < 224) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.1);}
+//                            else if (p < 240) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1.05);}
+//                            else if (p < 256) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1);}
+//                        }
+//                    }
+                    ImageProc::accumulative_enhance(modified_result, modified_result, settings->accu_base);
                     break;
                 }
                 // sigmoid (nonlinear) (mergw log w/ 1/(1+exp))
@@ -638,7 +639,7 @@ int Demo::grab_thread_process() {
     //                temp = temp * err_out + bottom;
     //                cv::normalize(temp, temp, 0, 255, cv::NORM_MINMAX);
     //                cv::convertScaleAbs(temp, modified_result);
-                    ImageProc::adaptive_enhance(&modified_result, &modified_result, settings->low_in, settings->high_in, settings->low_out, settings->high_out, settings->gamma);
+                    ImageProc::adaptive_enhance(modified_result, modified_result, settings->low_in, settings->high_in, settings->low_out, settings->high_out, settings->gamma);
                     break;
                 }
                 // enhance_dehaze
@@ -965,8 +966,9 @@ void Demo::save_to_file(bool save_result) {
 
 //    if (!tp.append_task(std::bind(Demo::save_image_tif, tif_16, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full();
     switch (pixel_depth) {
-    case 8:  if (!tp.append_task(std::bind(Demo::save_image_bmp, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
-    case 16: if (!tp.append_task(std::bind(Demo::save_image_tif, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
+    case  8: if (!tp.append_task(std::bind(Demo::save_image_bmp, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
+    case 10:
+    case 12: if (!tp.append_task(std::bind(Demo::save_image_tif, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
     default: break;
     }
 }
@@ -1378,8 +1380,8 @@ void Demo::change_pixel_format(int pixel_format)
     int ret = curr_cam->pixel_type(false, &pixel_format);
     is_color = pixel_format == PixelType_Gvsp_RGB8_Packed;
     switch (pixel_format) {
-    case PixelType_Gvsp_Mono10:
-    case PixelType_Gvsp_Mono12: pixel_depth = 16; break;
+    case PixelType_Gvsp_Mono10: pixel_depth = 10; break;
+    case PixelType_Gvsp_Mono12: pixel_depth = 12; break;
     default: pixel_depth = 8; break;
     }
 }

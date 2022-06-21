@@ -1,5 +1,6 @@
 #include "imageproc.h"
 #include "opencv2/highgui.hpp"
+#include <QDebug>
 
 ImageProc::ImageProc()
 {
@@ -135,36 +136,48 @@ void ImageProc::equal_interval(uint *eq_hist, uchar *EI_hist, int num) {
     EI_hist[255] = 255;
 }
 
-cv::Mat ImageProc::gated3D(cv::Mat &img1, cv::Mat &img2, double delay, double gw, double range_thresh)
+void ImageProc::gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw, double range_thresh)
 {
-    const int BARWIDTH = 104, BARHEIGHT = img1.rows;
-    const int IMAGEWIDTH = img1.cols, IMAGEHEIGHT = img1.rows;
+    const int BARWIDTH = 104, BARHEIGHT = src1.rows;
+    const int IMAGEWIDTH = src1.cols, IMAGEHEIGHT = src1.rows;
     cv::Mat gray_bar(BARHEIGHT, BARWIDTH, CV_8UC1);
     cv::Mat color_bar(BARHEIGHT, BARWIDTH, CV_8UC3);
     static double *range = (double*)calloc(IMAGEWIDTH * IMAGEHEIGHT, sizeof(double));
 
     cv::Mat img_3d(IMAGEHEIGHT, IMAGEWIDTH, CV_8UC3);
 
-    const double c = 3e8 / 1.33;
+    const double c = 3e8;
+//    const double c = 3e8 / 1.33;
     double max = 0, min = 10255;
-    int threshold = 0;
+//    int threshold = 0;
     int i, j, idx1, idx2;
-    int step = img1.step, step_3d = img_3d.step;
+    int step = src1.step, step_3d = img_3d.step;
     int step_gray = gray_bar.step, step_color = color_bar.step;
     double R = delay * 1e-9 * c / 2;
-    uchar *ptr1, *ptr2;
+    int image_depth = (src1.depth() / 2 + 1) * 8;
+    uchar *uc_ptr1, *uc_ptr2;
+    ushort *us_ptr1, *us_ptr2;
 
-    threshold = cv::sum(img1)[0] / img1.total();
+//    threshold = cv::sum(img1)[0] / img1.total();
     img_3d = cv::Scalar(0, 0, 0);
 
-    ptr1 = img1.data;
-    ptr2 = img2.data;
+    switch (image_depth) {
+    case  8: uc_ptr1 = src1.data; uc_ptr2 = src2.data; break;
+    case 16: us_ptr1 = (ushort*)src1.data; us_ptr2 = (ushort*)src2.data; break;
+    default: break;
+    }
+
+    uint p1, p2;
     for (i = 0; i < IMAGEHEIGHT; i++) {
-        idx1 = i * step;
+        idx1 = i * step / (image_depth / 8);
         for (j = 0; j < IMAGEWIDTH; j++) {
-            uchar c1 = ptr1[idx1], c2 = ptr2[idx1];
-            if (c1 < 250 && c1 > range_thresh && c2 < 250 && c2 > range_thresh) {
-                range[idx1] = R + gw * 1e-9 * c / 2 / ((double)c1 / c2 + 1);
+            switch (image_depth) {
+            case  8: p1 = uc_ptr1[idx1], p2 = uc_ptr2[idx1]; break;
+            case 16: p1 = us_ptr1[idx1], p2 = us_ptr2[idx1]; break;
+            default: break;
+            }
+            if (p1 < 0.981 * (1 << image_depth) && p1 > range_thresh && p2 < 0.981 * (1 << image_depth) && p2 > range_thresh) {
+                range[idx1] = R + gw * 1e-9 * c / 2 / ((double)p1 / p2 + 1);
 
                 if (range[idx1] > max) max = range[idx1];
                 if (range[idx1] < min) min = range[idx1];
@@ -177,116 +190,138 @@ cv::Mat ImageProc::gated3D(cv::Mat &img1, cv::Mat &img2, double delay, double gw
     }
 
     for (i = 0; i < IMAGEHEIGHT; i++) {
-        idx1 = i * step;
+        idx1 = i * step / (image_depth / 8);
         for (j = 0; j < IMAGEWIDTH; j++) {
             if (range[idx1]) range[idx1] = (range[idx1] - min) / (max - min) * 255;
             idx1++;
         }
     }
 
-    ptr1 = img_3d.data;
+    uc_ptr1 = img_3d.data;
     for (i = 0; i < IMAGEHEIGHT; i++) {
-        idx1 = i * step_3d, idx2 = i * step;
+        idx1 = i * step_3d, idx2 = i * step / (image_depth / 8);
         for (j = 0; j < IMAGEWIDTH; j++) {
             uchar c0 = range[idx2++];
             if (c0 <= range_thresh) {
-                ptr1[idx1++] = 0;
-                ptr1[idx1++] = 0;
-                ptr1[idx1++] = 0;
+                uc_ptr1[idx1++] = 0;
+                uc_ptr1[idx1++] = 0;
+                uc_ptr1[idx1++] = 0;
             }
             else if (c0 <= 64) {
-                ptr1[idx1++] = 255;
-                ptr1[idx1++] = 4 * c0;
-                ptr1[idx1++] = 0;
+                uc_ptr1[idx1++] = 255;
+                uc_ptr1[idx1++] = 4 * c0;
+                uc_ptr1[idx1++] = 0;
             }
             else if(c0 <= 128) {
-                ptr1[idx1++] = 4 * (128 - c0);
-                ptr1[idx1++] = 255;
-                ptr1[idx1++] = 0;
+                uc_ptr1[idx1++] = 4 * (128 - c0);
+                uc_ptr1[idx1++] = 255;
+                uc_ptr1[idx1++] = 0;
             }
             else if(c0 <= 192) {
-                ptr1[idx1++] = 0;
-                ptr1[idx1++] = 255;
-                ptr1[idx1++] = 4 * (c0 - 128);
+                uc_ptr1[idx1++] = 0;
+                uc_ptr1[idx1++] = 255;
+                uc_ptr1[idx1++] = 4 * (c0 - 128);
             }
             else if(c0 <= 256) {
-                ptr1[idx1++] = 0;
-                ptr1[idx1++] = 4 * (256 - c0);
-                ptr1[idx1++] = 255;
+                uc_ptr1[idx1++] = 0;
+                uc_ptr1[idx1++] = 4 * (256 - c0);
+                uc_ptr1[idx1++] = 255;
             }
         }
     }
 
     int bar_gray = 255;
-    ptr1 = gray_bar.data;
+    uc_ptr1 = gray_bar.data;
     int color_step = BARHEIGHT / 256;
     int gap = (BARHEIGHT - 256 * color_step) / 2;
-    for (i = 0; i < gap; i++) for (j = 0; j < BARWIDTH; j++) ptr1[i * step_gray + j] = 255;
+    for (i = 0; i < gap; i++) for (j = 0; j < BARWIDTH; j++) uc_ptr1[i * step_gray + j] = 255;
     for (i = gap; i < BARHEIGHT - gap; i += color_step) {
         for (j = 0; j < BARWIDTH; j++) {
-            for (int k = 0; k < color_step; k++) ptr1[(i + k) * step_gray + j] = bar_gray;
+            for (int k = 0; k < color_step; k++) uc_ptr1[(i + k) * step_gray + j] = bar_gray;
         }
         bar_gray--;
     }
-    for (i = BARHEIGHT - gap; i < BARHEIGHT; i++) for (j = 0; j < BARWIDTH; j++) ptr1[i * step_gray + j] = 1;
+    for (i = BARHEIGHT - gap; i < BARHEIGHT; i++) for (j = 0; j < BARWIDTH; j++) uc_ptr1[i * step_gray + j] = 1;
 
-    ptr1 = color_bar.data, ptr2 = gray_bar.data;
+    uc_ptr1 = color_bar.data, uc_ptr2 = gray_bar.data;
     for(i = 0; i < BARHEIGHT; i++) {
         idx1 = i * step_color, idx2 = i * step_gray;
         for(j = 0; j < BARWIDTH; j++) {
-            uchar c0 = ptr2[idx2++];
+            uchar c0 = uc_ptr2[idx2++];
             if(c0 == 0) {
-                ptr1[idx1++] = 255;
-                ptr1[idx1++] = 4 * c0;
-                ptr1[idx1++] = 0;
+                uc_ptr1[idx1++] = 255;
+                uc_ptr1[idx1++] = 4 * c0;
+                uc_ptr1[idx1++] = 0;
             }
             else if(c0 <= 64) {
-                ptr1[idx1++] = 255;
-                ptr1[idx1++] = 4 * c0 - 1;
-                ptr1[idx1++] = 0;
+                uc_ptr1[idx1++] = 255;
+                uc_ptr1[idx1++] = 4 * c0 - 1;
+                uc_ptr1[idx1++] = 0;
             }
             else if(c0 <= 128) {
-                ptr1[idx1++] = 4 * (128 - c0);
-                ptr1[idx1++] = 255;
-                ptr1[idx1++] = 0;
+                uc_ptr1[idx1++] = 4 * (128 - c0);
+                uc_ptr1[idx1++] = 255;
+                uc_ptr1[idx1++] = 0;
             }
             else if(c0 <= 192) {
-                ptr1[idx1++] = 0;
-                ptr1[idx1++] = 255;
-                ptr1[idx1++] = 4 * (c0 - 128) - 1;
+                uc_ptr1[idx1++] = 0;
+                uc_ptr1[idx1++] = 255;
+                uc_ptr1[idx1++] = 4 * (c0 - 128) - 1;
             }
             else if(c0 <= 256) {
-                ptr1[idx1++] = 0;
-                ptr1[idx1++] = 4 * (256 - c0);
-                ptr1[idx1++] = 255;
+                uc_ptr1[idx1++] = 0;
+                uc_ptr1[idx1++] = 4 * (256 - c0);
+                uc_ptr1[idx1++] = 255;
             }
         }
     }
-    cv::hconcat(img_3d, color_bar, img_3d);
+    cv::hconcat(img_3d, color_bar, res);
 
     char text[32] = {0};
     sprintf(text, "%.2f", min);
-    cv::putText(img_3d, text, cv::Point(IMAGEWIDTH, 20), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
+    cv::putText(res, text, cv::Point(IMAGEWIDTH, 20), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
     sprintf(text, "%.2f", (max + min) / 2);
-    cv::putText(img_3d, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT / 2 - 15), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
+    cv::putText(res, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT / 2 - 15), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
     sprintf(text, "%.2f", max);
-    cv::putText(img_3d, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT - 10), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
+    cv::putText(res, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT - 10), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
+}
 
-    return img_3d;
+void ImageProc::accumulative_enhance(cv::Mat &src, cv::Mat &res, float accu_base)
+{
+    uchar *img = src.data;
+    int w = src.cols, h = src.rows, step = src.step;
+    uint max_val = 1 << (8 * (src.depth() / 2 + 1));
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            uchar p = img[i * step + j];
+            if      (p < 0.250 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 2.4);}
+            else if (p < 0.439 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.8);}
+            else if (p < 0.565 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.6);}
+            else if (p < 0.628 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.5);}
+            else if (p < 0.691 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.4);}
+            else if (p < 0.753 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.25);}
+            else if (p < 0.785 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.2);}
+            else if (p < 0.816 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.15);}
+            else if (p < 0.848 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.125);}
+            else if (p < 0.879 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.1);}
+            else if (p < 0.942 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.05);}
+            else if (p < 1.000 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1);}
+        }
+    }
 }
 
 // low: 0, 0; high: 0.05, 1; gamma:1.2
-void ImageProc::adaptive_enhance(cv::Mat *in, cv::Mat *out, double low_in, double high_in, double low_out, double high_out, double gamma)
+void ImageProc::adaptive_enhance(cv::Mat &src, cv::Mat &res, double low_in, double high_in, double low_out, double high_out, double gamma)
 {
     double low = low_in * 255, high = high_in * 255; // (0, 12.75)
     double bottom = low_out * 255, top = high_out * 255; // (0, 255)
     double err_in = high - low, err_out = top - bottom; // (12.75, 255)
 
     cv::Mat temp;
-    in->convertTo(temp, CV_32FC1);
+    src.convertTo(temp, CV_32FC1);
     cv::pow((temp - low) / err_in, gamma, temp);
     temp = temp * err_out + bottom;
-    temp.convertTo(*out, in->type());
+    temp.convertTo(res, src.type());
 
     // intensity transform
 //    for(int y = 0; y < in->rows; y++) {
