@@ -456,6 +456,7 @@ int Demo::grab_thread_process() {
     cv::Mat sobel;
     int ww, hh;
     float weight = h / 1024.0; // font scale & thickness
+    prev_3d = cv::Mat(w, h, CV_8UC3);
     while (grab_thread_state) {
         while (img_q.size() > 7) img_q.pop();
         if (img_q.empty()) {
@@ -531,8 +532,12 @@ int Demo::grab_thread_process() {
             hh = h;
             range_threshold = ui->RANGE_THRESH_EDIT->text().toFloat();
 //            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
-            if (prev_3d.empty()) cv::cvtColor(img_mem, prev_3d, cv::COLOR_GRAY2RGB);
-            if (updated) ImageProc::gated3D(prev_img, img_mem, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold), prev_3d = modified_result;
+//            if (prev_3d.empty()) cv::cvtColor(img_mem, prev_3d, cv::COLOR_GRAY2RGB);
+            if (updated) {
+                if (frame_a_3d) ImageProc::gated3D(prev_img, img_mem, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
+                else            ImageProc::gated3D(img_mem, prev_img, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
+                prev_3d = modified_result;
+            }
             else modified_result = prev_3d;
 //            if (!frame_a_3d) prev_3d = modified_result.clone();
             frame_a_3d ^= 1;
@@ -1384,6 +1389,11 @@ void Demo::change_pixel_format(int pixel_format)
     case PixelType_Gvsp_Mono12: pixel_depth = 12; break;
     default: pixel_depth = 8; break;
     }
+}
+
+void Demo::reset_frame_a()
+{
+    frame_a_3d ^= 1;
 }
 
 void Demo::joystick_button_pressed(int btn)

@@ -603,6 +603,19 @@
      <string>Central Symmetry</string>
     </property>
    </widget>
+   <widget class="QPushButton" name="RESET_3D_BTN">
+    <property name="geometry">
+     <rect>
+      <x>80</x>
+      <y>305</y>
+      <width>71</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Reset 3D</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QGroupBox" name="SERIAL_COMM_GRP">
    <property name="geometry">

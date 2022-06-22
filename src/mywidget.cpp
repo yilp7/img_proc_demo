@@ -219,6 +219,7 @@ void TitleBar::setup(QObject *ptr)
     connect(prog_settings, SIGNAL(auto_mcp(bool)),             signal_receiver, SLOT(set_auto_mcp(bool)));
     connect(prog_settings, SIGNAL(set_dev_ip(int, int)),       signal_receiver, SLOT(set_dev_ip(int, int)));
     connect(prog_settings, SIGNAL(change_pixel_format(int)),   signal_receiver, SLOT(change_pixel_format(int)));
+    connect(prog_settings, SIGNAL(reset_frame_a()),            signal_receiver, SLOT(reset_frame_a()));
     settings_menu->addAction(">> export pref.", signal_receiver, SLOT(export_config()), QKeySequence(Qt::ALT + Qt::Key_E));
     settings_menu->addAction("<< load pref.",   signal_receiver, SLOT(prompt_for_config_file()), QKeySequence(Qt::ALT + Qt::Key_R));
     settings_menu->addAction("## config s.n.",  signal_receiver, SLOT(prompt_for_serial_file()), QKeySequence(Qt::ALT + Qt::Key_C));

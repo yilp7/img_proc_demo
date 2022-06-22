@@ -60,6 +60,8 @@ private slots:
 
     void on_PIXEL_FORMAT_LIST_activated(int index);
 
+    void on_RESET_3D_BTN_clicked();
+
 signals:
     void rep_freq_unit_changed(int);
     void base_unit_changed(int);
@@ -72,6 +74,7 @@ signals:
     void auto_mcp(bool);
     void set_dev_ip(int ip, int gateway);
     void change_pixel_format(int format);
+    void reset_frame_a();
 
 public:
     Ui::ProgSettings *ui;

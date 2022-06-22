@@ -82,6 +82,7 @@ public slots:
     void set_auto_mcp(bool adaptive);
     void set_dev_ip(int ip, int gateway);
     void change_pixel_format(int pixel_format);
+    void reset_frame_a();
 
     // signaled by joystick input
     void joystick_button_pressed(int btn);

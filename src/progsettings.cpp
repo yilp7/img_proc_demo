@@ -475,3 +475,9 @@ void ProgSettings::on_PIXEL_FORMAT_LIST_activated(int index)
     static int pixel_format[4] = {PixelType_Gvsp_Mono8, PixelType_Gvsp_Mono10, PixelType_Gvsp_Mono12, PixelType_Gvsp_RGB8_Packed};
     emit change_pixel_format(pixel_format[index]);
 }
+
+void ProgSettings::on_RESET_3D_BTN_clicked()
+{
+    emit reset_frame_a();
+}
+
