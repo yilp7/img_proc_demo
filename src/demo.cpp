@@ -294,8 +294,8 @@ Demo::Demo(QWidget *parent)
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
-    Preferences *preferences = new Preferences;
-    preferences->show();
+//    Preferences *preferences = new Preferences;
+//    preferences->show();
 
 #ifdef ICMOS
     ui->RANGE_COM->setText("R1");
@@ -533,14 +533,14 @@ int Demo::grab_thread_process() {
             range_threshold = ui->RANGE_THRESH_EDIT->text().toFloat();
 //            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
 //            if (prev_3d.empty()) cv::cvtColor(img_mem, prev_3d, cv::COLOR_GRAY2RGB);
-            if (updated) {
+            if (updated && !prev_img.empty()) {
                 if (frame_a_3d) ImageProc::gated3D(prev_img, img_mem, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
                 else            ImageProc::gated3D(img_mem, prev_img, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
                 prev_3d = modified_result;
+                frame_a_3d ^= 1;
             }
             else modified_result = prev_3d;
 //            if (!frame_a_3d) prev_3d = modified_result.clone();
-            frame_a_3d ^= 1;
 
             cv::resize(modified_result, img_display, cv::Size(ui->SOURCE_DISPLAY->width(), ui->SOURCE_DISPLAY->height()), 0, 0, cv::INTER_AREA);
         }
@@ -743,7 +743,7 @@ int Demo::grab_thread_process() {
 
         // image write / video record
         if (updated && save_original) save_to_file(false);
-        if (updated && save_modified && (!image_3d || frame_a_3d)) save_to_file(true);
+        if (updated && save_modified) save_to_file(true);
         if (record_original) {
             if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
@@ -1205,7 +1205,7 @@ void Demo::on_STOP_GRABBING_BUTTON_clicked()
 
     start_grabbing = false;
     ui->SOURCE_DISPLAY->grab = false;
-    ui->SOURCE_DISPLAY->clear();
+    QTimer::singleShot(10, this, SLOT(clean()));
     enable_controls(true);
 }
 
@@ -1980,7 +1980,7 @@ void Demo::on_IMG_3D_CHECK_stateChanged(int arg1)
 
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
-    if (!arg1) frame_a_3d = 0, prev_3d.release();
+    if (!arg1) frame_a_3d = 0, prev_3d = cv::Mat(w, h, CV_8UC3);
 }
 
 void Demo::on_ZOOM_IN_BTN_pressed()
