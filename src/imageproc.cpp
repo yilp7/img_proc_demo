@@ -136,13 +136,13 @@ void ImageProc::equal_interval(uint *eq_hist, uchar *EI_hist, int num) {
     EI_hist[255] = 255;
 }
 
-void ImageProc::gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw, double range_thresh)
+void ImageProc::gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw, double *range, double range_thresh)
 {
     const int BARWIDTH = 104, BARHEIGHT = src1.rows;
     const int IMAGEWIDTH = src1.cols, IMAGEHEIGHT = src1.rows;
     cv::Mat gray_bar(BARHEIGHT, BARWIDTH, CV_8UC1);
     cv::Mat color_bar(BARHEIGHT, BARWIDTH, CV_8UC3);
-    static double *range = (double*)calloc(IMAGEWIDTH * IMAGEHEIGHT, sizeof(double));
+//    static double *range = (double*)calloc(IMAGEWIDTH * IMAGEHEIGHT, sizeof(double));
 
     cv::Mat img_3d(IMAGEHEIGHT, IMAGEWIDTH, CV_8UC3);
 

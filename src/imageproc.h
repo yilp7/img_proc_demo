@@ -13,7 +13,7 @@ public:
     // use CV_8U, CV_16U only
     ImageProc();
     static void plateau_equl_hist(cv::Mat *in, cv::Mat *out, int method);
-    static void gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw, double range_thresh);
+    static void gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw, double *range, double range_thresh);
     static void accumulative_enhance(cv::Mat &src, cv::Mat &res, float accu_base);
     static void adaptive_enhance(cv::Mat &src, cv::Mat &res, double low_in, double high_in, double low_out, double high_out, double gamma);
     static void haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega, float t0, int guided_radius = 60, float eps = 0.01);

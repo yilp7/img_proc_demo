@@ -457,6 +457,7 @@ int Demo::grab_thread_process() {
     int ww, hh;
     float weight = h / 1024.0; // font scale & thickness
     prev_3d = cv::Mat(w, h, CV_8UC3);
+    double *range = (double*)calloc(w * h, sizeof(double));
     while (grab_thread_state) {
         while (img_q.size() > 7) img_q.pop();
         if (img_q.empty()) {
@@ -534,8 +535,8 @@ int Demo::grab_thread_process() {
 //            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
 //            if (prev_3d.empty()) cv::cvtColor(img_mem, prev_3d, cv::COLOR_GRAY2RGB);
             if (updated && !prev_img.empty()) {
-                if (frame_a_3d) ImageProc::gated3D(prev_img, img_mem, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
-                else            ImageProc::gated3D(img_mem, prev_img, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
+                if (frame_a_3d) ImageProc::gated3D(prev_img, img_mem, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
+                else            ImageProc::gated3D(img_mem, prev_img, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
                 prev_3d = modified_result;
                 frame_a_3d ^= 1;
             }
@@ -762,6 +763,7 @@ int Demo::grab_thread_process() {
         if (updated) prev_img = img_mem.clone();
         image_mutex.unlock();
     }
+    free(range);
     return 0;
 }
 
@@ -852,11 +854,207 @@ void Demo::save_image_bmp(cv::Mat img, QString filename)
     }
 }
 
-// grayscale only
 void Demo::save_image_tif(cv::Mat img, QString filename)
 {
-    std::vector<int> params; params.push_back(cv::IMWRITE_TIFF_COMPRESSION); params.push_back(1);
-    cv::imwrite(filename.toLatin1().constData(), img, params);
+    uint w = img.cols, h = img.rows, channel = img.channels();
+    uint depth = 8 * (img.depth() / 2 + 1);
+    FILE *f = fopen(filename.toLocal8Bit().constData(), "wb");
+    static ushort type_short = 3, type_long = 4, type_fraction = 5;
+    static uint count_1 = 1, count_3 = 3;
+    static uint TWO = 2;
+    static uint next_ifd_offset = 0;
+    ulong block_size = w * channel, sum = h * block_size;
+    uint i;
+
+    // Offset=w*h*d + 8(eg:Img[1000][1000][3] --> 3000008)
+    // RGB  Color:W H BitsPerSample Compression Photometric StripOffset Orientation SamplePerPixle RowsPerStrip StripByteCounts PlanarConfiguration
+    // Gray Color:W H BitsPerSample Compression Photometric StripOffset Orientation SamplePerPixle RowsPerStrip StripByteCounts XResolution YResoulution PlanarConfiguration ResolutionUnit
+    // DE_N ID:   0 1 2             3           4           5           6           7              8            9               10          11           12                  13
+
+    fseek(f, 0, SEEK_SET);
+    static ushort endian = 'II';
+    fwrite(&endian, 2, 1, f);
+    static ushort tiff_magic_number = 42;
+    fwrite(&tiff_magic_number, 2, 1, f);
+    uint ifd_offset = sum + 8; // 8 (IFH size)
+    fwrite(&ifd_offset, 4, 1, f);
+
+    // Insert the image data
+    fwrite(img.data, 1, sum, f);
+
+//    fseek(f, ifd_offset, SEEK_SET);
+    static ushort num_de = 14;
+    fwrite(&num_de, 2, 1, f);
+    // 256 image width
+    static ushort tag_w = 256;
+    fwrite(&tag_w, 2, 1, f);
+    fwrite(&type_short, 2, 1, f);
+    fwrite(&count_1, 4, 1, f);
+    fwrite(&w, 4, 1, f);
+
+    // 257 image height
+    static ushort tag_h = 257;
+    fwrite(&tag_h, 2, 1, f);
+    fwrite(&type_short, 2, 1, f);
+    fwrite(&count_1, 4, 1, f);
+    fwrite(&h, 4, 1, f);
+
+    // 258 bits per sample
+    static ushort tag_bits_per_sample = 258;
+    fwrite(&tag_bits_per_sample, 2, 1, f);
+    fwrite(&type_short, 2, 1, f);
+    switch (channel) {
+    case 1: {
+        fwrite(&count_1, 4, 1, f);
+        fwrite(&depth, 4, 1, f);
+        break;
+    }
+    case 3: {
+        fwrite(&count_3, 4, 1, f);
+        // 8 (IFH size) + (2 + 14 * 12 + 4) (0th IFD size: 2->size of the num of DE = 14, 12->size of one DE, 4->size of offset of next IFD) = 146
+        uint tag_bits_per_sample_offset = sum + 182;
+        fwrite(&tag_bits_per_sample_offset, 4, 1, f);
+        break;
+    }
+    default: break;
+    }
+
+    // 259 compression
+    static ushort tag_compression = 259;
+    fwrite(&tag_compression, 2, 1, f);
+    fwrite(&type_short, 2, 1, f);
+    fwrite(&count_1, 4, 1, f);
+    fwrite(&count_1, 4, 1, f); // use 1 for uncompressed
+
+    // 262 photometric interpretation
+    static ushort tag_photometric_interpretation = 262;
+    fwrite(&tag_photometric_interpretation, 2, 1, f);
+    fwrite(&type_short, 2, 1, f);
+    fwrite(&count_1, 4, 1, f);
+    fwrite(channel == 1 ? &count_1 : &TWO, 4, 1, f); // use 1 for black is zero, use 2 for RGB
+
+    // 273 strip offsets
+    static ushort tag_strip_offsets = 273;
+    fwrite(&tag_strip_offsets, 2, 1, f);
+    fwrite(&type_long, 2, 1, f);
+    fwrite(&h, 4, 1, f);
+    // 1 channel
+    // 8 (IFH size) + (2 + 14 * 12 + 4) (0th IFD size: 2->size of the num of DE = 14, 12->size of one DE, 4->size of offset of next IFD) = 182
+    // 3 channels
+    // 182 (bits per sample offsets) + 3 * 2 (3 channels * 2 bytes) = 188
+    uint tag_strip_offsets_offset = channel == 1 ? sum + 182 : sum + 188;
+    fwrite(&tag_strip_offsets_offset, 4, 1, f);
+
+    // 274 orientation
+    static ushort tag_orientation = 274;
+    fwrite(&tag_orientation, 2, 1, f);
+    fwrite(&type_short, 2, 1, f);
+    fwrite(&count_1, 4, 1, f);
+    fwrite(&count_1, 4, 1, f); // 1 = The 0th row represents the visual top of the image, and the 0th column represents the visual left-hand side.
+
+    // 277 samples per pixel
+    static ushort tag_samples_per_pixel = 277;
+    fwrite(&tag_samples_per_pixel, 2, 1, f);
+    fwrite(&type_short, 2, 1, f);
+    fwrite(&count_1, 4, 1, f);
+    fwrite(channel == 1 ? &count_1 : &count_3, 4, 1, f); // use 1 for grayscale image, use 3 for 3-channel RGB image
+
+    // 278 rows per strip
+    static ushort tag_rows_per_strip = 278;
+    fwrite(&tag_rows_per_strip, 2, 1, f);
+    fwrite(&type_short, 2, 1, f);
+    fwrite(&count_1, 4, 1, f);
+    fwrite(&count_1, 4, 1, f); // rows = strips
+
+    // 279 strip byte counts
+    static ushort tag_strip_byte_counts = 279;
+    fwrite(&tag_strip_byte_counts, 2, 1, f);
+    fwrite(&type_long, 2, 1, f);
+    fwrite(&h, 4, 1, f);
+    // 1 channel
+    // 182 (offset of strip offsets), 4 * h (length of tag 273, strip_offsets)
+    // 3 channels
+    // 188 (offset of strip offsets), 4 * h (length of tag 273, strip_offsets)
+    uint tag_strip_byte_counts_offset = channel == 1 ? sum + 182 + 4 * h : sum + 188 + 4 * h;
+    fwrite(&tag_strip_byte_counts_offset, 4, 1, f);
+
+    // 282 X resolution
+    static ushort tag_x_resolution = 282;
+    fwrite(&tag_x_resolution, 2, 1, f);
+    fwrite(&type_fraction, 2, 1, f);
+    fwrite(&count_1, 4, 1, f);
+    uint tag_x_resolution_offset = channel == 1 ? sum + 182 + 8 * h : sum + 188 + 8 * h;
+    fwrite(&tag_x_resolution_offset, 4, 1, f);
+
+    // 283 Y resolution
+    static ushort tag_y_resolution = 283;
+    fwrite(&tag_y_resolution, 2, 1, f);
+    fwrite(&type_fraction, 2, 1, f);
+    fwrite(&count_1, 4, 1, f);
+    uint tag_y_resolution_offset = channel == 1 ? sum + 190 + 8 * h : sum + 196 + 8 * h;
+    fwrite(&tag_y_resolution_offset, 4, 1, f);
+
+    // 284 planar configuration
+    static ushort tag_planar_configuration = 284;
+    fwrite(&tag_planar_configuration, 2, 1, f);
+    fwrite(&type_short, 2, 1, f);
+    fwrite(&count_1, 4, 1, f);
+    fwrite(&count_1, 4, 1, f); // use 1 for chunky format
+
+    // 296 resolution unit
+    static ushort tag_resolution_unit = 296;
+    fwrite(&tag_resolution_unit, 2, 1, f);
+    fwrite(&type_short, 2, 1, f);
+    fwrite(&count_1, 4, 1, f);
+    fwrite(&TWO, 4, 1, f); // use 2 for inch
+
+    fwrite(&next_ifd_offset, 4, 1, f);
+
+    // (rgb only) value for tag 258, offset: sum + 182
+    if (channel == 3) for(i = 0; i < 3; i++) fwrite(&depth, 2, 1, f);
+
+    // value for tag 273, offset: sum + 182 (gray), sum + 188 (rgb)
+    uint strip_offset = 8;
+    for(i = 0; i < h; i++, strip_offset += block_size) fwrite(&strip_offset, 4, 1, f);
+
+    // value for tag 279, offset: sum + 182 + 4 * h (gray), sum + 188 + 4 * h (rgb)
+    for(i = 0; i < h; i++) fwrite(&block_size, 4, 1, f);
+
+    // value for tag 282, offset: sum + 182 + 8 * h (gray), sum + 188 + 8 * h (rgb)
+    static uint res_physical = 1, res_pixel = 72;
+    fwrite(&res_pixel, 4, 1, f); // fraction w-pixel
+    fwrite(&res_physical, 4, 1, f); // denominator PhyWidth-inch
+
+    // value for tag 283, offset: sum + 190 + 8 * h (gray), sum + 196 + 8 * h (rgb)
+    fwrite(&res_pixel, 4, 1, f); // fraction h-pixel
+    fwrite(&res_physical,4, 1, f); // denominator PhyHeight-inch
+/*
+    case 3: {
+        // 284 planar configuration
+        static ushort tag_planar_configuration = 284;
+        fwrite(&tag_planar_configuration, 2, 1, f);
+        fwrite(&type_short, 2, 1, f);
+        fwrite(&count_1, 4, 1, f);
+        fwrite(&count_1, 4, 1, f); // use 1 for chunky format
+
+        fwrite(&next_ifd_offset, 4, 1, f);
+
+        // value for tag 258, offset: sum + 146
+        for(i = 0; i < 3; i++) fwrite(&depth, 2, 1, f);
+
+        // value for tag 273, offset: sum + 152
+        uint strip_offset = 8;
+        for(i = 0; i < h; i++, strip_offset += block_size) fwrite(&strip_offset, 4, 1, f);
+
+        // value for tag 279, offset: sum + 152 + 4 * h
+        for(i = 0; i < h; i++) fwrite(&block_size, 4, 1, f);
+
+        break;
+    }
+    default: break;
+    }
+*/
+    fclose(f);
 }
 
 void Demo::stop_image_writing()
