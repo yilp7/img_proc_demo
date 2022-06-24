@@ -381,7 +381,30 @@ void ImageProc::haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega
     }
 
 //    QueryPerformanceCounter(&t2);
-//    printf("- reconstruct: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
+    //    printf("- reconstruct: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
+}
+
+void ImageProc::brightness_and_contrast(cv::Mat &src, cv::Mat &res, float alpha, float beta)
+{
+    uchar *ptr1 = src.data, *ptr2 = res.data;
+    int i, j, k, idx = 0, channels = src.channels(), w = src.cols, h = src.rows;
+    res = src * alpha + beta;
+    for (i = 0; i < h; i++) for (j = 0; j < w; j++) for (k = 0; k < channels; k++, idx++) {
+        if (ptr2[idx] == beta) ptr2[idx] = 0;
+    }
+}
+
+void ImageProc::brightness_and_contrast(cv::Mat &src, cv::Mat &res, float gamma)
+{
+    uchar *ptr1 = src.data, *ptr2 = res.data;
+    int i, j, k, idx = 0, channels = src.channels(), w = src.cols, h = src.rows;
+    for (i = 0; i < h; i++) {
+        for (j = 0; j < w; j++) {
+            for (k = 0; k < channels; k++, idx++) {
+                ptr2[idx] = cv::saturate_cast<uchar>(pow(ptr1[idx] / 255.0, gamma) * 255);
+            }
+        }
+    }
 }
 
 std::vector<uchar> ImageProc::estimate_atmospheric_light_avg(cv::Mat &src, cv::Mat &dark)

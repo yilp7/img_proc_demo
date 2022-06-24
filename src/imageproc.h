@@ -17,6 +17,8 @@ public:
     static void accumulative_enhance(cv::Mat &src, cv::Mat &res, float accu_base);
     static void adaptive_enhance(cv::Mat &src, cv::Mat &res, double low_in, double high_in, double low_out, double high_out, double gamma);
     static void haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega, float t0, int guided_radius = 60, float eps = 0.01);
+    static void brightness_and_contrast(cv::Mat & src, cv::Mat &res, float alpha, float beta);
+    static void brightness_and_contrast(cv::Mat & src, cv::Mat &res, float gamma);
 
 private:
     static int get_median(uint *arr, int len);

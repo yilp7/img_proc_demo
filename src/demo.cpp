@@ -120,27 +120,18 @@ Demo::Demo(QWidget *parent)
 
     // - image operations
     QComboBox *enhance_options = ui->ENHANCE_OPTIONS;
-    QComboBox *sp_options = ui->SP_OPTIONS;
     QComboBox *calc_avg_options = ui->FRAME_AVG_OPTIONS;
     enhance_options->addItem(tr("None"));
     enhance_options->addItem(tr("Histogram"));
     enhance_options->addItem(tr("Laplace"));
     enhance_options->addItem(tr("Log-based"));
-    enhance_options->addItem(tr("Gamma-based"));
+    enhance_options->addItem(tr("SP-5"));
     enhance_options->addItem(tr("Accumulative"));
     enhance_options->addItem(tr("Sigmoid-based"));
     enhance_options->addItem(tr("Adaptive"));
     enhance_options->addItem(tr("Dehaze_enh"));
     enhance_options->addItem(tr("DCP"));
     enhance_options->setCurrentIndex(0);
-    sp_options->addItem("1");
-    sp_options->addItem("2");
-    sp_options->addItem("3");
-    sp_options->addItem("4");
-    sp_options->addItem("5");
-    sp_options->addItem("6");
-    sp_options->addItem("7");
-    sp_options->setCurrentIndex(4);
     calc_avg_options->addItem("a");
     calc_avg_options->addItem("b");
     calc_avg_options->setCurrentIndex(0);
@@ -212,6 +203,13 @@ Demo::Demo(QWidget *parent)
     ui->CONTRAST_SLIDER->setPageStep(3);
     ui->CONTRAST_SLIDER->setValue(0);
     ui->CONTRAST_SLIDER->setTickInterval(5);
+
+    ui->GAMMA_SLIDER->setMinimum(-10);
+    ui->GAMMA_SLIDER->setMaximum(10);
+    ui->GAMMA_SLIDER->setSingleStep(1);
+    ui->GAMMA_SLIDER->setPageStep(3);
+    ui->GAMMA_SLIDER->setValue(0);
+    ui->GAMMA_SLIDER->setTickInterval(5);
 
     ui->RULER_V->vertical = true;
     ui->DRAG_TOOL->click();
@@ -456,13 +454,15 @@ int Demo::grab_thread_process() {
     cv::Mat sobel;
     int ww, hh;
     float weight = h / 1024.0; // font scale & thickness
-    prev_3d = cv::Mat(w, h, CV_8UC3);
+    prev_3d = cv::Mat(h, w, CV_8UC3);
+    prev_img = cv::Mat(h, w, CV_8UC1);
     double *range = (double*)calloc(w * h, sizeof(double));
     while (grab_thread_state) {
-        while (img_q.size() > 7) img_q.pop();
+        while (img_q.size() > 3) img_q.pop();
+
         if (img_q.empty()) {
-            QThread::msleep(10);
-            if (img_mem.empty()) continue;
+//            QThread::msleep(10);
+            img_mem = prev_img.clone();
             updated = false;
         }
         else {
@@ -472,14 +472,15 @@ int Demo::grab_thread_process() {
         }
 
         image_mutex.lock();
+//        qDebug () << QDateTime::currentDateTime().toString() << updated << img_mem.data;
 
         if (updated) {
             // calc histogram (grayscale)
             memset(hist, 0, 256 * sizeof(uint));
             for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * img_mem.cols)[j]]++;
 
-            // if the cam is installed upside down
-            if (settings->central_symmetry) cv::flip(img_mem, img_mem, -1);
+            // if the image needs flipping
+            if (settings->symmetry) cv::flip(img_mem, img_mem, settings->symmetry - 2);
 
             // mcp self-adaptive
             if (auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
@@ -493,6 +494,7 @@ int Demo::grab_thread_process() {
 //                qDebug() << "low" << thresh;
             }
         }
+        save_to_file(false);
 /*
         // tenengrad (sobel) auto-focus
         cv::Sobel(img_mem, sobel, CV_16U, 1, 1);
@@ -526,6 +528,7 @@ int Demo::grab_thread_process() {
         else {
             img_mem.convertTo(modified_result, CV_8U, 1.0 / (1 << (pixel_depth - 8)));
         }
+        save_to_file(false);
 
         // process 3d image construction from ABN frames
         if (ui->IMG_3D_CHECK->isChecked()) {
@@ -534,7 +537,7 @@ int Demo::grab_thread_process() {
             range_threshold = ui->RANGE_THRESH_EDIT->text().toFloat();
 //            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
 //            if (prev_3d.empty()) cv::cvtColor(img_mem, prev_3d, cv::COLOR_GRAY2RGB);
-            if (updated && !prev_img.empty()) {
+            if (updated) {
                 if (frame_a_3d) ImageProc::gated3D(prev_img, img_mem, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
                 else            ImageProc::gated3D(img_mem, prev_img, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
                 prev_3d = modified_result;
@@ -573,12 +576,9 @@ int Demo::grab_thread_process() {
                     cv::convertScaleAbs(img_log, modified_result);
                     break;
                 }
-                // gamma
+                // SP
                 case 4: {
-                    cv::Mat img_gamma;
-                    modified_result.convertTo(img_gamma, CV_32F, 1.0 / 255, 0);
-                    cv::pow(img_gamma, settings->gamma, img_gamma);
-                    img_gamma.convertTo(modified_result, CV_8U, 255, 0);
+                    ImageProc::plateau_equl_hist(&modified_result, &modified_result, 4);
                     break;
                 }
                 // accumulative
@@ -665,19 +665,21 @@ int Demo::grab_thread_process() {
                 }
             }
             // process special image enhance
-            if (ui->SP_CHECK->isChecked()) ImageProc::plateau_equl_hist(&modified_result, &modified_result, ui->SP_OPTIONS->currentIndex());
+//            if (ui->SP_CHECK->isChecked()) ImageProc::plateau_equl_hist(&modified_result, &modified_result, ui->SP_OPTIONS->currentIndex());
 
             // brightness & contrast
-//            float brightness = ui->BRIGHTNESS_SLIDER->value() / 10., contrast = ui->CONTRAST_SLIDER->value() / 10.;
-//            modified_result = (modified_result - 127.5 * (1 - brightness)) * std::tan((45 - 45 * contrast) / 180. * M_PI) + 127.5 * (1 + brightness);
-            int val = ui->BRIGHTNESS_SLIDER->value() * 12.8;
-            modified_result *= std::exp(ui->CONTRAST_SLIDER->value() / 10.);
-            modified_result += val;
-            // do not change pixel of value 0 when adjusting brightness
-//            int temp = 127.5 * brightness * (1 + std::tan((45 - 45 * contrast) / 180. * M_PI)) + 127.5 * (1 - std::tan((45 - 45 * contrast) / 180. * M_PI));
-            for (int i = 0; i < hh; i++) for (int j = 0; j < ww; j++) {
-                if (modified_result.data[i * ww + j] == val) modified_result.data[i * ww + j] = 0;
-            }
+////            float brightness = ui->BRIGHTNESS_SLIDER->value() / 10., contrast = ui->CONTRAST_SLIDER->value() / 10.;
+////            modified_result = (modified_result - 127.5 * (1 - brightness)) * std::tan((45 - 45 * contrast) / 180. * M_PI) + 127.5 * (1 + brightness);
+//            int val = ui->BRIGHTNESS_SLIDER->value() * 12.8;
+//            modified_result *= std::exp(ui->CONTRAST_SLIDER->value() / 10.);
+//            modified_result += val;
+//            // do not change pixel of value 0 when adjusting brightness
+////            int temp = 127.5 * brightness * (1 + std::tan((45 - 45 * contrast) / 180. * M_PI)) + 127.5 * (1 - std::tan((45 - 45 * contrast) / 180. * M_PI));
+//            for (int i = 0; i < hh; i++) for (int j = 0; j < ww; j++) {
+//                if (modified_result.data[i * ww + j] == val) modified_result.data[i * ww + j] = 0;
+//            }
+            ImageProc::brightness_and_contrast(modified_result, modified_result, std::exp(ui->CONTRAST_SLIDER->value() / 10.), ui->BRIGHTNESS_SLIDER->value() * 12.8);
+//            ImageProc::brightness_and_contrast(modified_result, modified_result, ui->GAMMA_SLIDER->value() / 10.);
 
             // display grayscale histogram of current image
             if (ui->HISTOGRAM_RADIO->isChecked()) {
@@ -704,6 +706,7 @@ int Demo::grab_thread_process() {
             if (region.height > hh) region.height = hh;
 //            qDebug("region x: %d y: %d, w: %d, h: %d\n", region.x, region.y, region.width, region.height);
 //            qDebug("image  w: %d, h: %d\n", modified_result.cols, modified_result.rows);
+            qDebug() << modified_result.cols << modified_result.rows;
             modified_result = modified_result(region);
             cv::resize(modified_result, modified_result, cv::Size(ww, hh));
 
@@ -723,6 +726,7 @@ int Demo::grab_thread_process() {
             }
             if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(img_display, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
         }
+        save_to_file(false);
 
         // image display
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
@@ -741,6 +745,7 @@ int Demo::grab_thread_process() {
 //            update_delay();
         }
         if (scan && std::round(delay_dist / dist_ns) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
+        save_to_file(false);
 
         // image write / video record
         if (updated && save_original) save_to_file(false);
@@ -759,6 +764,7 @@ int Demo::grab_thread_process() {
             }
             vid_out[1].write(modified_result);
         }
+        save_to_file(false);
 
         if (updated) prev_img = img_mem.clone();
         image_mutex.unlock();
@@ -1028,32 +1034,7 @@ void Demo::save_image_tif(cv::Mat img, QString filename)
     // value for tag 283, offset: sum + 190 + 8 * h (gray), sum + 196 + 8 * h (rgb)
     fwrite(&res_pixel, 4, 1, f); // fraction h-pixel
     fwrite(&res_physical,4, 1, f); // denominator PhyHeight-inch
-/*
-    case 3: {
-        // 284 planar configuration
-        static ushort tag_planar_configuration = 284;
-        fwrite(&tag_planar_configuration, 2, 1, f);
-        fwrite(&type_short, 2, 1, f);
-        fwrite(&count_1, 4, 1, f);
-        fwrite(&count_1, 4, 1, f); // use 1 for chunky format
 
-        fwrite(&next_ifd_offset, 4, 1, f);
-
-        // value for tag 258, offset: sum + 146
-        for(i = 0; i < 3; i++) fwrite(&depth, 2, 1, f);
-
-        // value for tag 273, offset: sum + 152
-        uint strip_offset = 8;
-        for(i = 0; i < h; i++, strip_offset += block_size) fwrite(&strip_offset, 4, 1, f);
-
-        // value for tag 279, offset: sum + 152 + 4 * h
-        for(i = 0; i < h; i++) fwrite(&block_size, 4, 1, f);
-
-        break;
-    }
-    default: break;
-    }
-*/
     fclose(f);
 }
 
@@ -1140,16 +1121,15 @@ void Demo::enable_controls(bool cam_rdy) {
     ui->SOFTWARE_TRIGGER_BUTTON->setEnabled(start_grabbing && trigger_mode_on && trigger_by_software);
     ui->IMG_3D_CHECK->setEnabled(start_grabbing);
     ui->IMG_ENHANCE_CHECK->setEnabled(start_grabbing);
-    ui->SP_CHECK->setEnabled(start_grabbing);
     ui->FRAME_AVG_CHECK->setEnabled(start_grabbing);
     ui->ENHANCE_OPTIONS->setEnabled(start_grabbing);
-    ui->SP_OPTIONS->setEnabled(start_grabbing);
     ui->FRAME_AVG_OPTIONS->setEnabled(start_grabbing);
     ui->RANGE_THRESH_EDIT->setEnabled(start_grabbing);
 //    ui->BRIGHTNESS_LABEL->setEnabled(start_grabbing);
     ui->BRIGHTNESS_SLIDER->setEnabled(start_grabbing);
 //    ui->CONTRAST_LABEL->setEnabled(start_grabbing);
     ui->CONTRAST_SLIDER->setEnabled(start_grabbing);
+    ui->GAMMA_SLIDER->setEnabled(start_grabbing);
     ui->SCAN_BUTTON->setEnabled(start_grabbing);
     ui->INFO_CHECK->setEnabled(start_grabbing);
     ui->CENTER_CHECK->setEnabled(start_grabbing);
@@ -1303,7 +1283,6 @@ void Demo::on_SHUTDOWN_BUTTON_clicked()
 {
     shut_down();
     ui->IMG_ENHANCE_CHECK->setChecked(false);
-    ui->SP_CHECK->setChecked(false);
     ui->FRAME_AVG_CHECK->setChecked(false);
     ui->IMG_3D_CHECK->setChecked(false);
     on_ENUM_BUTTON_clicked();

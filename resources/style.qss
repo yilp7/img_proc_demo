@@ -298,7 +298,7 @@ QSlider::handle:horizontal:disabled {
 	margin-bottom: -6px;
 }
 
-#BRIGHTNESS_SLIDER::handle:horizontal, #CONTRAST_SLIDER::handle:horizontal, #FOCUS_SPEED_SLIDER::handle:horizontal {
+#BRIGHTNESS_SLIDER::handle:horizontal, #CONTRAST_SLIDER::handle:horizontal, #GAMMA_SLIDER::handle::horizontal, #FOCUS_SPEED_SLIDER::handle:horizontal {
 	width: 6px;
 	height: 8px;
 	margin-top: -2px;

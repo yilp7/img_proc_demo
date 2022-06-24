@@ -23,7 +23,7 @@ ProgSettings::ProgSettings(QWidget *parent) :
     dehaze_pct(0.95),
     sky_tolerance(40),
     fast_gf(1),
-    central_symmetry(false),
+    symmetry(0),
     dist_ns(3e8 / 2e9),
     auto_rep_freq(true),
     hz_unit(0),
@@ -97,6 +97,12 @@ ProgSettings::ProgSettings(QWidget *parent) :
     ui->PIXEL_FORMAT_LIST->addItem("Mono12");
     ui->PIXEL_FORMAT_LIST->addItem("RGB8");
     ui->PIXEL_FORMAT_LIST->installEventFilter(this);
+
+    ui->SYMMETRY_LIST->addItem("No");
+    ui->SYMMETRY_LIST->addItem("Central");
+    ui->SYMMETRY_LIST->addItem("Vertical");
+    ui->SYMMETRY_LIST->addItem("Horizontal");
+    ui->SYMMETRY_LIST->installEventFilter(this);
 
     data_exchange(false);
 
@@ -463,13 +469,6 @@ void ProgSettings::on_FAST_GF_EDIT_editingFinished()
     ui->FAST_GF_EDIT->setText(QString::number(val));
 }
 
-
-void ProgSettings::on_CENTRAL_SYMM_CHK_stateChanged(int arg1)
-{
-    central_symmetry = arg1;
-}
-
-
 void ProgSettings::on_PIXEL_FORMAT_LIST_activated(int index)
 {
     static int pixel_format[4] = {PixelType_Gvsp_Mono8, PixelType_Gvsp_Mono10, PixelType_Gvsp_Mono12, PixelType_Gvsp_RGB8_Packed};
@@ -481,3 +480,7 @@ void ProgSettings::on_RESET_3D_BTN_clicked()
     emit reset_frame_a();
 }
 
+void ProgSettings::on_SYMMETRY_LIST_currentIndexChanged(int index)
+{
+    symmetry = index;
+}

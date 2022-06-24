@@ -6,6 +6,8 @@ Preferences::Preferences(QWidget *parent) :
     ui(new Ui::Preferences)
 {
     ui->setupUi(this);
+
+    setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
 }
 
 Preferences::~Preferences()

@@ -590,19 +590,6 @@
      <string>Fast gf</string>
     </property>
    </widget>
-   <widget class="QCheckBox" name="CENTRAL_SYMM_CHK">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>335</y>
-      <width>141</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Central Symmetry</string>
-    </property>
-   </widget>
    <widget class="QPushButton" name="RESET_3D_BTN">
     <property name="geometry">
      <rect>
@@ -614,6 +601,29 @@
     </property>
     <property name="text">
      <string>Reset 3D</string>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="SYMMETRY_LIST">
+    <property name="geometry">
+     <rect>
+      <x>80</x>
+      <y>335</y>
+      <width>72</width>
+      <height>21</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="SYMMETRY">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>337</y>
+      <width>71</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Symmetry</string>
     </property>
    </widget>
   </widget>
