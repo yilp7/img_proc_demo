@@ -351,3 +351,19 @@ void Coordinate::display_pos(QPoint p)
     coord_x->setText(QString::asprintf("X: %04d", abs(p.x())));
     coord_y->setText(QString::asprintf("Y: %04d", abs(p.y())));
 }
+
+IndexLabel::IndexLabel(QWidget *parent) : QLabel(parent) {}
+
+void IndexLabel::setup(int idx, int pos_y)
+{
+    this->idx = idx;
+    this->pos_y = pos_y;
+}
+
+void IndexLabel::mouseReleaseEvent(QMouseEvent *event)
+{
+    QLabel::mouseReleaseEvent(event);
+
+    if(event->button() != Qt::LeftButton) return;
+    emit index_label_clicked(pos_y);
+}

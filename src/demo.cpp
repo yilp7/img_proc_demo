@@ -204,11 +204,11 @@ Demo::Demo(QWidget *parent)
     ui->CONTRAST_SLIDER->setValue(0);
     ui->CONTRAST_SLIDER->setTickInterval(5);
 
-    ui->GAMMA_SLIDER->setMinimum(-10);
-    ui->GAMMA_SLIDER->setMaximum(10);
+    ui->GAMMA_SLIDER->setMinimum(0);
+    ui->GAMMA_SLIDER->setMaximum(20);
     ui->GAMMA_SLIDER->setSingleStep(1);
     ui->GAMMA_SLIDER->setPageStep(3);
-    ui->GAMMA_SLIDER->setValue(0);
+    ui->GAMMA_SLIDER->setValue(10);
     ui->GAMMA_SLIDER->setTickInterval(5);
 
     ui->RULER_V->vertical = true;
@@ -494,7 +494,6 @@ int Demo::grab_thread_process() {
 //                qDebug() << "low" << thresh;
             }
         }
-        save_to_file(false);
 /*
         // tenengrad (sobel) auto-focus
         cv::Sobel(img_mem, sobel, CV_16U, 1, 1);
@@ -528,7 +527,6 @@ int Demo::grab_thread_process() {
         else {
             img_mem.convertTo(modified_result, CV_8U, 1.0 / (1 << (pixel_depth - 8)));
         }
-        save_to_file(false);
 
         // process 3d image construction from ABN frames
         if (ui->IMG_3D_CHECK->isChecked()) {
@@ -679,7 +677,8 @@ int Demo::grab_thread_process() {
 //                if (modified_result.data[i * ww + j] == val) modified_result.data[i * ww + j] = 0;
 //            }
             ImageProc::brightness_and_contrast(modified_result, modified_result, std::exp(ui->CONTRAST_SLIDER->value() / 10.), ui->BRIGHTNESS_SLIDER->value() * 12.8);
-//            ImageProc::brightness_and_contrast(modified_result, modified_result, ui->GAMMA_SLIDER->value() / 10.);
+            // map [0, 20] to [0, +inf) using tan
+            ImageProc::brightness_and_contrast(modified_result, modified_result, tan((20 - ui->GAMMA_SLIDER->value()) / 40. * M_PI));
 
             // display grayscale histogram of current image
             if (ui->HISTOGRAM_RADIO->isChecked()) {
@@ -706,7 +705,6 @@ int Demo::grab_thread_process() {
             if (region.height > hh) region.height = hh;
 //            qDebug("region x: %d y: %d, w: %d, h: %d\n", region.x, region.y, region.width, region.height);
 //            qDebug("image  w: %d, h: %d\n", modified_result.cols, modified_result.rows);
-            qDebug() << modified_result.cols << modified_result.rows;
             modified_result = modified_result(region);
             cv::resize(modified_result, modified_result, cv::Size(ww, hh));
 
@@ -726,7 +724,6 @@ int Demo::grab_thread_process() {
             }
             if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(img_display, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
         }
-        save_to_file(false);
 
         // image display
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
@@ -745,18 +742,18 @@ int Demo::grab_thread_process() {
 //            update_delay();
         }
         if (scan && std::round(delay_dist / dist_ns) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
-        save_to_file(false);
 
         // image write / video record
         if (updated && save_original) save_to_file(false);
         if (updated && save_modified) save_to_file(true);
-        if (record_original) {
-            if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            cv::putText(img_mem, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), weight * 2);
-            vid_out[0].write(img_mem);
+        if (updated && record_original) {
+            cv::Mat temp = img_mem.clone();
+            if (base_unit == 2) cv::putText(temp, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            else cv::putText(temp, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            cv::putText(temp, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), weight * 2);
+            vid_out[0].write(temp);
         }
-        if (record_modified) {
+        if (updated && record_modified) {
             if (!image_3d && !ui->INFO_CHECK->isChecked()) {
                 if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
@@ -764,7 +761,6 @@ int Demo::grab_thread_process() {
             }
             vid_out[1].write(modified_result);
         }
-        save_to_file(false);
 
         if (updated) prev_img = img_mem.clone();
         image_mutex.unlock();
@@ -1281,6 +1277,7 @@ void Demo::on_START_BUTTON_clicked()
 
 void Demo::on_SHUTDOWN_BUTTON_clicked()
 {
+    ui->STOP_GRABBING_BUTTON->click();
     shut_down();
     ui->IMG_ENHANCE_CHECK->setChecked(false);
     ui->FRAME_AVG_CHECK->setChecked(false);
@@ -1337,6 +1334,14 @@ void Demo::on_START_GRABBING_BUTTON_clicked()
 {
     if (!device_on || start_grabbing || curr_cam == NULL) return;
 
+    if (grab_thread_state || h_grab_thread) {
+        grab_thread_state = false;
+        h_grab_thread->quit();
+        h_grab_thread->wait();
+        delete h_grab_thread;
+        h_grab_thread = NULL;
+    }
+
     grab_thread_state = true;
     h_grab_thread = new GrabThread((void*)this);
     if (h_grab_thread == NULL) {
@@ -1365,10 +1370,9 @@ void Demo::on_START_GRABBING_BUTTON_clicked()
 
 void Demo::on_STOP_GRABBING_BUTTON_clicked()
 {
-    if (!device_on || !start_grabbing || curr_cam == NULL) return;
+//    if (!device_on || !start_grabbing || curr_cam == NULL) return;
 
     if (record_original) on_SAVE_AVI_BUTTON_clicked();
-    if (curr_cam->stop_grabbing()) return;
 
     if (!img_q.empty()) std::queue<cv::Mat>().swap(img_q);
 
@@ -1383,7 +1387,9 @@ void Demo::on_STOP_GRABBING_BUTTON_clicked()
     start_grabbing = false;
     ui->SOURCE_DISPLAY->grab = false;
     QTimer::singleShot(10, this, SLOT(clean()));
-    enable_controls(true);
+    enable_controls(device_type);
+
+    curr_cam->stop_grabbing();
 }
 
 void Demo::on_SAVE_BMP_BUTTON_clicked()
@@ -1553,7 +1559,7 @@ void Demo::set_auto_mcp(bool adaptive)
 
 void Demo::set_dev_ip(int ip, int gateway)
 {
-    curr_cam->ip_address(false, &ip, &gateway);
+    qDebug() << "modify ip: " << hex << curr_cam->ip_address(false, &ip, &gateway);
 }
 
 void Demo::change_pixel_format(int pixel_format)
@@ -2837,8 +2843,46 @@ void Demo::dropEvent(QDropEvent *event)
 {
     QMainWindow::dropEvent(event);
 
-    QString config_name = event->mimeData()->urls().first().toLocalFile();
-    load_config(config_name);
+    QString file_name = event->mimeData()->urls().first().toLocalFile();
+    if (file_name.endsWith(".bmp", Qt::CaseInsensitive) || file_name.endsWith(".png", Qt::CaseInsensitive) || file_name.endsWith(".tif", Qt::CaseInsensitive)) {
+        if (device_on) {
+            QMessageBox::warning(this, "PROMPT", tr("Cannot read local image while cam is on"));
+            return;
+        }
+
+        QImage temp_img;
+        temp_img.load(file_name);
+        w = temp_img.width();
+        h = temp_img.height();
+        is_color = false;
+        pixel_depth = temp_img.depth();
+
+        if (grab_thread_state || h_grab_thread) {
+            grab_thread_state = false;
+            if (h_grab_thread) {
+                h_grab_thread->quit();
+                h_grab_thread->wait();
+                delete h_grab_thread;
+                h_grab_thread = NULL;
+            }
+        }
+
+        grab_thread_state = true;
+        h_grab_thread = new GrabThread((void*)this);
+        if (h_grab_thread == NULL) {
+            grab_thread_state = false;
+            QMessageBox::warning(this, "PROMPT", tr("Cannot display image"));
+            return;
+        }
+        h_grab_thread->start();
+        start_grabbing = true;
+        enable_controls(true);
+        ui->START_BUTTON->setEnabled(false);
+
+        img_q.push(cv::Mat(h, w, CV_8UC1, (uchar*)temp_img.bits(), temp_img.bytesPerLine()).clone());
+
+    }
+    else load_config(file_name);
 }
 
 void Demo::showEvent(QShowEvent *event)

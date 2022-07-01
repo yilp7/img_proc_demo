@@ -138,16 +138,17 @@ void Cam::binning(bool read, int *val)
     }
 }
 
-void Cam::ip_address(bool read, int *ip, int *gateway)
+int Cam::ip_address(bool read, int *ip, int *gateway)
 {
     if (read) {
         MV_CC_DEVICE_INFO_LIST st_dev_list = {0};
         MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
         *ip = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nCurrentIp;
         *gateway = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nDefultGateWay;
+        return 0;
     }
     else {
-        MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
+        return MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
     }
 }
 
@@ -205,6 +206,6 @@ void Cam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *
         break;
     }
 
-    ((std::queue<cv::Mat>*)user_data)->push(img);
+    ((std::queue<cv::Mat>*)user_data)->push(img.clone());
 }
 

@@ -126,7 +126,7 @@ class AnimationLabel : public QLabel
 {
     Q_OBJECT
 public:
-    explicit AnimationLabel(QWidget* parent = 0, QString path = "", QSize size = QSize(), int interval = 100);
+    explicit AnimationLabel(QWidget *parent = 0, QString path = "", QSize size = QSize(), int interval = 100);
     void setup_animation(QString path, QSize size, int interval);
 
 private slots:
@@ -146,7 +146,7 @@ class Tools : public QRadioButton
 {
     Q_OBJECT
 public:
-    explicit Tools(QWidget* parent = 0);
+    explicit Tools(QWidget *parent = 0);
 };
 
 class Coordinate : public QFrame
@@ -163,6 +163,24 @@ public:
     InfoLabel *set_name;
     InfoLabel *coord_x;
     InfoLabel *coord_y;
+};
+
+class IndexLabel : public QLabel
+{
+    Q_OBJECT
+public:
+    explicit IndexLabel(QWidget *parent);
+    void setup(int idx, int pos_y);
+
+protected:
+    void mouseReleaseEvent(QMouseEvent *event);
+
+signals:
+    void index_label_clicked(int pos_y);
+
+private:
+    int idx;
+    int pos_y;
 };
 
 #endif // MYWIDGET_H

@@ -398,12 +398,8 @@ void ImageProc::brightness_and_contrast(cv::Mat &src, cv::Mat &res, float gamma)
 {
     uchar *ptr1 = src.data, *ptr2 = res.data;
     int i, j, k, idx = 0, channels = src.channels(), w = src.cols, h = src.rows;
-    for (i = 0; i < h; i++) {
-        for (j = 0; j < w; j++) {
-            for (k = 0; k < channels; k++, idx++) {
-                ptr2[idx] = cv::saturate_cast<uchar>(pow(ptr1[idx] / 255.0, gamma) * 255);
-            }
-        }
+    for (i = 0; i < h; i++) for (j = 0; j < w; j++) for (k = 0; k < channels; k++, idx++) {
+        ptr2[idx] = cv::saturate_cast<uchar>(pow(ptr1[idx] / 255.0, gamma) * 255);
     }
 }
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(Demo_combined LANGUAGES CXX VERSION 0.2.0.0)
+project(Demo_combined LANGUAGES CXX VERSION 0.2.1.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -89,13 +89,13 @@ set(SOURCE_FILES
 #    src/euresyscam.cpp
     src/joystick.h
     src/joystick.cpp
+    src/preferences.h
+    src/preferences.cpp
     src/demo_dev.ui
     src/settings.ui
+    src/preferences.ui
     resources/resources.qrc
     resources/gist.rc
-    preferences.h
-    preferences.cpp
-    preferences.ui
 )
 
 set(PROJECT_LIBS

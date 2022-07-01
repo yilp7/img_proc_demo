@@ -372,3 +372,22 @@ QSpinBox::down-button {
 	image: url(:/tools/down);
 	margin-right: 16px;
 }
+
+QScrollArea, #CONTENT {
+	border: none;
+	background-color: #323232;
+	color: #B0C4DE;
+}
+
+IndexLabel {
+	color: #B0C4DE;
+}
+
+IndexLabel::hover {
+	color: #FFFFFF;
+	text-decoration: line-through;
+}
+
+QScrollBar {
+
+}
