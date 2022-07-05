@@ -305,6 +305,9 @@ private:
     // send ptz control cmd
     void send_ctrl_cmd(uchar dir);
 
+    // static image display (drag & drop)
+    void Demo::start_static_display(QImage img);
+
 public:
     bool                    mouse_pressed;
 

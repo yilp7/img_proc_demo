@@ -540,6 +540,7 @@ int Demo::grab_thread_process() {
                 else            ImageProc::gated3D(img_mem, prev_img, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
                 prev_3d = modified_result;
                 frame_a_3d ^= 1;
+//                if (device_type < -1) device_type++;
             }
             else modified_result = prev_3d;
 //            if (!frame_a_3d) prev_3d = modified_result.clone();
@@ -1388,15 +1389,19 @@ void Demo::on_STOP_GRABBING_BUTTON_clicked()
     ui->SOURCE_DISPLAY->grab = false;
     QTimer::singleShot(10, this, SLOT(clean()));
     enable_controls(device_type);
+    if (device_type == -1) ui->ENUM_BUTTON->click();
 
     curr_cam->stop_grabbing();
 }
 
 void Demo::on_SAVE_BMP_BUTTON_clicked()
 {
-    save_original = !save_original;
-    if (save_original && !QDir(save_location + "/ori_bmp").exists()) QDir().mkdir(save_location + "/ori_bmp");
-    ui->SAVE_BMP_BUTTON->setText(save_original ? tr("Stop") : tr("ORI"));
+    if (!QDir(save_location + "/ori_bmp").exists()) QDir().mkdir(save_location + "/ori_bmp");
+    if (device_type == -1) save_to_file(false);
+    else {
+        save_original = !save_original;
+        ui->SAVE_BMP_BUTTON->setText(save_original ? tr("Stop") : tr("ORI"));
+    }
 }
 
 void Demo::on_SAVE_FINAL_BUTTON_clicked()
@@ -2836,53 +2841,89 @@ void Demo::dragEnterEvent(QDragEnterEvent *event)
 {
     QMainWindow::dragEnterEvent(event);
 
-    if (event->mimeData()->urls().length() == 1) event->acceptProposedAction();
+    if (event->mimeData()->urls().length() < 3) event->acceptProposedAction();
 }
 
 void Demo::dropEvent(QDropEvent *event)
 {
     QMainWindow::dropEvent(event);
 
-    QString file_name = event->mimeData()->urls().first().toLocalFile();
-    if (file_name.endsWith(".bmp", Qt::CaseInsensitive) || file_name.endsWith(".png", Qt::CaseInsensitive) || file_name.endsWith(".tif", Qt::CaseInsensitive)) {
-        if (device_on) {
-            QMessageBox::warning(this, "PROMPT", tr("Cannot read local image while cam is on"));
-            return;
-        }
-
-        QImage temp_img;
-        temp_img.load(file_name);
-        w = temp_img.width();
-        h = temp_img.height();
-        is_color = false;
-        pixel_depth = temp_img.depth();
-
-        if (grab_thread_state || h_grab_thread) {
-            grab_thread_state = false;
-            if (h_grab_thread) {
-                h_grab_thread->quit();
-                h_grab_thread->wait();
-                delete h_grab_thread;
-                h_grab_thread = NULL;
+    if (event->mimeData()->urls().length() == 1) {
+        QString file_name = event->mimeData()->urls().first().toLocalFile();
+        if (file_name.endsWith(".bmp", Qt::CaseInsensitive) || file_name.endsWith(".png", Qt::CaseInsensitive) || file_name.endsWith(".tif", Qt::CaseInsensitive)) {
+            if (device_on) {
+                QMessageBox::warning(this, "PROMPT", tr("Cannot read local image while cam is on"));
+                return;
             }
+            QImage temp_img;
+            temp_img.load(file_name);
+            start_static_display(temp_img);
+
+            img_q.push(cv::Mat(h, w, CV_8UC1, (uchar*)temp_img.bits(), temp_img.bytesPerLine()).clone());
         }
-
-        grab_thread_state = true;
-        h_grab_thread = new GrabThread((void*)this);
-        if (h_grab_thread == NULL) {
-            grab_thread_state = false;
-            QMessageBox::warning(this, "PROMPT", tr("Cannot display image"));
-            return;
-        }
-        h_grab_thread->start();
-        start_grabbing = true;
-        enable_controls(true);
-        ui->START_BUTTON->setEnabled(false);
-
-        img_q.push(cv::Mat(h, w, CV_8UC1, (uchar*)temp_img.bits(), temp_img.bytesPerLine()).clone());
-
+        else load_config(file_name);
     }
-    else load_config(file_name);
+    else {
+        QString file_name1 = event->mimeData()->urls()[0].toLocalFile();
+        QString file_name2 = event->mimeData()->urls()[1].toLocalFile();
+        if ((file_name1.endsWith(".bmp", Qt::CaseInsensitive) || file_name1.endsWith(".png", Qt::CaseInsensitive) || file_name1.endsWith(".tif", Qt::CaseInsensitive)) &&
+            (file_name2.endsWith(".bmp", Qt::CaseInsensitive) || file_name2.endsWith(".png", Qt::CaseInsensitive) || file_name2.endsWith(".tif", Qt::CaseInsensitive))) {
+            if (device_on) {
+                QMessageBox::warning(this, "PROMPT", tr("Cannot read local image while cam is on"));
+                return;
+            }
+            QImage temp_img1, temp_img2;
+            temp_img1.load(file_name1);
+            temp_img2.load(file_name2);
+            if (temp_img1.width() == temp_img2.width() && temp_img1.height() == temp_img2.height() && temp_img1.depth() == temp_img2.depth()) start_static_display(temp_img1);
+            else {
+                QMessageBox::warning(this, "PROMPT", tr("Multiple images need to have the same size"));
+                return;
+            }
+            cv::Mat img1(h, w, CV_8UC1, (uchar*)temp_img1.bits(), temp_img1.bytesPerLine());
+            cv::Mat img2(h, w, CV_8UC1, (uchar*)temp_img2.bits(), temp_img2.bytesPerLine());
+            double *range = (double*)malloc(w * h * sizeof(double));
+            ImageProc::gated3D(img1, img2, prev_3d, delay_a_n + delay_a_u * 1000, gate_width_a_n + gate_width_a_u * 1000, range, ui->RANGE_THRESH_EDIT->text().toFloat());
+            free(range);
+
+            img_q.push(img1.clone());
+            img_q.push(img2.clone());
+        }
+        else {
+            QMessageBox::warning(this, "PROMPT", tr("Cannot read selected image files"));
+        }
+    }
+}
+
+void Demo::start_static_display(QImage img)
+{
+    w = img.width();
+    h = img.height();
+    is_color = false;
+    pixel_depth = img.depth();
+    device_type = -1;
+
+    if (grab_thread_state || h_grab_thread) {
+        grab_thread_state = false;
+        if (h_grab_thread) {
+            h_grab_thread->quit();
+            h_grab_thread->wait();
+            delete h_grab_thread;
+            h_grab_thread = NULL;
+        }
+    }
+
+    grab_thread_state = true;
+    h_grab_thread = new GrabThread((void*)this);
+    if (h_grab_thread == NULL) {
+        grab_thread_state = false;
+        QMessageBox::warning(this, "PROMPT", tr("Cannot display image"));
+        return;
+    }
+    h_grab_thread->start();
+    start_grabbing = true;
+    enable_controls(true);
+    ui->START_BUTTON->setEnabled(false);
 }
 
 void Demo::showEvent(QShowEvent *event)
@@ -3017,9 +3058,12 @@ void Demo::on_FRAME_AVG_CHECK_stateChanged(int arg1)
 
 void Demo::on_SAVE_RESULT_BUTTON_clicked()
 {
-    save_modified = !save_modified;
-    if (save_modified && !QDir(save_location + "/res_bmp").exists()) QDir().mkdir(save_location + "/res_bmp");
-    ui->SAVE_RESULT_BUTTON->setText(save_modified ? tr("Stop") : tr("RES"));
+    if (!QDir(save_location + "/res_bmp").exists()) QDir().mkdir(save_location + "/res_bmp");
+    if (device_type == -1) save_to_file(true);
+    else{
+        save_modified = !save_modified;
+        ui->SAVE_RESULT_BUTTON->setText(save_modified ? tr("Stop") : tr("RES"));
+    }
 }
 
 void Demo::on_LASER_ZOOM_IN_BTN_pressed()
