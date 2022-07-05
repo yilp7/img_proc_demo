@@ -469,6 +469,7 @@ int Demo::grab_thread_process() {
             img_mem = img_q.front();
             img_q.pop();
             updated = true;
+            if (device_type < 0) img_q.push(img_mem.clone());
         }
 
         image_mutex.lock();
@@ -1397,7 +1398,15 @@ void Demo::on_STOP_GRABBING_BUTTON_clicked()
 void Demo::on_SAVE_BMP_BUTTON_clicked()
 {
     if (!QDir(save_location + "/ori_bmp").exists()) QDir().mkdir(save_location + "/ori_bmp");
-    if (device_type == -1) save_to_file(false);
+    if (device_type == -1) {
+        image_mutex.lock();
+        save_original = 1;
+        image_mutex.unlock();
+        QThread::msleep(10);
+        image_mutex.lock();
+        save_original = 0;
+        image_mutex.unlock();
+    }
     else {
         save_original = !save_original;
         ui->SAVE_BMP_BUTTON->setText(save_original ? tr("Stop") : tr("ORI"));
@@ -2875,6 +2884,8 @@ void Demo::dropEvent(QDropEvent *event)
             QImage temp_img1, temp_img2;
             temp_img1.load(file_name1);
             temp_img2.load(file_name2);
+            if (temp_img1.format() != QImage::Format_Indexed8) temp_img1 = temp_img1.convertToFormat(QImage::Format_Indexed8);
+            if (temp_img2.format() != QImage::Format_Indexed8) temp_img2 = temp_img2.convertToFormat(QImage::Format_Indexed8);
             if (temp_img1.width() == temp_img2.width() && temp_img1.height() == temp_img2.height() && temp_img1.depth() == temp_img2.depth()) start_static_display(temp_img1);
             else {
                 QMessageBox::warning(this, "PROMPT", tr("Multiple images need to have the same size"));
@@ -2882,9 +2893,6 @@ void Demo::dropEvent(QDropEvent *event)
             }
             cv::Mat img1(h, w, CV_8UC1, (uchar*)temp_img1.bits(), temp_img1.bytesPerLine());
             cv::Mat img2(h, w, CV_8UC1, (uchar*)temp_img2.bits(), temp_img2.bytesPerLine());
-            double *range = (double*)malloc(w * h * sizeof(double));
-            ImageProc::gated3D(img1, img2, prev_3d, delay_a_n + delay_a_u * 1000, gate_width_a_n + gate_width_a_u * 1000, range, ui->RANGE_THRESH_EDIT->text().toFloat());
-            free(range);
 
             img_q.push(img1.clone());
             img_q.push(img2.clone());
@@ -2911,6 +2919,7 @@ void Demo::start_static_display(QImage img)
             delete h_grab_thread;
             h_grab_thread = NULL;
         }
+        clean();
     }
 
     grab_thread_state = true;
@@ -3059,7 +3068,15 @@ void Demo::on_FRAME_AVG_CHECK_stateChanged(int arg1)
 void Demo::on_SAVE_RESULT_BUTTON_clicked()
 {
     if (!QDir(save_location + "/res_bmp").exists()) QDir().mkdir(save_location + "/res_bmp");
-    if (device_type == -1) save_to_file(true);
+    if (device_type == -1) {
+        image_mutex.lock();
+        save_modified = 1;
+        image_mutex.unlock();
+        QThread::msleep(10);
+        image_mutex.lock();
+        save_modified = 0;
+        image_mutex.unlock();
+    }
     else{
         save_modified = !save_modified;
         ui->SAVE_RESULT_BUTTON->setText(save_modified ? tr("Stop") : tr("RES"));
