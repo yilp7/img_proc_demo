@@ -1254,12 +1254,30 @@
       <bool>true</bool>
      </property>
     </widget>
+    <widget class="QPushButton" name="DUAL_LIGHT_BTN">
+     <property name="geometry">
+      <rect>
+       <x>160</x>
+       <y>10</y>
+       <width>20</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="icon">
+      <iconset resource="../resources/resources.qrc">
+       <normaloff>:/logo/logo/logo.png</normaloff>:/logo/logo/logo.png</iconset>
+     </property>
+    </widget>
     <zorder>ALT_DISPLAY</zorder>
     <zorder>PARAMS_STATIC</zorder>
     <zorder>IMG_GRAB_STATIC</zorder>
     <zorder>INITIALIZATION</zorder>
     <zorder>LASER_STATIC</zorder>
     <zorder>LOGO</zorder>
+    <zorder>DUAL_LIGHT_BTN</zorder>
    </widget>
    <widget class="QFrame" name="MID">
     <property name="geometry">

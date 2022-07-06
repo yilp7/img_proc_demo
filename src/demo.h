@@ -14,6 +14,7 @@
 //#include "hqvscam.h"
 //#include "euresyscam.h"
 #include "preferences.h"
+#include "plugininterface.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class Demo; }
@@ -212,6 +213,8 @@ private slots:
     void on_PTZ_SPEED_EDIT_editingFinished();
 
     void on_STOP_BTN_clicked();
+
+    void on_DUAL_LIGHT_BTN_clicked();
 
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
@@ -437,6 +440,10 @@ private:
 
     QButtonGroup            *ptz_grp;                   // ptz button group
     int                     ptz_speed;
+
+    // TEMP ONLY
+    // TO-DO: move to addons
+    PluginInterface         *pluginInterface;           // for ir with visible light
 
 };
 #endif // DEMO_H

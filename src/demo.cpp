@@ -3334,3 +3334,17 @@ void Demo::on_STOP_BTN_clicked()
     communicate_display(4, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 }
 
+
+void Demo::on_DUAL_LIGHT_BTN_clicked()
+{
+    QPluginLoader pluginLoader("plugins/ir_visible_light/plugin_ir_visible_light.dll");
+    QObject *plugin = pluginLoader.instance();
+    qDebug() << plugin;
+    if (plugin) {
+        pluginInterface = qobject_cast<PluginInterface *>(plugin);
+//        pluginInterface = (PluginInterface *)plugin;
+        qDebug() << pluginInterface;
+        if (pluginInterface) pluginInterface->start();
+    }
+}
+
