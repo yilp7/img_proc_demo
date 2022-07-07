@@ -1734,6 +1734,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
         }
         else if (edit == ui->DELAY_N_EDIT_N) {
             delay_n_n = edit->text().toInt();
+            data_exchange(false);
             update_delay();
         }
         else if (edit == ui->MCP_EDIT) {
