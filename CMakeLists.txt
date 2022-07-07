@@ -11,7 +11,11 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(SDK_DIR "${PROJECT_SOURCE_DIR}/sdk64")
+if (CMAKE_SIZEOF_VOID_P EQUAL 64)
+	set(SDK_DIR "${PROJECT_SOURCE_DIR}/sdk64")
+else()
+	set(SDK_DIR "${PROJECT_SOURCE_DIR}/sdk32")
+endif()
 
 set(Hik_SDK_DIR "${SDK_DIR}/mvs")
 set(HQV_DIR "${SDK_DIR}/HQV")
@@ -35,20 +39,27 @@ find_package(QT NAMES Qt5 REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort Network REQUIRED)
 
 if (WIN32)
-	include_directories(${Hik_SDK_DIR}/include/win10_x64)
+	include_directories(${Hik_SDK_DIR}/include/win)
 	include_directories(${HQV_DIR}/include)
 	include_directories(${EURESYS_DIR}/include)
 	include_directories(${OpenCV_DIR}/include)
 
-	link_directories(${Hik_SDK_DIR}/lib/win64_x64)
-	link_directories(${HQV_DIR}/lib)
-	link_directories(${EURESYS_DIR}/lib)
-	link_directories(${OpenCV_DIR}/lib/win64_x64)
+	if (CMAKE_SIZEOF_VOID_P EQUAL 64)
+		link_directories(${Hik_SDK_DIR}/lib/x64)
+		link_directories(${HQV_DIR}/lib)
+		link_directories(${EURESYS_DIR}/lib)
+		link_directories(${OpenCV_DIR}/lib/x64)
+	else()
+		link_directories(${Hik_SDK_DIR}/lib/x86)
+		link_directories(${HQV_DIR}/lib)
+		link_directories(${EURESYS_DIR}/lib)
+		link_directories(${OpenCV_DIR}/lib/x86)
+	endif()
 elseif (APPLE)
 
 # for aarch64 only
 elseif (UNIX)
-	include_directories(${Hik_SDK_DIR}/include/aarch64)
+	include_directories(${Hik_SDK_DIR}/include/linux)
 	include_directories(${HQV_DIR}/include)
 	include_directories(${EURESYS_DIR}/include)
 	include_directories(${OpenCV_DIR}/include)
@@ -117,10 +128,10 @@ if (WIN32)
         # joystick
         winmm
         # opencv
-        opencv_core454
-        opencv_imgcodecs454
-        opencv_imgproc454
-        opencv_videoio454
+		opencv_core455
+		opencv_imgcodecs455
+		opencv_imgproc455
+		opencv_videoio455
     )
 elseif (APPLE)
 
