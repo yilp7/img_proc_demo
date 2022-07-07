@@ -315,7 +315,7 @@ private:
     void send_ctrl_cmd(uchar dir);
 
     // static image display (drag & drop)
-    void Demo::start_static_display(QImage img);
+    void start_static_display(QImage img);
 
 public:
     bool                    mouse_pressed;

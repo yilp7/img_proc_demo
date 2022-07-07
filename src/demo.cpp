@@ -283,6 +283,8 @@ Demo::Demo(QWidget *parent)
     connect(h_joystick_thread, SIGNAL(button_released(int)), this, SLOT(joystick_button_released(int)));
     connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
 
+    connect(this, SIGNAL(update_fishnet_result(int)), SLOT(display_fishnet_result(int)));
+
     // right before gui display (init state)
     for (int i = 0; i < 5; i++) serial_port[i] = new QSerialPort(this), setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600);
     for (int i = 0; i < 5; i++) tcp_port[i] = new QTcpSocket(this);
