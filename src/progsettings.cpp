@@ -24,6 +24,8 @@ ProgSettings::ProgSettings(QWidget *parent) :
     sky_tolerance(40),
     fast_gf(1),
     symmetry(0),
+    fishnet_recog(false),
+    fishnet_thresh(0.99),
     dist_ns(3e8 / 2e9),
     auto_rep_freq(true),
     hz_unit(0),
@@ -163,6 +165,8 @@ void ProgSettings::data_exchange(bool read)
         dehaze_pct = ui->DEHAZE_PCT_EDIT->text().toFloat() / 100;
         sky_tolerance = ui->SKY_TOLERANCE_EDIT->text().toFloat();
         fast_gf = ui->FAST_GF_EDIT->text().toInt();
+        fishnet_recog = ui->FISHNET_RECOG->isChecked();
+        fishnet_thresh = ui->FISHNET_THRESH_EDIT->text().toFloat();
 
         auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
         base_unit = ui->UNIT_LIST->currentIndex();
@@ -209,6 +213,8 @@ void ProgSettings::data_exchange(bool read)
         ui->DEHAZE_PCT_EDIT->setText(QString::number(dehaze_pct * 100, 'f', 2));
         ui->SKY_TOLERANCE_EDIT->setText(QString::number(sky_tolerance, 'f', 2));
         ui->FAST_GF_EDIT->setText(QString::number(fast_gf));
+        ui->FISHNET_RECOG->setChecked(fishnet_recog);
+        ui->FISHNET_THRESH_EDIT->setText(QString::number(fishnet_thresh, 'f', 2));
 
         ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
         ui->UNIT_LIST->setCurrentIndex(base_unit);
@@ -483,4 +489,15 @@ void ProgSettings::on_RESET_3D_BTN_clicked()
 void ProgSettings::on_SYMMETRY_LIST_currentIndexChanged(int index)
 {
     symmetry = index;
+}
+
+void ProgSettings::on_FISHNET_RECOG_stateChanged(int arg1)
+{
+    fishnet_recog = arg1;
+}
+
+void ProgSettings::on_FISHNET_THRESH_EDIT_editingFinished()
+{
+    fishnet_thresh = ui->FISHNET_THRESH_EDIT->text().toFloat();
+    ui->FISHNET_THRESH_EDIT->setText(QString::number(fishnet_thresh, 'f', 2));
 }

@@ -489,8 +489,8 @@
    <widget class="QLabel" name="ACCU_BASE">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>200</y>
+      <x>90</x>
+      <y>20</y>
       <width>81</width>
       <height>16</height>
      </rect>
@@ -502,10 +502,10 @@
    <widget class="QLineEdit" name="ACCU_BASE_EDIT">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>215</y>
+      <x>90</x>
+      <y>35</y>
       <width>51</width>
-      <height>24</height>
+      <height>21</height>
      </rect>
     </property>
     <property name="alignment">
@@ -516,9 +516,9 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>260</y>
+      <y>215</y>
       <width>51</width>
-      <height>24</height>
+      <height>21</height>
      </rect>
     </property>
     <property name="alignment">
@@ -529,7 +529,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>245</y>
+      <y>200</y>
       <width>71</width>
       <height>16</height>
      </rect>
@@ -542,7 +542,7 @@
     <property name="geometry">
      <rect>
       <x>90</x>
-      <y>245</y>
+      <y>200</y>
       <width>61</width>
       <height>16</height>
      </rect>
@@ -555,9 +555,9 @@
     <property name="geometry">
      <rect>
       <x>90</x>
-      <y>260</y>
+      <y>215</y>
       <width>51</width>
-      <height>24</height>
+      <height>21</height>
      </rect>
     </property>
     <property name="alignment">
@@ -568,9 +568,9 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>305</y>
+      <y>260</y>
       <width>31</width>
-      <height>24</height>
+      <height>21</height>
      </rect>
     </property>
     <property name="alignment">
@@ -581,7 +581,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>290</y>
+      <y>245</y>
       <width>61</width>
       <height>16</height>
      </rect>
@@ -594,7 +594,7 @@
     <property name="geometry">
      <rect>
       <x>80</x>
-      <y>305</y>
+      <y>255</y>
       <width>71</width>
       <height>21</height>
      </rect>
@@ -624,6 +624,42 @@
     </property>
     <property name="text">
      <string>Symmetry</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="FISHNET">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>300</y>
+      <width>101</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>fishnet recog</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="FISHNET_RECOG">
+    <property name="geometry">
+     <rect>
+      <x>90</x>
+      <y>280</y>
+      <width>77</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>enable</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="FISHNET_THRESH_EDIT">
+    <property name="geometry">
+     <rect>
+      <x>90</x>
+      <y>305</y>
+      <width>53</width>
+      <height>21</height>
+     </rect>
     </property>
    </widget>
   </widget>
@@ -912,7 +948,7 @@
       <x>30</x>
       <y>15</y>
       <width>101</width>
-      <height>24</height>
+      <height>21</height>
      </rect>
     </property>
     <property name="text">

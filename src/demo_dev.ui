@@ -1457,6 +1457,22 @@
       <string>info</string>
      </property>
     </widget>
+    <widget class="QLabel" name="FISHNET_RESULT">
+     <property name="geometry">
+      <rect>
+       <x>488</x>
+       <y>5</y>
+       <width>101</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;FISHNET&lt;br/&gt;???&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
    </widget>
    <widget class="QFrame" name="RIGHT">
     <property name="geometry">

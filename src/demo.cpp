@@ -451,12 +451,14 @@ int Demo::grab_thread_process() {
     Display *disp = ui->SOURCE_DISPLAY;
     ProgSettings *settings = ui->TITLE->prog_settings;
     QImage stream;
-    cv::Mat sobel;
     int ww, hh;
     float weight = h / 1024.0; // font scale & thickness
     prev_3d = cv::Mat(h, w, CV_8UC3);
     prev_img = cv::Mat(h, w, CV_8UC1);
     double *range = (double*)calloc(w * h, sizeof(double));
+    cv::Mat sobel, fishnet_res;
+    cv::dnn::Net net = cv::dnn::readNet("model/resnet18.onnx");
+    double threshold = 0.99;
     while (grab_thread_state) {
         while (img_q.size() > 3) img_q.pop();
 
@@ -509,6 +511,27 @@ int Demo::grab_thread_process() {
             }
         }
 */
+        if (ui->TITLE->prog_settings->fishnet_recog) {
+            cv::cvtColor(img_mem, fishnet_res, cv::COLOR_GRAY2RGB);
+            fishnet_res.convertTo(fishnet_res, CV_32FC3, 1.0 / 255);
+            cv::resize(fishnet_res, fishnet_res, cv::Size(224, 224));
+
+            cv::Mat blob = cv::dnn::blobFromImage(fishnet_res, 1.0, cv::Size(224, 224));
+            net.setInput(blob);
+            cv::Mat prob = net.forward("195");
+//            std::cout << cv::format(prob, cv::Formatter::FMT_C) << std::endl;
+
+            double min, max;
+            cv::minMaxLoc(prob, &min, &max);
+
+    //        prob -=max;
+            double is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
+//            double is_net = exp(prob.at<float>(1)) / exp(prob.at<float>(0) + prob.at<float>(1));
+
+            emit update_fishnet_result(is_net > ui->TITLE->prog_settings->fishnet_thresh);
+        }
+        else emit update_fishnet_result(-1);
+
         // process frame average
         if (seq_sum.empty()) seq_sum = cv::Mat::zeros(h, w, CV_16U);
         if (ui->FRAME_AVG_CHECK->isChecked()) {
@@ -1974,7 +1997,8 @@ void Demo::filter_scan()
 void Demo::update_current()
 {
     if (!serial_port[3]) return;
-    QString send = "DIOD1:CURR " + ui->CURRENT_EDIT->text() + "\r";
+//    QString send = "DIOD1:CURR " + ui->CURRENT_EDIT->text() + "\r";
+    QString send = "PCUR " + ui->CURRENT_EDIT->text() + "\r";
     serial_port[3]->write(send.toLatin1().data(), send.length());
     serial_port[3]->waitForBytesWritten(100);
     serial_port[3]->readAll();
@@ -2700,6 +2724,7 @@ void Demo::resizeEvent(QResizeEvent *event)
 //    ui->HIDE_BTN->move(ui->LEFT->geometry().right() - 10 + (ui->SOURCE_DISPLAY->geometry().left() + ui->MID->geometry().left() - ui->LEFT->geometry().right() + 10) / 2 + 2, this->geometry().height() / 2 - 10);
     ui->RULER_H->setGeometry(region.left(), region.bottom() - 10, region.width(), 32);
     ui->RULER_V->setGeometry(region.right() - 10, region.top(), 32, region.height());
+    ui->FISHNET_RESULT->move(region.right() - 170, 5);
 
     image_mutex.lock();
     ui->SOURCE_DISPLAY->setGeometry(region);
@@ -3129,6 +3154,12 @@ void Demo::on_LASER_BTN_clicked()
         QTimer::singleShot(4000, this, SLOT(start_laser()));
     }
     else {
+        if (serial_port[3] && serial_port[3]->isOpen()) {
+            serial_port[3]->write("OFF\r", 10);
+            serial_port[3]->waitForBytesWritten(100);
+            QThread::msleep(100);
+            serial_port[3]->readAll();
+        }
         communicate_display(0, generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 7, 0, false);
 
         ui->LASER_BTN->setText(tr("ON"));
@@ -3348,3 +3379,12 @@ void Demo::on_DUAL_LIGHT_BTN_clicked()
     }
 }
 
+void Demo::display_fishnet_result(int result)
+{
+    switch (result) {
+    case -1: ui->FISHNET_RESULT->setText("FISHNET<br>???"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");            break;
+    case  0: ui->FISHNET_RESULT->setText("FISHNET<br>DOES NOT EXIST"), ui->FISHNET_RESULT->setStyleSheet("color: #CD5C5C;"); break;
+    case  1: ui->FISHNET_RESULT->setText("FISHNET<br>EXISTS"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");         break;
+    default: return;
+    }
+}

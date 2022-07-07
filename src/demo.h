@@ -216,6 +216,9 @@ private slots:
 
     void on_DUAL_LIGHT_BTN_clicked();
 
+    // display fishnet result
+    void display_fishnet_result(int result);
+
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);
@@ -232,6 +235,9 @@ signals:
 
     // task queue full in thread pool
     void task_queue_full();
+
+    // update fishnet result in thread
+    void update_fishnet_result(int res);
 
 protected:
 //  overload

@@ -63,6 +63,9 @@ private slots:
 
     void on_SYMMETRY_LIST_currentIndexChanged(int index);
 
+    void on_FISHNET_RECOG_stateChanged(int arg1);
+    void on_FISHNET_THRESH_EDIT_editingFinished();
+
 signals:
     void rep_freq_unit_changed(int);
     void base_unit_changed(int);
@@ -103,6 +106,8 @@ public:
     float            sky_tolerance;
     int              fast_gf;
     int              symmetry;
+    float            fishnet_recog;
+    float            fishnet_thresh;
 
     float            dist_ns;
     bool             auto_rep_freq;
