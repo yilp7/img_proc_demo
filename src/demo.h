@@ -309,7 +309,8 @@ private:
     void send_ctrl_cmd(uchar dir);
 
     // static image display (drag & drop)
-    void Demo::start_static_display(QImage img);
+    void start_static_display(QImage img);
+    bool load_image_file(QString filename, bool init);
 
 public:
     bool                    mouse_pressed;

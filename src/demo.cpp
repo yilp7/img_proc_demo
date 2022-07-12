@@ -458,7 +458,7 @@ int Demo::grab_thread_process() {
     prev_img = cv::Mat(h, w, CV_8UC1);
     double *range = (double*)calloc(w * h, sizeof(double));
     while (grab_thread_state) {
-        while (img_q.size() > 3) img_q.pop();
+        while (img_q.size() > 5) img_q.pop();
 
         if (img_q.empty()) {
 //            QThread::msleep(10);
@@ -546,7 +546,7 @@ int Demo::grab_thread_process() {
             else modified_result = prev_3d;
 //            if (!frame_a_3d) prev_3d = modified_result.clone();
 
-            cv::resize(modified_result, img_display, cv::Size(ui->SOURCE_DISPLAY->width(), ui->SOURCE_DISPLAY->height()), 0, 0, cv::INTER_AREA);
+            cv::resize(modified_result, img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
         }
         // process ordinary image enhance
         else {
@@ -718,7 +718,7 @@ int Demo::grab_thread_process() {
             }
 
             // resize to display size
-            cv::resize(modified_result, img_display, cv::Size(ui->SOURCE_DISPLAY->width(), ui->SOURCE_DISPLAY->height()), 0, 0, cv::INTER_AREA);
+            cv::resize(modified_result, img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
             // draw the center cross
             if (!image_3d && ui->CENTER_CHECK->isChecked()) {
                 for (int i = img_display.cols / 2 - 9; i < img_display.cols / 2 + 10; i++) img_display.at<uchar>(img_display.rows / 2, i) = img_display.at<uchar>(img_display.rows / 2, i) > 127 ? 0 : 255;
@@ -732,7 +732,7 @@ int Demo::grab_thread_process() {
         stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, image_3d || is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
 //        ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         // use signal->slot instead of directly call
-        emit set_pixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+        emit set_pixmap(QPixmap::fromImage(stream.scaled(disp->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 
         // process scan
         if (scan && updated) {
@@ -2850,7 +2850,7 @@ void Demo::dragEnterEvent(QDragEnterEvent *event)
 {
     QMainWindow::dragEnterEvent(event);
 
-    if (event->mimeData()->urls().length() < 3) event->acceptProposedAction();
+    if (event->mimeData()->urls().length() < 6) event->acceptProposedAction();
 }
 
 void Demo::dropEvent(QDropEvent *event)
@@ -2859,56 +2859,46 @@ void Demo::dropEvent(QDropEvent *event)
 
     if (event->mimeData()->urls().length() == 1) {
         QString file_name = event->mimeData()->urls().first().toLocalFile();
-        if (file_name.endsWith(".bmp", Qt::CaseInsensitive) || file_name.endsWith(".png", Qt::CaseInsensitive) || file_name.endsWith(".tif", Qt::CaseInsensitive)) {
-            if (device_on) {
-                QMessageBox::warning(this, "PROMPT", tr("Cannot read local image while cam is on"));
-                return;
-            }
-            QImage temp_img;
-            temp_img.load(file_name);
-            start_static_display(temp_img);
-
-            img_q.push(cv::Mat(h, w, CV_8UC1, (uchar*)temp_img.bits(), temp_img.bytesPerLine()).clone());
-        }
-        else load_config(file_name);
+        if (!load_image_file(file_name, true)) load_config(file_name);
     }
     else {
-        QString file_name1 = event->mimeData()->urls()[0].toLocalFile();
-        QString file_name2 = event->mimeData()->urls()[1].toLocalFile();
-        if ((file_name1.endsWith(".bmp", Qt::CaseInsensitive) || file_name1.endsWith(".png", Qt::CaseInsensitive) || file_name1.endsWith(".tif", Qt::CaseInsensitive)) &&
-            (file_name2.endsWith(".bmp", Qt::CaseInsensitive) || file_name2.endsWith(".png", Qt::CaseInsensitive) || file_name2.endsWith(".tif", Qt::CaseInsensitive))) {
-            if (device_on) {
-                QMessageBox::warning(this, "PROMPT", tr("Cannot read local image while cam is on"));
-                return;
-            }
-            QImage temp_img1, temp_img2;
-            temp_img1.load(file_name1);
-            temp_img2.load(file_name2);
-            if (temp_img1.format() != QImage::Format_Indexed8) temp_img1 = temp_img1.convertToFormat(QImage::Format_Indexed8);
-            if (temp_img2.format() != QImage::Format_Indexed8) temp_img2 = temp_img2.convertToFormat(QImage::Format_Indexed8);
-            if (temp_img1.width() == temp_img2.width() && temp_img1.height() == temp_img2.height() && temp_img1.depth() == temp_img2.depth()) start_static_display(temp_img1);
-            else {
-                QMessageBox::warning(this, "PROMPT", tr("Multiple images need to have the same size"));
-                return;
-            }
-            cv::Mat img1(h, w, CV_8UC1, (uchar*)temp_img1.bits(), temp_img1.bytesPerLine());
-            cv::Mat img2(h, w, CV_8UC1, (uchar*)temp_img2.bits(), temp_img2.bytesPerLine());
-
-            img_q.push(img1.clone());
-            img_q.push(img2.clone());
+        bool result = true, init = true;
+        for (QUrl path : event->mimeData()->urls()) {
+            bool temp = load_image_file(path.toLocalFile(), init);
+            if (init) init = !temp;
+            result |= temp;
         }
-        else {
-            QMessageBox::warning(this, "PROMPT", tr("Cannot read selected image files"));
-        }
+        if (!result) QMessageBox::warning(this, "PROMPT", tr("Some of the image files cannot be read"));
     }
+}
+
+bool Demo::load_image_file(QString filename, bool init)
+{
+    QImage temp;
+    if (device_on) {
+        QMessageBox::warning(this, "PROMPT", tr("Cannot read local image while cam is on"));
+        return false;
+    }
+    if (!temp.load(filename)) {
+        return false;
+    }
+
+    if (init) start_static_display(temp);
+    temp = temp.convertToFormat(is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+
+    img_q.push(cv::Mat(h, w, is_color ? CV_8UC3 : CV_8UC1, (uchar*)temp.bits(), temp.bytesPerLine()).clone());
+
+    return true;
 }
 
 void Demo::start_static_display(QImage img)
 {
     w = img.width();
     h = img.height();
-    is_color = false;
-    pixel_depth = img.depth();
+
+    is_color = img.format() != QImage::Format_Indexed8;
+//    pixel_depth = img.depth();
+    pixel_depth = 8;
     device_type = -1;
 
     if (grab_thread_state || h_grab_thread) {
@@ -2931,6 +2921,7 @@ void Demo::start_static_display(QImage img)
     }
     h_grab_thread->start();
     start_grabbing = true;
+    ui->SOURCE_DISPLAY->grab = true;
     enable_controls(true);
     ui->START_BUTTON->setEnabled(false);
 }
