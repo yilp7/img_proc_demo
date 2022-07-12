@@ -59,6 +59,8 @@ elseif (APPLE)
 
 # for aarch64 only
 elseif (UNIX)
+        include_directories(${PROJECT_SOURCE_DIR}/src)
+
 	include_directories(${Hik_SDK_DIR}/include/linux)
 	include_directories(${HQV_DIR}/include)
 	include_directories(${EURESYS_DIR}/include)
@@ -106,8 +108,13 @@ set(SOURCE_FILES
     src/settings.ui
     src/preferences.ui
     resources/resources.qrc
-    resources/gist.rc
 )
+
+if (WIN32)
+    set(SOURCE_FILES
+        resources/gist.rc
+    )
+endif()
 
 set(PROJECT_LIBS
     Qt${QT_VERSION_MAJOR}::Widgets
@@ -128,10 +135,10 @@ if (WIN32)
         # joystick
         winmm
         # opencv
-		opencv_core455
-		opencv_imgcodecs455
-		opencv_imgproc455
-		opencv_videoio455
+        opencv_core455
+        opencv_imgcodecs455
+        opencv_imgproc455
+        opencv_videoio455
     )
 elseif (APPLE)
 
