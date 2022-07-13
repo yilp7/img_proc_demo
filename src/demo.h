@@ -216,6 +216,8 @@ private slots:
 
     void on_DUAL_LIGHT_BTN_clicked();
 
+    void on_RESET_3D_BTN_clicked();
+
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);
