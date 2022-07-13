@@ -3339,3 +3339,7 @@ void Demo::on_DUAL_LIGHT_BTN_clicked()
     }
 }
 
+void Demo::on_RESET_3D_BTN_clicked()
+{
+    frame_a_3d ^= 1;
+}
