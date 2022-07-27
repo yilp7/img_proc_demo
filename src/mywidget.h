@@ -2,6 +2,7 @@
 #define MYWIDGET_H
 
 #include "progsettings.h"
+#include "preferences.h"
 #include "utils.h"
 
 class Display : public QLabel
@@ -119,6 +120,7 @@ public:
     QObject      *signal_receiver;
 
     ProgSettings *prog_settings;
+    Preferences  *preferences;
 
 };
 

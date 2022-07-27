@@ -320,6 +320,8 @@ public:
 private:
     Ui::Demo*               ui;
 
+    Preferences             *pref;
+
     int                     calc_avg_option;            // a: 5 frames; b: 10 frames
     double                  range_threshold;            // range threshold for building 3d images
     bool                    trigger_by_software;        // whether the device gets trigger signal from sw
@@ -334,8 +336,8 @@ private:
     QString                 TEMP_SAVE_LOCATION;         // temp location to save the image
     cv::VideoWriter         vid_out[2];                 // video writer for ORI/RES
 
-    QSerialPort*            serial_port[5];             // 0: tcu, 1: rangefinder, 2: lens, 3: laser
-    QTcpSocket*             tcp_port[5];
+    QSerialPort*            serial_port[5];             // 0: tcu, 1: rangefinder, 2: lens, 3: laser, 4: PTZ
+    QTcpSocket*             tcp_port[5];                // 0-1: 232, 2-4: 485
     bool                    use_tcp;
     bool                    share_serial_port;          // whether using a single comm for serial communication
     float                   rep_freq;
@@ -356,7 +358,6 @@ private:
     int                     laser_width;
     float                   delay_dist;                 // estimated distance calculated from delay
     float                   depth_of_view;
-    // TODO rewrite auto focus function
     int                     focus_direction;
     int                     clarity[3];
     char                    curr_laser_idx;
@@ -445,7 +446,7 @@ private:
     int                     ptz_speed;
 
     // TEMP ONLY
-    // TO-DO: move to addons
+    // TODO: move to addons
     PluginInterface         *pluginInterface;           // for ir with visible light
 
 };

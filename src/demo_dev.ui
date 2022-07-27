@@ -35,9 +35,6 @@
    <iconset>
     <normaloff>:/logo/1.png</normaloff>:/logo/1.png</iconset>
   </property>
-  <property name="styleSheet">
-   <string notr="true"/>
-  </property>
   <property name="tabShape">
    <enum>QTabWidget::Rounded</enum>
   </property>

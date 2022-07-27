@@ -198,6 +198,7 @@ void TitleBar::setup(QObject *ptr)
     signal_receiver = ptr;
 
     prog_settings = new ProgSettings();
+    preferences = new Preferences();
 
     settings = new TitleButton("", this);
     settings->setObjectName("SETTINGS_BTN");
@@ -206,6 +207,7 @@ void TitleBar::setup(QObject *ptr)
     QAction *pref = new QAction("-- preferences", this);
     settings_menu->addAction(pref);
     pref->setShortcut(QKeySequence(Qt::ALT + Qt::Key_S));
+/*
     connect(pref, SIGNAL(triggered()), prog_settings, SLOT(show()));
     connect(pref, SIGNAL(triggered()), prog_settings, SLOT(raise()));
     connect(prog_settings, SIGNAL(rep_freq_unit_changed(int)), signal_receiver, SLOT(setup_hz(int)));
@@ -220,6 +222,24 @@ void TitleBar::setup(QObject *ptr)
     connect(prog_settings, SIGNAL(set_dev_ip(int, int)),       signal_receiver, SLOT(set_dev_ip(int, int)));
     connect(prog_settings, SIGNAL(change_pixel_format(int)),   signal_receiver, SLOT(change_pixel_format(int)));
     connect(prog_settings, SIGNAL(reset_frame_a()),            signal_receiver, SLOT(reset_frame_a()));
+*/
+    connect(pref, SIGNAL(triggered()), preferences, SLOT(show()));
+    connect(pref, SIGNAL(triggered()), preferences, SLOT(raise()));
+    connect(preferences, SIGNAL(set_dev_ip(int, int)),       signal_receiver, SLOT(set_dev_ip(int, int)));
+    connect(preferences, SIGNAL(change_pixel_format(int)),   signal_receiver, SLOT(change_pixel_format(int)));
+    connect(preferences, SIGNAL(get_baudrate(int)),          signal_receiver, SLOT(display_baudrate(int)));
+    connect(preferences, SIGNAL(change_baudrate(int, int)),  signal_receiver, SLOT(set_baudrate(int, int)));
+    //TODO connect to tcp button clicked
+    connect(preferences, SIGNAL(com_write(int, QByteArray)), signal_receiver, SLOT(com_write_data(int, QByteArray)));
+    connect(preferences, SIGNAL(rep_freq_unit_changed(int)), signal_receiver, SLOT(setup_hz(int)));
+    connect(preferences, SIGNAL(base_unit_changed(int)),     signal_receiver, SLOT(setup_stepping(int)));
+    connect(preferences, SIGNAL(max_dist_changed(int)),      signal_receiver, SLOT(setup_max_dist(int)));
+    connect(preferences, SIGNAL(laser_toggled(int)),         signal_receiver, SLOT(setup_laser(int)));
+    // TODO remove below slots in Demo class
+    connect(preferences, SIGNAL(share_serial_port(bool)),    signal_receiver, SLOT(set_serial_port_share(bool)));
+    connect(preferences, SIGNAL(auto_mcp(bool)),             signal_receiver, SLOT(set_auto_mcp(bool)));
+    connect(preferences, SIGNAL(reset_frame_a()),            signal_receiver, SLOT(reset_frame_a()));
+
     settings_menu->addAction(">> export pref.", signal_receiver, SLOT(export_config()), QKeySequence(Qt::ALT + Qt::Key_E));
     settings_menu->addAction("<< load pref.",   signal_receiver, SLOT(prompt_for_config_file()), QKeySequence(Qt::ALT + Qt::Key_R));
     settings_menu->addAction("## config s.n.",  signal_receiver, SLOT(prompt_for_serial_file()), QKeySequence(Qt::ALT + Qt::Key_C));

@@ -59,7 +59,7 @@ ProgSettings::ProgSettings(QWidget *parent) :
     connect(ui->FRAME_COUNT_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
     connect(ui->STEP_SIZE_EDIT, SIGNAL(editingFinished()), SLOT(update_scan()));
 
-    laser_grp = new QButtonGroup();
+    laser_grp = new QButtonGroup(this);
     laser_grp->addButton(ui->LASER_CHK_1, 0);
     laser_grp->addButton(ui->LASER_CHK_2, 1);
     laser_grp->addButton(ui->LASER_CHK_3, 2);

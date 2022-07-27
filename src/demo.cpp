@@ -17,6 +17,7 @@ Demo::Demo(QWidget *parent)
     : QMainWindow(parent),
     mouse_pressed(false),
     ui(new Ui::Demo),
+    pref(NULL),
     calc_avg_option(5),
     range_threshold(0),
     trigger_by_software(false),
@@ -124,7 +125,6 @@ Demo::Demo(QWidget *parent)
     enhance_options->addItem(tr("None"));
     enhance_options->addItem(tr("Histogram"));
     enhance_options->addItem(tr("Laplace"));
-    enhance_options->addItem(tr("Log-based"));
     enhance_options->addItem(tr("SP-5"));
     enhance_options->addItem(tr("Accumulative"));
     enhance_options->addItem(tr("Sigmoid-based"));
@@ -274,6 +274,7 @@ Demo::Demo(QWidget *parent)
 
     // connect title bar to the main window (Demo*)
     ui->TITLE->setup(this);
+    pref = ui->TITLE->preferences;
 
     // connect to joystick (windows xbox only)
     h_joystick_thread = new JoystickThread(this);
@@ -291,9 +292,6 @@ Demo::Demo(QWidget *parent)
 
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
-
-//    Preferences *preferences = new Preferences;
-//    preferences->show();
 
 #ifdef ICMOS
     ui->RANGE_COM->setText("R1");
@@ -335,10 +333,14 @@ Demo::Demo(QWidget *parent)
     ui->DELAY_B_EDIT_N->setEnabled(false);
 
     max_dist = 6000;
-    ui->TITLE->prog_settings->max_dist = 6000;
-    ui->TITLE->prog_settings->data_exchange(false);
-    ui->TITLE->prog_settings->max_dist_changed(6000);
+//    ui->TITLE->prog_settings->max_dist = 6000;
+//    ui->TITLE->prog_settings->data_exchange(false);
+//    ui->TITLE->prog_settings->max_dist_changed(6000);
+    pref->max_dist = 6000;
+    pref->data_exchange(false);
+    pref->max_dist_changed(6000);
 
+    ui->DUAL_LIGHT_BTN->hide();
 #else
     ui->LOGO->hide();
 #endif
@@ -449,7 +451,7 @@ void Demo::data_exchange(bool read){
 
 int Demo::grab_thread_process() {
     Display *disp = ui->SOURCE_DISPLAY;
-    ProgSettings *settings = ui->TITLE->prog_settings;
+//    ProgSettings *settings = ui->TITLE->prog_settings;
     QImage stream;
     cv::Mat sobel;
     int ww, hh;
@@ -481,10 +483,10 @@ int Demo::grab_thread_process() {
             for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * img_mem.cols)[j]]++;
 
             // if the image needs flipping
-            if (settings->symmetry) cv::flip(img_mem, img_mem, settings->symmetry - 2);
+            if (pref->symmetry) cv::flip(img_mem, img_mem, pref->symmetry - 2);
 
             // mcp self-adaptive
-            if (auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
+            if (pref->auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
                 int thresh_num = img_mem.total() / 200, thresh = 1 << pixel_depth;
                 while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
                 if (thresh > (1 << pixel_depth) * 0.94) emit update_mcp_in_thread(mcp - sqrt(thresh - (1 << pixel_depth) * 0.94));
@@ -565,24 +567,24 @@ int Demo::grab_thread_process() {
                     cv::filter2D(modified_result, modified_result, CV_8U, kernel);
                     break;
                 }
-                // log
-                case 3: {
-                    cv::Mat img_log;
-                    modified_result.convertTo(img_log, CV_32F);
-                    modified_result += 1.0;
-                    cv::log(img_log, img_log);
-                    img_log *= settings->log;
-                    cv::normalize(img_log, img_log, 0, 255, cv::NORM_MINMAX);
-                    cv::convertScaleAbs(img_log, modified_result);
-                    break;
-                }
+//                // log
+//                case 3: {
+//                    cv::Mat img_log;
+//                    modified_result.convertTo(img_log, CV_32F);
+//                    modified_result += 1.0;
+//                    cv::log(img_log, img_log);
+//                    img_log *= settings->log;
+//                    cv::normalize(img_log, img_log, 0, 255, cv::NORM_MINMAX);
+//                    cv::convertScaleAbs(img_log, modified_result);
+//                    break;
+//                }
                 // SP
-                case 4: {
+                case 3: {
                     ImageProc::plateau_equl_hist(&modified_result, &modified_result, 4);
                     break;
                 }
                 // accumulative
-                case 5: {
+                case 4: {
 //                    uchar *img = modified_result.data;
 //                    for (int i = 0; i < h; i++) {
 //                        for (int j = 0; j < w; j++) {
@@ -601,17 +603,19 @@ int Demo::grab_thread_process() {
 //                            else if (p < 256) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1);}
 //                        }
 //                    }
-                    ImageProc::accumulative_enhance(modified_result, modified_result, settings->accu_base);
+                    ImageProc::accumulative_enhance(modified_result, modified_result, pref->accu_base);
                     break;
                 }
+                //TODO rewrite sigmoid enchance
                 // sigmoid (nonlinear) (mergw log w/ 1/(1+exp))
-                case 6: {
+                case 5: {
                     uchar *img = modified_result.data;
                     cv::Mat img_log, img_nonLT = cv::Mat(h, w, CV_8U);
                     modified_result.convertTo(img_log, CV_32F);
                     modified_result += 1.0;
                     cv::log(img_log, img_log);
-                    img_log *= settings->log;
+//                    img_log *= settings->log;
+                    img_log *= 1.2;
                     double m = 0, kv = 0, mean = cv::mean(modified_result)[0];
                     uchar p;
                     for (int i = 0; i < h; i++) {
@@ -634,7 +638,7 @@ int Demo::grab_thread_process() {
                     break;
                 }
                 // adaptive
-                case 7: {
+                case 6: {
     //                double low = settings->low_in * 255, high = settings->high_in * 255; // (0, 12.75)
     //                double bottom = settings->low_out * 255, top = settings->high_out * 255; // (0, 255)
     //                double err_in = high - low, err_out = top - bottom; // (12.75, 255)
@@ -645,19 +649,19 @@ int Demo::grab_thread_process() {
     //                temp = temp * err_out + bottom;
     //                cv::normalize(temp, temp, 0, 255, cv::NORM_MINMAX);
     //                cv::convertScaleAbs(temp, modified_result);
-                    ImageProc::adaptive_enhance(modified_result, modified_result, settings->low_in, settings->high_in, settings->low_out, settings->high_out, settings->gamma);
+                    ImageProc::adaptive_enhance(modified_result, modified_result, pref->low_in, pref->high_in, pref->low_out, pref->high_out, pref->gamma);
                     break;
                 }
                 // enhance_dehaze
-                case 8: {
+                case 7: {
                     modified_result = ~modified_result;
-                    ImageProc::haze_removal(modified_result, modified_result, 7, settings->dehaze_pct, 0.1, 60, 0.01);
+                    ImageProc::haze_removal(modified_result, modified_result, 7, pref->dehaze_pct, 0.1, 60, 0.01);
                     modified_result = ~modified_result;
                     break;
                 }
                 // dcp
-                case 9: {
-                    ImageProc::haze_removal(modified_result, modified_result, 7, settings->dehaze_pct, 0.1, 60, 0.01);
+                case 8: {
+                    ImageProc::haze_removal(modified_result, modified_result, 7, pref->dehaze_pct, 0.1, 60, 0.01);
                 }
                 // none
                 default:
@@ -1051,7 +1055,8 @@ void Demo::switch_language()
 {
     en ? (qApp->removeTranslator(&trans), qApp->setFont(monaco)) : (qApp->installTranslator(&trans), qApp->setFont(consolas));
     ui->retranslateUi(this);
-    ui->TITLE->prog_settings->switch_language(en, &trans);
+//    ui->TITLE->prog_settings->switch_language(en, &trans);
+    pref->switch_language(en, &trans);
 //    int idx = ui->ENHANCE_OPTIONS->currentIndex();
 //    ui->ENHANCE_OPTIONS->clear();
 //    ui->ENHANCE_OPTIONS->addItem(tr("None"));
@@ -1067,7 +1072,8 @@ void Demo::closeEvent(QCloseEvent *event)
 {
     shut_down();
     event->accept();
-    ui->TITLE->prog_settings->reject();
+//    ui->TITLE->prog_settings->reject();
+    pref->reject();
     if (QFile::exists("HQVSDK.xml")) QFile::remove("HQVSDK.xml");
 }
 
@@ -1208,7 +1214,7 @@ void Demo::setup_serial_port(QSerialPort **port, int id, QString port_num, int b
         default:
             break;
         }
-        ui->TITLE->prog_settings->display_baudrate(id, baud_rate);
+        pref->display_baudrate(id, baud_rate);
     }
     else {
         com_label[id]->setStyleSheet("color: #CD5C5C;");
@@ -1219,13 +1225,16 @@ void Demo::on_ENUM_BUTTON_clicked()
 {
     if (curr_cam) delete curr_cam;
     curr_cam = new Cam;
-    if (ui->TITLE->prog_settings->cameralink) curr_cam->cameralink = true;
+//    if (ui->TITLE->prog_settings->cameralink) curr_cam->cameralink = true;
+    curr_cam->cameralink = pref->cameralink;
     enable_controls(device_type = curr_cam->search_for_devices());
-    ui->TITLE->prog_settings->enable_ip_editing(device_type == 1);
+//    ui->TITLE->prog_settings->enable_ip_editing(device_type == 1);
+    pref->enable_ip_editing(device_type == 1);
     if (device_type) {
         int ip, gateway;
         curr_cam->ip_address(true, &ip, &gateway);
-        ui->TITLE->prog_settings->config_ip(true, ip, gateway);
+//        ui->TITLE->prog_settings->config_ip(true, ip, gateway);
+        pref->config_ip(true, ip, gateway);
     }
 }
 
@@ -1274,7 +1283,8 @@ void Demo::on_START_BUTTON_clicked()
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
 
-    ui->TITLE->prog_settings->set_pixel_format(0);
+//    ui->TITLE->prog_settings->set_pixel_format(0);
+    pref->set_pixel_format(0);
 }
 
 void Demo::on_SHUTDOWN_BUTTON_clicked()
@@ -1523,7 +1533,8 @@ void Demo::setup_stepping(int base_unit)
     // ns
     case 0: ui->STEPPING_UNIT->setText("ns"); ui->STEPPING_EDIT->setText(QString::number((int)stepping)); break;
     // μs
-    case 1: ui->STEPPING_UNIT->setText(QString::fromLocal8Bit("μs")); ui->STEPPING_EDIT->setText(QString::number(stepping / 1000, 'f', 2)); break;
+//    case 1: ui->STEPPING_UNIT->setText(QString::fromLocal8Bit("μs")); ui->STEPPING_EDIT->setText(QString::number(stepping / 1000, 'f', 2)); break;
+    case 1: ui->STEPPING_UNIT->setText("μs"); ui->STEPPING_EDIT->setText(QString::number(stepping / 1000, 'f', 2)); break;
     // m
     case 2: ui->STEPPING_UNIT->setText("m"); ui->STEPPING_EDIT->setText(QString::number(stepping * dist_ns, 'f', 2)); break;
     default: break;
@@ -1563,7 +1574,8 @@ void Demo::com_write_data(int com_idx, QByteArray data)
 
 void Demo::display_baudrate(int idx)
 {
-    if (serial_port[idx]->isOpen()) ui->TITLE->prog_settings->display_baudrate(idx, serial_port[idx]->baudRate());
+//    if (serial_port[idx]->isOpen()) ui->TITLE->prog_settings->display_baudrate(idx, serial_port[idx]->baudRate());
+    if (serial_port[idx]->isOpen()) pref->display_baudrate(idx, serial_port[idx]->baudRate());
 }
 
 void Demo::set_auto_mcp(bool adaptive)
@@ -1780,11 +1792,13 @@ void Demo::load_config(QString config_name)
         communicate_display(0, convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
         ui->MCP_SLIDER->setValue(mcp);
         on_SET_PARAMS_BUTTON_clicked();
-        ui->TITLE->prog_settings->data_exchange(false);
+//        ui->TITLE->prog_settings->data_exchange(false);
+        pref->data_exchange(false);
     }
     else {
         data_exchange(true);
-        ui->TITLE->prog_settings->data_exchange(true);
+//        ui->TITLE->prog_settings->data_exchange(true);
+        pref->data_exchange(true);
         QMessageBox::warning(this, "PROMPT", tr("cannot read config file"));
     }
 }
@@ -1821,12 +1835,12 @@ QByteArray Demo::communicate_display(int id, QByteArray write, int write_size, i
     port_mutex.lock();
 //    image_mutex.lock();
     QByteArray read;
+    QString str_s("sent    "), str_r("received");
+
+    for (char i = 0; i < write_size; i++) str_s += QString::asprintf(" %02X", (uchar)write[i]);
+    emit append_text(str_s);
+
     if (!use_tcp) {
-        QString str_s("sent    "), str_r("received");
-
-        for (char i = 0; i < write_size; i++) str_s += QString::asprintf(" %02X", (uchar)write[i]);
-        emit append_text(str_s);
-
         if (!serial_port[id]->isOpen()) {
             port_mutex.unlock();
 //            image_mutex.unlock();
@@ -1843,11 +1857,6 @@ QByteArray Demo::communicate_display(int id, QByteArray write, int write_size, i
         emit append_text(str_r);
     }
     else {
-        QString str_s("sent    "), str_r("received");
-
-        for (char i = 0; i < write_size; i++) str_s += QString::asprintf(" %02X", (uchar)write[i]);
-        emit append_text(str_s);
-
         if (!tcp_port[id]->isOpen()) {
             port_mutex.unlock();
 //            image_mutex.unlock();
@@ -1895,7 +1904,8 @@ void Demo::update_delay()
     }
     else {
         // change repeated frequency according to delay: rep frequency (kHz) <= 1s / delay (μs)
-        if (ui->TITLE->prog_settings->auto_rep_freq) {
+//        if (ui->TITLE->prog_settings->auto_rep_freq) {
+        if (pref->auto_rep_freq) {
             rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000) : 30;
             if (rep_freq > 30) rep_freq = 30;
 //            if (rep_freq < 10) rep_freq = 10;
@@ -1985,12 +1995,13 @@ void Demo::convert_write(QDataStream &out, const int TYPE)
 {
     data_exchange(true);
     out << uchar(0xAA) << uchar(0xAA);
-    static ProgSettings *ps = ui->TITLE->prog_settings;
+//    static ProgSettings *ps = ui->TITLE->prog_settings;
     switch (TYPE) {
     case WIN_PREF:
     {
         out << "WIN_PREF" << uchar('.');
-        out << com_edit[0]->text().toInt() << com_edit[1]->text().toInt() << com_edit[2]->text().toInt() << com_edit[3]->text().toInt() << save_location.toUtf8().constData();
+//        out << com_edit[0]->text().toInt() << com_edit[1]->text().toInt() << com_edit[2]->text().toInt() << com_edit[3]->text().toInt() << save_location.toUtf8().constData();
+        out << save_location.toUtf8().constData();
     }
     case TCU:
     {
@@ -1999,18 +2010,20 @@ void Demo::convert_write(QDataStream &out, const int TYPE)
     }
     case SCAN:
     {
-        out << "SCAN" << uchar('.');
-        out << ps->start_pos << ps->end_pos << ps->frame_count << ps->step_size << ps->rep_freq << (int)(ps->save_scan_ori) << (int)(ps->save_scan_res);
+//        out << "SCAN" << uchar('.');
+//        out << ps->start_pos << ps->end_pos << ps->frame_count << ps->step_size << ps->rep_freq << (int)(ps->save_scan_ori) << (int)(ps->save_scan_res);
     }
     case IMG:
     {
         out << "IMG" << uchar('.');
-        out << ps->kernel << ps->gamma << ps->log << ps->low_in << ps->low_out << ps->high_in << ps->high_out << ps->dehaze_pct << ps->sky_tolerance << ps->fast_gf;
+//        out << ps->kernel << ps->gamma << ps->log << ps->low_in << ps->low_out << ps->high_in << ps->high_out << ps->dehaze_pct << ps->sky_tolerance << ps->fast_gf;
+        out << pref->accu_base << pref->gamma << pref->low_in << pref->low_out << pref->high_in << pref->high_out << pref->dehaze_pct << pref->sky_tolerance << pref->fast_gf;
     }
     case TCU_PREF:
     {
-        out << "TCU_PREF" << uchar('.');
-        out << (int)(ps->auto_rep_freq) << ps->hz_unit << ps->base_unit << ps->max_dist;
+//        out << "TCU_PREF" << uchar('.');
+//        out << (int)(ps->auto_rep_freq) << ps->hz_unit << ps->base_unit << ps->max_dist;
+//        out << (int)(pref->auto_rep_freq) << pref->hz_unit << pref->base_unit << pref->max_dist;
     }
     default: break;
     }
@@ -2030,11 +2043,11 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
     {
         out >> temp_str; if (std::strcmp(temp_str, "WIN_PREF")) return false;
         out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
-        int temp_int = 0;
-        for (int i = 0; i < 4; i++) {
-            out >> temp_int;
-            com_edit[i]->setText(QString::number(temp_int));
-        }
+//        int temp_int = 0;
+//        for (int i = 0; i < 4; i++) {
+//            out >> temp_int;
+//            com_edit[i]->setText(QString::number(temp_int));
+//        }
         out >> temp_str; save_location = QString::fromUtf8(temp_str);
     }
     case TCU:
@@ -2045,27 +2058,28 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
     }
     case SCAN:
     {
-        out >> temp_str; if (std::strcmp(temp_str, "SCAN")) return false;
-        out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
-        int temp_bool;
-        out >> ps->start_pos >> ps->end_pos >> ps->frame_count >> ps->step_size >> ps->rep_freq >> temp_bool;
-        ps->save_scan_ori = temp_bool;
-        out >> temp_bool;
-        ps->save_scan_res = temp_bool;
+//        out >> temp_str; if (std::strcmp(temp_str, "SCAN")) return false;
+//        out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
+//        int temp_bool;
+//        out >> ps->start_pos >> ps->end_pos >> ps->frame_count >> ps->step_size >> ps->rep_freq >> temp_bool;
+//        ps->save_scan_ori = temp_bool;
+//        out >> temp_bool;
+//        ps->save_scan_res = temp_bool;
     }
     case IMG:
     {
         out >> temp_str; if (std::strcmp(temp_str, "IMG")) return false;
         out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
-        out >> ps->kernel >> ps->gamma >> ps->log >> ps->low_in >> ps->low_out >> ps->high_in >> ps->high_out >> ps->dehaze_pct >> ps->sky_tolerance >> ps->fast_gf;
+//        out >> ps->kernel >> ps->gamma >> ps->log >> ps->low_in >> ps->low_out >> ps->high_in >> ps->high_out >> ps->dehaze_pct >> ps->sky_tolerance >> ps->fast_gf;
+        out >> pref->accu_base >> pref->gamma >> ps->low_in >> ps->low_out >> ps->high_in >> ps->high_out >> ps->dehaze_pct >> ps->sky_tolerance >> ps->fast_gf;
     }
     case TCU_PREF:
     {
-        out >> temp_str; if (std::strcmp(temp_str, "TCU_PREF")) return false;
-        out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
-        int temp_bool;
-        out >> temp_bool >> ps->hz_unit >> ps->base_unit >> ps->max_dist;
-        ps->auto_rep_freq = temp_bool;
+//        out >> temp_str; if (std::strcmp(temp_str, "TCU_PREF")) return false;
+//        out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
+//        int temp_bool;
+//        out >> temp_bool >> ps->hz_unit >> ps->base_unit >> ps->max_dist;
+//        ps->auto_rep_freq = temp_bool;
     }
     default: break;
     }
@@ -2094,6 +2108,7 @@ void Demo::connect_to_serial_server_tcp()
     tcp_port[2]->connectToHost(ip, 10002);
     connected = tcp_port[0]->waitForConnected(3000);
     connected = tcp_port[2]->waitForConnected(3000);
+    tcp_port[4] = tcp_port[2];
     use_tcp = connected;
     if (connected) QMessageBox::information(this, "serial port server", "connected to server");
     else           QMessageBox::information(this, "serial port server", "cannot connect to server");
@@ -2631,8 +2646,10 @@ void Demo::keyPressEvent(QKeyEvent *event)
             goto_laser_preset(1 << (event->key() - Qt::Key_1));
             break;
         case Qt::Key_S:
-            ui->TITLE->prog_settings->show();
-            ui->TITLE->prog_settings->raise();
+//            ui->TITLE->prog_settings->show();
+//            ui->TITLE->prog_settings->raise();
+            pref->show();
+            pref->raise();
             break;
         case Qt::Key_E:
             export_config();
@@ -3324,7 +3341,6 @@ void Demo::on_STOP_BTN_clicked()
 {
     communicate_display(4, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 }
-
 
 void Demo::on_DUAL_LIGHT_BTN_clicked()
 {
