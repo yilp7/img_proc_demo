@@ -283,6 +283,8 @@ Demo::Demo(QWidget *parent)
     connect(h_joystick_thread, SIGNAL(button_released(int)), this, SLOT(joystick_button_released(int)));
     connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
 
+    connect(this, SIGNAL(update_fishnet_result(int)), SLOT(display_fishnet_result(int)));
+
     // right before gui display (init state)
     for (int i = 0; i < 5; i++) serial_port[i] = new QSerialPort(this), setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600);
     for (int i = 0; i < 5; i++) tcp_port[i] = new QTcpSocket(this);
@@ -458,9 +460,8 @@ int Demo::grab_thread_process() {
     double *range = (double*)calloc(w * h, sizeof(double));
     cv::Mat sobel, fishnet_res;
     cv::dnn::Net net = cv::dnn::readNet("model/resnet18.onnx");
-    double threshold = 0.99;
     while (grab_thread_state) {
-        while (img_q.size() > 3) img_q.pop();
+        while (img_q.size() > 1) img_q.pop();
 
         if (img_q.empty()) {
 //            QThread::msleep(10);
@@ -479,8 +480,8 @@ int Demo::grab_thread_process() {
 
         if (updated) {
             // calc histogram (grayscale)
-            memset(hist, 0, 256 * sizeof(uint));
-            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * img_mem.cols)[j]]++;
+//            memset(hist, 0, 256 * sizeof(uint));
+//            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * img_mem.cols)[j]]++;
 
             // if the image needs flipping
             if (settings->symmetry) cv::flip(img_mem, img_mem, settings->symmetry - 2);
@@ -789,6 +790,8 @@ int Demo::grab_thread_process() {
 
         if (updated) prev_img = img_mem.clone();
         image_mutex.unlock();
+
+        QThread::msleep(10);
     }
     free(range);
     return 0;

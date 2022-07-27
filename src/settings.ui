@@ -630,13 +630,13 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>300</y>
-      <width>101</width>
-      <height>16</height>
+      <y>290</y>
+      <width>81</width>
+      <height>36</height>
      </rect>
     </property>
     <property name="text">
-     <string>fishnet recog</string>
+     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;fishnet&lt;br/&gt;recognition&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
     </property>
    </widget>
    <widget class="QCheckBox" name="FISHNET_RECOG">
@@ -655,9 +655,9 @@
    <widget class="QLineEdit" name="FISHNET_THRESH_EDIT">
     <property name="geometry">
      <rect>
-      <x>90</x>
+      <x>102</x>
       <y>305</y>
-      <width>53</width>
+      <width>41</width>
       <height>21</height>
      </rect>
     </property>
