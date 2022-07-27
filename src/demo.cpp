@@ -1952,9 +1952,9 @@ void Demo::update_delay()
 }
 
 void Demo::update_gate_width() {
-    static QElapsedTimer t;
-    if (t.elapsed() < (fps > 9 ? 900 / fps : 100)) return;
-    t.start();
+//    static QElapsedTimer t;
+//    if (t.elapsed() < (fps > 9 ? 900 / fps : 100)) return;
+//    t.start();
 
     if (depth_of_view < 0) depth_of_view = 0;
     if (depth_of_view > 1500) depth_of_view = 1500;
