@@ -460,9 +460,8 @@ int Demo::grab_thread_process() {
     double *range = (double*)calloc(w * h, sizeof(double));
     cv::Mat sobel, fishnet_res;
     cv::dnn::Net net = cv::dnn::readNet("model/resnet18.onnx");
-    double threshold = 0.99;
     while (grab_thread_state) {
-        while (img_q.size() > 3) img_q.pop();
+        while (img_q.size() > 1) img_q.pop();
 
         if (img_q.empty()) {
 //            QThread::msleep(10);
@@ -481,8 +480,8 @@ int Demo::grab_thread_process() {
 
         if (updated) {
             // calc histogram (grayscale)
-            memset(hist, 0, 256 * sizeof(uint));
-            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * img_mem.cols)[j]]++;
+//            memset(hist, 0, 256 * sizeof(uint));
+//            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * img_mem.cols)[j]]++;
 
             // if the image needs flipping
             if (settings->symmetry) cv::flip(img_mem, img_mem, settings->symmetry - 2);
@@ -791,6 +790,8 @@ int Demo::grab_thread_process() {
 
         if (updated) prev_img = img_mem.clone();
         image_mutex.unlock();
+
+        QThread::msleep(10);
     }
     free(range);
     return 0;
