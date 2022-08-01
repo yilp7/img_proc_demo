@@ -127,11 +127,11 @@ if (WIN32)
         # joystick
         winmm
         # opencv
-        opencv_core455
-        opencv_imgcodecs455
-        opencv_imgproc455
-        opencv_videoio455
-        opencv_dnn455
+        opencv_core454
+        opencv_imgcodecs454
+        opencv_imgproc454
+        opencv_videoio454
+        opencv_dnn454
     )
 elseif (APPLE)
 

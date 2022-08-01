@@ -276,12 +276,12 @@ Demo::Demo(QWidget *parent)
     ui->TITLE->setup(this);
 
     // connect to joystick (windows xbox only)
-    h_joystick_thread = new JoystickThread(this);
-    h_joystick_thread->start();
+//    h_joystick_thread = new JoystickThread(this);
+//    h_joystick_thread->start();
 
-    connect(h_joystick_thread, SIGNAL(button_pressed(int)), this, SLOT(joystick_button_pressed(int)));
-    connect(h_joystick_thread, SIGNAL(button_released(int)), this, SLOT(joystick_button_released(int)));
-    connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
+//    connect(h_joystick_thread, SIGNAL(button_pressed(int)), this, SLOT(joystick_button_pressed(int)));
+//    connect(h_joystick_thread, SIGNAL(button_released(int)), this, SLOT(joystick_button_released(int)));
+//    connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
 
     connect(this, SIGNAL(update_fishnet_result(int)), SLOT(display_fishnet_result(int)));
 
@@ -464,9 +464,10 @@ int Demo::grab_thread_process() {
         while (img_q.size() > 1) img_q.pop();
 
         if (img_q.empty()) {
-//            QThread::msleep(10);
-            img_mem = prev_img.clone();
-            updated = false;
+            QThread::msleep(10);
+//            img_mem = prev_img.clone();
+//            updated = false;
+            continue;
         }
         else {
             img_mem = img_q.front();
@@ -790,8 +791,6 @@ int Demo::grab_thread_process() {
 
         if (updated) prev_img = img_mem.clone();
         image_mutex.unlock();
-
-        QThread::msleep(10);
     }
     free(range);
     return 0;
@@ -2444,9 +2443,9 @@ void Demo::change_focus_speed(int val)
     ui->FOCUS_SPEED_SLIDER->setValue(val);
     if (val > 1) val -= 1;
 
-    static QElapsedTimer t;
-    if (t.elapsed() < 100) return;
-    t.restart();
+//    static QElapsedTimer t;
+//    if (t.elapsed() < 100) return;
+//    t.restart();
 
     int temp_serial_port_id = share_serial_port && serial_port[0]->isOpen() ? 0 : 2;
 
