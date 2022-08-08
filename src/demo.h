@@ -9,11 +9,12 @@
 #include "threadpool.h"
 #include "mywidget.h"
 #include "imageproc.h"
-//#include "cam.h"
-#include "mvcam.h"
+#include "cam.h"
+//#include "mvcam.h"
 //#include "hqvscam.h"
 //#include "euresyscam.h"
 #include "preferences.h"
+#include "lasersettings.h"
 #include "plugininterface.h"
 
 QT_BEGIN_NAMESPACE
@@ -149,10 +150,10 @@ private slots:
     // TODO rewrite auto focus function
     void on_AUTO_FOCUS_BTN_clicked();
 
-    void on_LASER_ZOOM_IN_BTN_pressed();
-    void on_LASER_ZOOM_OUT_BTN_pressed();
-    void on_LASER_ZOOM_IN_BTN_released();
-    void on_LASER_ZOOM_OUT_BTN_released();
+    void on_IRIS_OPEN_BTN_pressed();
+    void on_IRIS_CLOSE_BTN_pressed();
+    void on_IRIS_OPEN_BTN_released();
+    void on_IRIS_CLOSE_BTN_released();
     void laser_preset_reached();
 
     // slider-controlled slots
@@ -321,6 +322,7 @@ private:
     Ui::Demo*               ui;
 
     Preferences             *pref;
+    LaserSettings           *laser_settings;
 
     int                     calc_avg_option;            // a: 5 frames; b: 10 frames
     double                  range_threshold;            // range threshold for building 3d images

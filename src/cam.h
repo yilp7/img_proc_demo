@@ -1,4 +1,4 @@
-﻿#ifndef CAM_H
+#ifndef CAM_H
 #define CAM_H
 
 #include "MvCameraControl.h"
@@ -40,7 +40,7 @@ public:
     void trigger_mode(bool read, bool *val);
     void trigger_source(bool read, bool *val);
     void binning(bool read, int *val);
-    void ip_address(bool read, int *ip, int *gateway);
+    int ip_address(bool read, int *ip, int *gateway);
     int pixel_type(bool read, int *val);
     void trigger_once();
 

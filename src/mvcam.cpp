@@ -24,6 +24,7 @@ int Cam::start() {
     MV_CC_EnumDevices(MV_GIGE_DEVICE | MV_USB_DEVICE, &st_dev_list);
     if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;
     int ret = MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
+    device_type = 1;
 
     ret = MV_CC_OpenDevice(dev_handle);
 

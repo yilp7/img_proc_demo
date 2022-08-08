@@ -18,6 +18,7 @@ Demo::Demo(QWidget *parent)
     mouse_pressed(false),
     ui(new Ui::Demo),
     pref(NULL),
+    laser_settings(NULL),
     calc_avg_option(5),
     range_threshold(0),
     trigger_by_software(false),
@@ -175,7 +176,7 @@ Demo::Demo(QWidget *parent)
     ui->FOCUS_SPEED_SLIDER->setSingleStep(1);
     ui->FOCUS_SPEED_SLIDER->setPageStep(4);
     ui->FOCUS_SPEED_SLIDER->setValue(32);
-    connect(ui->FOCUS_SPEED_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_focus_speed(int)), Qt::QueuedConnection);
+    connect(ui->FOCUS_SPEED_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_focus_speed(int)));
 
     ui->CONTINUE_SCAN_BUTTON->hide();
     ui->RESTART_SCAN_BUTTON->hide();
@@ -271,6 +272,7 @@ Demo::Demo(QWidget *parent)
     display_grp->addButton(ui->HISTOGRAM_RADIO);
     display_grp->addButton(ui->PTZ_RADIO);
     display_grp->setExclusive(true);
+    //TODO change continuous/trigger exclusive
 
     // connect title bar to the main window (Demo*)
     ui->TITLE->setup(this);
@@ -283,6 +285,9 @@ Demo::Demo(QWidget *parent)
     connect(h_joystick_thread, SIGNAL(button_pressed(int)), this, SLOT(joystick_button_pressed(int)));
     connect(h_joystick_thread, SIGNAL(button_released(int)), this, SLOT(joystick_button_released(int)));
     connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
+
+    laser_settings = new LaserSettings();
+    connect(laser_settings, SIGNAL(com_write(int, QByteArray)), this, SLOT(com_write_data(int, QByteArray)));
 
     // right before gui display (init state)
     for (int i = 0; i < 5; i++) serial_port[i] = new QSerialPort(this), setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600);
@@ -349,6 +354,7 @@ Demo::Demo(QWidget *parent)
 Demo::~Demo()
 {
     tp.stop();
+    delete laser_settings;
 
     delete ui;
 }
@@ -703,6 +709,7 @@ int Demo::grab_thread_process() {
                 for (int i = 0; i < 256; i++) {
                     cv::rectangle(hist_image, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
                 }
+                //TODO change to signal/slots
                 ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
             }
             // crop the region to display
@@ -1617,14 +1624,14 @@ void Demo::joystick_button_pressed(int btn)
         joybtn_L2 = true;
         if      (joybtn_X) on_ZOOM_IN_BTN_pressed(),       lens_adjust_ongoing = 0b001;
         else if (joybtn_Y) on_FOCUS_NEAR_BTN_pressed(),    lens_adjust_ongoing = 0b010;
-        else if (joybtn_A) on_LASER_ZOOM_IN_BTN_pressed(), lens_adjust_ongoing = 0b100;
+        else if (joybtn_A) on_IRIS_OPEN_BTN_pressed(), lens_adjust_ongoing = 0b100;
         break;
     case JoystickThread::BUTTON::R1: joybtn_R1 = true; break;
     case JoystickThread::BUTTON::R2:
         joybtn_R2 = true;
         if      (joybtn_X) on_ZOOM_OUT_BTN_pressed(),       lens_adjust_ongoing = 0b001;
         else if (joybtn_Y) on_FOCUS_FAR_BTN_pressed(),      lens_adjust_ongoing = 0b010;
-        else if (joybtn_A) on_LASER_ZOOM_OUT_BTN_pressed(), lens_adjust_ongoing = 0b100;
+        else if (joybtn_A) on_IRIS_CLOSE_BTN_pressed(), lens_adjust_ongoing = 0b100;
         break;
     case JoystickThread::BUTTON::HOME:
     case JoystickThread::BUTTON::SELECT:
@@ -1649,14 +1656,14 @@ void Demo::joystick_button_released(int btn)
         joybtn_L2 = false;
         if (lens_adjust_ongoing & 0b001) on_ZOOM_IN_BTN_released(),       lens_adjust_ongoing = 0;
         if (lens_adjust_ongoing & 0b010) on_FOCUS_NEAR_BTN_released(),    lens_adjust_ongoing = 0;
-        if (lens_adjust_ongoing & 0b100) on_LASER_ZOOM_IN_BTN_released(), lens_adjust_ongoing = 0;
+        if (lens_adjust_ongoing & 0b100) on_IRIS_OPEN_BTN_released(), lens_adjust_ongoing = 0;
         break;
     case JoystickThread::BUTTON::R1: joybtn_R1 = false; break;
     case JoystickThread::BUTTON::R2:
         joybtn_R2 = false;
         if (lens_adjust_ongoing & 0b001) on_ZOOM_OUT_BTN_released(),       lens_adjust_ongoing = 0;
         if (lens_adjust_ongoing & 0b010) on_FOCUS_FAR_BTN_released(),      lens_adjust_ongoing = 0;
-        if (lens_adjust_ongoing & 0b100) on_LASER_ZOOM_OUT_BTN_released(), lens_adjust_ongoing = 0;
+        if (lens_adjust_ongoing & 0b100) on_IRIS_CLOSE_BTN_released(), lens_adjust_ongoing = 0;
         break;
     case JoystickThread::BUTTON::HOME: ui->SHUTDOWN_BUTTON->click(); ui->ENUM_BUTTON->click(); break;
     case JoystickThread::BUTTON::SELECT: ui->START_BUTTON->click(); break;
@@ -2106,8 +2113,8 @@ void Demo::connect_to_serial_server_tcp()
     bool connected = false;
     tcp_port[0]->connectToHost(ip, 10001);
     tcp_port[2]->connectToHost(ip, 10002);
-    connected = tcp_port[0]->waitForConnected(3000);
-    connected = tcp_port[2]->waitForConnected(3000);
+    connected |= tcp_port[0]->waitForConnected(3000);
+    connected |= tcp_port[2]->waitForConnected(3000);
     tcp_port[4] = tcp_port[2];
     use_tcp = connected;
     if (connected) QMessageBox::information(this, "serial port server", "connected to server");
@@ -2199,14 +2206,14 @@ void Demo::on_ZOOM_IN_BTN_pressed()
 {
     ui->ZOOM_IN_BTN->setText("x");
 
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
 }
 
 void Demo::on_ZOOM_OUT_BTN_pressed()
 {
     ui->ZOOM_OUT_BTN->setText("x");
 
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
 }
 
 void Demo::on_FOCUS_NEAR_BTN_pressed()
@@ -2217,15 +2224,15 @@ void Demo::on_FOCUS_NEAR_BTN_pressed()
 
 inline void Demo::focus_near()
 {
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
 }
 
 inline void Demo::set_laser_preset_target(int *pos)
 {
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x81, uchar((pos[0] >> 8) & 0xFF), uchar(pos[0] & 0xFF), uchar((((pos[0] >> 8) & 0xFF) + (pos[0] & 0xFF) + 0x82) & 0xFF)}, 7), 7, 1, false);
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4F, uchar((pos[1] >> 8) & 0xFF), uchar(pos[1] & 0xFF), uchar((((pos[1] >> 8) & 0xFF) + (pos[1] & 0xFF) + 0x51) & 0xFF)}, 7), 7, 1, false);
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4E, uchar((pos[2] >> 8) & 0xFF), uchar(pos[2] & 0xFF), uchar((((pos[2] >> 8) & 0xFF) + (pos[2] & 0xFF) + 0x50) & 0xFF)}, 7), 7, 1, false);
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x81, uchar((pos[3] >> 8) & 0xFF), uchar(pos[3] & 0xFF), uchar((((pos[3] >> 8) & 0xFF) + (pos[3] & 0xFF) + 0x83) & 0xFF)}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x81, uchar((pos[0] >> 8) & 0xFF), uchar(pos[0] & 0xFF), uchar((((pos[0] >> 8) & 0xFF) + (pos[0] & 0xFF) + 0x82) & 0xFF)}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4F, uchar((pos[1] >> 8) & 0xFF), uchar(pos[1] & 0xFF), uchar((((pos[1] >> 8) & 0xFF) + (pos[1] & 0xFF) + 0x51) & 0xFF)}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4E, uchar((pos[2] >> 8) & 0xFF), uchar(pos[2] & 0xFF), uchar((((pos[2] >> 8) & 0xFF) + (pos[2] & 0xFF) + 0x50) & 0xFF)}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x81, uchar((pos[3] >> 8) & 0xFF), uchar(pos[3] & 0xFF), uchar((((pos[3] >> 8) & 0xFF) + (pos[3] & 0xFF) + 0x83) & 0xFF)}, 7), 7, 1, false);
     delete[] pos;
 }
 
@@ -2297,12 +2304,12 @@ void Demo::on_FOCUS_FAR_BTN_pressed()
 
 inline void Demo::focus_far()
 {
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), 7, 1, false);
 }
 
 inline void Demo::lens_stop() {
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
 }
 
 void Demo::set_zoom()
@@ -2321,7 +2328,7 @@ void Demo::set_zoom()
         sum += out[i];
     out[6] = sum & 0xFF;
 
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, QByteArray((char*)out, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, QByteArray((char*)out, 7), 7, 1, false);
 }
 
 void Demo::set_focus()
@@ -2340,7 +2347,7 @@ void Demo::set_focus()
         sum += out[i];
     out[6] = sum & 0xFF;
 
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, QByteArray((char*)out, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, QByteArray((char*)out, 7), 7, 1, false);
 }
 
 
@@ -2436,7 +2443,7 @@ void Demo::change_focus_speed(int val)
     if (t.elapsed() < 100) return;
     t.restart();
 
-    int temp_serial_port_id = share_serial_port && serial_port[0]->isOpen() ? 0 : 2;
+    int temp_serial_port_id = pref->share_port && serial_port[0]->isOpen() ? 0 : 2;
 
     uchar out_data[9] = {0};
     out_data[0] = 0xB0;
@@ -2461,7 +2468,7 @@ void Demo::change_focus_speed(int val)
     out_data[7] = val;
 
     out_data[8] = (4 * (uint)val + 0xA3) & 0xFF;
-    communicate_display(temp_serial_port_id, QByteArray((char*)out_data, 9), 9, 0, false);
+    if (multi_laser_lenses) communicate_display(temp_serial_port_id, QByteArray((char*)out_data, 9), 9, 0, false);
 }
 
 void Demo::on_ZOOM_IN_BTN_released()
@@ -2660,7 +2667,10 @@ void Demo::keyPressEvent(QKeyEvent *event)
         case Qt::Key_Q:
             use_tcp ? disconnect_from_serial_server_tcp() : connect_to_serial_server_tcp();
             break;
-        default: break;
+        case Qt::Key_L:
+            laser_settings->show();
+            laser_settings->raise();
+       default: break;
         }
     case Qt::ControlModifier:
         switch (event->key()) {
@@ -2892,11 +2902,12 @@ void Demo::dropEvent(QDropEvent *event)
 bool Demo::load_image_file(QString filename, bool init)
 {
     QImage temp;
-    if (device_on) {
-        QMessageBox::warning(this, "PROMPT", tr("Cannot read local image while cam is on"));
+
+    if (!temp.load(filename)) {
         return false;
     }
-    if (!temp.load(filename)) {
+    if (device_on) {
+        QMessageBox::warning(this, "PROMPT", tr("Cannot read local image while cam is on"));
         return false;
     }
 
@@ -3091,35 +3102,35 @@ void Demo::on_SAVE_RESULT_BUTTON_clicked()
     }
 }
 
-void Demo::on_LASER_ZOOM_IN_BTN_pressed()
+void Demo::on_IRIS_OPEN_BTN_pressed()
 {
-    ui->LASER_ZOOM_IN_BTN->setText("x");
+    ui->IRIS_OPEN_BTN->setText("x");
 
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x20, 0x00, 0x00, 0x22}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x01, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x02, 0x00, 0x00, 0x00, 0x04}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x20, 0x00, 0x00, 0x22}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x01, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x02, 0x00, 0x00, 0x00, 0x04}, 7), 7, 1, false);
 }
 
-void Demo::on_LASER_ZOOM_OUT_BTN_pressed()
+void Demo::on_IRIS_CLOSE_BTN_pressed()
 {
-    ui->LASER_ZOOM_OUT_BTN->setText("x");
+    ui->IRIS_CLOSE_BTN->setText("x");
 
-    communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x40, 0x00, 0x00, 0x42}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x80, 0x00, 0x00, 0x82}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x04, 0x00, 0x00, 0x00, 0x06}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x40, 0x00, 0x00, 0x42}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x80, 0x00, 0x00, 0x82}, 7), 7, 1, false);
+    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x04, 0x00, 0x00, 0x00, 0x06}, 7), 7, 1, false);
 }
 
-void Demo::on_LASER_ZOOM_IN_BTN_released()
+void Demo::on_IRIS_OPEN_BTN_released()
 {
-    ui->LASER_ZOOM_IN_BTN->setText("+");
+    ui->IRIS_OPEN_BTN->setText("+");
     lens_stop();
 }
 
-void Demo::on_LASER_ZOOM_OUT_BTN_released()
+void Demo::on_IRIS_CLOSE_BTN_released()
 {
-    ui->LASER_ZOOM_OUT_BTN->setText("-");
+    ui->IRIS_CLOSE_BTN->setText("-");
     lens_stop();
 }
 
@@ -3146,10 +3157,10 @@ void Demo::on_LASER_BTN_clicked()
 
 void Demo::on_GET_LENS_PARAM_BTN_clicked()
 {
-    QByteArray read = communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
+    QByteArray read = communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
     zoom = ((read[4] & 0xFF) << 8) + read[5] & 0xFF;
 
-    read = communicate_display(share_serial_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
+    read = communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
     focus = ((read[4] & 0xFF) << 8) + read[5] & 0xFF;
 
     ui->ZOOM_EDIT->setText(QString::asprintf("%d", zoom));

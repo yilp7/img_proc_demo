@@ -134,7 +134,7 @@ Preferences::Preferences(QWidget *parent) :
             });
     connect(ui->MAX_DIST_EDT, &QLineEdit::editingFinished, this, [this](){ emit max_dist_changed(max_dist); });
     connect(ui->LASER_ENABLE_CHK, &QCheckBox::stateChanged, this,
-            [this](int arg1){ send_cmd(arg1 ? "88 1F 00 00 00 00 99" : "88 1F 00 00 00 00 99"); });
+            [this](int arg1){ send_cmd(arg1 ? "88 1F 00 00 00 01 99" : "88 1F 00 00 00 00 99"); });
     laser_grp = new QButtonGroup(this);
     laser_grp->addButton(ui->LASER_CHK_1, 0);
     laser_grp->addButton(ui->LASER_CHK_2, 1);

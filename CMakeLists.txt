@@ -90,12 +90,14 @@ set(SOURCE_FILES
     src/mywidget.cpp
     src/progsettings.h
     src/progsettings.cpp
+    src/lasersettings.cpp
+    src/lasersettings.h
     src/imageproc.h
     src/imageproc.cpp
-#    src/cam.h
-#    src/cam.cpp
-    src/mvcam.h
-    src/mvcam.cpp
+    src/cam.h
+    src/cam.cpp
+#    src/mvcam.h
+#    src/mvcam.cpp
 #    src/hqvcam.h
 #    src/hqvcam.cpp
 #    src/euresyscam.h
@@ -107,6 +109,7 @@ set(SOURCE_FILES
     src/demo_dev.ui
     src/settings.ui
     src/preferences.ui
+    src/laser_settings.ui
     resources/resources.qrc
 )
 
@@ -122,9 +125,9 @@ set(PROJECT_LIBS
     # mvs
     MvCameraControl
     # HQV
-#    HQV_AVIProcess64
-#    HQV_DataConvert64
-#    HQV_SDK64
+    HQV_AVIProcess64
+    HQV_DataConvert64
+    HQV_SDK64
     # Euresys
 #    MultiCam
 #    clallserial

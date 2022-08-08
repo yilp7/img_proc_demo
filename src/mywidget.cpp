@@ -229,7 +229,7 @@ void TitleBar::setup(QObject *ptr)
     connect(preferences, SIGNAL(change_pixel_format(int)),   signal_receiver, SLOT(change_pixel_format(int)));
     connect(preferences, SIGNAL(get_baudrate(int)),          signal_receiver, SLOT(display_baudrate(int)));
     connect(preferences, SIGNAL(change_baudrate(int, int)),  signal_receiver, SLOT(set_baudrate(int, int)));
-    //TODO connect to tcp button clicked
+    //TODO connect_to_tcp button clicked
     connect(preferences, SIGNAL(com_write(int, QByteArray)), signal_receiver, SLOT(com_write_data(int, QByteArray)));
     connect(preferences, SIGNAL(rep_freq_unit_changed(int)), signal_receiver, SLOT(setup_hz(int)));
     connect(preferences, SIGNAL(base_unit_changed(int)),     signal_receiver, SLOT(setup_stepping(int)));

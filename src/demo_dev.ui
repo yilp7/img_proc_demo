@@ -643,7 +643,7 @@
        <string>18</string>
       </property>
      </widget>
-     <widget class="QPushButton" name="LASER_ZOOM_IN_BTN">
+     <widget class="QPushButton" name="IRIS_OPEN_BTN">
       <property name="enabled">
        <bool>true</bool>
       </property>
@@ -681,7 +681,7 @@
        <set>Qt::AlignCenter</set>
       </property>
      </widget>
-     <widget class="QPushButton" name="LASER_ZOOM_OUT_BTN">
+     <widget class="QPushButton" name="IRIS_CLOSE_BTN">
       <property name="enabled">
        <bool>true</bool>
       </property>
@@ -3033,8 +3033,8 @@
   <tabstop>CONTINUE_SCAN_BUTTON</tabstop>
   <tabstop>RESTART_SCAN_BUTTON</tabstop>
   <tabstop>CURRENT_EDIT</tabstop>
-  <tabstop>LASER_ZOOM_IN_BTN</tabstop>
-  <tabstop>LASER_ZOOM_OUT_BTN</tabstop>
+  <tabstop>IRIS_OPEN_BTN</tabstop>
+  <tabstop>IRIS_CLOSE_BTN</tabstop>
   <tabstop>LASER_BTN</tabstop>
   <tabstop>CENTER_CHECK</tabstop>
  </tabstops>

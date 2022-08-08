@@ -291,14 +291,16 @@ QSlider::handle:horizontal:disabled {
 	background-color: #646464;
 }
 
-#MCP_SLIDER::handle:horizontal, #DELAY_SLIDER::handle:horizontal, #GAIN_SLIDER::handle:horizontal, #PTZ_SPEED_SLIDER::handle:horizontal {
+#MCP_SLIDER::handle:horizontal, #DELAY_SLIDER::handle:horizontal, 
+#GAIN_SLIDER::handle:horizontal, #PTZ_SPEED_SLIDER::handle:horizontal {
 	width: 8px;
 	height: 16px;
 	margin-top: -6px;
 	margin-bottom: -6px;
 }
 
-#BRIGHTNESS_SLIDER::handle:horizontal, #CONTRAST_SLIDER::handle:horizontal, #GAMMA_SLIDER::handle::horizontal, #FOCUS_SPEED_SLIDER::handle:horizontal {
+#BRIGHTNESS_SLIDER::handle:horizontal, #CONTRAST_SLIDER::handle:horizontal, 
+#GAMMA_SLIDER::handle:horizontal, #FOCUS_SPEED_SLIDER::handle:horizontal {
 	width: 6px;
 	height: 8px;
 	margin-top: -2px;

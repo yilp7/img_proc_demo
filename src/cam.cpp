@@ -1,4 +1,4 @@
-﻿#include "cam.h"
+#include "cam.h"
 
 Cam::Cam() {dev_handle = NULL; cameralink = false;}
 Cam::~Cam() {if (dev_handle) CloseHandle(dev_handle), dev_handle = NULL;}
@@ -13,7 +13,7 @@ int Cam::search_for_devices()
     if (!cameralink)
     {
         MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
-        if (st_dev_list.nDeviceNum) device_type = 1;
+        if (st_dev_list.nDeviceNum) device_type = 1, MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
         if (device_type) return device_type;
     }
 
@@ -30,7 +30,8 @@ int Cam::start() {
     case 1: {
         // get and store devices list to m_stDevList
         MV_CC_DEVICE_INFO_LIST st_dev_list;
-        MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
+        MV_CC_EnumDevices(MV_GIGE_DEVICE | MV_USB_DEVICE, &st_dev_list);
+        if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;
         int ret = MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
 
         ret = MV_CC_OpenDevice(dev_handle);
@@ -147,6 +148,7 @@ void Cam::get_frame_size(int &w, int &h)
 
 void Cam::time_exposure(bool read, float *val)
 {
+    qDebug() << device_type;
     switch (device_type) {
     case 1: {
         if (read) {
@@ -323,18 +325,21 @@ void Cam::binning(bool read, int *val)
     }
 }
 
-void Cam::ip_address(bool read, int *ip, int *gateway)
+int Cam::ip_address(bool read, int *ip, int *gateway)
 {
     switch (device_type) {
     case 1: {
         if (read) {
             MV_CC_DEVICE_INFO_LIST st_dev_list = {0};
             MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
-            *ip = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nCurrentIp;
-            *gateway = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nDefultGateWay;
+            if (st_dev_list.nDeviceNum) {
+                *ip = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nCurrentIp;
+                *gateway = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nDefultGateWay;
+            }
+            return 0;
         }
         else {
-            MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
+            return MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
         }
     }
     case 2:
@@ -355,8 +360,22 @@ int Cam::pixel_type(bool read, int *val)
             *val = temp.nCurValue;
         }
         else {
-//            MV_CC_SetPixelFormat(dev_handle, PixelType_Gvsp_Mono8);
-            if (*val == PixelType_Gvsp_RGB8_Packed) cv::cvtColor(img, img, cv::COLOR_GRAY2RGB);
+            switch (*val) {
+            case PixelType_Gvsp_RGB8_Packed:
+                img = cv::Mat(img.rows, img.cols, CV_8UC3);
+                break;
+            case PixelType_Gvsp_Mono8:
+                img = cv::Mat(img.rows, img.cols, CV_8UC1);
+                break;
+            case PixelType_Gvsp_Mono10:
+            case PixelType_Gvsp_Mono12:
+            case PixelType_Gvsp_Mono10_Packed:
+            case PixelType_Gvsp_Mono12_Packed:
+                img = cv::Mat(img.rows, img.cols, CV_16UC1);
+                break;
+            default: break;
+            }
+
             ret = MV_CC_SetPixelFormat(dev_handle, *val);
         }
     }
@@ -384,10 +403,24 @@ void Cam::trigger_once()
 
 void Cam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *user_data)
 {
-//    static cv::Mat img(frame_info->nHeight, frame_info->nWidth, CV_8UC1);
-//    img.data = data;
-    memcpy(img.data, data, frame_info->nFrameLen);
-    ((std::queue<cv::Mat>*)user_data)->push(img.clone());
+    //    static cv::Mat img(frame_info->nHeight, frame_info->nWidth, CV_8UC1);
+    //    img.data = data;
+        switch (frame_info->enPixelType) {
+        case PixelType_Gvsp_Mono8:
+        case PixelType_Gvsp_Mono10:
+        case PixelType_Gvsp_Mono12:
+        case PixelType_Gvsp_RGB8_Packed:
+            memcpy(img.data, data, frame_info->nFrameLen);
+            break;
+        case PixelType_Gvsp_Mono10_Packed:
+        case PixelType_Gvsp_Mono12_Packed:
+            break;
+        default:
+            img = 0;
+            break;
+        }
+
+        ((std::queue<cv::Mat>*)user_data)->push(img.clone());
 }
 
 DWORD Cam::frame_cb(HANDLE dev, HQV_FRAMEINFO frame_info, void *user_data)
