@@ -399,8 +399,10 @@ private:
     cv::Mat                 img_display;                // right-side img display cropped (stream)
     cv::Mat                 prev_img;                   // previous original image
     cv::Mat                 prev_3d;                    // previous 3d image
-    cv::Mat                 seq[10];                    // for frame average
+    cv::Mat                 seq[8];                    // for frame average
     cv::Mat                 seq_sum;
+    cv::Mat                 frame_a_sum;
+    cv::Mat                 frame_b_sum;
     uint                    hist[256];                  // display histogram
     int                     seq_idx;                    // frame-average current index
 

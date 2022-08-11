@@ -145,6 +145,8 @@ Preferences::Preferences(QWidget *parent) :
     //[3]
 
     data_exchange(false);
+
+    ui->LASER_CHK_1->setChecked(true);
 }
 
 Preferences::~Preferences()
@@ -177,10 +179,10 @@ void Preferences::data_exchange(bool read)
         default: break;
         }
         laser_on = 0;
-        laser_on ^= ui->LASER_CHK_1->isChecked() << 0;
-        laser_on ^= ui->LASER_CHK_2->isChecked() << 1;
-        laser_on ^= ui->LASER_CHK_3->isChecked() << 2;
-        laser_on ^= ui->LASER_CHK_4->isChecked() << 3;
+        laser_on |= ui->LASER_CHK_1->isChecked() << 0;
+        laser_on |= ui->LASER_CHK_2->isChecked() << 1;
+        laser_on |= ui->LASER_CHK_3->isChecked() << 2;
+        laser_on |= ui->LASER_CHK_4->isChecked() << 3;
     }
     else {
         ui->GAMMA_EDIT->setText(QString::number(gamma, 'f', 2));
@@ -347,7 +349,8 @@ void Preferences::send_cmd(QString str)
 
 void Preferences::toggle_laser(int id, bool on)
 {
-    if (on) laser_on |= 1 << id;
-    else    laser_on &= 0 << id;
+    laser_on ^= 1 << id;
+//    if (on) laser_on |= 1 << id;
+//    else    laser_on &= 0 << id;
     emit laser_toggled(laser_on);
 }

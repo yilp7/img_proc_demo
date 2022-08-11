@@ -4,10 +4,7 @@
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
 #include <queue>
-#include <QApplication>
-#include <QDebug>
-#include <QThread>
-#include <QMutex>
+#include <QtCore>
 #include "windows.h"
 #include "multicam.h"
 #include "clallserial.h"
@@ -22,6 +19,7 @@ private:
 public:
     // 0: no device; 1: MvCam; 2: HqvCam; 3: EuresysCam
     int device_type;
+    bool cameralink;
 
 public:
     Cam();
@@ -44,6 +42,9 @@ public:
     void trigger_mode(bool read, bool *val);
     // val: true->soft trigger; false->external trigger
     void trigger_source(bool read, bool *val);
+    void binning(bool read, int *val);
+    int ip_address(bool read, int *ip, int *gateway);
+    int pixel_type(bool read, int *val);
     void trigger_once();
 
     static void WINAPI frame_cb(PMCCALLBACKINFO cb_info);

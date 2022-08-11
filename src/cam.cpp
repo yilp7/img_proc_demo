@@ -148,7 +148,6 @@ void Cam::get_frame_size(int &w, int &h)
 
 void Cam::time_exposure(bool read, float *val)
 {
-    qDebug() << device_type;
     switch (device_type) {
     case 1: {
         if (read) {

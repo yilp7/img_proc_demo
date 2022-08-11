@@ -40,7 +40,8 @@ int Cam::start() {
 
     // Choose the pixel color format
     ret = McSetParamInt(dev_handle, MC_ColorFormat, MC_ColorFormat_Y8);
-    ret = McSetParamInt(dev_handle, MC_TapConfiguration, MC_TapConfiguration_BASE_2T8);
+//    ret = McSetParamInt(dev_handle, MC_TapConfiguration, MC_TapConfiguration_BASE_2T8);
+    ret = McSetParamInt(dev_handle, MC_TapConfiguration, MC_TapConfiguration_BASE_1T8);
 
     // Set the acquisition mode
     ret = McSetParamInt(dev_handle, MC_AcquisitionMode, MC_AcquisitionMode_HFR);
@@ -239,6 +240,21 @@ void Cam::trigger_source(bool read, bool *val)
         out[4] = *val ? 0x02 : 0x01;
         communicate((char*)out, (char*)in, 7, 1);
     }
+}
+
+void Cam::binning(bool read, int *val)
+{
+
+}
+
+int Cam::ip_address(bool read, int *ip, int *gateway)
+{
+    return 0;
+}
+
+int Cam::pixel_type(bool read, int *val)
+{
+    return 0;
 }
 
 void Cam::trigger_once()

@@ -131,7 +131,6 @@ set(PROJECT_LIBS
     # Euresys
 #    MultiCam
 #    clallserial
-
 )
 if (WIN32)
     set(PROJECT_LIBS

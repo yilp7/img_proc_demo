@@ -38,7 +38,7 @@ Demo::Demo(QWidget *parent)
     fps(10),
     duty(5000),
     mcp(5),
-    laser_on(0),
+    laser_on(0b0001),
     zoom(0),
     focus(0),
     distance(0),
@@ -362,7 +362,7 @@ Demo::~Demo()
 void Demo::data_exchange(bool read){
     if (read) {
 //        device_idx = ui->DEVICE_SELECTION->currentIndex();
-        calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 5 + 5;
+        calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
 
         trigger_by_software = ui->SOFTWARE_CHECK->isChecked();
         image_3d = ui->IMG_3D_CHECK->isChecked();
@@ -413,7 +413,7 @@ void Demo::data_exchange(bool read){
     }
     else {
 //        ui->DEVICE_SELECTION->setCurrentIndex(device_idx);
-        ui->FRAME_AVG_OPTIONS->setCurrentIndex(calc_avg_option / 5 - 1);
+        ui->FRAME_AVG_OPTIONS->setCurrentIndex(calc_avg_option / 4 - 1);
 
         ui->SOFTWARE_CHECK->setChecked(trigger_by_software);
         ui->IMG_3D_CHECK->setChecked(image_3d);
@@ -519,22 +519,32 @@ int Demo::grab_thread_process() {
 */
         // process frame average
         if (seq_sum.empty()) seq_sum = cv::Mat::zeros(h, w, CV_16U);
+        if (frame_a_sum.empty()) frame_a_sum = cv::Mat::zeros(h, w, CV_16U);
+        if (frame_b_sum.empty()) frame_b_sum = cv::Mat::zeros(h, w, CV_16U);
         if (ui->FRAME_AVG_CHECK->isChecked()) {
             if (updated) {
-                calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 5 + 5;
-                if (seq[9].empty()) for (auto& m: seq) m = cv::Mat::zeros(h, w, CV_16U);
+                calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
+                if (seq[7].empty()) for (auto& m: seq) m = cv::Mat::zeros(h, w, CV_16U);
 
-                seq_sum -= seq[seq_idx];
+                seq_sum -= seq[(seq_idx + 4) & 7];
+//                seq_sum -= seq[seq_idx];
+                if (frame_a_3d) frame_a_sum -= seq[seq_idx];
+                else            frame_b_sum -= seq[seq_idx];
                 img_mem.convertTo(seq[seq_idx], CV_16U);
                 seq_sum += seq[seq_idx];
+                if (frame_a_3d) frame_a_sum += seq[seq_idx];
+                else            frame_b_sum += seq[seq_idx];
 //                for(int i = 0; i < calc_avg_option; i++) seq_sum += seq[i];
 
-                seq_idx = (seq_idx + 1) % calc_avg_option;
+//                seq_idx = (seq_idx + 1) % calc_avg_option;
+                seq_idx = (seq_idx + 1) & 7;
+                frame_a_3d ^= 1;
             }
-            seq_sum.convertTo(modified_result, CV_8U, 1.0 / (calc_avg_option * (1 << (pixel_depth - 8))));
+//            seq_sum.convertTo(modified_result, CV_8U, 1. / (calc_avg_option * (1 << (pixel_depth - 8))));
+            seq_sum.convertTo(modified_result, CV_8U, 1. / (4 * (1 << (pixel_depth - 8))));
         }
         else {
-            img_mem.convertTo(modified_result, CV_8U, 1.0 / (1 << (pixel_depth - 8)));
+            img_mem.convertTo(modified_result, CV_8U, 1. / (1 << (pixel_depth - 8)));
         }
 
         // process 3d image construction from ABN frames
@@ -545,14 +555,21 @@ int Demo::grab_thread_process() {
 //            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
 //            if (prev_3d.empty()) cv::cvtColor(img_mem, prev_3d, cv::COLOR_GRAY2RGB);
             if (updated) {
-                if (frame_a_3d) ImageProc::gated3D(prev_img, img_mem, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
-                else            ImageProc::gated3D(img_mem, prev_img, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
-                prev_3d = modified_result;
-                frame_a_3d ^= 1;
-//                if (device_type < -1) device_type++;
+                //TODO add support to 16-bit for 3d
+                //TODO try to reduce if statements
+                if (ui->FRAME_AVG_CHECK->isChecked()) {
+                    static cv::Mat frame_a_avg, frame_b_avg;
+                    frame_a_sum.convertTo(frame_a_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
+                    frame_b_sum.convertTo(frame_b_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
+                    ImageProc::gated3D(frame_a_avg, frame_b_avg, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
+                }
+                else {
+                    if (frame_a_3d) ImageProc::gated3D(prev_img, img_mem, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
+                    else            ImageProc::gated3D(img_mem, prev_img, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
+                }
+                prev_3d = modified_result.clone();
             }
             else modified_result = prev_3d;
-//            if (!frame_a_3d) prev_3d = modified_result.clone();
 
             cv::resize(modified_result, img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
         }
@@ -764,15 +781,18 @@ int Demo::grab_thread_process() {
             if (base_unit == 2) cv::putText(temp, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             else cv::putText(temp, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             cv::putText(temp, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), weight * 2);
+            if (is_color) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
             vid_out[0].write(temp);
         }
         if (updated && record_modified) {
+            cv::Mat temp = modified_result.clone();
             if (!image_3d && !ui->INFO_CHECK->isChecked()) {
                 if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
-            vid_out[1].write(modified_result);
+            if (is_color || image_3d) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
+            vid_out[1].write(temp);
         }
 
         if (updated) prev_img = img_mem.clone();
@@ -1081,6 +1101,7 @@ void Demo::closeEvent(QCloseEvent *event)
     event->accept();
 //    ui->TITLE->prog_settings->reject();
     pref->reject();
+    laser_settings->reject();
     if (QFile::exists("HQVSDK.xml")) QFile::remove("HQVSDK.xml");
 }
 
@@ -1279,6 +1300,17 @@ void Demo::on_START_BUTTON_clicked()
     ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
     ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
 
+    //TODO complete BayerGB process & display
+    curr_cam->pixel_type(true, &pixel_format);
+    switch (pixel_format) {
+    case PixelType_Gvsp_Mono8:       is_color = false; pixel_depth =  8; break;
+    case PixelType_Gvsp_Mono10:      is_color = false; pixel_depth = 10; break;
+    case PixelType_Gvsp_Mono12:      is_color = false; pixel_depth = 12; break;
+    case PixelType_Gvsp_BayerGB8:    is_color =  true; pixel_depth =  8; break;
+    case PixelType_Gvsp_RGB8_Packed: is_color =  true; pixel_depth =  8; break;
+    default:                         is_color = false; pixel_depth =  8; break;
+    }
+
     // adjust display size according to frame size
     curr_cam->get_frame_size(w, h);
     qInfo("frame w: %d, h: %d", w, h);
@@ -1448,7 +1480,7 @@ void Demo::on_SAVE_FINAL_BUTTON_clicked()
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         image_mutex.lock();
         res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi");
-        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), image_3d);
+        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(image_3d ? w + 104 : w, h), is_color || image_3d);
         image_mutex.unlock();
     }
     record_modified = !record_modified;
@@ -1517,8 +1549,10 @@ void Demo::clean()
     img_display.release();
     prev_img.release();
     prev_3d.release();
-    for (auto& m: seq) m.release();
+    for (cv::Mat &m: seq) m.release();
     seq_sum.release();
+    frame_a_sum.release();
+    frame_b_sum.release();
 }
 
 void Demo::setup_hz(int hz_unit)
@@ -1599,11 +1633,13 @@ void Demo::change_pixel_format(int pixel_format)
 {
     this->pixel_format = pixel_format;
     int ret = curr_cam->pixel_type(false, &pixel_format);
-    is_color = pixel_format == PixelType_Gvsp_RGB8_Packed;
     switch (pixel_format) {
-    case PixelType_Gvsp_Mono10: pixel_depth = 10; break;
-    case PixelType_Gvsp_Mono12: pixel_depth = 12; break;
-    default: pixel_depth = 8; break;
+    case PixelType_Gvsp_Mono8:       is_color = false; pixel_depth =  8; break;
+    case PixelType_Gvsp_Mono10:      is_color = false; pixel_depth = 10; break;
+    case PixelType_Gvsp_Mono12:      is_color = false; pixel_depth = 12; break;
+    case PixelType_Gvsp_BayerGB8:    is_color =  true; pixel_depth =  8; break;
+    case PixelType_Gvsp_RGB8_Packed: is_color =  true; pixel_depth =  8; break;
+    default:                         is_color = false; pixel_depth =  8; break;
     }
 }
 
@@ -2206,14 +2242,14 @@ void Demo::on_ZOOM_IN_BTN_pressed()
 {
     ui->ZOOM_IN_BTN->setText("x");
 
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
 }
 
 void Demo::on_ZOOM_OUT_BTN_pressed()
 {
     ui->ZOOM_OUT_BTN->setText("x");
 
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
+    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
 }
 
 void Demo::on_FOCUS_NEAR_BTN_pressed()
@@ -2908,7 +2944,7 @@ bool Demo::load_image_file(QString filename, bool init)
     }
     if (device_on) {
         QMessageBox::warning(this, "PROMPT", tr("Cannot read local image while cam is on"));
-        return false;
+        return true;
     }
 
     if (init) start_static_display(temp);
@@ -2980,7 +3016,7 @@ void Demo::on_SAVE_AVI_BUTTON_clicked()
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         image_mutex.lock();
         raw_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw.avi");
-        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(image_3d ? w - 104 : w, h), false);
+        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), is_color || image_3d);
         image_mutex.unlock();
     }
     record_original = !record_original;
@@ -3078,10 +3114,12 @@ void Demo::on_FRAME_AVG_CHECK_stateChanged(int arg1)
 {
     if (arg1) {
         seq_sum.release();
-        for (int i = 0; i < 10; i++) seq[i].release();
+        frame_a_sum.release();
+        frame_b_sum.release();
+        for (cv::Mat &m: seq) m.release();
         seq_idx = 0;
     }
-    calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 5 + 5;
+    calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
 }
 
 void Demo::on_SAVE_RESULT_BUTTON_clicked()
