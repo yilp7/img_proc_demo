@@ -213,6 +213,8 @@ private slots:
 
     void on_STOP_BTN_clicked();
 
+    void on_PSEUDO_COLOR_CHECK_stateChanged(int arg1);
+
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);

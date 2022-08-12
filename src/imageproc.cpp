@@ -148,7 +148,7 @@ void ImageProc::gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay
 
     const double c = 3e8;
 //    const double c = 3e8 / 1.33;
-    double max = 0, min = 10255;
+    double max = 0, min = 65535;
 //    int threshold = 0;
     int i, j, idx1, idx2;
     int step = src1.step, step_3d = img_3d.step;
@@ -176,8 +176,10 @@ void ImageProc::gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay
             case 16: p1 = us_ptr1[idx1], p2 = us_ptr2[idx1]; break;
             default: break;
             }
-            if (p1 < 0.981 * (1 << image_depth) && p1 > range_thresh && p2 < 0.981 * (1 << image_depth) && p2 > range_thresh) {
-                range[idx1] = R + gw * 1e-9 * c / 2 / ((double)p1 / p2 + 1);
+//            if (p1 < 0.981 * (1 << image_depth) && p1 > range_thresh && p2 < 0.981 * (1 << image_depth) && p2 > range_thresh) {
+//                range[idx1] = R + gw * 1e-9 * c / 2 / ((double)p1 / p2 + 1);
+            if (p1) {
+                range[idx1] = p1;
 
                 if (range[idx1] > max) max = range[idx1];
                 if (range[idx1] < min) min = range[idx1];

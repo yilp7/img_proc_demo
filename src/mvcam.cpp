@@ -10,7 +10,10 @@ int Cam::search_for_devices()
     device_type = 0;
     MV_CC_DEVICE_INFO_LIST st_dev_list = {0};
     MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
-    if (st_dev_list.nDeviceNum) device_type = 1;
+    if (st_dev_list.nDeviceNum) {
+        device_type = 1;
+        int ret = MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
+    }
 
     return device_type;
 }
@@ -19,6 +22,7 @@ int Cam::start() {
     // get and store devices list to m_stDevList
     MV_CC_DEVICE_INFO_LIST st_dev_list;
     MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
+    if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;
     int ret = MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
 
     ret = MV_CC_OpenDevice(dev_handle);

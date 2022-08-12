@@ -292,9 +292,6 @@ Demo::Demo(QWidget *parent)
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
-//    Preferences *preferences = new Preferences;
-//    preferences->show();
-
 #ifdef ICMOS
     ui->RANGE_COM->setText("R1");
     ui->LASER_COM->setText("R2");
@@ -339,6 +336,8 @@ Demo::Demo(QWidget *parent)
     ui->TITLE->prog_settings->data_exchange(false);
     ui->TITLE->prog_settings->max_dist_changed(6000);
 
+    ui->PTZ_RADIO->hide();
+    ui->PTZ_GRP->hide();
 #else
     ui->LOGO->hide();
 #endif
@@ -701,6 +700,12 @@ int Demo::grab_thread_process() {
                 }
                 ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
             }
+            if (ui->PSEUDO_COLOR_CHECK->isChecked()) {
+                is_color = true;
+                ww += 104;
+                ImageProc::gated3D(modified_result, modified_result, modified_result, 0, 0, range, 0);
+            }
+            else is_color = false;
             // crop the region to display
 //            cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? ww + 104 : ww) / disp->width(), disp->display_region.br() * (image_3d ? ww + 104 : ww) / disp->width());
             cv::Rect region = cv::Rect(disp->display_region.tl() * ww / disp->width(), disp->display_region.br() * ww / disp->width());
@@ -756,12 +761,14 @@ int Demo::grab_thread_process() {
             vid_out[0].write(temp);
         }
         if (updated && record_modified) {
+            cv::Mat temp = modified_result.clone();
             if (!image_3d && !ui->INFO_CHECK->isChecked()) {
-                if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                if (base_unit == 2) cv::putText(temp, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                else cv::putText(temp, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                cv::putText(temp, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
-            vid_out[1].write(modified_result);
+            if (is_color || image_3d) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
+            vid_out[1].write(temp);
         }
 
         if (updated) prev_img = img_mem.clone();
@@ -1129,6 +1136,7 @@ void Demo::enable_controls(bool cam_rdy) {
     ui->CONTRAST_SLIDER->setEnabled(start_grabbing);
     ui->GAMMA_SLIDER->setEnabled(start_grabbing);
     ui->SCAN_BUTTON->setEnabled(start_grabbing);
+    ui->PSEUDO_COLOR_CHECK->setEnabled(start_grabbing);
     ui->INFO_CHECK->setEnabled(start_grabbing);
     ui->CENTER_CHECK->setEnabled(start_grabbing);
 }
@@ -1431,7 +1439,7 @@ void Demo::on_SAVE_FINAL_BUTTON_clicked()
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         image_mutex.lock();
         res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi");
-        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), image_3d);
+        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w + 104, h), image_3d);
         image_mutex.unlock();
     }
     record_modified = !record_modified;
@@ -2694,6 +2702,7 @@ void Demo::resizeEvent(QResizeEvent *event)
     ui->CURR_COORD->move(region.x() + 80, 5);
     ui->START_COORD->move(ui->CURR_COORD->geometry().right() + 20, 5);
     ui->SHAPE_INFO->move(ui->START_COORD->geometry().right() + 20, 5);
+    ui->PSEUDO_COLOR_CHECK->move(region.right() - 170, 20);
     ui->INFO_CHECK->move(region.right() - 60, 0);
     ui->CENTER_CHECK->move(region.right() - 60, 20);
     ui->HIDE_BTN->move(ui->MID->geometry().left() - 8, this->geometry().height() / 2 - 10);
@@ -3334,3 +3343,12 @@ void Demo::on_STOP_BTN_clicked()
     communicate_display(4, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 }
 
+
+void Demo::on_PSEUDO_COLOR_CHECK_stateChanged(int arg1)
+{
+    image_3d = ui->PSEUDO_COLOR_CHECK->isChecked();
+
+    QResizeEvent e(this->size(), this->size());
+    resizeEvent(&e);
+    if (!arg1) frame_a_3d = 0, prev_3d = cv::Mat(w, h, CV_8UC3);
+}
