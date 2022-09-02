@@ -1,4 +1,4 @@
-﻿#include "demo.h"
+#include "demo.h"
 #include "./ui_demo_dev.h"
 
 GrabThread::GrabThread(void *info)
@@ -195,7 +195,7 @@ Demo::Demo(QWidget *parent)
     for (int i = 0; i < 4; i++) com[i] = new QSerialPort, setup_com(com + i, i, com_edit[i]->text(), 115200);
 
 //    setup_com(com + 0, 0, com_edit[0]->text(), 9600);
-//    setup_com(com + 1, 1, com_edit[1]->text(), 115200);
+//    setup_com(com + 1, 1, com_edit[1]->text(), 9600);
 //    setup_com(com + 2, 2, com_edit[2]->text(), 9600);
 //    setup_com(com + 3, 3, com_edit[3]->text(), 9600);
 
@@ -1522,7 +1522,7 @@ void Demo::update_delay()
 
 void Demo::update_gate_width() {
     if (depth_of_view < 0) depth_of_view = 0;
-    if (depth_of_view > 525) depth_of_view = 525;
+    if (depth_of_view > 900) depth_of_view = 900;
 
     int gw = laser_width = std::round(depth_of_view / dist_ns);
 
@@ -2048,7 +2048,7 @@ void Demo::keyPressEvent(QKeyEvent *event)
             for (int i = 0; i < 4; i++) {
                 if (edit == com_edit[i]) {
                     if (com[i]) com[i]->close();
-                    setup_com(com + i, i, edit->text(), 115200);
+                    setup_com(com + i, i, edit->text(), 9600);
                     if (i == 0) {
                         QFile user_param("user_param");
                         user_param.open(QIODevice::WriteOnly);
