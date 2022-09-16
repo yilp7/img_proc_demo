@@ -63,6 +63,7 @@ int Cam::start() {
     MV_CC_SetEnumValue(dev_handle, "ExposureMode", MV_EXPOSURE_MODE_TIMED);
     MV_CC_SetEnumValue(dev_handle, "ExposureAuto", MV_EXPOSURE_AUTO_MODE_OFF);
     MV_CC_SetEnumValue(dev_handle, "GainAuto", 0);
+    MV_CC_SetFloatValue(dev_handle, "Gain", 23);
     MV_CC_SetBoolValue(dev_handle, "AcquisitionFrameRateEnable", true);
     MV_CC_SetEnumValue(dev_handle, "BinningHorizontal", 1);
     MV_CC_SetEnumValue(dev_handle, "BinningVertical", 1);

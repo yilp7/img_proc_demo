@@ -1950,7 +1950,7 @@ void Demo::change_gain(int val)
     }
 
     gain_analog_edit = val;
-    curr_cam->gain_analog(false, &gain_analog_edit);
+//    curr_cam->gain_analog(false, &gain_analog_edit);
     ui->GAIN_EDIT->setText(QString::number((int)gain_analog_edit));
     ui->GAIN_SLIDER->setValue(gain_analog_edit);
     data_exchange(false);
