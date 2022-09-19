@@ -1,4 +1,4 @@
-﻿#include "progsettings.h"
+#include "progsettings.h"
 #include "ui_settings.h"
 
 ProgSettings::ProgSettings(QWidget *parent) :
@@ -141,11 +141,11 @@ void ProgSettings::data_exchange(bool read)
         case 2: max_dist = ui->MAX_DIST_EDT->text().toInt(); break;
         default: break;
         }
-        laser_on = 0;
-        laser_on ^= ui->LASER_CHK_1->isChecked() << 0;
-        laser_on ^= ui->LASER_CHK_2->isChecked() << 1;
-        laser_on ^= ui->LASER_CHK_3->isChecked() << 2;
-        laser_on ^= ui->LASER_CHK_4->isChecked() << 3;
+//        laser_on = 0;
+//        laser_on ^= ui->LASER_CHK_1->isChecked() << 0;
+//        laser_on ^= ui->LASER_CHK_2->isChecked() << 1;
+//        laser_on ^= ui->LASER_CHK_3->isChecked() << 2;
+//        laser_on ^= ui->LASER_CHK_4->isChecked() << 3;
     }
     else {
 //        ui->START_POS_EDIT_N->setText(QString::number(start_pos % 1000));
@@ -189,10 +189,10 @@ void ProgSettings::data_exchange(bool read)
         case 2: ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist))); break;
         default: break;
         }
-        ui->LASER_CHK_1->setChecked(laser_on & 0b0001);
-        ui->LASER_CHK_2->setChecked(laser_on & 0b0010);
-        ui->LASER_CHK_3->setChecked(laser_on & 0b0100);
-        ui->LASER_CHK_4->setChecked(laser_on & 0b1000);
+//        ui->LASER_CHK_1->setChecked(laser_on & 0b0001);
+//        ui->LASER_CHK_2->setChecked(laser_on & 0b0010);
+//        ui->LASER_CHK_3->setChecked(laser_on & 0b0100);
+//        ui->LASER_CHK_4->setChecked(laser_on & 0b1000);
     }
 }
 
@@ -420,12 +420,10 @@ void ProgSettings::on_FAST_GF_EDIT_editingFinished()
     ui->FAST_GF_EDIT->setText(QString::number(val));
 }
 
-
 void ProgSettings::on_CENTRAL_SYMM_CHK_stateChanged(int arg1)
 {
     central_symmetry = arg1;
 }
-
 
 void ProgSettings::on_LASER_ENERGY_LIST_currentIndexChanged(int index)
 {
@@ -437,12 +435,16 @@ void ProgSettings::on_LASER_ENERGY_LIST_currentIndexChanged(int index)
 //    }
 //    emit laser_toggled(laser_on);
 
+    switch (index) {
+    case 0: ui->COM_DATA_EDT->setText("88 1A 00 00 00 04 99"); break;
+    case 1: ui->COM_DATA_EDT->setText("88 1A 00 00 00 08 99"); break;
+    default:break;
+    }
+
     send_cmd();
 }
-
 
 void ProgSettings::on_FILTER_CHK_stateChanged(int arg1)
 {
     filter_scan = arg1;
 }
-
