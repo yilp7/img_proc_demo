@@ -872,9 +872,6 @@
     <property name="text">
      <string>1</string>
     </property>
-    <property name="checked">
-     <bool>true</bool>
-    </property>
    </widget>
    <widget class="QComboBox" name="HZ_LIST">
     <property name="geometry">

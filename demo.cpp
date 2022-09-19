@@ -90,7 +90,7 @@ Demo::Demo(QWidget *parent)
     fps(10),
     duty(95000),
     mcp(0),
-    laser_on(1),
+    laser_on(0),
     zoom(0),
     focus(0),
     laser_zoom(0),

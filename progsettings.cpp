@@ -1,4 +1,4 @@
-﻿#include "progsettings.h"
+#include "progsettings.h"
 #include "ui_settings.h"
 
 ProgSettings::ProgSettings(QWidget *parent) :
@@ -30,7 +30,7 @@ ProgSettings::ProgSettings(QWidget *parent) :
     base_unit(0),
     max_dist(15000),
     laser_grp(NULL),
-    laser_on(1),
+    laser_on(0),
     com_idx(0),
     cameralink(false)
 {
@@ -85,7 +85,7 @@ ProgSettings::ProgSettings(QWidget *parent) :
     ui->LASER_ENERGY_LIST->addItem("0%");
     ui->LASER_ENERGY_LIST->addItem("50%");
     ui->LASER_ENERGY_LIST->addItem("100%");
-    ui->LASER_ENERGY_LIST->setCurrentIndex(1);
+    ui->LASER_ENERGY_LIST->setCurrentIndex(0);
     ui->LASER_ENERGY_LIST->installEventFilter(this);
 
     data_exchange(false);
@@ -141,11 +141,11 @@ void ProgSettings::data_exchange(bool read)
         case 2: max_dist = ui->MAX_DIST_EDT->text().toInt(); break;
         default: break;
         }
-        laser_on = 0;
-        laser_on ^= ui->LASER_CHK_1->isChecked() << 0;
-        laser_on ^= ui->LASER_CHK_2->isChecked() << 1;
-        laser_on ^= ui->LASER_CHK_3->isChecked() << 2;
-        laser_on ^= ui->LASER_CHK_4->isChecked() << 3;
+//        laser_on = 0;
+//        laser_on |= ui->LASER_CHK_1->isChecked() << 0;
+//        laser_on |= ui->LASER_CHK_2->isChecked() << 1;
+//        laser_on |= ui->LASER_CHK_3->isChecked() << 2;
+//        laser_on |= ui->LASER_CHK_4->isChecked() << 3;
     }
     else {
 //        ui->START_POS_EDIT_N->setText(QString::number(start_pos % 1000));
@@ -189,10 +189,10 @@ void ProgSettings::data_exchange(bool read)
         case 2: ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist))); break;
         default: break;
         }
-        ui->LASER_CHK_1->setChecked(laser_on & 0b0001);
-        ui->LASER_CHK_2->setChecked(laser_on & 0b0010);
-        ui->LASER_CHK_3->setChecked(laser_on & 0b0100);
-        ui->LASER_CHK_4->setChecked(laser_on & 0b1000);
+//        ui->LASER_CHK_1->setChecked(laser_on & 0b0001);
+//        ui->LASER_CHK_2->setChecked(laser_on & 0b0010);
+//        ui->LASER_CHK_3->setChecked(laser_on & 0b0100);
+//        ui->LASER_CHK_4->setChecked(laser_on & 0b1000);
     }
 }
 
@@ -370,8 +370,9 @@ void ProgSettings::on_MAX_DIST_EDT_editingFinished()
 
 void ProgSettings::toggle_laser(int id, bool on)
 {
-    if (on) laser_on += 1 << id;
-    else    laser_on -= 1 << id;
+//    if (on) laser_on += 1 << id;
+//    else    laser_on -= 1 << id;
+    laser_on ^= 1 << id;
     emit laser_toggled(laser_on);
 }
 
@@ -443,4 +444,3 @@ void ProgSettings::on_FILTER_CHK_stateChanged(int arg1)
 {
     filter_scan = arg1;
 }
-
