@@ -2,7 +2,12 @@
 
 #ifdef WIN32
 #include <DbgHelp.h>
+
+#if BUILD_STATIC
+#include <QtCore/QtPlugin>
+Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
 #pragma comment(lib, "user32.lib")
+#endif
 
 int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
 {

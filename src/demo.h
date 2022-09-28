@@ -9,8 +9,8 @@
 #include "threadpool.h"
 #include "mywidget.h"
 #include "imageproc.h"
-#include "cam.h"
-//#include "mvcam.h"
+//#include "cam.h"
+#include "mvcam.h"
 //#include "hqvscam.h"
 //#include "euresyscam.h"
 #include "preferences.h"
@@ -61,6 +61,7 @@ public:
     static void move_to_dest(QString src, QString dst);
     static void save_image_bmp(cv::Mat img, QString filename);
     static void save_image_tif(cv::Mat img, QString filename);
+    static bool load_image_tif(cv::Mat &img, QString filename);
 
 public slots:
     // signaled by Titlebar button
@@ -312,7 +313,7 @@ private:
     void send_ctrl_cmd(uchar dir);
 
     // static image display (drag & drop)
-    void start_static_display(QImage img);
+    void start_static_display(int width, int height, bool is_color, int pixel_depth = 8);
     bool load_image_file(QString filename, bool init);
 
 public:

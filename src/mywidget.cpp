@@ -8,7 +8,7 @@ Display::Display(QWidget *parent) : QLabel(parent)
   , curr_scale(0)
 //  , scale{ QSize(640, 512), QSize(480, 384), QSize(320, 256), QSize(160, 128), QSize(80, 64)}
 //  , scale{ QSize(640, 400), QSize(480, 300), QSize(320, 200), QSize(160, 100), QSize(80, 50)}
-  , scale{ 1.0, 2.0 / 3, 1.0 / 2, 1.0 / 4, 1.0 / 8}
+  , scale{ 1.0f, 2.0f / 3, 1.0f / 2, 1.0f / 4, 1.0f / 8}
   , pressed(false)
 {
 

@@ -11,6 +11,8 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(BUILD_STATIC 0)
+
 if (CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(SDK_DIR "${PROJECT_SOURCE_DIR}/sdk64")
 else()
@@ -49,6 +51,9 @@ if (WIN32)
         link_directories(${HQV_DIR}/lib)
         link_directories(${EURESYS_DIR}/lib)
         link_directories(${OpenCV_DIR}/lib/x64)
+        if (BUILD_STATIC)
+            link_directories(${OpenCV_DIR}/lib/x64_static)
+        endif()
     else()
         link_directories(${Hik_SDK_DIR}/lib/x86)
         link_directories(${HQV_DIR}/lib)
@@ -94,10 +99,10 @@ set(SOURCE_FILES
     src/lasersettings.h
     src/imageproc.h
     src/imageproc.cpp
-    src/cam.h
-    src/cam.cpp
-#    src/mvcam.h
-#    src/mvcam.cpp
+#    src/cam.h
+#    src/cam.cpp
+    src/mvcam.h
+    src/mvcam.cpp
 #    src/hqvcam.h
 #    src/hqvcam.cpp
 #    src/euresyscam.h
@@ -121,7 +126,10 @@ if (WIN32)
 endif()
 
 set(PROJECT_LIBS
+    Qt${QT_VERSION_MAJOR}::Core
     Qt${QT_VERSION_MAJOR}::Widgets
+    Qt${QT_VERSION_MAJOR}::SerialPort
+    Qt${QT_VERSION_MAJOR}::Network
     # mvs
     MvCameraControl
     # HQV
@@ -138,11 +146,41 @@ if (WIN32)
         # joystick
         winmm
         # opencv
-        opencv_core455
-        opencv_imgcodecs455
-        opencv_imgproc455
-        opencv_videoio455
+        opencv_core454
+        opencv_imgcodecs454
+        opencv_imgproc454
+        opencv_videoio454
     )
+    if (BUILD_STATIC)
+        string(LENGTH ${QT_DIR} LEN_QT_DIR)
+        math(EXPR LEN_QT_DIR ${LEN_QT_DIR}-14)
+        string(SUBSTRING ${QT_DIR} 0 ${LEN_QT_DIR} QT_ROOT_DIR)
+        link_directories(${QT_ROOT_DIR}/lib)
+        link_directories(${QT_ROOT_DIR}/plugins/platforms)
+        set(PROJECT_LIBS
+            ${PROJECT_LIBS}
+            # windows static runtime lib
+            setupapi      #QtSerialPort qserialportinfo_win.obj
+            ws2_32        #Qt5Network qhostaddress.obj qhostinfo_win.obj qnativesocketengine.obj qnativesocketengine_win.obj
+            iphlpapi      #Qt5Network qnetworkinterface_win.obj
+            qtpcre2       #Qt5Core qregularexpression.obj
+            netapi32      #Qt5Core qfilesystemengine_win.obj
+            userenv       #Qt5Core qfilesystemengine_win.obj
+            mincore       #Qt5Core qcoreapplication.obj
+            qtharfbuzz    #Qt5Gui qtextengine.obj
+            qtlibpng      #QtGui qpnghandler.obj
+            ippicvmt      #opencv_core454
+            ippiw         #opencv_core454
+            ittnotify     #opencv_core454
+            zlib          #opencv_core454
+            libopenjp2    #opencv_imgcodecs454
+            libjpeg-turbo #opencv_imgcodecs454
+            libtiff       #opencv_imgcodecs454
+            libwebp       #opencv_imgcodecs454
+            IlmImf        #opencv_imgcodecs454
+            qwindows      #platform plugin
+        )
+    endif()
 elseif (APPLE)
 
 # for aarch64 only
@@ -159,6 +197,22 @@ elseif (UNIX)
     )
 endif()
 
+if (MSVC AND BUILD_STATIC)
+    set(CompilerFlags
+        CMAKE_C_FLAGS
+        CMAKE_C_FLAGS_DEBUG
+        CMAKE_C_FLAGS_RELEASE
+        CMAKE_C_FLAGS_RELWITHDEBINFO
+        CMAKE_CXX_FLAGS
+        CMAKE_CXX_FLAGS_DEBUG
+        CMAKE_CXX_FLAGS_RELEASE
+        CMAKE_CXX_FLAGS_RELWITHDEBINFO
+        )
+    foreach(CompilerFlag ${CompilerFlags})
+        string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
+    endforeach()
+endif()
+
 add_executable(Demo_param WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(Demo_param PRIVATE PARAM=1)
 qt5_use_modules(Demo_param Widgets SerialPort Network)
@@ -168,3 +222,8 @@ add_executable(Demo_ICMOS WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(Demo_ICMOS PRIVATE ICMOS=1)
 qt5_use_modules(Demo_ICMOS Widgets SerialPort Network)
 target_link_libraries(Demo_ICMOS ${PROJECT_LIBS})
+
+add_executable(LvTong WIN32 ${TRANSLATE} ${SOURCE_FILES})
+target_compile_definitions(LvTong PRIVATE LVTONG=1)
+qt5_use_modules(Demo_param Widgets SerialPort Network)
+target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn454)

@@ -9,6 +9,7 @@ Preferences::Preferences(QWidget *parent) :
     cameralink(false),
     dist_ns(3e8 / 2e9),
     auto_rep_freq(true),
+    auto_mcp(false),
     hz_unit(0),
     base_unit(0),
     max_dist(15000),

@@ -12,7 +12,7 @@ int Cam::search_for_devices()
     MV_CC_DEVICE_INFO_LIST st_dev_list = {0};
     if (!cameralink)
     {
-        MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
+        MV_CC_EnumDevices(MV_GIGE_DEVICE | MV_USB_DEVICE, &st_dev_list);
         if (st_dev_list.nDeviceNum) device_type = 1, MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
         if (device_type) return device_type;
     }
