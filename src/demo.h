@@ -3,11 +3,9 @@
 
 #include <QSerialPort>
 #include <QTcpSocket>
-//#include <windows.h>
 
 #include "joystick.h"
 #include "threadpool.h"
-#include "mywidget.h"
 #include "imageproc.h"
 //#include "cam.h"
 #include "mvcam.h"
@@ -209,16 +207,19 @@ private slots:
 
     void ptz_button_pressed(int id);
     void ptz_button_released(int id);
-
     void on_PTZ_SPEED_SLIDER_valueChanged(int value);
-
     void on_PTZ_SPEED_EDIT_editingFinished();
-
     void on_STOP_BTN_clicked();
 
     void on_DUAL_LIGHT_BTN_clicked();
 
     void on_RESET_3D_BTN_clicked();
+
+#ifdef LVTONG
+    void display_fishnet_result(int result);
+#endif
+
+    void on_FIRE_LASER_BTN_clicked();
 
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
@@ -236,6 +237,11 @@ signals:
 
     // task queue full in thread pool
     void task_queue_full();
+
+#ifdef LVTONG
+    // update fishnet result in thread
+    void update_fishnet_result(int res);
+#endif
 
 protected:
 //  overload

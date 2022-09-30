@@ -90,6 +90,8 @@ public:
     float           dehaze_pct;
     float           sky_tolerance;
     int             fast_gf;
+    bool            fishnet_recog;
+    float           fishnet_thresh;
 
 };
 

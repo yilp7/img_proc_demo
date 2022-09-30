@@ -23,7 +23,9 @@ Preferences::Preferences(QWidget *parent) :
     high_out(1),
     dehaze_pct(0.95),
     sky_tolerance(40),
-    fast_gf(1)
+    fast_gf(1),
+    fishnet_recog(false),
+    fishnet_thresh(0.99)
 {
     ui->setupUi(this);
 
@@ -145,9 +147,21 @@ Preferences::Preferences(QWidget *parent) :
     connect(laser_grp, SIGNAL(buttonToggled(int, bool)), SLOT(toggle_laser(int, bool)));
     //[3]
 
+    //[4] set up ui for image proc
+#ifdef LVTONG
+    connect(ui->FISHNET_RECOG_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ fishnet_recog = arg1; });
+    connect(ui->FISHNET_THRESH_EDIT, &QLineEdit::editingFinished, this,
+            [this](){
+                fishnet_thresh = ui->FISHNET_THRESH_EDIT->text().toFloat();
+                ui->FISHNET_THRESH_EDIT->setText(QString::number(fishnet_thresh, 'f', 2));
+            });
+#else
+    ui->FISHNET->hide();
+    ui->FISHNET_RECOG_CHK->hide();
+    ui->FISHNET_THRESH_EDIT->hide();
+#endif
+    //[4]
     data_exchange(false);
-
-    ui->LASER_CHK_1->setChecked(true);
 }
 
 Preferences::~Preferences()
@@ -167,6 +181,10 @@ void Preferences::data_exchange(bool read)
         dehaze_pct = ui->DEHAZE_PCT_EDIT->text().toFloat() / 100;
         sky_tolerance = ui->SKY_TOLERANCE_EDIT->text().toFloat();
         fast_gf = ui->FAST_GF_EDIT->text().toInt();
+#ifdef LVTONG
+        fishnet_recog = ui->FISHNET_RECOG_CHK->isChecked();
+        fishnet_thresh = ui->FISHNET_THRESH_EDIT->text().toFloat();
+#endif
 
         auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
         base_unit = ui->UNIT_LIST->currentIndex();
@@ -195,6 +213,10 @@ void Preferences::data_exchange(bool read)
         ui->DEHAZE_PCT_EDIT->setText(QString::number(dehaze_pct * 100, 'f', 2));
         ui->SKY_TOLERANCE_EDIT->setText(QString::number(sky_tolerance, 'f', 2));
         ui->FAST_GF_EDIT->setText(QString::number(fast_gf));
+#ifdef LVTONG
+        ui->FISHNET_RECOG_CHK->setChecked(fishnet_recog);
+        ui->FISHNET_THRESH_EDIT->setText(QString::number(fishnet_thresh, 'f', 2));
+#endif
 
         ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
         ui->UNIT_LIST->setCurrentIndex(base_unit);

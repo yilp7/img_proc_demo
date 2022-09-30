@@ -298,6 +298,15 @@ Demo::Demo(QWidget *parent)
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
+#ifdef LVTONG
+    ui->DISTANCE->hide();
+    ui->DIST_BTN->hide();
+
+    connect(this, SIGNAL(update_fishnet_result(int)), SLOT(display_fishnet_result(int)));
+#else
+    ui->FIRE_LASER_BTN->hide();
+#endif
+
 #ifdef ICMOS
     ui->RANGE_COM->setText("R1");
     ui->LASER_COM->setText("R2");
@@ -465,13 +474,22 @@ int Demo::grab_thread_process() {
     prev_3d = cv::Mat(h, w, CV_8UC3);
     prev_img = cv::Mat(h, w, CV_8UC1);
     double *range = (double*)calloc(w * h, sizeof(double));
+#ifdef LVTONG
+    cv::Mat fishnet_res;
+    cv::dnn::Net net = cv::dnn::readNet("model/resnet18.onnx");
+#endif
     while (grab_thread_state) {
         while (img_q.size() > 5) img_q.pop();
 
         if (img_q.empty()) {
+#ifdef LVTONG
+            QThread::msleep(10);
+            continue;
+#else
 //            QThread::msleep(10);
             img_mem = prev_img.clone();
             updated = false;
+#endif
         }
         else {
             img_mem = img_q.front();
@@ -517,6 +535,29 @@ int Demo::grab_thread_process() {
             }
         }
 */
+#ifdef LVTONG
+        if (pref->fishnet_recog) {
+            cv::cvtColor(img_mem, fishnet_res, cv::COLOR_GRAY2RGB);
+            fishnet_res.convertTo(fishnet_res, CV_32FC3, 1.0 / 255);
+            cv::resize(fishnet_res, fishnet_res, cv::Size(224, 224));
+
+            cv::Mat blob = cv::dnn::blobFromImage(fishnet_res, 1.0, cv::Size(224, 224));
+            net.setInput(blob);
+            cv::Mat prob = net.forward("195");
+//            std::cout << cv::format(prob, cv::Formatter::FMT_C) << std::endl;
+
+            static double min, max;
+            cv::minMaxLoc(prob, &min, &max);
+
+    //        prob -=max;
+            double is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
+//            double is_net = exp(prob.at<float>(1)) / exp(prob.at<float>(0) + prob.at<float>(1));
+
+            emit update_fishnet_result(is_net > pref->fishnet_thresh);
+        }
+        else emit update_fishnet_result(-1);
+#endif
+
         // process frame average
         if (seq_sum.empty()) seq_sum = cv::Mat::zeros(h, w, CV_16U);
         if (frame_a_sum.empty()) frame_a_sum = cv::Mat::zeros(h, w, CV_16U);
@@ -1277,11 +1318,16 @@ void Demo::save_to_file(bool save_result) {
         Demo::save_image_bmp(temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
         return;
     }
-    switch (pixel_depth) {
-    case  8: if (!tp.append_task(std::bind(Demo::save_image_bmp, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
-    case 10:
-    case 12: if (!tp.append_task(std::bind(Demo::save_image_tif, temp->clone() * (1 << pixel_depth - 8), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
-    default: break;
+    //TODO implement 16bit result image processing/writing
+    if (save_result) {
+        if (!tp.append_task(std::bind(Demo::save_image_bmp, temp->clone(), save_location + "/res_bmp/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
+    } else {
+        switch (pixel_depth) {
+        case  8: if (!tp.append_task(std::bind(Demo::save_image_bmp, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
+        case 10:
+        case 12: if (!tp.append_task(std::bind(Demo::save_image_tif, temp->clone() * (1 << 16 - pixel_depth), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
+        default: break;
+        }
     }
 }
 
@@ -2073,7 +2119,7 @@ void Demo::update_delay()
 void Demo::update_gate_width() {
     static QElapsedTimer t;
     if (t.elapsed() < (fps > 9 ? 900 / fps : 100)) return;
-    t.start();
+    t.restart();
 
     if (depth_of_view < 0) depth_of_view = 0;
     if (depth_of_view > 1500) depth_of_view = 1500;
@@ -2513,6 +2559,9 @@ void Demo::init_laser()
     qDebug() << QString("QSW:PRF 0\r");
 
     update_current();
+
+    ui->FIRE_LASER_BTN->setEnabled(true);
+    ui->FIRE_LASER_BTN->click();
 }
 
 void Demo::change_mcp(int val)
@@ -2852,6 +2901,9 @@ void Demo::resizeEvent(QResizeEvent *event)
 //    ui->HIDE_BTN->move(ui->LEFT->geometry().right() - 10 + (ui->SOURCE_DISPLAY->geometry().left() + ui->MID->geometry().left() - ui->LEFT->geometry().right() + 10) / 2 + 2, this->geometry().height() / 2 - 10);
     ui->RULER_H->setGeometry(region.left(), region.bottom() - 10, region.width(), 32);
     ui->RULER_V->setGeometry(region.right() - 10, region.top(), 32, region.height());
+#ifdef LVTONG
+    ui->FISHNET_RESULT->move(region.right() - 170, 5);
+#endif
 
     image_mutex.lock();
     ui->SOURCE_DISPLAY->setGeometry(region);
@@ -3283,10 +3335,17 @@ void Demo::on_LASER_BTN_clicked()
         QTimer::singleShot(4000, this, SLOT(start_laser()));
     }
     else {
+        if (serial_port[3] && serial_port[3]->isOpen()) {
+            serial_port[3]->write("OFF\r", 10);
+            serial_port[3]->waitForBytesWritten(100);
+            QThread::msleep(100);
+            serial_port[3]->readAll();
+        }
         communicate_display(0, generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 7, 0, false);
 
         ui->LASER_BTN->setText(tr("ON"));
         ui->CURRENT_EDIT->setEnabled(false);
+        ui->FIRE_LASER_BTN->setEnabled(false);
     }
 }
 
@@ -3504,4 +3563,49 @@ void Demo::on_DUAL_LIGHT_BTN_clicked()
 void Demo::on_RESET_3D_BTN_clicked()
 {
     frame_a_3d ^= 1;
+}
+
+#ifdef LVTONG
+void Demo::display_fishnet_result(int result)
+{
+    switch (result) {
+    case -1: ui->FISHNET_RESULT->setText("FISHNET<br>???"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");            break;
+    case  0: ui->FISHNET_RESULT->setText("FISHNET<br>DOES NOT EXIST"), ui->FISHNET_RESULT->setStyleSheet("color: #CD5C5C;"); break;
+    case  1: ui->FISHNET_RESULT->setText("FISHNET<br>EXISTS"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");         break;
+    default: return;
+    }
+}
+#endif
+
+void Demo::on_FIRE_LASER_BTN_clicked()
+{
+    if (ui->FIRE_LASER_BTN->text() == "FIRE") {
+        serial_port[3]->write("MODE:STBY 0\r", 12);
+        serial_port[3]->waitForBytesWritten(100);
+        QThread::msleep(100);
+        serial_port[3]->readAll();
+        qDebug() << QString("MODE:STBY 0\r");
+
+        serial_port[3]->write("ON\r", 3);
+        serial_port[3]->waitForBytesWritten(100);
+        QThread::msleep(100);
+        serial_port[3]->readAll();
+        qDebug() << QString("ON\r");
+
+        ui->FIRE_LASER_BTN->setText("STOP");
+    } else {
+        serial_port[3]->write("OFF\r", 4);
+        serial_port[3]->waitForBytesWritten(100);
+        QThread::msleep(100);
+        serial_port[3]->readAll();
+        qDebug() << QString("OFF\r");
+
+        serial_port[3]->write("MODE:STBY 1\r", 12);
+        serial_port[3]->waitForBytesWritten(100);
+        QThread::msleep(100);
+        serial_port[3]->readAll();
+        qDebug() << QString("MODE:STBY 1\r");
+
+        ui->FIRE_LASER_BTN->setText("FIRE");
+    }
 }

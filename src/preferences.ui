@@ -504,7 +504,7 @@
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>0</y>
+      <y>-862</y>
       <width>324</width>
       <height>1200</height>
      </rect>
@@ -1281,6 +1281,42 @@
      </property>
      <property name="text">
       <string/>
+     </property>
+    </widget>
+    <widget class="QLabel" name="FISHNET">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>1130</y>
+       <width>101</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>fishnet&lt;br&gt;recognition</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="FISHNET_THRESH_EDIT">
+     <property name="geometry">
+      <rect>
+       <x>230</x>
+       <y>1140</y>
+       <width>51</width>
+       <height>21</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="FISHNET_RECOG_CHK">
+     <property name="geometry">
+      <rect>
+       <x>148</x>
+       <y>1140</y>
+       <width>77</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>enable</string>
      </property>
     </widget>
    </widget>
