@@ -7,6 +7,9 @@ Preferences::Preferences(QWidget *parent) :
     pressed(false),
     symmetry(0),
     cameralink(false),
+    port_idx(0),
+    share_port(false),
+    use_tcp(false),
     dist_ns(3e8 / 2e9),
     auto_rep_freq(true),
     auto_mcp(false),
@@ -32,14 +35,14 @@ Preferences::Preferences(QWidget *parent) :
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
 
     // [0] set up ui for info tabs
-    ui->DEVICES_TAB->setup(0, ui->SEP_0->pos().y() + 10);
-    ui->SERIAL_TAB->setup(0, ui->SEP_1->pos().y() + 10);
-    ui->TCU_TAB->setup(0, ui->SEP_2->pos().y() + 10);
+    ui->DEVICES_TAB ->setup(0, ui->SEP_0->pos().y() + 10);
+    ui->SERIAL_TAB  ->setup(0, ui->SEP_1->pos().y() + 10);
+    ui->TCU_TAB     ->setup(0, ui->SEP_2->pos().y() + 10);
     ui->IMG_PROC_TAB->setup(0, ui->SEP_3->pos().y() + 10);
 
-    connect(ui->DEVICES_TAB, SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
-    connect(ui->SERIAL_TAB, SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
-    connect(ui->TCU_TAB, SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
+    connect(ui->DEVICES_TAB,  SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
+    connect(ui->SERIAL_TAB,   SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
+    connect(ui->TCU_TAB,      SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
     connect(ui->IMG_PROC_TAB, SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
     //[0]
 
@@ -73,6 +76,7 @@ Preferences::Preferences(QWidget *parent) :
     ui->COM_LIST->addItem("LENS");
     ui->COM_LIST->addItem("LASER");
 #endif
+    ui->COM_LIST->addItem("PTZ");
     ui->COM_LIST->installEventFilter(this);
 
     ui->BAUDRATE_LIST->addItem("------");
@@ -236,10 +240,11 @@ void Preferences::data_exchange(bool read)
     }
 }
 
-void Preferences::config_ip(bool read, int ip, int gateway)
+void Preferences::config_ip(bool read, int ip, int gateway, int nic_address)
 {
     if (read) {
         ui->IP_EDIT->setText(QString::asprintf("%d.%d.%d.%d", (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF));
+        ui->LOCAL_IP_EDIT->setText(QString::asprintf("%d.%d.%d.%d", (nic_address >> 24) & 0xFF, (nic_address >> 16) & 0xFF, (nic_address >> 8) & 0xFF, nic_address & 0xFF));
     }
     else {
         int ip1, ip2, ip3, ip4;
@@ -351,7 +356,6 @@ void Preferences::showEvent(QShowEvent *event)
     if (this->focusWidget()) this->focusWidget()->clearFocus();
     this->setFocus();
 }
-
 
 void Preferences::jump_to_content(int pos)
 {

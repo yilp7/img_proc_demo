@@ -1,8 +1,9 @@
 #ifndef MYWIDGET_H
 #define MYWIDGET_H
 
-#include "progsettings.h"
+//#include "progsettings.h"
 #include "preferences.h"
+#include "scanconfig.h"
 #include "utils.h"
 
 class Display : public QLabel
@@ -25,6 +26,7 @@ signals:
     void curr_pos(QPoint pos);
     void start_pos(QPoint pos);
     void shape_size(QPoint size);
+    void ptz_target(QPoint pos);
 
 public:
     QPoint    lefttop;
@@ -32,7 +34,7 @@ public:
     QPoint    prev_pos; // start position of mouse when image is dragged
     QPoint    ori_pos;  // start position of roi when image is dragged
     bool      grab;
-    bool      drag;
+    int       mode; // 0: zoom mode, 1: selection mode, 2: ptz mode
     int       curr_scale;
     float     scale[5];
     cv::Rect  display_region;
@@ -119,8 +121,9 @@ public:
 
     QObject      *signal_receiver;
 
-    ProgSettings *prog_settings;
+//    ProgSettings *prog_settings;
     Preferences  *preferences;
+    ScanConfig   *scan_config;
 
 };
 

@@ -504,7 +504,7 @@
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>-862</y>
+      <y>0</y>
       <width>324</width>
       <height>1200</height>
      </rect>
@@ -600,7 +600,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>0.0.0.0</string>
+      <string>127.0.0.1</string>
      </property>
     </widget>
     <widget class="QLabel" name="DEV_IP">

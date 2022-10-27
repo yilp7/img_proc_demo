@@ -16,7 +16,7 @@ public:
     ~Preferences();
 
     void data_exchange(bool read);
-    void config_ip(bool read, int ip = 0, int gateway = 0); // ip and gateway will only be used when reading ip
+    void config_ip(bool read, int ip = 0, int gateway = 0, int nic_address = 0); // ip and gateway will only be used when reading ip
     void enable_ip_editing(bool enable);
     void set_pixel_format(int idx);
     void display_baudrate(int id, int baudrate);

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(Demo_combined LANGUAGES CXX VERSION 0.2.4.0)
+project(Demo_combined LANGUAGES CXX VERSION 0.3.1.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -93,8 +93,8 @@ set(SOURCE_FILES
     src/threadpool.cpp
     src/mywidget.h
     src/mywidget.cpp
-    src/progsettings.h
-    src/progsettings.cpp
+#    src/progsettings.h
+#    src/progsettings.cpp
     src/lasersettings.cpp
     src/lasersettings.h
     src/imageproc.h
@@ -111,11 +111,15 @@ set(SOURCE_FILES
     src/joystick.cpp
     src/preferences.h
     src/preferences.cpp
+    src/scanconfig.h
+    src/scanconfig.cpp
     src/demo_dev.ui
-    src/settings.ui
+#    src/settings.ui
     src/preferences.ui
+    src/scanconfig.ui
     src/laser_settings.ui
     resources/resources.qrc
+    resources/style.qss
 )
 
 if (WIN32)
@@ -132,14 +136,29 @@ set(PROJECT_LIBS
     Qt${QT_VERSION_MAJOR}::Network
     # mvs
     MvCameraControl
-    # HQV
-    HQV_AVIProcess64
-    HQV_DataConvert64
-    HQV_SDK64
     # Euresys
 #    MultiCam
 #    clallserial
 )
+
+#if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+#    set(PROJECT_LIBS
+#        ${PROJECT_LIBS}
+#        # HQV
+#        HQV_AVIProcess64
+#        HQV_DataConvert64
+#        HQV_SDK64
+#    )
+#else()
+#    set(PROJECT_LIBS
+#        ${PROJECT_LIBS}
+#        # HQV
+#        HQV_AVIProcess
+#        HQV_DataConvert
+#        HQV_SDK
+#    )
+#endif()
+
 if (WIN32)
     set(PROJECT_LIBS
         ${PROJECT_LIBS}

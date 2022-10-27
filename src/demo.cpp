@@ -1,5 +1,6 @@
 #include "demo.h"
-#include "./ui_demo_dev.h"
+#include "ui_demo_dev.h"
+#include "ui_preferences.h"
 
 GrabThread::GrabThread(void *info)
 {
@@ -18,6 +19,7 @@ Demo::Demo(QWidget *parent)
     mouse_pressed(false),
     ui(new Ui::Demo),
     pref(NULL),
+    scan_config(NULL),
     laser_settings(NULL),
     calc_avg_option(5),
     range_threshold(0),
@@ -213,7 +215,7 @@ Demo::Demo(QWidget *parent)
     ui->GAMMA_SLIDER->setTickInterval(5);
 
     ui->RULER_V->vertical = true;
-    ui->DRAG_TOOL->click();
+    ui->ZOOM_TOOL->click();
     ui->CURR_COORD->setup("current");
     connect(ui->SOURCE_DISPLAY, SIGNAL(curr_pos(QPoint)), ui->CURR_COORD, SLOT(display_pos(QPoint)));
     ui->START_COORD->setup("start");
@@ -277,6 +279,7 @@ Demo::Demo(QWidget *parent)
     // connect title bar to the main window (Demo*)
     ui->TITLE->setup(this);
     pref = ui->TITLE->preferences;
+    scan_config = ui->TITLE->scan_config;
 
     // connect to joystick (windows xbox only)
     h_joystick_thread = new JoystickThread(this);
@@ -295,6 +298,9 @@ Demo::Demo(QWidget *parent)
     on_ENUM_BUTTON_clicked();
     if (serial_port[0]->isOpen() && serial_port[3]->isOpen()) on_LASER_BTN_clicked();
 
+    // connect ptz targeting slots
+    connect(ui->SOURCE_DISPLAY, SIGNAL(ptz_target(QPoint)), this, SLOT(point_ptz_to_target(QPoint)));
+
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
@@ -305,6 +311,7 @@ Demo::Demo(QWidget *parent)
     connect(this, SIGNAL(update_fishnet_result(int)), SLOT(display_fishnet_result(int)));
 #else
     ui->FIRE_LASER_BTN->hide();
+    ui->FISHNET_RESULT->hide();
 #endif
 
 #ifdef ICMOS
@@ -469,7 +476,7 @@ int Demo::grab_thread_process() {
 //    ProgSettings *settings = ui->TITLE->prog_settings;
     QImage stream;
     cv::Mat sobel;
-    int ww, hh;
+    int ww, hh, scan_img_count = -1;
     float weight = h / 1024.0; // font scale & thickness
     prev_3d = cv::Mat(h, w, CV_8UC3);
     prev_img = cv::Mat(h, w, CV_8UC1);
@@ -536,6 +543,7 @@ int Demo::grab_thread_process() {
         }
 */
 #ifdef LVTONG
+        double is_net;
         if (pref->fishnet_recog) {
             cv::cvtColor(img_mem, fishnet_res, cv::COLOR_GRAY2RGB);
             fishnet_res.convertTo(fishnet_res, CV_32FC3, 1.0 / 255);
@@ -550,8 +558,8 @@ int Demo::grab_thread_process() {
             cv::minMaxLoc(prob, &min, &max);
 
     //        prob -=max;
-            double is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
-//            double is_net = exp(prob.at<float>(1)) / exp(prob.at<float>(0) + prob.at<float>(1));
+            is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
+//            is_net = exp(prob.at<float>(1)) / exp(prob.at<float>(0) + prob.at<float>(1));
 
             emit update_fishnet_result(is_net > pref->fishnet_thresh);
         }
@@ -601,7 +609,7 @@ int Demo::grab_thread_process() {
                     static cv::Mat frame_a_avg, frame_b_avg;
                     frame_a_sum.convertTo(frame_a_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
                     frame_b_sum.convertTo(frame_b_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
-                    ImageProc::gated3D(frame_a_avg, frame_b_avg, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
+                    ImageProc::gated3D(frame_b_avg, frame_a_avg, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
                 }
                 else {
                     if (frame_a_3d) ImageProc::gated3D(prev_img, img_mem, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
@@ -785,6 +793,13 @@ int Demo::grab_thread_process() {
                 if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+#ifdef LVTONG
+                static int baseline = 0;
+                if (pref->fishnet_recog) {
+//                    cv::putText(modified_result, "FISHNET", cv::Point(ww - 40 - cv::getTextSize("FISHNET", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    cv::putText(modified_result, is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                }
+#endif
             }
 
             // resize to display size
@@ -806,12 +821,23 @@ int Demo::grab_thread_process() {
 
         // process scan
         if (scan && updated) {
-            save_scan_img();
-            delay_dist += scan_step;
-//            filter_scan();
+            static cv::Mat temp;
+            if (scan_img_count < 0) scan_img_count = ui->FRAME_AVG_CHECK->isChecked() ? 5 : 1;
+            scan_img_count -= 1;
+            if (!scan_img_count) {
+                save_scan_img();
 
-            emit update_delay_in_thread();
-//            update_delay();
+                delay_dist += scan_step;
+                scan_img_count = ui->FRAME_AVG_CHECK->isChecked() ? 5 : 1;
+//                filter_scan();
+
+                modified_result.convertTo(temp, CV_64F);
+                cv::threshold(temp, temp, 20, 255, cv::THRESH_TOZERO);
+                scan_3d += temp * (++scan_idx);
+                scan_sum += temp;
+
+                emit update_delay_in_thread();
+            }
         }
         if (scan && std::round(delay_dist / dist_ns) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
 
@@ -838,6 +864,13 @@ int Demo::grab_thread_process() {
                 if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+#ifdef LVTONG
+                static int baseline = 0;
+                if (pref->fishnet_recog) {
+//                    cv::putText(modified_result, "FISHNET", cv::Point(ww - 40 - cv::getTextSize("FISHNET", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    cv::putText(modified_result, is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                }
+#endif
             }
             if (is_color || image_3d) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
             vid_out[1].write(temp);
@@ -1236,6 +1269,7 @@ void Demo::closeEvent(QCloseEvent *event)
 //    ui->TITLE->prog_settings->reject();
     pref->reject();
     laser_settings->reject();
+    scan_config->reject();
     if (QFile::exists("HQVSDK.xml")) QFile::remove("HQVSDK.xml");
 }
 
@@ -1297,6 +1331,7 @@ void Demo::enable_controls(bool cam_rdy) {
     ui->CONTRAST_SLIDER->setEnabled(start_grabbing);
     ui->GAMMA_SLIDER->setEnabled(start_grabbing);
     ui->SCAN_BUTTON->setEnabled(start_grabbing);
+//    ui->SCAN_BUTTON->setEnabled(start_grabbing || device_type > 0);
     ui->INFO_CHECK->setEnabled(start_grabbing);
     ui->CENTER_CHECK->setEnabled(start_grabbing);
 }
@@ -1337,7 +1372,7 @@ void Demo::save_scan_img() {
 //    cv::imwrite(temp.toLatin1().data(), img_mem);
 //    QFile::rename(temp, dest);
 //    if (ui->TITLE->prog_settings->save_scan_ori) QPixmap::fromImage(QImage(img_mem.data, img_mem.cols, img_mem.rows, img_mem.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
-    if (ui->TITLE->prog_settings->save_scan_ori) {
+    if (scan_config->capture_scan_ori) {
 //        std::thread t_ori(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
 //        t_ori.detach();
         tp.append_task(std::bind(save_image_bmp, img_mem.clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp"));
@@ -1346,7 +1381,7 @@ void Demo::save_scan_img() {
 //    cv::imwrite(temp.toLatin1().data(), modified_result);
 //    QFile::rename(temp, dest);
 //    if (ui->TITLE->prog_settings->save_scan_res) QPixmap::fromImage(QImage(modified_result.data, modified_result.cols, modified_result.rows, modified_result.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
-    if (ui->TITLE->prog_settings->save_scan_res) {
+    if (scan_config->capture_scan_res) {
 //        std::thread t_res(save_image_bmp, modified_result, save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
 //        t_res.detach();
         tp.append_task(std::bind(save_image_bmp, modified_result.clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp"));
@@ -1402,10 +1437,10 @@ void Demo::on_ENUM_BUTTON_clicked()
 //    ui->TITLE->prog_settings->enable_ip_editing(device_type == 1);
     pref->enable_ip_editing(device_type == 1);
     if (device_type) {
-        int ip, gateway;
-        curr_cam->ip_address(true, &ip, &gateway);
+        int ip, gateway, nic_address;
+        curr_cam->ip_address(true, &ip, &gateway, &nic_address);
 //        ui->TITLE->prog_settings->config_ip(true, ip, gateway);
-        pref->config_ip(true, ip, gateway);
+        pref->config_ip(true, ip, gateway, nic_address);
     }
 }
 
@@ -1590,11 +1625,8 @@ void Demo::on_STOP_GRABBING_BUTTON_clicked()
 void Demo::on_SAVE_BMP_BUTTON_clicked()
 {
     if (!QDir(save_location + "/ori_bmp").exists()) QDir().mkdir(save_location + "/ori_bmp");
-//    if (device_type == -1) save_original = 1;
-    else {
-        save_original = !save_original;
-        ui->SAVE_BMP_BUTTON->setText(save_original ? tr("Stop") : tr("ORI"));
-    }
+    save_original = !save_original;
+    ui->SAVE_BMP_BUTTON->setText(save_original ? tr("Stop") : tr("ORI"));
 }
 
 void Demo::on_SAVE_FINAL_BUTTON_clicked()
@@ -1733,11 +1765,6 @@ void Demo::setup_laser(int laser_on)
     this->laser_on = laser_on;
 }
 
-void Demo::set_serial_port_share(bool share)
-{
-    share_serial_port = share;
-}
-
 void Demo::set_baudrate(int idx, int baudrate)
 {
     if (serial_port[idx]->isOpen()) serial_port[idx]->setBaudRate(baudrate);
@@ -1752,11 +1779,6 @@ void Demo::display_baudrate(int idx)
 {
 //    if (serial_port[idx]->isOpen()) ui->TITLE->prog_settings->display_baudrate(idx, serial_port[idx]->baudRate());
     if (serial_port[idx]->isOpen()) pref->display_baudrate(idx, serial_port[idx]->baudRate());
-}
-
-void Demo::set_auto_mcp(bool adaptive)
-{
-    this->auto_mcp = adaptive;
 }
 
 void Demo::set_dev_ip(int ip, int gateway)
@@ -1776,11 +1798,6 @@ void Demo::change_pixel_format(int pixel_format)
     case PixelType_Gvsp_RGB8_Packed: is_color =  true; pixel_depth =  8; break;
     default:                         is_color = false; pixel_depth =  8; break;
     }
-}
-
-void Demo::reset_frame_a()
-{
-    frame_a_3d ^= 1;
 }
 
 void Demo::joystick_button_pressed(int btn)
@@ -2078,7 +2095,7 @@ void Demo::update_delay()
     delay_b_n = (delay + delay_n_n) % 1000;
 
     if (scan) {
-        rep_freq = ui->TITLE->prog_settings->rep_freq;
+        rep_freq = scan_config->rep_freq;
     }
     else {
         // change repeated frequency according to delay: rep frequency (kHz) <= 1s / delay (μs)
@@ -2117,9 +2134,11 @@ void Demo::update_delay()
 }
 
 void Demo::update_gate_width() {
+#ifndef LVTONG
     static QElapsedTimer t;
     if (t.elapsed() < (fps > 9 ? 900 / fps : 100)) return;
     t.restart();
+#endif
 
     if (depth_of_view < 0) depth_of_view = 0;
     if (depth_of_view > 1500) depth_of_view = 1500;
@@ -2162,7 +2181,8 @@ void Demo::filter_scan()
 void Demo::update_current()
 {
     if (!serial_port[3]) return;
-    QString send = "DIOD1:CURR " + ui->CURRENT_EDIT->text() + "\r";
+//    QString send = "DIOD1:CURR " + ui->CURRENT_EDIT->text() + "\r";
+    QString send = "PCUR " + ui->CURRENT_EDIT->text() + "\r";
     serial_port[3]->write(send.toLatin1().data(), send.length());
     serial_port[3]->waitForBytesWritten(100);
     serial_port[3]->readAll();
@@ -2211,11 +2231,11 @@ void Demo::convert_write(QDataStream &out, const int TYPE)
 bool Demo::convert_read(QDataStream &out, const int TYPE)
 {
     uchar temp_uchar = 0x00;
+    bool result = false;
     char *temp_str = (char*)malloc(100 * sizeof(char));
     memset(temp_str, 0, 100);
     out >> temp_uchar; if (temp_uchar != 0xAA) return false;
     out >> temp_uchar; if (temp_uchar != 0xAA) return false;
-    static ProgSettings *ps = ui->TITLE->prog_settings;
     switch (TYPE) {
     case WIN_PREF:
     {
@@ -2249,7 +2269,7 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
         out >> temp_str; if (std::strcmp(temp_str, "IMG")) return false;
         out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
 //        out >> ps->kernel >> ps->gamma >> ps->log >> ps->low_in >> ps->low_out >> ps->high_in >> ps->high_out >> ps->dehaze_pct >> ps->sky_tolerance >> ps->fast_gf;
-        out >> pref->accu_base >> pref->gamma >> ps->low_in >> ps->low_out >> ps->high_in >> ps->high_out >> ps->dehaze_pct >> ps->sky_tolerance >> ps->fast_gf;
+        out >> pref->accu_base >> pref->gamma >> pref->low_in >> pref->low_out >> pref->high_in >> pref->high_out >> pref->dehaze_pct >> pref->sky_tolerance >> pref->fast_gf;
     }
     case TCU_PREF:
     {
@@ -2264,8 +2284,9 @@ bool Demo::convert_read(QDataStream &out, const int TYPE)
     out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
     out >> temp_uchar; if (temp_uchar != 0xFF) return false;
     out >> temp_uchar; if (temp_uchar != 0xFF) return false;
+    result = true;
     free(temp_str);
-    return true;
+    return result;
 }
 
 void Demo::read_gatewidth_lookup_table(QFile *fp)
@@ -2613,9 +2634,11 @@ void Demo::change_focus_speed(int val)
     ui->FOCUS_SPEED_SLIDER->setValue(val);
     if (val > 1) val -= 1;
 
+#ifndef LVTONG
     static QElapsedTimer t;
     if (t.elapsed() < 100) return;
     t.restart();
+#endif
 
     int temp_serial_port_id = pref->share_port && serial_port[0]->isOpen() ? 0 : 2;
 
@@ -2779,6 +2802,14 @@ void Demo::keyPressEvent(QKeyEvent *event)
             else if (edit == ui->CURRENT_EDIT) {
                 update_current();
             }
+            else if (edit == ui->ANGLE_H_EDIT) {
+                angle_h = ui->ANGLE_H_EDIT->text().toFloat();
+                set_ptz_angle();
+            }
+            else if (edit == ui->ANGLE_V_EDIT) {
+                angle_v = ui->ANGLE_V_EDIT->text().toFloat();
+                set_ptz_angle();
+            }
             this->focusWidget()->clearFocus();
             break;
         // 100m => 667ns, 10m => 67ns
@@ -2890,8 +2921,9 @@ void Demo::resizeEvent(QResizeEvent *event)
         region.setRect(10, 40, width, height);
     }
     ui->TITLE->resize(this->width(), 30);
-    ui->DRAG_TOOL->move(region.x(), 15);
-    ui->SELECT_TOOL->move(region.x() + 30, 15);
+    ui->ZOOM_TOOL->move(region.x(), 15);
+    ui->SELECT_TOOL->move(region.x() + 25, 15);
+    ui->PTZ_TOOL->move(region.x() + 50, 15);
     ui->CURR_COORD->move(region.x() + 80, 5);
     ui->START_COORD->move(ui->CURR_COORD->geometry().right() + 20, 5);
     ui->SHAPE_INFO->move(ui->START_COORD->geometry().right() + 20, 5);
@@ -3182,18 +3214,21 @@ void Demo::on_SAVE_AVI_BUTTON_clicked()
 
 void Demo::on_SCAN_BUTTON_clicked()
 {
-    static ProgSettings *settings = ui->TITLE->prog_settings;
     bool start_scan = ui->SCAN_BUTTON->text() == tr("Scan");
 
-    while (updated);
+//    while (updated);
 
     if (start_scan) {
-        rep_freq = settings->rep_freq;
-        delay_dist = settings->start_pos * dist_ns;
-        scan_stopping_delay = settings->end_pos;
-        scan_step = settings->step_size * dist_ns;
+        scan_3d = cv::Mat::zeros(h, w, CV_64F);
+        scan_sum = cv::Mat::zeros(h, w, CV_64F);
+        scan_idx = 0;
 
-        if (ui->TITLE->prog_settings->save_scan_ori || ui->TITLE->prog_settings->save_scan_res) {
+        rep_freq = scan_config->rep_freq;
+        delay_dist = scan_config->starting_delay * dist_ns;
+        scan_stopping_delay = scan_config->ending_delay;
+        scan_step = scan_config->step_size_delay * dist_ns;
+
+        if (scan_config->capture_scan_ori || scan_config->capture_scan_res) {
             scan_name = "scan_" + QDateTime::currentDateTime().toString("MMdd_hhmmss");
             if (!QDir(save_location + "/" + scan_name).exists()) {
                 QDir().mkdir(save_location + "/" + scan_name);
@@ -3211,7 +3246,7 @@ void Demo::on_SCAN_BUTTON_clicked()
                                            "laser width:        %06d ns\n"
                                            "gate width:         %06d ns\n"
                                            "MCP:                %03d",
-                                           settings->start_pos, settings->end_pos, settings->frame_count, settings->step_size,
+                                           scan_config->starting_delay, scan_config->ending_delay, scan_config->frame_count, scan_config->step_size_delay,
                                            (int)rep_freq, laser_width, gate_width_a_u * 1000 + gate_width_a_n, mcp).toUtf8());
             params.close();
         }
@@ -3223,9 +3258,16 @@ void Demo::on_SCAN_BUTTON_clicked()
         scan = false;
 
 //        for (uint i = scan_q.size(); i; i--) qDebug("dist %f", scan_q.front()), scan_q.pop_front();
+
+        scan_3d = scan_3d.mul(1 / scan_sum);
+        scan_3d *= 2.25;
+        cv::Mat scan_result_3d;
+        ImageProc::paint_3d(scan_3d, scan_result_3d, 0, scan_config->starting_delay * dist_ns, scan_config->ending_delay * dist_ns);
+        cv::imwrite((TEMP_SAVE_LOCATION + "/" + scan_name + "_result.bmp").toLatin1().constData(), scan_result_3d);
+        QFile::rename(TEMP_SAVE_LOCATION + "/" + scan_name + "_result.bmp", save_location + "/" + scan_name + "/result.bmp");
     }
 
-    ui->SCAN_BUTTON->setText(start_scan ? tr("Pause") : tr("Scan"));
+    ui->SCAN_BUTTON->setText(start_scan ? tr("Stop") : tr("Scan"));
 }
 
 void Demo::on_CONTINUE_SCAN_BUTTON_clicked()
@@ -3244,6 +3286,12 @@ void Demo::on_RESTART_SCAN_BUTTON_clicked()
     delay_dist = 200;
 
     on_CONTINUE_SCAN_BUTTON_clicked();
+}
+
+void Demo::on_SCAN_CONFIG_BTN_clicked()
+{
+    scan_config->show();
+    scan_config->raise();
 }
 
 void Demo::append_data(QString text)
@@ -3329,6 +3377,7 @@ void Demo::laser_preset_reached()
 
 void Demo::on_LASER_BTN_clicked()
 {
+#ifdef LVTONG
     if (ui->LASER_BTN->text() == "ON") {
         ui->LASER_BTN->setEnabled(false);
         communicate_display(0, generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
@@ -3347,6 +3396,11 @@ void Demo::on_LASER_BTN_clicked()
         ui->CURRENT_EDIT->setEnabled(false);
         ui->FIRE_LASER_BTN->setEnabled(false);
     }
+#else
+    pref->ui->LASER_ENABLE_CHK->click();
+    ui->LASER_BTN->setText(ui->LASER_BTN->text() == "ON" ? tr("OFF") : tr("ON"));
+
+#endif
 }
 
 void Demo::on_GET_LENS_PARAM_BTN_clicked()
@@ -3408,16 +3462,25 @@ void Demo::screenshot()
     image_mutex.unlock();
 }
 
-void Demo::on_DRAG_TOOL_clicked()
+void Demo::on_ZOOM_TOOL_clicked()
 {
     ui->SELECT_TOOL->setChecked(false);
-    ui->SOURCE_DISPLAY->drag = true;
+    ui->PTZ_TOOL->setChecked(false);
+    ui->SOURCE_DISPLAY->mode = 0;
 }
 
 void Demo::on_SELECT_TOOL_clicked()
 {
-    ui->DRAG_TOOL->setChecked(false);
-    ui->SOURCE_DISPLAY->drag = false;
+    ui->ZOOM_TOOL->setChecked(false);
+    ui->PTZ_TOOL->setChecked(false);
+    ui->SOURCE_DISPLAY->mode = 1;
+}
+
+void Demo::on_PTZ_TOOL_clicked()
+{
+    ui->ZOOM_TOOL->setChecked(false);
+    ui->SELECT_TOOL->setChecked(false);
+    ui->SOURCE_DISPLAY->mode = 2;
 }
 
 void Demo::on_FILE_PATH_EDIT_editingFinished()
@@ -3491,7 +3554,7 @@ void Demo::config_gatewidth(QString filename)
 
 void Demo::send_ctrl_cmd(uchar dir)
 {
-    uchar buffer_out[7];
+    static uchar buffer_out[7] = {0};
     buffer_out[0] = 0xFF;
     buffer_out[1] = 0x01;
     buffer_out[2] = 0x00;
@@ -3542,9 +3605,79 @@ void Demo::on_PTZ_SPEED_EDIT_editingFinished()
     ui->PTZ_SPEED_EDIT->setText(QString::number(ptz_speed));
 }
 
+void Demo::on_GET_ANGLE_BTN_clicked()
+{
+    uchar buffer_out[7] = {0};
+    buffer_out[0] = 0xFF;
+    buffer_out[1] = 0x01;
+    buffer_out[2] = 0x00;
+    buffer_out[3] = 0x51;
+    buffer_out[4] = 0x00;
+    buffer_out[5] = 0x00;
+    buffer_out[6] = 0x52;
+    QByteArray read = communicate_display(4, QByteArray((char*)buffer_out, 7), 7, 7, true);
+    angle_h = (((uchar)read[4] << 8) + (uchar)read[5]) / 100.0;
+    ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", angle_h));
+
+    QThread::msleep(30);
+
+    buffer_out[3] = 0x53;
+    buffer_out[6] = 0x54;
+    read = communicate_display(4, QByteArray((char*)buffer_out, 7), 7, 7, true);
+    angle_v = (((uchar)read[4] << 8) + (uchar)read[5]) / 100.0;
+    ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", angle_v > 40 ? angle_v - 360 : angle_v));
+}
+
+void Demo::set_ptz_angle()
+{
+    static int angle = 0, sum = 0;
+    static uchar buffer_out[7] = {0};
+
+    angle_h += 360 * (int)((-angle_h) / 360);
+    if (angle_h < 0) angle_h += 360;
+    angle = angle_h * 100;
+    buffer_out[0] = 0xFF;
+    buffer_out[1] = 0x01;
+    buffer_out[2] = 0x00;
+    buffer_out[3] = 0x4B;
+    buffer_out[4] = (angle >> 8) & 0xFF;
+    buffer_out[5] = angle & 0xFF;
+    sum = 0;
+    for (int i = 1; i < 6; i++) sum += buffer_out[i];
+    buffer_out[6] = sum & 0xFF;
+    communicate_display(4, QByteArray((char*)buffer_out, 7), 7, 0, false);
+    ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", angle_h));
+
+    if (angle_v >  40) angle_v =  40;
+    if (angle_v < -40) angle_v = -40;
+    angle = angle_v * 100;
+    buffer_out[3] = 0x4D;
+    buffer_out[4] = (angle >> 8) & 0xFF;
+    buffer_out[5] = angle & 0xFF;
+    sum = 0;
+    for (int i = 1; i < 6; i++) sum += buffer_out[i];
+    buffer_out[6] = sum & 0xFF;
+    communicate_display(4, QByteArray((char*)buffer_out, 7), 7, 0, false);
+    ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", angle_v));
+}
+
 void Demo::on_STOP_BTN_clicked()
 {
     communicate_display(4, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
+}
+
+void Demo::point_ptz_to_target(QPoint target)
+{
+    static int display_width, display_height;
+    //TODO config params for max zoom
+//    static float tot_h = 20, tot_v = 14;// large FOV
+    static float tot_h = 0.82, tot_v = 0.57;// small FOV
+    display_width = ui->SOURCE_DISPLAY->width();
+    display_height = ui->SOURCE_DISPLAY->height();
+    angle_h += target.x() * tot_h / display_width - tot_h / 2;
+    angle_v += target.y() * tot_v / display_height - tot_v / 2;
+
+    set_ptz_angle();
 }
 
 void Demo::on_DUAL_LIGHT_BTN_clicked()
@@ -3563,6 +3696,8 @@ void Demo::on_DUAL_LIGHT_BTN_clicked()
 void Demo::on_RESET_3D_BTN_clicked()
 {
     frame_a_3d ^= 1;
+    frame_a_sum = 0;
+    frame_b_sum = 0;
 }
 
 #ifdef LVTONG
@@ -3570,8 +3705,8 @@ void Demo::display_fishnet_result(int result)
 {
     switch (result) {
     case -1: ui->FISHNET_RESULT->setText("FISHNET<br>???"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");            break;
-    case  0: ui->FISHNET_RESULT->setText("FISHNET<br>DOES NOT EXIST"), ui->FISHNET_RESULT->setStyleSheet("color: #CD5C5C;"); break;
-    case  1: ui->FISHNET_RESULT->setText("FISHNET<br>EXISTS"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");         break;
+    case  0: ui->FISHNET_RESULT->setText("FISHNET<br>DOES NOT EXIST"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;"); break;
+    case  1: ui->FISHNET_RESULT->setText("FISHNET<br>EXISTS"), ui->FISHNET_RESULT->setStyleSheet("color: #CD5C5C;");         break;
     default: return;
     }
 }

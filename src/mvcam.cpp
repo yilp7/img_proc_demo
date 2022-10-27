@@ -143,7 +143,7 @@ void Cam::binning(bool read, int *val)
     }
 }
 
-int Cam::ip_address(bool read, int *ip, int *gateway)
+int Cam::ip_address(bool read, int *ip, int *gateway, int *nic_address)
 {
     if (read) {
         MV_CC_DEVICE_INFO_LIST st_dev_list = {0};
@@ -151,6 +151,7 @@ int Cam::ip_address(bool read, int *ip, int *gateway)
         if (st_dev_list.nDeviceNum) {
             *ip = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nCurrentIp;
             *gateway = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nDefultGateWay;
+            if (nic_address) *nic_address = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nNetExport;
         }
         return 0;
     }

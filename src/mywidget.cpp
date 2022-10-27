@@ -1,15 +1,16 @@
 #include "mywidget.h"
 
-Display::Display(QWidget *parent) : QLabel(parent)
-  , lefttop(0, 0)
-  , center(0, 0)
-  , grab(false)
-  , drag(false)
-  , curr_scale(0)
-//  , scale{ QSize(640, 512), QSize(480, 384), QSize(320, 256), QSize(160, 128), QSize(80, 64)}
-//  , scale{ QSize(640, 400), QSize(480, 300), QSize(320, 200), QSize(160, 100), QSize(80, 50)}
-  , scale{ 1.0f, 2.0f / 3, 1.0f / 2, 1.0f / 4, 1.0f / 8}
-  , pressed(false)
+Display::Display(QWidget *parent) :
+    QLabel(parent),
+    lefttop(0, 0),
+    center(0, 0),
+    grab(false),
+    mode(0),
+    curr_scale(0),
+//    scale{ QSize(640, 512), QSize(480, 384), QSize(320, 256), QSize(160, 128), QSize(80, 64)},
+//    scale{ QSize(640, 400), QSize(480, 300), QSize(320, 200), QSize(160, 100), QSize(80, 50)},
+    scale{ 1.0f, 2.0f / 3, 1.0f / 2, 1.0f / 4, 1.0f / 8},
+    pressed(false)
 {
 
 }
@@ -44,10 +45,11 @@ void Display::mousePressEvent(QMouseEvent *event)
     pressed = true;
     prev_pos = event->pos();
     ori_pos = lefttop;
-    if (drag) return;
-    selection_v2.x = selection_v1.x = event->pos().x();
-    selection_v2.y = selection_v1.y = event->pos().y();
-    emit start_pos(event->pos());
+    if (mode == 1) {
+        selection_v2.x = selection_v1.x = event->pos().x();
+        selection_v2.y = selection_v1.y = event->pos().y();
+        emit start_pos(event->pos());
+    }
 }
 
 void Display::mouseMoveEvent(QMouseEvent *event)
@@ -61,12 +63,13 @@ void Display::mouseMoveEvent(QMouseEvent *event)
 //    qDebug("pos: %d, %d\n", event->globalX(), event->globalY());
 //    qDebug("%s selecting\n", qPrintable(this->objectName()));
 
-    if (drag) update_roi(ori_pos + QPoint((int)(scale[curr_scale] * this->width()), (int)(scale[curr_scale] * this->height())) / 2 - (event->pos() - prev_pos) * scale[curr_scale]);
+    if (!mode) update_roi(ori_pos + QPoint((int)(scale[curr_scale] * this->width()), (int)(scale[curr_scale] * this->height())) / 2 - (event->pos() - prev_pos) * scale[curr_scale]);
 //    prev_pos = event->pos();
-    if (drag) return;
-    selection_v2.x = event->pos().x();
-    selection_v2.y = event->pos().y();
-    emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
+    if (mode == 1) {
+        selection_v2.x = event->pos().x();
+        selection_v2.y = event->pos().y();
+        emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
+    }
 }
 
 void Display::mouseReleaseEvent(QMouseEvent *event)
@@ -77,17 +80,21 @@ void Display::mouseReleaseEvent(QMouseEvent *event)
     if (!grab) return;
 
     pressed = false;
-    if (drag) return;
-    selection_v2.x = event->pos().x();
-    selection_v2.y = event->pos().y();
-    emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
+    if (mode == 1) {
+        selection_v2.x = event->pos().x();
+        selection_v2.y = event->pos().y();
+        emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
+    }
+    else if (mode == 2) {
+        emit ptz_target(event->pos());
+    }
 }
 
 void Display::wheelEvent(QWheelEvent *event)
 {
     QLabel::wheelEvent(event);
 
-    if (!grab) return;
+    if (!grab || mode) return;
     QPoint center = lefttop + QPoint((int)(scale[curr_scale] * this->width() / 2), (int)(scale[curr_scale] * this->height() / 2));
     QLabel::wheelEvent(event);
     if(event->delta() > 0) {
@@ -197,8 +204,9 @@ void TitleBar::setup(QObject *ptr)
 {
     signal_receiver = ptr;
 
-    prog_settings = new ProgSettings();
+//    prog_settings = new ProgSettings();
     preferences = new Preferences();
+    scan_config = new ScanConfig();
 
     settings = new TitleButton("", this);
     settings->setObjectName("SETTINGS_BTN");
@@ -235,10 +243,6 @@ void TitleBar::setup(QObject *ptr)
     connect(preferences, SIGNAL(base_unit_changed(int)),     signal_receiver, SLOT(setup_stepping(int)));
     connect(preferences, SIGNAL(max_dist_changed(int)),      signal_receiver, SLOT(setup_max_dist(int)));
     connect(preferences, SIGNAL(laser_toggled(int)),         signal_receiver, SLOT(setup_laser(int)));
-    // TODO remove below slots in Demo class
-    connect(preferences, SIGNAL(share_serial_port(bool)),    signal_receiver, SLOT(set_serial_port_share(bool)));
-    connect(preferences, SIGNAL(auto_mcp(bool)),             signal_receiver, SLOT(set_auto_mcp(bool)));
-    connect(preferences, SIGNAL(reset_frame_a()),            signal_receiver, SLOT(reset_frame_a()));
 
     settings_menu->addAction(">> export pref.", signal_receiver, SLOT(export_config()), QKeySequence(Qt::ALT + Qt::Key_E));
     settings_menu->addAction("<< load pref.",   signal_receiver, SLOT(prompt_for_config_file()), QKeySequence(Qt::ALT + Qt::Key_R));

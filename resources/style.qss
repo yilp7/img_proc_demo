@@ -313,7 +313,7 @@ Tools {
 	border-radius: 3px;
 }
 
-#DRAG_TOOL::indicator {
+#ZOOM_TOOL::indicator {
 	width: 16px;
 	height: 16px;
 	margin-left: 2px;
@@ -325,6 +325,13 @@ Tools {
 	height: 16px;
 	margin-left: 2px;
 	image: url(:/tools/select);
+}
+
+#PTZ_TOOL::indicator {
+    width: 16px;
+    height: 16px;
+    margin-left: 2px;
+    image: url(:/tools/select);
 }
 
 Tools::checked {
@@ -388,6 +395,17 @@ IndexLabel {
 IndexLabel::hover {
 	color: #FFFFFF;
 	text-decoration: line-through;
+}
+
+#SCAN_CONFIG_BTN {
+	background-color: transparent;
+	border-style: none;
+}
+
+#SCAN_CONFIG_BTN::hover, #SCAN_CONFIG_BTN::pressed {
+	background-color: transparent;
+	border-style: none;
+	image: url(:/tools/settings_hover);
 }
 
 QScrollBar {

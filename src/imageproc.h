@@ -14,6 +14,8 @@ public:
     ImageProc();
     static void plateau_equl_hist(cv::Mat *in, cv::Mat *out, int method);
     static void gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw, double *range, double range_thresh);
+    //TODO rewrite 3d painting function
+    static void paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double min, double max);
     static void accumulative_enhance(cv::Mat &src, cv::Mat &res, float accu_base);
     static void adaptive_enhance(cv::Mat &src, cv::Mat &res, double low_in, double high_in, double low_out, double high_out, double gamma);
     static void haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega, float t0, int guided_radius = 60, float eps = 0.01);

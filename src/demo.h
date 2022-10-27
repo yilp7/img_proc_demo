@@ -12,6 +12,7 @@
 //#include "hqvscam.h"
 //#include "euresyscam.h"
 #include "preferences.h"
+#include "scanconfig.h"
 #include "lasersettings.h"
 #include "plugininterface.h"
 
@@ -57,9 +58,14 @@ public:
 
     // rename vid file in new thread
     static void move_to_dest(QString src, QString dst);
+
+    // image i/o
     static void save_image_bmp(cv::Mat img, QString filename);
     static void save_image_tif(cv::Mat img, QString filename);
     static bool load_image_tif(cv::Mat &img, QString filename);
+
+    // generate 3d image through scan result
+    static void paint_3d();
 
 public slots:
     // signaled by Titlebar button
@@ -76,14 +82,11 @@ public slots:
     void setup_stepping(int base_unit);
     void setup_max_dist(int max_dist);
     void setup_laser(int laser_on);
-    void set_serial_port_share(bool share);
     void set_baudrate(int idx, int baudrate);
     void com_write_data(int com_idx, QByteArray data);
     void display_baudrate(int idx);
-    void set_auto_mcp(bool adaptive);
     void set_dev_ip(int ip, int gateway);
     void change_pixel_format(int pixel_format);
-    void reset_frame_a();
 
     // signaled by joystick input
     void joystick_button_pressed(int btn);
@@ -161,11 +164,12 @@ private slots:
     void change_delay(int val);
     void change_focus_speed(int val);
 
-    // TODO add pause function
+    //TODO add pause function
     // process scan
     void on_SCAN_BUTTON_clicked();
     void on_CONTINUE_SCAN_BUTTON_clicked();
     void on_RESTART_SCAN_BUTTON_clicked();
+    void on_SCAN_CONFIG_BTN_clicked();
 
     // append data to DATA_EXCHANGE
     void append_data(QString text);
@@ -190,8 +194,10 @@ private slots:
     void on_PTZ_RADIO_clicked();
 
     // choose how mouse works in DISPLAY
-    void on_DRAG_TOOL_clicked();
+    //TODO add a new exclusive button group
+    void on_ZOOM_TOOL_clicked();
     void on_SELECT_TOOL_clicked();
+    void on_PTZ_TOOL_clicked();
 
     // too much memory occupied (too many unfinished tasks in thread pool)
     void stop_image_writing();
@@ -209,7 +215,10 @@ private slots:
     void ptz_button_released(int id);
     void on_PTZ_SPEED_SLIDER_valueChanged(int value);
     void on_PTZ_SPEED_EDIT_editingFinished();
+    void on_GET_ANGLE_BTN_clicked();
+    void set_ptz_angle();
     void on_STOP_BTN_clicked();
+    void point_ptz_to_target(QPoint target);
 
     void on_DUAL_LIGHT_BTN_clicked();
 
@@ -329,6 +338,7 @@ private:
     Ui::Demo*               ui;
 
     Preferences             *pref;
+    ScanConfig              *scan_config;
     LaserSettings           *laser_settings;
 
     int                     calc_avg_option;            // a: 5 frames; b: 10 frames
@@ -406,7 +416,7 @@ private:
     cv::Mat                 img_display;                // right-side img display cropped (stream)
     cv::Mat                 prev_img;                   // previous original image
     cv::Mat                 prev_3d;                    // previous 3d image
-    cv::Mat                 seq[8];                    // for frame average
+    cv::Mat                 seq[8];                     // for frame average
     cv::Mat                 seq_sum;
     cv::Mat                 frame_a_sum;
     cv::Mat                 frame_b_sum;
@@ -421,6 +431,9 @@ private:
     float                   scan_step;                  // stepping size when scanning
     float                   scan_stopping_delay;        // upper limit for scanning
     QString                 scan_name;
+    cv::Mat                 scan_3d;
+    cv::Mat                 scan_sum;
+    int                     scan_idx;
 
     float                   c;                          // light speed
     float                   dist_ns;                    // dist of light per ns
@@ -455,6 +468,8 @@ private:
 
     QButtonGroup            *ptz_grp;                   // ptz button group
     int                     ptz_speed;
+    float                   angle_h;
+    float                   angle_v;
 
     // TEMP ONLY
     // TODO: move to addons
