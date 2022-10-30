@@ -4,7 +4,7 @@ Display::Display(QWidget *parent) :
     QLabel(parent),
     lefttop(0, 0),
     center(0, 0),
-    grab(false),
+    is_grabbing(false),
     mode(0),
     curr_scale(0),
 //    scale{ QSize(640, 512), QSize(480, 384), QSize(320, 256), QSize(160, 128), QSize(80, 64)},
@@ -41,7 +41,7 @@ void Display::mousePressEvent(QMouseEvent *event)
 //    qDebug("pos: %d, %d\n", event->globalX(), event->globalY());
 //    qDebug("%s pressed\n", qPrintable(this->objectName()));
 
-    if (!grab) return;
+    if (!is_grabbing) return;
     pressed = true;
     prev_pos = event->pos();
     ori_pos = lefttop;
@@ -56,7 +56,7 @@ void Display::mouseMoveEvent(QMouseEvent *event)
 {
     QLabel::mouseMoveEvent(event);
 
-    if (!grab) return;
+    if (!is_grabbing) return;
     if (geometry().contains(event->pos())) emit curr_pos(event->pos());
     if (!pressed) return;
 //    qDebug("pos: %d, %d\n", event->x(), event->y());
@@ -77,7 +77,7 @@ void Display::mouseReleaseEvent(QMouseEvent *event)
     QLabel::mouseReleaseEvent(event);
 
     if(event->button() != Qt::LeftButton) return;
-    if (!grab) return;
+    if (!is_grabbing) return;
 
     pressed = false;
     if (mode == 1) {
@@ -94,7 +94,7 @@ void Display::wheelEvent(QWheelEvent *event)
 {
     QLabel::wheelEvent(event);
 
-    if (!grab || mode) return;
+    if (!is_grabbing || mode) return;
     QPoint center = lefttop + QPoint((int)(scale[curr_scale] * this->width() / 2), (int)(scale[curr_scale] * this->height() / 2));
     QLabel::wheelEvent(event);
     if(event->delta() > 0) {
@@ -172,7 +172,7 @@ InfoLabel::InfoLabel(QWidget *parent) : QLabel(parent) {}
 
 TitleButton::TitleButton(QString icon, QWidget *parent) : QPushButton(QIcon(icon), "", parent) {}
 
-void TitleButton::mouseMoveEvent(QMouseEvent *event) { setCursor(QCursor(QPixmap(":/cursor/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0)); }
+void TitleButton::mouseMoveEvent(QMouseEvent *event) { setCursor(cursor_dark_pointer); }
 
 TitleBar::TitleBar(QWidget *parent)
     : QFrame(parent),
@@ -260,6 +260,10 @@ void TitleBar::setup(QObject *ptr)
     lang = new TitleButton("", this);
     lang->setObjectName("LANGUAGE_BTN");
     connect(lang, SIGNAL(clicked()), signal_receiver, SLOT(switch_language()));
+
+    theme = new TitleButton("", this);
+    theme->setObjectName("THEME_BTN");
+    connect(theme, SIGNAL(clicked()), signal_receiver, SLOT(set_theme()));
 }
 
 void TitleBar::process_maximize()
@@ -276,6 +280,7 @@ void TitleBar::resizeEvent(QResizeEvent *event)
     capture->setGeometry(this->width() - 270, 5, 20, 20);
     cls->setGeometry(this->width() - 230, 5, 20, 20);
     lang->setGeometry(this->width() - 190, 5, 20, 20);
+    theme->setGeometry(this->width() - 150, 5, 20, 20);
     min->setGeometry(this->width() - 120, 0, 40, 30);
     max->setGeometry(this->width() - 80, 0, 40, 30);
     exit->setGeometry(this->width() - 40, 0, 40, 30);
@@ -354,17 +359,17 @@ void Coordinate::setup(QString name)
     set_name = new InfoLabel(this);
     set_name->setText(name);
     set_name->setFont(monaco);
-    set_name->setStyleSheet("color: #DEC4B0;");
+//    set_name->setStyleSheet("color: #DEC4B0;");
     set_name->setGeometry(0, 0, this->fontMetrics().width(name) + 10, 13);
     coord_x = new InfoLabel(this);
     coord_x->setText("X: xxxx");
     coord_x->setFont(monaco);
-    coord_x->setStyleSheet("color: #DEC4B0;");
+//    coord_x->setStyleSheet("color: #DEC4B0;");
     coord_x->setGeometry(set_name->geometry().right() + 10, 0, this->fontMetrics().width("X: xxxx") + 10, 13);
     coord_y = new InfoLabel(this);
     coord_y->setText("Y: yyyy");
     coord_y->setFont(monaco);
-    coord_y->setStyleSheet("color: #DEC4B0;");
+//    coord_y->setStyleSheet("color: #DEC4B0;");
     coord_y->setGeometry(set_name->geometry().right() + 10, 17, this->fontMetrics().width("Y: yyyy") + 10, 13);
 
     this->resize(set_name->width() + 10 + coord_x->width(), 30);

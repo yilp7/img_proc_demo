@@ -10,6 +10,9 @@
     <height>360</height>
    </rect>
   </property>
+  <property name="mouseTracking">
+   <bool>true</bool>
+  </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
@@ -496,6 +499,9 @@
      <width>340</width>
      <height>340</height>
     </rect>
+   </property>
+   <property name="mouseTracking">
+    <bool>true</bool>
    </property>
    <property name="widgetResizable">
     <bool>true</bool>

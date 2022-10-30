@@ -98,9 +98,10 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->TCP_SERVER_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ use_tcp = arg1; });
     connect(ui->CONNECT_TCP_BTN, &QPushButton::clicked, this, [this](){ emit connect_tcp_btn_clicked();});
 
-    QFont temp = QFont(consolas);
-    temp.setPixelSize(11);
-    ui->COM_DATA_EDT->setFont(temp);
+//    QFont temp = QFont(consolas);
+//    temp.setPixelSize(11);
+//    ui->COM_DATA_EDT->setFont(temp);
+    ui->COM_DATA_EDT->setFont(consolas);
     //[2]
 
     //[3] set up ui for tcu config
@@ -324,14 +325,13 @@ void Preferences::mousePressEvent(QMouseEvent *event)
 
 void Preferences::mouseMoveEvent(QMouseEvent *event)
 {
-    static QCursor pointer = QCursor(QPixmap(":/cursor/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0);
     if (pressed) {
         // use globalPos instead of pos to prevent window shaking
         window()->move(window()->pos() + event->globalPos() - prev_pos);
         prev_pos = event->globalPos();
     }
     else {
-        setCursor(pointer);
+        setCursor(cursor_curr_pointer);
     }
     QDialog::mouseMoveEvent(event);
 }

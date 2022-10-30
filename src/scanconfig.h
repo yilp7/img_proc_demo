@@ -25,10 +25,18 @@ public slots:
 protected:
     void keyPressEvent(QKeyEvent *event);
     void showEvent(QShowEvent *event);
+    void mousePressEvent(QMouseEvent *event);
+    void mouseMoveEvent(QMouseEvent *event);
+    void mouseReleaseEvent(QMouseEvent *event);
 
 public:
     Ui::ScanConfig *ui;
 
+    // ui-control
+    bool            pressed;
+    QPoint          prev_pos;
+
+    // scan params
     float          dist_ns;
     int            hz_unit;// 0: kHz, 1: Hz
     int            base_unit;// 0: ns, 1: μs, 2: m

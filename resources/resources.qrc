@@ -11,39 +11,33 @@
         <file>icon.ico</file>
     </qresource>
     <qresource prefix="/style">
-        <file>style.qss</file>
+        <file>style_dark.qss</file>
+        <file>style_light.qss</file>
     </qresource>
-    <qresource prefix="/tools">
-        <file alias="brush">tools/brush.png</file>
-        <file alias="brush_hover">tools/brush_hover.png</file>
-        <file alias="capture">tools/capture.png</file>
-        <file alias="capture_hover">tools/capture_hover.png</file>
-        <file alias="check">tools/check1.png</file>
-        <file alias="dot">tools/dot1.png</file>
-        <file alias="down">tools/down.png</file>
-        <file alias="down_arrow">tools/down_arrow.png</file>
-        <file alias="exit">tools/exit.png</file>
-        <file alias="lang">tools/lang.png</file>
-        <file alias="left">tools/left.png</file>
-        <file alias="max">tools/max.png</file>
-        <file alias="min">tools/min.png</file>
-        <file alias="move">tools/move.png</file>
-        <file alias="restore">tools/restore.png</file>
-        <file alias="right">tools/right.png</file>
-        <file alias="select">tools/select.png</file>
-        <file alias="settings">tools/settings.png</file>
-        <file alias="settings_hover">tools/settings_hover.png</file>
-        <file alias="triangle">tools/triangle1.png</file>
-        <file alias="up">tools/up.png</file>
-        <file alias="up_arrow">tools/up_arrow.png</file>
+    <qresource prefix="/tools/dark">
+        <file alias="brush">tools/dark/brush.png</file>
+        <file alias="brush_hover">tools/dark/brush_hover.png</file>
+        <file alias="capture">tools/dark/capture.png</file>
+        <file alias="capture_hover">tools/dark/capture_hover.png</file>
+        <file alias="check">tools/dark/check1.png</file>
+        <file alias="dot">tools/dark/dot1.png</file>
+        <file alias="down">tools/dark/down.png</file>
+        <file alias="lang">tools/dark/lang.png</file>
+        <file alias="left">tools/dark/left.png</file>
+        <file alias="move">tools/dark/move.png</file>
+        <file alias="right">tools/dark/right.png</file>
+        <file alias="select">tools/dark/select.png</file>
+        <file alias="settings">tools/dark/settings.png</file>
+        <file alias="settings_hover">tools/dark/settings_hover.png</file>
+        <file alias="triangle">tools/dark/triangle1.png</file>
+        <file alias="up">tools/dark/up.png</file>
     </qresource>
-    <qresource prefix="/cursor">
-        <file alias="cursor">cursor/cursor.png</file>
-        <file alias="input">cursor/input.png</file>
-        <file alias="resize_h">cursor/resize_h.png</file>
-        <file alias="resize_md">cursor/resize_md.png</file>
-        <file alias="resize_sd">cursor/resize_sd.png</file>
-        <file alias="resize_v">cursor/resize_v.png</file>
+    <qresource prefix="/cursor/dark">
+        <file alias="cursor">cursor/dark/cursor.png</file>
+        <file alias="resize_h">cursor/dark/resize_h.png</file>
+        <file alias="resize_md">cursor/dark/resize_md.png</file>
+        <file alias="resize_sd">cursor/dark/resize_sd.png</file>
+        <file alias="resize_v">cursor/dark/resize_v.png</file>
     </qresource>
     <qresource prefix="/fonts">
         <file alias="consolas">fonts/consola.ttf</file>
@@ -54,16 +48,60 @@
     </qresource>
     <qresource prefix="/title">
         <file alias="YJS">title/YJS00.png</file>
+        <file alias="GLI_dark">title/GLI1.png</file>
+        <file alias="GLI_light">title/GLI2.png</file>
     </qresource>
-    <qresource prefix="/directions">
-        <file alias="up_left">directions/direction_0.png</file>
-        <file alias="up">directions/direction_1.png</file>
-        <file alias="up_right">directions/direction_2.png</file>
-        <file alias="left">directions/direction_3.png</file>
-        <file alias="self_test">directions/direction_4.png</file>
-        <file alias="right">directions/direction_5.png</file>
-        <file alias="down_left">directions/direction_6.png</file>
-        <file alias="down">directions/direction_7.png</file>
-        <file alias="down_right">directions/direction_8.png</file>
+    <qresource prefix="/directions/dark">
+        <file alias="up_left">directions/dark/direction_0.png</file>
+        <file alias="up">directions/dark/direction_1.png</file>
+        <file alias="up_right">directions/dark/direction_2.png</file>
+        <file alias="left">directions/dark/direction_3.png</file>
+        <file alias="self_test">directions/dark/direction_4.png</file>
+        <file alias="right">directions/dark/direction_5.png</file>
+        <file alias="down_left">directions/dark/direction_6.png</file>
+        <file alias="down">directions/dark/direction_7.png</file>
+        <file alias="down_right">directions/dark/direction_8.png</file>
+    </qresource>
+    <qresource prefix="/tools">
+        <file alias="exit">tools/exit.png</file>
+        <file alias="max">tools/max.png</file>
+        <file alias="min">tools/min.png</file>
+        <file alias="restore">tools/restore.png</file>
+        <file alias="toggle_dark">tools/toggle_dark.png</file>
+        <file alias="toggle_light">tools/toggle_light.png</file>
+    </qresource>
+    <qresource prefix="/tools/light">
+        <file alias="check">tools/light/check1.png</file>
+        <file alias="dot">tools/light/dot1.png</file>
+        <file alias="down">tools/light/down.png</file>
+        <file alias="lang">tools/light/lang.png</file>
+        <file alias="left">tools/light/left.png</file>
+        <file alias="right">tools/light/right.png</file>
+        <file alias="triangle">tools/light/triangle1.png</file>
+        <file alias="up">tools/light/up.png</file>
+        <file alias="brush">tools/light/brush.png</file>
+        <file alias="brush_hover">tools/light/brush_hover.png</file>
+        <file alias="capture">tools/light/capture.png</file>
+        <file alias="capture_hover">tools/light/capture_hover.png</file>
+        <file alias="settings">tools/light/settings.png</file>
+        <file alias="settings_hover">tools/light/settings_hover.png</file>
+    </qresource>
+    <qresource prefix="/cursor/light">
+        <file alias="cursor">cursor/light/cursor.png</file>
+        <file alias="resize_h">cursor/light/resize_h.png</file>
+        <file alias="resize_md">cursor/light/resize_md.png</file>
+        <file alias="resize_sd">cursor/light/resize_sd.png</file>
+        <file alias="resize_v">cursor/light/resize_v.png</file>
+    </qresource>
+    <qresource prefix="/directions/light">
+        <file alias="up_left">directions/light/direction_0.png</file>
+        <file alias="up">directions/light/direction_1.png</file>
+        <file alias="up_right">directions/light/direction_2.png</file>
+        <file alias="left">directions/light/direction_3.png</file>
+        <file alias="self_test">directions/light/direction_4.png</file>
+        <file alias="right">directions/light/direction_5.png</file>
+        <file alias="down_left">directions/light/direction_6.png</file>
+        <file alias="down">directions/light/direction_7.png</file>
+        <file alias="down_right">directions/light/direction_8.png</file>
     </qresource>
 </RCC>

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(Demo_combined LANGUAGES CXX VERSION 0.3.1.0)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.4.1.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -87,8 +87,8 @@ set(SOURCE_FILES
     src/main.cpp
     src/utils.h
     src/utils.cpp
-    src/demo.h
-    src/demo.cpp
+    src/userpanel.h
+    src/userpanel.cpp
     src/threadpool.h
     src/threadpool.cpp
     src/mywidget.h
@@ -113,13 +113,14 @@ set(SOURCE_FILES
     src/preferences.cpp
     src/scanconfig.h
     src/scanconfig.cpp
-    src/demo_dev.ui
+    src/user_panel.ui
 #    src/settings.ui
     src/preferences.ui
     src/scanconfig.ui
     src/laser_settings.ui
     resources/resources.qrc
-    resources/style.qss
+    resources/style_dark.qss
+    resources/style_light.qss
 )
 
 if (WIN32)
@@ -232,17 +233,17 @@ if (MSVC AND BUILD_STATIC)
     endforeach()
 endif()
 
-add_executable(Demo_param WIN32 ${TRANSLATE} ${SOURCE_FILES})
-target_compile_definitions(Demo_param PRIVATE PARAM=1)
-qt5_use_modules(Demo_param Widgets SerialPort Network)
-target_link_libraries(Demo_param ${PROJECT_LIBS})
+add_executable(GLI_params WIN32 ${TRANSLATE} ${SOURCE_FILES})
+target_compile_definitions(GLI_params PRIVATE PARAM=1)
+qt5_use_modules(GLI_params Widgets SerialPort Network)
+target_link_libraries(GLI_params ${PROJECT_LIBS})
 
-add_executable(Demo_ICMOS WIN32 ${TRANSLATE} ${SOURCE_FILES})
-target_compile_definitions(Demo_ICMOS PRIVATE ICMOS=1)
-qt5_use_modules(Demo_ICMOS Widgets SerialPort Network)
-target_link_libraries(Demo_ICMOS ${PROJECT_LIBS})
+add_executable(ICMOS WIN32 ${TRANSLATE} ${SOURCE_FILES})
+target_compile_definitions(ICMOS PRIVATE ICMOS=1)
+qt5_use_modules(ICMOS Widgets SerialPort Network)
+target_link_libraries(ICMOS ${PROJECT_LIBS})
 
 add_executable(LvTong WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(LvTong PRIVATE LVTONG=1)
-qt5_use_modules(Demo_param Widgets SerialPort Network)
+qt5_use_modules(LvTong Widgets SerialPort Network)
 target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn454)

@@ -1,4 +1,4 @@
-#include "demo.h"
+#include "userpanel.h"
 
 #ifdef WIN32
 #include <DbgHelp.h>
@@ -126,12 +126,30 @@ int main(int argc, char *argv[])
 //    consolas.setLetterSpacing(QFont::PercentageSpacing, 120);
 
     a.setFont(monaco);
-    QFile style(":/style/style.qss");
+    QFile style(":/style/style_dark.qss");
     style.open(QIODevice::ReadOnly);
-    a.setStyleSheet(style.readAll());
+    theme_dark = style.readAll();
+    style.close();
+    style.setFileName(":/style/style_light.qss");
+    style.open(QIODevice::ReadOnly);
+    theme_light = style.readAll();
     style.close();
 
-    a.setWindowIcon(QIcon(":/tools/brush"));
+    cursor_curr_pointer = cursor_dark_pointer = QCursor(QPixmap(":/cursor/dark/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0);
+    cursor_curr_resize_h = cursor_dark_resize_h = QCursor(QPixmap(":/cursor/dark/resize_h").scaled(20, 20));
+    cursor_curr_resize_v = cursor_dark_resize_v = QCursor(QPixmap(":/cursor/dark/resize_v").scaled(20, 20));
+    cursor_curr_resize_md = cursor_dark_resize_md = QCursor(QPixmap(":/cursor/dark/resize_md").scaled(16, 16));
+    cursor_curr_resize_sd = cursor_dark_resize_sd = QCursor(QPixmap(":/cursor/dark/resize_sd").scaled(16, 16));
+
+    cursor_light_pointer = QCursor(QPixmap(":/cursor/light/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0);
+    cursor_light_resize_h = QCursor(QPixmap(":/cursor/light/resize_h").scaled(20, 20));
+    cursor_light_resize_v = QCursor(QPixmap(":/cursor/light/resize_v").scaled(20, 20));
+    cursor_light_resize_md = QCursor(QPixmap(":/cursor/light/resize_md").scaled(16, 16));
+    cursor_light_resize_sd = QCursor(QPixmap(":/cursor/light/resize_sd").scaled(16, 16));
+
+    a.setStyleSheet(theme_dark);
+
+//    a.setWindowIcon(QIcon(":/tools/brush"));
 
 //    qInstallMessageHandler(log_message);
 
@@ -139,7 +157,7 @@ int main(int argc, char *argv[])
     SetUnhandledExceptionFilter(ExceptionFilter);
 #endif
 
-    Demo w;
+    UserPanel w;
     w.show();
     return a.exec();
 }

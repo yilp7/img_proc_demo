@@ -33,7 +33,7 @@ public:
     QPoint    center;
     QPoint    prev_pos; // start position of mouse when image is dragged
     QPoint    ori_pos;  // start position of roi when image is dragged
-    bool      grab;
+    bool      is_grabbing;
     int       mode; // 0: zoom mode, 1: selection mode, 2: ptz mode
     int       curr_scale;
     float     scale[5];
@@ -107,8 +107,9 @@ public:
     InfoLabel    *title;
     TitleButton  *settings;
     TitleButton  *capture;
-    TitleButton  *lang;
     TitleButton  *cls;
+    TitleButton  *lang;
+    TitleButton  *theme;
     TitleButton  *min;
     TitleButton  *max;
     TitleButton  *exit;

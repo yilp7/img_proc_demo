@@ -44,14 +44,13 @@ void LaserSettings::mousePressEvent(QMouseEvent *event)
 
 void LaserSettings::mouseMoveEvent(QMouseEvent *event)
 {
-    static QCursor pointer = QCursor(QPixmap(":/cursor/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0);
     if (pressed) {
         // use globalPos instead of pos to prevent window shaking
         window()->move(window()->pos() + event->globalPos() - prev_pos);
         prev_pos = event->globalPos();
     }
     else {
-        setCursor(pointer);
+        setCursor(cursor_curr_pointer);
     }
     QDialog::mouseMoveEvent(event);
 }

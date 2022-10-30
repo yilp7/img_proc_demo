@@ -4,6 +4,7 @@
 ScanConfig::ScanConfig(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::ScanConfig),
+    pressed(false),
     dist_ns(3e8 / 2e9),
     hz_unit(0),
     base_unit(0),
@@ -219,7 +220,7 @@ void ScanConfig::setup_unit(int idx)
     // μs
     case 1:
         ui->START_DELAY_EDIT_M->hide(); ui->END_DELAY_EDIT_M->hide();
-        ui->START_DELAY_EDIT_M->hide(); ui->END_DELAY_EDIT_M->hide();
+        ui->START_GW_EDIT_M->hide(); ui->END_GW_EDIT_M->hide();
         ui->UNIT_M_1->hide(); ui->UNIT_M_2->hide(); ui->UNIT_M_3->hide(); ui->UNIT_M_4->hide();
         ui->START_DELAY_EDIT_U->show(); ui->START_DELAY_EDIT_N->show();
         ui->END_DELAY_EDIT_U->show(); ui->END_DELAY_EDIT_N->show();
@@ -234,7 +235,7 @@ void ScanConfig::setup_unit(int idx)
     // m
     case 2:
         ui->START_DELAY_EDIT_M->show(); ui->END_DELAY_EDIT_M->show();
-        ui->START_DELAY_EDIT_M->show(); ui->END_DELAY_EDIT_M->show();
+        ui->START_GW_EDIT_M->show(); ui->END_GW_EDIT_M->show();
         ui->UNIT_M_1->show(); ui->UNIT_M_2->show(); ui->UNIT_M_3->show(); ui->UNIT_M_4->show();
         ui->START_DELAY_EDIT_U->hide(); ui->START_DELAY_EDIT_N->hide();
         ui->END_DELAY_EDIT_U->hide(); ui->END_DELAY_EDIT_N->hide();
@@ -278,3 +279,34 @@ void ScanConfig::showEvent(QShowEvent *event)
     if (this->focusWidget()) this->focusWidget()->clearFocus();
     this->setFocus();
 }
+
+void ScanConfig::mousePressEvent(QMouseEvent *event)
+{
+    if(event->button() != Qt::LeftButton) return;
+    pressed = true;
+    prev_pos = event->globalPos();
+
+    QDialog::mousePressEvent(event);
+}
+
+void ScanConfig::mouseMoveEvent(QMouseEvent *event)
+{
+    if (pressed) {
+        // use globalPos instead of pos to prevent window shaking
+        window()->move(window()->pos() + event->globalPos() - prev_pos);
+        prev_pos = event->globalPos();
+    }
+    else {
+        setCursor(cursor_curr_pointer);
+    }
+    QDialog::mouseMoveEvent(event);
+}
+
+void ScanConfig::mouseReleaseEvent(QMouseEvent *event)
+{
+    if(event->button() != Qt::LeftButton) return;
+    pressed = false;
+
+    QDialog::mouseReleaseEvent(event);
+}
+
