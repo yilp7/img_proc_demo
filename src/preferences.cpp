@@ -34,7 +34,7 @@ Preferences::Preferences(QWidget *parent) :
 
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
 
-    // [0] set up ui for info tabs
+    //[0] set up ui for info tabs
     ui->DEVICES_TAB ->setup(0, ui->SEP_0->pos().y() + 10);
     ui->SERIAL_TAB  ->setup(0, ui->SEP_1->pos().y() + 10);
     ui->TCU_TAB     ->setup(0, ui->SEP_2->pos().y() + 10);

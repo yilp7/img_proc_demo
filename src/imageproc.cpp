@@ -560,7 +560,8 @@ std::vector<uchar> ImageProc::estimate_atmospheric_light_avg(cv::Mat &src, cv::M
             for (int k = 0; k < ch; k++) _A[k] += ptr1[i * step + j * ch + k];
         }
     }
-    for (int k = 0; k < ch; k++) A[k] = _A[k] / count;
+    if (count) for (int k = 0; k < ch; k++) A[k] = _A[k] / count;
+    else       for (int k = 0; k < ch; k++) A[k] = 0;
 
     return A;
 }

@@ -88,7 +88,7 @@ void LaserSettings::adjustment_btn_pressed(int id)
     send_str.replace(" ", "");
     for (int i = 0; i < send_str.length() / 2; i++) cmd[i] = send_str.mid(i * 2, 2).toInt(&ok, 16);
     // TODO finishup share port settings
-    emit com_write(0, cmd); // 0 for lens' port with TUC share
+    emit com_write(0, cmd); // 0 for lens' port with TCU share
 }
 
 void LaserSettings::adjustment_btn_released(int id)

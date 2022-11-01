@@ -50,7 +50,7 @@ public:
     float          rep_freq;
     bool           capture_scan_ori;
     bool           capture_scan_res;
-    //TODO implement record function in main
+    // TODO implement record function in main
     bool           record_scan_ori;
     bool           record_scan_res;
 };

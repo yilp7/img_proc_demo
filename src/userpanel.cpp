@@ -101,7 +101,7 @@ UserPanel::UserPanel(QWidget *parent)
     wnd = this;
 
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
-    //TODO complete rounded rect for main window
+    // TODO complete rounded rect for main window
 //    QBitmap bg(this->size());
 //    bg.fill();
 //    QPainter bg_painter(&bg);
@@ -292,7 +292,7 @@ UserPanel::UserPanel(QWidget *parent)
     display_grp->addButton(ui->HISTOGRAM_RADIO);
     display_grp->addButton(ui->PTZ_RADIO);
     display_grp->setExclusive(true);
-    //TODO change continuous/trigger exclusive
+    // TODO change continuous/trigger exclusive
 
     // connect title bar to the main window (UserPanel*)
     ui->TITLE->setup(this);
@@ -553,7 +553,7 @@ int UserPanel::grab_thread_process() {
         if (focus_direction) {
             if (clarity[2] > clarity[1] && clarity[1] > clarity[0]) {
                 focus_direction *= -2;
-                // TODO not yet well implemented
+                // FIXME auto focus by traversing
                 if (abs(focus_direction) > 7) lens_stop(), focus_direction = 0;
                 else if (focus_direction > 0) lens_stop(), change_focus_speed(8), focus_far();
                 else if (focus_direction < 0) lens_stop(), change_focus_speed(16), focus_near();
@@ -575,7 +575,7 @@ int UserPanel::grab_thread_process() {
             static double min, max;
             cv::minMaxLoc(prob, &min, &max);
 
-    //        prob -=max;
+            prob -= max;
             is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
 //            is_net = exp(prob.at<float>(1)) / exp(prob.at<float>(0) + prob.at<float>(1));
 
@@ -621,8 +621,7 @@ int UserPanel::grab_thread_process() {
 //            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
 //            if (prev_3d.empty()) cv::cvtColor(img_mem, prev_3d, cv::COLOR_GRAY2RGB);
             if (updated) {
-                //TODO add support to 16-bit for 3d
-                //TODO try to reduce if statements
+                // TODO try to reduce if statements
                 if (ui->FRAME_AVG_CHECK->isChecked()) {
                     static cv::Mat frame_a_avg, frame_b_avg;
                     frame_a_sum.convertTo(frame_a_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
@@ -696,7 +695,7 @@ int UserPanel::grab_thread_process() {
                     ImageProc::accumulative_enhance(modified_result, modified_result, pref->accu_base);
                     break;
                 }
-                //TODO rewrite sigmoid enchance
+                // TODO rewrite sigmoid enchance
                 // sigmoid (nonlinear) (mergw log w/ 1/(1+exp))
                 case 5: {
                     uchar *img = modified_result.data;
@@ -793,10 +792,10 @@ int UserPanel::grab_thread_process() {
                 for (int i = 0; i < 256; i++) {
                     cv::rectangle(hist_image, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
                 }
-                //TODO change to signal/slots
+                // TODO change to signal/slots
                 ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
             }
-            //FIXME possible crash when move scaled image to bottom-right corner
+            // FIXME possible crash when move scaled image to bottom-right corner
             // crop the region to display
 //            cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? ww + 104 : ww) / disp->width(), disp->display_region.br() * (image_3d ? ww + 104 : ww) / disp->width());
             cv::Rect region = cv::Rect(disp->display_region.tl() * ww / disp->width(), disp->display_region.br() * ww / disp->width());
@@ -1187,7 +1186,7 @@ void UserPanel::save_image_tif(cv::Mat img, QString filename)
 
 bool UserPanel::load_image_tif(cv::Mat &img, QString filename)
 {
-    //TODO implement motorola tiff read function
+    // TODO test motorola tiff read function
     static uint16_t byte_order;
     static bool is_big_endian;
     static uint32_t ifd_offset;
@@ -1298,7 +1297,7 @@ void UserPanel::stop_image_writing()
 //    QThread::msleep(1000);
 }
 
-//FIXME font change when switching language
+// FIXME font change when switching language
 void UserPanel::switch_language()
 {
     en ? (qApp->removeTranslator(&trans), qApp->setFont(monaco)) : (qApp->installTranslator(&trans), qApp->setFont(consolas));
@@ -1407,7 +1406,7 @@ void UserPanel::save_to_file(bool save_result) {
         UserPanel::save_image_bmp(temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
         return;
     }
-    //TODO implement 16bit result image processing/writing
+    // TODO implement 16bit result image processing/writing
     if (save_result) {
         if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp->clone(), save_location + "/res_bmp/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
     } else {
@@ -1534,7 +1533,7 @@ void UserPanel::on_START_BUTTON_clicked()
     ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
     ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
 
-    //TODO complete BayerGB process & display
+    // TODO complete BayerGB process & display
     curr_cam->pixel_type(true, &pixel_format);
     switch (pixel_format) {
     case PixelType_Gvsp_Mono8:       is_color = false; pixel_depth =  8; break;
@@ -1989,7 +1988,7 @@ void UserPanel::joystick_direction_changed(int direction)
     }
 }
 
-//FIXME update config i/o
+// FIXME update config i/o
 void UserPanel::export_config()
 {
 //    QString config_name = QFileDialog::getSaveFileName(this, tr("Save Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/config.ssy", tr("*.ssy"));
@@ -3745,7 +3744,7 @@ void UserPanel::on_STOP_BTN_clicked()
 void UserPanel::point_ptz_to_target(QPoint target)
 {
     static int display_width, display_height;
-    //TODO config params for max zoom
+    // TODO config params for max zoom
 //    static float tot_h = 20, tot_v = 14;// large FOV
     static float tot_h = 0.82, tot_v = 0.57;// small FOV
     display_width = ui->SOURCE_DISPLAY->width();

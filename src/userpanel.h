@@ -165,7 +165,7 @@ private slots:
     void change_delay(int val);
     void change_focus_speed(int val);
 
-    //TODO add pause function
+    // TODO add pause function
     // process scan
     void on_SCAN_BUTTON_clicked();
     void on_CONTINUE_SCAN_BUTTON_clicked();
@@ -192,7 +192,7 @@ private slots:
     void on_PTZ_RADIO_clicked();
 
     // choose how mouse works in DISPLAY
-    //TODO add a new exclusive button group
+    // TODO add a new exclusive button group
     void on_ZOOM_TOOL_clicked();
     void on_SELECT_TOOL_clicked();
     void on_PTZ_TOOL_clicked();
@@ -471,7 +471,7 @@ private:
     float                   angle_v;
 
     // TEMP ONLY
-    // TODO: move to addons
+    // TODO move to addons
     PluginInterface         *pluginInterface;           // for ir with visible light
 
 };
