@@ -81,13 +81,15 @@ public slots:
     // signaled in settings ui
     void setup_hz(int hz_unit);
     void setup_stepping(int base_unit);
-    void setup_max_dist(int max_dist);
+    void setup_max_dist(float max_dist);
+    void update_delay_offset(float delay_dist_offset);
     void setup_laser(int laser_on);
     void set_baudrate(int idx, int baudrate);
     void com_write_data(int com_idx, QByteArray data);
     void display_baudrate(int idx);
     void set_dev_ip(int ip, int gateway);
     void change_pixel_format(int pixel_format);
+    void update_lower_3d_thresh();
 
     // signaled by joystick input
     void joystick_button_pressed(int btn);
@@ -331,16 +333,16 @@ public:
     bool                    mouse_pressed;
 
 private:
-    Ui::UserPanel*               ui;
+    Ui::UserPanel*          ui;
 
+    // TODO: move theme to utils global
     int                     theme;                      // 1: dark theme, 2: light theme
 
-    Preferences             *pref;
-    ScanConfig              *scan_config;
-    LaserSettings           *laser_settings;
+    Preferences*            pref;
+    ScanConfig*             scan_config;
+    LaserSettings*          laser_settings;
 
     int                     calc_avg_option;            // a: 4 frames; b: 8 frames
-    double                  range_threshold;            // range threshold for building 3d images
     bool                    trigger_by_software;        // whether the device gets trigger signal from sw
 
     QMutex                  image_mutex;                // img handle lock
@@ -375,13 +377,13 @@ private:
     float                   max_dist;
     int                     laser_width;
     float                   delay_dist;                 // estimated distance calculated from delay
-    float                   depth_of_view;
+    float                   depth_of_view;              // depth of view from gate width
     int                     focus_direction;
     int                     clarity[3];
     char                    curr_laser_idx;
 
     int                     display_option;             // data display option: 1: com data; 2: histogram
-    QButtonGroup            *display_grp;
+    QButtonGroup*           display_grp;
 
     std::queue<cv::Mat>     img_q;                      // image queue in grab_thread
     bool                    updated;                    // whether the program get a new image from stream
@@ -465,14 +467,14 @@ private:
     int                     offset_delay;
     int                     offset_gatewidth;
 
-    QButtonGroup            *ptz_grp;                   // ptz button group
+    QButtonGroup*           ptz_grp;                   // ptz button group
     int                     ptz_speed;
     float                   angle_h;
     float                   angle_v;
 
     // TEMP ONLY
     // TODO move to addons
-    PluginInterface         *pluginInterface;           // for ir with visible light
+    PluginInterface*        pluginInterface;           // for ir with visible light
 
 };
 #endif // USERPANEL_H

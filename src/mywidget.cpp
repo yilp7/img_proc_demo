@@ -233,16 +233,18 @@ void TitleBar::setup(QObject *ptr)
 */
     connect(pref, SIGNAL(triggered()), preferences, SLOT(show()));
     connect(pref, SIGNAL(triggered()), preferences, SLOT(raise()));
-    connect(preferences, SIGNAL(set_dev_ip(int, int)),       signal_receiver, SLOT(set_dev_ip(int, int)));
-    connect(preferences, SIGNAL(change_pixel_format(int)),   signal_receiver, SLOT(change_pixel_format(int)));
-    connect(preferences, SIGNAL(get_baudrate(int)),          signal_receiver, SLOT(display_baudrate(int)));
-    connect(preferences, SIGNAL(change_baudrate(int, int)),  signal_receiver, SLOT(set_baudrate(int, int)));
+    connect(preferences, SIGNAL(set_dev_ip(int, int)),        signal_receiver, SLOT(set_dev_ip(int, int)));
+    connect(preferences, SIGNAL(change_pixel_format(int)),    signal_receiver, SLOT(change_pixel_format(int)));
+    connect(preferences, SIGNAL(get_baudrate(int)),           signal_receiver, SLOT(display_baudrate(int)));
+    connect(preferences, SIGNAL(change_baudrate(int, int)),   signal_receiver, SLOT(set_baudrate(int, int)));
     // TODO connect_to_tcp button clicked
-    connect(preferences, SIGNAL(com_write(int, QByteArray)), signal_receiver, SLOT(com_write_data(int, QByteArray)));
-    connect(preferences, SIGNAL(rep_freq_unit_changed(int)), signal_receiver, SLOT(setup_hz(int)));
-    connect(preferences, SIGNAL(base_unit_changed(int)),     signal_receiver, SLOT(setup_stepping(int)));
-    connect(preferences, SIGNAL(max_dist_changed(int)),      signal_receiver, SLOT(setup_max_dist(int)));
-    connect(preferences, SIGNAL(laser_toggled(int)),         signal_receiver, SLOT(setup_laser(int)));
+    connect(preferences, SIGNAL(com_write(int, QByteArray)),  signal_receiver, SLOT(com_write_data(int, QByteArray)));
+    connect(preferences, SIGNAL(rep_freq_unit_changed(int)),  signal_receiver, SLOT(setup_hz(int)));
+    connect(preferences, SIGNAL(base_unit_changed(int)),      signal_receiver, SLOT(setup_stepping(int)));
+    connect(preferences, SIGNAL(max_dist_changed(float)),     signal_receiver, SLOT(setup_max_dist(float)));
+    connect(preferences, SIGNAL(delay_offset_changed(float)), signal_receiver, SLOT(update_delay_offset(float)));
+    connect(preferences, SIGNAL(laser_toggled(int)),          signal_receiver, SLOT(setup_laser(int)));
+    connect(preferences, SIGNAL(lower_3d_thresh_updated()),   signal_receiver, SLOT(update_lower_3d_thresh()));
 
     settings_menu->addAction(">> export pref.", signal_receiver, SLOT(export_config()), QKeySequence(Qt::ALT + Qt::Key_E));
     settings_menu->addAction("<< load pref.",   signal_receiver, SLOT(prompt_for_config_file()), QKeySequence(Qt::ALT + Qt::Key_R));

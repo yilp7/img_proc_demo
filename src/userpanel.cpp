@@ -23,7 +23,6 @@ UserPanel::UserPanel(QWidget *parent)
     scan_config(NULL),
     laser_settings(NULL),
     calc_avg_option(5),
-    range_threshold(0),
     trigger_by_software(false),
     curr_cam(NULL),
     time_exposure_edit(5000),
@@ -73,7 +72,11 @@ UserPanel::UserPanel(QWidget *parent)
     seq_idx(0),
     scan(false),
     scan_distance(200),
+#ifdef LVTONG
+    c(3e8 * 0.75),
+#else
     c(3e8),
+#endif
     frame_a_3d(false),
     auto_mcp(false),
     multi_laser_lenses(false),
@@ -209,6 +212,12 @@ UserPanel::UserPanel(QWidget *parent)
     // register signal when thread pool full
     connect(this, SIGNAL(task_queue_full()), SLOT(stop_image_writing()), Qt::UniqueConnection);
 
+    connect(ui->RANGE_THRESH_EDIT, &QLineEdit::textChanged, this,
+            [this](QString arg1){
+                pref->lower_3d_thresh = arg1.toFloat() / (1 << pixel_depth);
+                pref->ui->LOWER_3D_THRESH_EDT->setText(QString::number(pref->lower_3d_thresh, 'f', 3));
+    });
+
     ui->BRIGHTNESS_SLIDER->setMinimum(-5);
     ui->BRIGHTNESS_SLIDER->setMaximum(5);
     ui->BRIGHTNESS_SLIDER->setSingleStep(1);
@@ -311,6 +320,12 @@ UserPanel::UserPanel(QWidget *parent)
     connect(laser_settings, SIGNAL(com_write(int, QByteArray)), this, SLOT(com_write_data(int, QByteArray)));
 
     // right before gui display (init state)
+    QFile file_user_port("user_serial_port_com");
+    uchar com[5] = {0};
+    if (file_user_port.open(QIODevice::ReadOnly)) memcpy(com, file_user_port.readLine().simplified().data(), 5);
+    file_user_port.close();
+    for (int i = 0; i < 5; i++) com_edit[i]->setText(QString::number(com[i]));
+
     for (int i = 0; i < 5; i++) serial_port[i] = new QSerialPort(this), setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600);
     for (int i = 0; i < 5; i++) tcp_port[i] = new QTcpSocket(this);
     on_ENUM_BUTTON_clicked();
@@ -498,7 +513,7 @@ int UserPanel::grab_thread_process() {
     float weight = h / 1024.0; // font scale & thickness
     prev_3d = cv::Mat(h, w, CV_8UC3);
     prev_img = cv::Mat(h, w, CV_8UC1);
-    double *range = (double*)calloc(w * h, sizeof(double));
+//    double *range = (double*)calloc(w * h, sizeof(double));
 #ifdef LVTONG
     cv::Mat fishnet_res;
     cv::dnn::Net net = cv::dnn::readNet("model/resnet18.onnx");
@@ -617,7 +632,6 @@ int UserPanel::grab_thread_process() {
         if (ui->IMG_3D_CHECK->isChecked()) {
             ww = w + 104;
             hh = h;
-            range_threshold = ui->RANGE_THRESH_EDIT->text().toFloat();
 //            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
 //            if (prev_3d.empty()) cv::cvtColor(img_mem, prev_3d, cv::COLOR_GRAY2RGB);
             if (updated) {
@@ -626,11 +640,14 @@ int UserPanel::grab_thread_process() {
                     static cv::Mat frame_a_avg, frame_b_avg;
                     frame_a_sum.convertTo(frame_a_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
                     frame_b_sum.convertTo(frame_b_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
-                    ImageProc::gated3D(frame_b_avg, frame_a_avg, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
+                    ImageProc::gated3D_v2(frame_b_avg, frame_a_avg, modified_result, (delay_dist - pref->delay_dist_offset) / dist_ns,
+                                          depth_of_view / dist_ns, pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d);
                 }
                 else {
-                    if (frame_a_3d) ImageProc::gated3D(prev_img, img_mem, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
-                    else            ImageProc::gated3D(img_mem, prev_img, modified_result, delay_dist / dist_ns, depth_of_view / dist_ns, range, range_threshold);
+                    if (frame_a_3d) ImageProc::gated3D_v2(prev_img, img_mem, modified_result, (delay_dist - pref->delay_dist_offset) / dist_ns,
+                                                          depth_of_view / dist_ns, pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d);
+                    else            ImageProc::gated3D_v2(img_mem, prev_img, modified_result, (delay_dist - pref->delay_dist_offset) / dist_ns,
+                                                          depth_of_view / dist_ns, pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d);
                 }
                 frame_a_3d ^= 1;
                 prev_3d = modified_result.clone();
@@ -776,8 +793,7 @@ int UserPanel::grab_thread_process() {
             ImageProc::brightness_and_contrast(modified_result, modified_result, tan((20 - ui->GAMMA_SLIDER->value()) / 40. * M_PI));
 
             // display grayscale histogram of current image
-            if (ui->HISTOGRAM_RADIO->isChecked()) {
-                if (modified_result.channels() != 1) continue;
+            if (ui->HISTOGRAM_RADIO->isChecked() && modified_result.channels() == 1) {
                 uchar *img = modified_result.data;
                 int step = modified_result.step;
                 memset(hist, 0, 256 * sizeof(uint));
@@ -896,7 +912,7 @@ int UserPanel::grab_thread_process() {
         if (updated) prev_img = img_mem.clone();
         image_mutex.unlock();
     }
-    free(range);
+//    free(range);
     return 0;
 }
 
@@ -1480,6 +1496,16 @@ void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, 
         serial_port_connected[id] = false;
         com_label[id]->setStyleSheet("color: #CD5C5C;");
     }
+
+    // TODO: test for user utilities
+    QFile file_user_port("user_serial_port_com");
+    uchar com[5] = {0};
+    if (file_user_port.open(QIODevice::ReadOnly)) memcpy(com, file_user_port.readLine().simplified().data(), 5);
+    com[id] = port_num.toUInt() & 0xFF;
+    file_user_port.close();
+    file_user_port.open(QIODevice::WriteOnly);
+    file_user_port.write(QByteArray((char*)com, 5));
+    file_user_port.close();
 }
 
 void UserPanel::on_ENUM_BUTTON_clicked()
@@ -1804,13 +1830,18 @@ void UserPanel::setup_stepping(int base_unit)
     }
 }
 
-void UserPanel::setup_max_dist(int max_dist)
+void UserPanel::setup_max_dist(float max_dist)
 {
     this->max_dist = max_dist;
     ui->DELAY_SLIDER->setMaximum(max_dist);
 }
 
-// laser_on: 0b0101 -> laser[2] and laser[0] is on, laser[3] and laser[1] is off
+void UserPanel::update_delay_offset(float delay_dist_offset)
+{
+    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - pref->delay_dist_offset));
+}
+
+// e.g. laser_on: 0b1110 -> laser[1], laser[2] and laser[3] are on, laser[0] is off
 void UserPanel::setup_laser(int laser_on)
 {
     int change = laser_on ^ this->laser_on;
@@ -1853,6 +1884,11 @@ void UserPanel::change_pixel_format(int pixel_format)
     case PixelType_Gvsp_RGB8_Packed: is_color =  true; pixel_depth =  8; break;
     default:                         is_color = false; pixel_depth =  8; break;
     }
+}
+
+void UserPanel::update_lower_3d_thresh()
+{
+    ui->RANGE_THRESH_EDIT->setText(QString::number((int)(pref->lower_3d_thresh * (1 << pixel_depth))));
 }
 
 void UserPanel::joystick_button_pressed(int btn)
@@ -2141,7 +2177,7 @@ void UserPanel::update_delay()
     if (delay_dist > max_dist) delay_dist = max_dist;
 //    qDebug("estimated distance: %f\n", delay_dist);
 
-    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
+    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - pref->delay_dist_offset));
     if (!qobject_cast<QSlider*>(sender())) ui->DELAY_SLIDER->setValue(delay_dist);
 
     int delay = std::round(delay_dist / dist_ns);
@@ -2419,7 +2455,7 @@ void UserPanel::on_DIST_BTN_clicked() {
 //    data_exchange(true);
 
     // change delay and gate width according to distance
-    delay_dist = distance;
+    delay_dist = distance + pref->delay_dist_offset;
     update_delay();
 //    update_gate_width();
 //    change_mcp(150);
@@ -2432,7 +2468,7 @@ void UserPanel::on_DIST_BTN_clicked() {
     else                      depth_of_view = 3500 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
 
     communicate_display(0, convert_to_send_tcu(0x1E, distance), 7, 1, true);
-    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
+    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - pref->delay_dist_offset));
 
     setup_hz(hz_unit);
     ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", laser_width_u));

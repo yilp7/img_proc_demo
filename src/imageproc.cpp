@@ -286,6 +286,95 @@ void ImageProc::gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay
     cv::putText(res, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT - 10), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
 }
 
+void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw,
+                           int colormap, double lower_thresh, double upper_thresh, bool truncate)
+{
+    const int BARWIDTH = 104, BARHEIGHT = src1.rows;
+    const int IMAGEWIDTH = src1.cols, IMAGEHEIGHT = src1.rows;
+    static cv::Mat gray_bar(BARHEIGHT, BARWIDTH, CV_8UC1);
+    // TODO add implemention for image size update
+    static bool gray_bar_init = true;
+
+    cv::Mat img_3d(IMAGEHEIGHT, IMAGEWIDTH, CV_8UC3), img_3d_gray;
+
+#ifdef LVTONG
+    const double c = 3e8 * 0.75;
+#else
+    const double c = 3e8;
+#endif
+    double max = 0, min = 65535;
+    int i, j;
+    double R = delay * 1e-9 * c / 2;
+    int image_depth = (src1.depth() / 2 + 1) * 8;
+    uchar *uc_ptr;
+
+    cv::Mat temp1, temp2, range_mat, mask;
+    cv::threshold(src1,  temp1, lower_thresh * (1 << image_depth), 0, cv::THRESH_TOZERO);
+    cv::threshold(temp1, temp1, upper_thresh * (1 << image_depth), 0, cv::THRESH_TOZERO_INV);
+    cv::threshold(src2,  temp2, lower_thresh * (1 << image_depth), 0, cv::THRESH_TOZERO);
+    cv::threshold(temp2, temp2, upper_thresh * (1 << image_depth), 0, cv::THRESH_TOZERO_INV);
+    mask = temp1 * (1 << image_depth) & temp2;
+    temp1.convertTo(temp1, CV_64FC1);
+    temp2.convertTo(temp2, CV_64FC1);
+    range_mat = R + gw * 1e-9 * c / 2 / (temp1 / temp2 + 1);
+    if (truncate) {
+        cv::Mat mean, stddev;
+        cv::meanStdDev(range_mat, mean, stddev, mask);
+        double m = mean.at<double>(0, 0), s = stddev.at<double>(0, 0);
+        cv::threshold(range_mat, range_mat, m - 2 * s, 0, cv::THRESH_TOZERO);
+        cv::threshold(range_mat, range_mat, m + 2 * s, 0, cv::THRESH_TOZERO_INV);
+        range_mat.convertTo(mask, CV_8UC1);
+    }
+    cv::minMaxIdx(range_mat, &min, &max, 0, 0, mask);
+    cv::normalize(range_mat, img_3d_gray, 0, 255, cv::NORM_MINMAX, CV_8UC1, mask);
+/*
+    uint hist[256] = {0};
+    memset(hist, 0, 256);
+    uchar *img = img_3d_gray.data;
+    int step = img_3d_gray.step;
+    memset(hist, 0, 256 * sizeof(uint));
+    for (int i = 0; i < img_3d_gray.rows; i++) for (int j = 0; j < img_3d_gray.cols; j++) hist[(img + i * step)[j]]++;
+    uint _max = 0;
+    for (int i = 1; i < 256; i++) {
+        if (hist[i] > _max) _max = hist[i];
+    }
+    cv::Mat hist_image(225, 256, CV_8UC3, cv::Scalar(56, 64, 72));
+    for (int i = 0; i < 256; i++) {
+        cv::rectangle(hist_image, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / _max), cv::Scalar(202, 225, 255));
+    }
+    cv::imwrite("../aaa.bmp", hist_image);
+*/
+    if (gray_bar_init) {
+        int step_gray = gray_bar.step;
+        int bar_gray = 255;
+        uc_ptr = gray_bar.data;
+        int color_step = BARHEIGHT / 254;
+        int gap = (BARHEIGHT - 254 * color_step) / 2;
+        for (i = 0; i < gap; i++) for (j = 0; j < BARWIDTH; j++) uc_ptr[i * step_gray + j] = 255;
+        for (i = gap; i < BARHEIGHT - gap; i += color_step) {
+            for (j = 0; j < BARWIDTH; j++) {
+                for (int k = 0; k < color_step; k++) uc_ptr[(i + k) * step_gray + j] = bar_gray;
+            }
+            bar_gray--;
+        }
+        for (i = BARHEIGHT - gap; i < BARHEIGHT; i++) for (j = 0; j < BARWIDTH; j++) uc_ptr[i * step_gray + j] = 1;
+        gray_bar_init = false;
+    }
+
+    cv::hconcat(img_3d_gray, gray_bar, img_3d_gray);
+    cv::hconcat(mask, gray_bar, mask);
+    cv::applyColorMap(img_3d_gray, img_3d, colormap);
+    img_3d.copyTo(res, mask);
+
+    char text[32] = {0};
+    sprintf(text, "%.2f", min);
+    cv::putText(res, text, cv::Point(IMAGEWIDTH, 20), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
+    sprintf(text, "%.2f", (max + min) / 2);
+    cv::putText(res, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT / 2 - 15), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
+    sprintf(text, "%.2f", max);
+    cv::putText(res, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT - 10), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
+}
+
 void ImageProc::paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double start_pos, double end_pos)
 {
     const int BARWIDTH = 104, BARHEIGHT = src.rows;
@@ -298,8 +387,7 @@ void ImageProc::paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double
 
     double max = 0, min = 65535;
     int i, j, idx1, idx2;
-    int step = src.cols, step_3d = img_3d.step;
-    int step_gray = gray_bar.step, step_color = color_bar.step;
+    int step_gray = gray_bar.step;
     double *ptr1;
     uchar *ptr2;
 

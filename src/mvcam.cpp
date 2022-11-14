@@ -9,6 +9,7 @@ int Cam::search_for_devices()
 {
     device_type = 0;
     MV_CC_DEVICE_INFO_LIST st_dev_list = {0};
+    // FIXME: error 2 -2146885623
     MV_CC_EnumDevices(MV_GIGE_DEVICE | MV_USB_DEVICE, &st_dev_list);
     if (st_dev_list.nDeviceNum) {
         device_type = 1;

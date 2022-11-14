@@ -49,49 +49,58 @@ signals:
     // tcu config
     void rep_freq_unit_changed(int idx);
     void base_unit_changed(int idx);
-    void max_dist_changed(int num);
+    void max_dist_changed(float dist);
+    void delay_offset_changed(float dist);
     void laser_toggled(int config);
 
+    // image process
+    void lower_3d_thresh_updated();
+
 public:
-    Ui::Preferences *ui;
+    Ui::Preferences* ui;
 
     // ui-control
-    bool            pressed;
-    QPoint          prev_pos;
+    bool             pressed;
+    QPoint           prev_pos;
 
     // device
-    int             symmetry;
-    int             pixel_type;
-    bool            cameralink;
+    int              symmetry;
+    int              pixel_type;
+    bool             cameralink;
 
     // serial comm.
-    int             port_idx;
-    bool            share_port;
-    bool            use_tcp;
+    int              port_idx;
+    bool             share_port;
+    bool             use_tcp;
 
     // tcu config
-    float           dist_ns;
-    bool            auto_rep_freq;
-    bool            auto_mcp;
-    int             hz_unit;   // 0: kHz, 1:Hz
-    int             base_unit; // 0: ns, 1: μs, 2: m
-    float           max_dist;
-    bool            laser_enable;
-    QButtonGroup    *laser_grp;
-    int             laser_on; // does not rely on laser_enable
+    float            dist_ns;
+    bool             auto_rep_freq;
+    bool             auto_mcp;
+    int              hz_unit;   // 0: kHz, 1:Hz
+    int              base_unit; // 0: ns, 1: μs, 2: m
+    float            max_dist;
+    float            delay_dist_offset; // distance offset (from hardware)
+    bool             laser_enable;
+    QButtonGroup*    laser_grp;
+    int              laser_on; // does not rely on laser_enable
 
     // img proc
-    float           accu_base;
-    float           gamma;
-    float           low_in;
-    float           high_in;
-    float           low_out;
-    float           high_out;
-    float           dehaze_pct;
-    float           sky_tolerance;
-    int             fast_gf;
-    bool            fishnet_recog;
-    float           fishnet_thresh;
+    float            accu_base;
+    float            gamma;
+    float            low_in;
+    float            high_in;
+    float            low_out;
+    float            high_out;
+    float            dehaze_pct;
+    float            sky_tolerance;
+    int              fast_gf;
+    int              colormap;
+    double           lower_3d_thresh;
+    double           upper_3d_thresh;
+    bool             truncate_3d;
+    bool             fishnet_recog;
+    float            fishnet_thresh;
 
 };
 
