@@ -2548,7 +2548,7 @@
        <rect>
         <x>52</x>
         <y>89</y>
-        <width>31</width>
+        <width>41</width>
         <height>20</height>
        </rect>
       </property>
@@ -2703,7 +2703,7 @@
      <widget class="QPushButton" name="RESET_3D_BTN">
       <property name="geometry">
        <rect>
-        <x>90</x>
+        <x>95</x>
         <y>90</y>
         <width>16</width>
         <height>16</height>

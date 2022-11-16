@@ -291,11 +291,8 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
 {
     const int BARWIDTH = 104, BARHEIGHT = src1.rows;
     const int IMAGEWIDTH = src1.cols, IMAGEHEIGHT = src1.rows;
-    static cv::Mat gray_bar(BARHEIGHT, BARWIDTH, CV_8UC1);
-    // TODO add implemention for image size update
-    static bool gray_bar_init = true;
-
-    cv::Mat img_3d(IMAGEHEIGHT, IMAGEWIDTH, CV_8UC3), img_3d_gray;
+    cv::Mat gray_bar(BARHEIGHT, BARWIDTH, CV_8UC1);
+    cv::Mat img_3d, img_3d_gray;
 
 #ifdef LVTONG
     const double c = 3e8 * 0.75;
@@ -313,12 +310,14 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
     cv::threshold(temp1, temp1, upper_thresh * (1 << image_depth), 0, cv::THRESH_TOZERO_INV);
     cv::threshold(src2,  temp2, lower_thresh * (1 << image_depth), 0, cv::THRESH_TOZERO);
     cv::threshold(temp2, temp2, upper_thresh * (1 << image_depth), 0, cv::THRESH_TOZERO_INV);
-    mask = temp1 * (1 << image_depth) & temp2;
+    mask = (temp1 * (1 << image_depth)) & (temp2 * (1 << image_depth));
+    mask.convertTo(mask, CV_8UC1);
     temp1.convertTo(temp1, CV_64FC1);
     temp2.convertTo(temp2, CV_64FC1);
     range_mat = R + gw * 1e-9 * c / 2 / (temp1 / temp2 + 1);
     if (truncate) {
         cv::Mat mean, stddev;
+        range_mat.setTo(0, ~mask);
         cv::meanStdDev(range_mat, mean, stddev, mask);
         double m = mean.at<double>(0, 0), s = stddev.at<double>(0, 0);
         cv::threshold(range_mat, range_mat, m - 2 * s, 0, cv::THRESH_TOZERO);
@@ -344,22 +343,19 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
     }
     cv::imwrite("../aaa.bmp", hist_image);
 */
-    if (gray_bar_init) {
-        int step_gray = gray_bar.step;
-        int bar_gray = 255;
-        uc_ptr = gray_bar.data;
-        int color_step = BARHEIGHT / 254;
-        int gap = (BARHEIGHT - 254 * color_step) / 2;
-        for (i = 0; i < gap; i++) for (j = 0; j < BARWIDTH; j++) uc_ptr[i * step_gray + j] = 255;
-        for (i = gap; i < BARHEIGHT - gap; i += color_step) {
-            for (j = 0; j < BARWIDTH; j++) {
-                for (int k = 0; k < color_step; k++) uc_ptr[(i + k) * step_gray + j] = bar_gray;
-            }
-            bar_gray--;
+    int step_gray = gray_bar.step;
+    int bar_gray = 255;
+    uc_ptr = gray_bar.data;
+    int color_step = BARHEIGHT / 254;
+    int gap = (BARHEIGHT - 254 * color_step) / 2;
+    for (i = 0; i < gap; i++) for (j = 0; j < BARWIDTH; j++) uc_ptr[i * step_gray + j] = 255;
+    for (i = gap; i < BARHEIGHT - gap; i += color_step) {
+        for (j = 0; j < BARWIDTH; j++) {
+            for (int k = 0; k < color_step; k++) uc_ptr[(i + k) * step_gray + j] = bar_gray;
         }
-        for (i = BARHEIGHT - gap; i < BARHEIGHT; i++) for (j = 0; j < BARWIDTH; j++) uc_ptr[i * step_gray + j] = 1;
-        gray_bar_init = false;
+        bar_gray--;
     }
+    for (i = BARHEIGHT - gap; i < BARHEIGHT; i++) for (j = 0; j < BARWIDTH; j++) uc_ptr[i * step_gray + j] = 1;
 
     cv::hconcat(img_3d_gray, gray_bar, img_3d_gray);
     cv::hconcat(mask, gray_bar, mask);

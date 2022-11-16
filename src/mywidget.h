@@ -189,4 +189,11 @@ private:
     int pos_y;
 };
 
+class StatusBar : public QFrame
+{
+    Q_OBJECT
+public:
+    explicit StatusBar(QWidget *parent);
+};
+
 #endif // MYWIDGET_H

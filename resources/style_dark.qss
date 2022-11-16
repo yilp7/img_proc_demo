@@ -68,6 +68,10 @@ TitleButton {
 }
 
 #THEME_BTN {
+	image: url(:/tools/toggle_dark);
+}
+
+#THEME_BTN::hover, #THEME_BTN::pressed {
 	image: url(:/tools/toggle_light);
 }
 

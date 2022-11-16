@@ -71,24 +71,25 @@ void LaserSettings::adjustment_btn_pressed(int id)
     QByteArray cmd(7, 0x00);
     switch(id) {
     case 0:
-        send_str = grp == 1 ? "FF 01 00 08 00 18 21" : "FF 02 00 10 00 18 2A"; break;
+        send_str = grp == 1 ? "FF 01 00 10 00 1F 30" : "FF 02 00 10 00 18 2A"; break;
     case 1:
-        send_str = grp == 1 ? "FF 01 00 10 00 18 29" : "FF 02 00 08 00 18 22"; break;
+        send_str = grp == 1 ? "FF 01 00 08 00 1F 28" : "FF 02 00 08 00 18 22"; break;
     case 2:
-        send_str = grp == 1 ? "FF 01 02 00 00 18 1B" : "FF 02 20 00 00 18 3A"; break;
+        send_str = grp == 1 ? "FF 01 02 00 00 1F 22" : "FF 02 20 00 00 18 3A"; break;
     case 3:
-        send_str = grp == 1 ? "FF 01 04 00 00 18 1D" : "FF 02 40 00 00 18 5A"; break;
+        send_str = grp == 1 ? "FF 01 04 00 00 1F 24" : "FF 02 40 00 00 18 5A"; break;
     case 4:
-        send_str = grp == 1 ? "FF 01 20 00 00 18 39" : "FF 02 02 00 00 18 1C"; break;
+        send_str = grp == 1 ? "FF 01 20 00 00 1F 40" : "FF 02 02 00 00 18 1C"; break;
     case 5:
-        send_str = grp == 1 ? "FF 01 40 00 00 18 59" : "FF 02 04 00 00 18 1E"; break;
+        send_str = grp == 1 ? "FF 01 40 00 00 1F 60" : "FF 02 04 00 00 18 1E"; break;
     default: break;
     }
 
     send_str.replace(" ", "");
     for (int i = 0; i < send_str.length() / 2; i++) cmd[i] = send_str.mid(i * 2, 2).toInt(&ok, 16);
     // TODO finishup share port settings
-    emit com_write(0, cmd); // 0 for lens' port with TCU share
+    emit com_write(2, cmd); // 2 for lens' port
+//    emit com_write(0, cmd); // 0 for lens' port with TCU share
 }
 
 void LaserSettings::adjustment_btn_released(int id)
@@ -105,5 +106,6 @@ void LaserSettings::adjustment_btn_released(int id)
     send_str.replace(" ", "");
     for (int i = 0; i < send_str.length() / 2; i++) cmd[i] = send_str.mid(i * 2, 2).toInt(&ok, 16);
     // TODO finishup share port settings
-    emit com_write(0, cmd); // 0 for lens' port with TUC share
+    emit com_write(2, cmd); // 2 for lens' port
+//    emit com_write(0, cmd); // 0 for lens' port with TUC share
 }

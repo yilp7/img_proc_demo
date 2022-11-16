@@ -512,7 +512,7 @@ int UserPanel::grab_thread_process() {
     int ww, hh, scan_img_count = -1;
     float weight = h / 1024.0; // font scale & thickness
     prev_3d = cv::Mat(h, w, CV_8UC3);
-    prev_img = cv::Mat(h, w, CV_8UC1);
+    prev_img = cv::Mat(h, w, pixel_depth == 8 ? CV_8U : CV_16U);
 //    double *range = (double*)calloc(w * h, sizeof(double));
 #ifdef LVTONG
     cv::Mat fishnet_res;
@@ -1546,7 +1546,7 @@ void UserPanel::on_START_BUTTON_clicked()
     ui->GAIN_SLIDER->setMaximum(curr_cam->device_type == 1 ? 23 : 480);
     ui->GAIN_SLIDER->setSingleStep(1);
     ui->GAIN_SLIDER->setPageStep(4);
-    ui->GAIN_SLIDER->setValue(0);
+    ui->GAIN_SLIDER->setValue(gain_analog_edit);
     connect(ui->GAIN_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_gain(int)));
 
     on_CONTINUOUS_RADIO_clicked();
@@ -2696,6 +2696,9 @@ void UserPanel::change_mcp(int val)
 {
     if (val < 0) val = 0;
     if (val > 255) val = 255;
+    ui->MCP_EDIT->setText(QString::number(val));
+    ui->MCP_SLIDER->setValue(val);
+
     if (val == mcp) return;
     mcp = val;
 
@@ -2703,9 +2706,6 @@ void UserPanel::change_mcp(int val)
 //    static QElapsedTimer t;
 //    if (!h_grab_thread || t.elapsed() > (fps > 9 ? 900 / fps : 100)) communicate_display(0, convert_to_send_tcu(0x0A, mcp), 7, 1, false), t.start();
     communicate_display(0, convert_to_send_tcu(0x0A, mcp), 7, 1, false);
-
-    ui->MCP_EDIT->setText(QString::number(val));
-    ui->MCP_SLIDER->setValue(mcp);
 }
 
 void UserPanel::change_gain(int val)
