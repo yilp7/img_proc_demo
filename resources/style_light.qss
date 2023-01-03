@@ -39,6 +39,14 @@ TitleButton {
 	background-color: #BD4C4C;
 }
 
+#URL_BTN {
+	image: url(:/tools/light/url);
+}
+
+#URL_BTN::hover, #URL_BTN::pressed {
+	image: url(:/tools/light/url_hover);
+}
+
 #SETTINGS_BTN {
 	image: url(:/tools/light/settings);
 }

@@ -43,6 +43,7 @@ signals:
     // serial comm.
     void get_baudrate(int com_idx);
     void change_baudrate(int idx, int baudrate);
+    void share_tcu_port(bool share);
     void connect_tcp_btn_clicked();
     void com_write(int idx, QByteArray data);
 

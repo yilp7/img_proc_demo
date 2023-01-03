@@ -15,7 +15,7 @@ public:
     static void plateau_equl_hist(cv::Mat *in, cv::Mat *out, int method);
     static void gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw, double *range, double range_thresh);
     static void gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw,
-                           int colormap = cv::COLORMAP_PARULA, double lower_thresh = 0, double upper_thresh = 0.981, bool truncate = false);
+                           int colormap = cv::COLORMAP_PARULA, double lower_thresh = 0, double upper_thresh = 0.981, bool trim = false);
     // TODO rewrite 3d painting function
     static void paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double min, double max);
     static void accumulative_enhance(cv::Mat &src, cv::Mat &res, float accu_base);

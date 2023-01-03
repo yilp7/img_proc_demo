@@ -1,6 +1,8 @@
 #include "imageproc.h"
 #include "opencv2/highgui.hpp"
 #include <QDebug>
+//#define NOMINMAX
+//#include <windows.h>
 
 ImageProc::ImageProc()
 {
@@ -287,12 +289,16 @@ void ImageProc::gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay
 }
 
 void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw,
-                           int colormap, double lower_thresh, double upper_thresh, bool truncate)
+                           int colormap, double lower_thresh, double upper_thresh, bool trim)
 {
+//    LARGE_INTEGER t1, t2, tc;
+//    QueryPerformanceFrequency(&tc);
+//    QueryPerformanceCounter(&t1);
+
     const int BARWIDTH = 104, BARHEIGHT = src1.rows;
     const int IMAGEWIDTH = src1.cols, IMAGEHEIGHT = src1.rows;
+    static cv::Mat img_3d, img_3d_gray;
     cv::Mat gray_bar(BARHEIGHT, BARWIDTH, CV_8UC1);
-    cv::Mat img_3d, img_3d_gray;
 
 #ifdef LVTONG
     const double c = 3e8 * 0.75;
@@ -305,17 +311,31 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
     int image_depth = (src1.depth() / 2 + 1) * 8;
     uchar *uc_ptr;
 
-    cv::Mat temp1, temp2, range_mat, mask;
+    static cv::Mat temp1, temp2, range_mat, mask, temp_mask;
     cv::threshold(src1,  temp1, lower_thresh * (1 << image_depth), 0, cv::THRESH_TOZERO);
     cv::threshold(temp1, temp1, upper_thresh * (1 << image_depth), 0, cv::THRESH_TOZERO_INV);
     cv::threshold(src2,  temp2, lower_thresh * (1 << image_depth), 0, cv::THRESH_TOZERO);
     cv::threshold(temp2, temp2, upper_thresh * (1 << image_depth), 0, cv::THRESH_TOZERO_INV);
-    mask = (temp1 * (1 << image_depth)) & (temp2 * (1 << image_depth));
-    mask.convertTo(mask, CV_8UC1);
-    temp1.convertTo(temp1, CV_64FC1);
-    temp2.convertTo(temp2, CV_64FC1);
-    range_mat = R + gw * 1e-9 * c / 2 / (temp1 / temp2 + 1);
-    if (truncate) {
+//    QueryPerformanceCounter(&t2);
+//    printf("-     threshold: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
+//    t1 = t2;
+//    mask = (temp1 * (1 << image_depth)) & (temp2 * (1 << image_depth));
+//    mask.convertTo(mask, CV_8UC1);
+    temp1.convertTo(mask, CV_8UC1, 1 << image_depth);
+    temp2.convertTo(temp_mask, CV_8UC1, 1 << image_depth);
+    mask &= temp_mask;
+//    QueryPerformanceCounter(&t2);
+//    printf("-     calc mask: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
+//    t1 = t2;
+//    temp1.convertTo(temp1, CV_32FC1);
+    temp2.convertTo(temp2, CV_32FC1);
+//    range_mat = R + gw * 1e-9 * c / 2 / (temp1 / temp2 + 1);
+    cv::multiply(temp1, 1 / temp2, range_mat, 1, CV_32FC1);
+    range_mat = R + gw * 1e-9 * c / 2 / (range_mat + 1);
+//    QueryPerformanceCounter(&t2);
+//    printf("- calc distance: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
+//    t1 = t2;
+    if (trim) {
         cv::Mat mean, stddev;
         range_mat.setTo(0, ~mask);
         cv::meanStdDev(range_mat, mean, stddev, mask);
@@ -323,9 +343,15 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
         cv::threshold(range_mat, range_mat, m - 2 * s, 0, cv::THRESH_TOZERO);
         cv::threshold(range_mat, range_mat, m + 2 * s, 0, cv::THRESH_TOZERO_INV);
         range_mat.convertTo(mask, CV_8UC1);
+//        QueryPerformanceCounter(&t2);
+//        printf("- trim distance: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
+//        t1 = t2;
     }
     cv::minMaxIdx(range_mat, &min, &max, 0, 0, mask);
     cv::normalize(range_mat, img_3d_gray, 0, 255, cv::NORM_MINMAX, CV_8UC1, mask);
+//    QueryPerformanceCounter(&t2);
+//    printf("-     normalize: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
+//    t1 = t2;
 /*
     uint hist[256] = {0};
     memset(hist, 0, 256);
@@ -361,6 +387,9 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
     cv::hconcat(mask, gray_bar, mask);
     cv::applyColorMap(img_3d_gray, img_3d, colormap);
     img_3d.copyTo(res, mask);
+//    QueryPerformanceCounter(&t2);
+//    printf("-      colormap: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
+//    t1 = t2;
 
     char text[32] = {0};
     sprintf(text, "%.2f", min);

@@ -31,6 +31,10 @@
         <file alias="settings_hover">tools/dark/settings_hover.png</file>
         <file alias="triangle">tools/dark/triangle1.png</file>
         <file alias="up">tools/dark/up.png</file>
+        <file alias="file">tools/dark/file.png</file>
+        <file alias="file_hover">tools/dark/file_hover.png</file>
+        <file alias="url">tools/dark/url.png</file>
+        <file alias="url_hover">tools/dark/url_hover.png</file>
     </qresource>
     <qresource prefix="/cursor/dark">
         <file alias="cursor">cursor/dark/cursor.png</file>
@@ -85,6 +89,10 @@
         <file alias="capture_hover">tools/light/capture_hover.png</file>
         <file alias="settings">tools/light/settings.png</file>
         <file alias="settings_hover">tools/light/settings_hover.png</file>
+        <file alias="file">tools/light/file.png</file>
+        <file alias="file_hover">tools/light/file_hover.png</file>
+        <file alias="url">tools/light/url.png</file>
+        <file alias="url_hover">tools/light/url_hover.png</file>
     </qresource>
     <qresource prefix="/cursor/light">
         <file alias="cursor">cursor/light/cursor.png</file>
@@ -103,5 +111,18 @@
         <file alias="down_left">directions/light/direction_6.png</file>
         <file alias="down">directions/light/direction_7.png</file>
         <file alias="down_right">directions/light/direction_8.png</file>
+    </qresource>
+    <qresource prefix="/status/dots">
+        <file alias="connected">status/connected.png</file>
+        <file alias="disconnected">status/disconnected.png</file>
+        <file alias="not_connected">status/not_connected.png</file>
+        <file alias="reconnecting">status/reconnecting.png</file>
+    </qresource>
+    <qresource prefix="/status/dark">
+        <file alias="cam">status/dark/cam.png</file>
+        <file alias="laser">status/dark/laser.png</file>
+        <file alias="lens">status/dark/lens.png</file>
+        <file alias="ptz">status/dark/ptz.png</file>
+        <file alias="tcu">status/dark/tcu.png</file>
     </qresource>
 </RCC>

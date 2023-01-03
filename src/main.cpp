@@ -107,6 +107,18 @@ int main(int argc, char *argv[])
 //    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
 //    qDebug() << QTextCodec::availableCodecs();
 
+    FILE *f = NULL;
+    if (!(f = fopen("user_default", "r"))) {
+        f = fopen("user_default", "w");
+        uchar ZERO = 0;
+        // uchar(com) * 5 + delay_offset(uint) + eof = 10
+        fwrite(&ZERO, 1, 10, f);
+    }
+    fclose(f);
+
+    int attr = GetFileAttributes("user_default");
+    if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) SetFileAttributes("user_default", attr | FILE_ATTRIBUTE_HIDDEN);
+
     QApplication a(argc, argv);
 
 //    QPixmap pixmap("screen.png");
@@ -134,6 +146,8 @@ int main(int argc, char *argv[])
     style.open(QIODevice::ReadOnly);
     theme_light = style.readAll();
     style.close();
+
+    app_theme = 0;
 
     cursor_curr_pointer = cursor_dark_pointer = QCursor(QPixmap(":/cursor/dark/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0);
     cursor_curr_resize_h = cursor_dark_resize_h = QCursor(QPixmap(":/cursor/dark/resize_h").scaled(20, 20));

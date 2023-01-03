@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(GLI_user_panel LANGUAGES CXX VERSION 0.4.2.0)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.5.1.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -23,6 +23,7 @@ set(Hik_SDK_DIR "${SDK_DIR}/mvs")
 set(HQV_DIR "${SDK_DIR}/HQV")
 set(EURESYS_DIR "${SDK_DIR}/euresys")
 set(OpenCV_DIR "${SDK_DIR}/opencv")
+set(FFMPEG_DIR "${SDK_DIR}/ffmpeg")
 
 # QtCreator supports the following variables for Android, which are identical to qmake Android variables.
 # Check http://doc.qt.io/qt-5/deployment-android.html for more information.
@@ -45,14 +46,17 @@ if (WIN32)
     include_directories(${HQV_DIR}/include)
     include_directories(${EURESYS_DIR}/include)
     include_directories(${OpenCV_DIR}/include)
+    include_directories(${FFMPEG_DIR}/include)
 
     if (CMAKE_SIZEOF_VOID_P EQUAL 8)
         link_directories(${Hik_SDK_DIR}/lib/x64)
         link_directories(${HQV_DIR}/lib)
         link_directories(${EURESYS_DIR}/lib)
-        link_directories(${OpenCV_DIR}/lib/x64)
+        link_directories(${FFMPEG_DIR}/lib/x64)
         if (BUILD_STATIC)
             link_directories(${OpenCV_DIR}/lib/x64_static)
+        else()
+            link_directories(${OpenCV_DIR}/lib/x64)
         endif()
     else()
         link_directories(${Hik_SDK_DIR}/lib/x86)
@@ -89,14 +93,17 @@ set(SOURCE_FILES
     src/utils.cpp
     src/userpanel.h
     src/userpanel.cpp
+    src/user_panel.ui
     src/threadpool.h
     src/threadpool.cpp
     src/mywidget.h
     src/mywidget.cpp
 #    src/progsettings.h
 #    src/progsettings.cpp
+#    src/settings.ui
     src/lasersettings.cpp
     src/lasersettings.h
+    src/laser_settings.ui
     src/imageproc.h
     src/imageproc.cpp
 #    src/cam.h
@@ -111,13 +118,14 @@ set(SOURCE_FILES
     src/joystick.cpp
     src/preferences.h
     src/preferences.cpp
+    src/preferences.ui
     src/scanconfig.h
     src/scanconfig.cpp
-    src/user_panel.ui
-#    src/settings.ui
-    src/preferences.ui
     src/scanconfig.ui
-    src/laser_settings.ui
+    src/controlport.h
+    src/controlport.cpp
+#    src/videosurface.h
+#    src/videosurface.cpp
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss
@@ -170,6 +178,21 @@ if (WIN32)
         opencv_imgcodecs454
         opencv_imgproc454
         opencv_videoio454
+        # ffmpeg
+        avcodec
+        avformat
+        avutil
+        avfilter
+        swscale
+        swresample
+        postproc
+        libx264
+        # win lib for ffmpeg
+        Strmiids
+        Mfuuid
+        ws2_32
+        Secur32
+        Bcrypt
     )
     if (BUILD_STATIC)
         string(LENGTH ${QT_DIR} LEN_QT_DIR)

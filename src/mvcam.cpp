@@ -77,6 +77,51 @@ void Cam::get_frame_size(int &w, int &h)
     img = cv::Mat(h, w, CV_8UC1);
 }
 
+void Cam::get_max_frame_size(int *w, int *h)
+{
+    MVCC_INTVALUE int_value;
+    MV_CC_GetIntValue(dev_handle, "WidthMax", &int_value);
+    *w = int_value.nCurValue;
+    MV_CC_GetIntValue(dev_handle, "HeightMax", &int_value);
+    *h = int_value.nCurValue;
+}
+
+void Cam::frame_size(bool read, int *w, int *h, int *inc_w, int *inc_h)
+{
+    if (read) {
+        MVCC_INTVALUE int_value;
+        MV_CC_GetIntValue(dev_handle, "Width", &int_value);
+        *w = int_value.nCurValue;
+        if (inc_w) *inc_w = int_value.nInc;
+        MV_CC_GetIntValue(dev_handle, "Height", &int_value);
+        *h = int_value.nCurValue;
+        if (inc_h) *inc_h = int_value.nInc;
+        img = cv::Mat(*h, *w, CV_8UC1);
+    }
+    else {
+        MV_CC_SetIntValue(dev_handle, "Width", *w);
+        MV_CC_SetIntValue(dev_handle, "Height", *h);
+        img = cv::Mat(*h, *w, CV_8UC1);
+    }
+}
+
+void Cam::frame_offset(bool read, int *x, int *y, int *inc_x, int *inc_y)
+{
+    if (read) {
+        MVCC_INTVALUE int_value;
+        MV_CC_GetIntValue(dev_handle, "OffsetX", &int_value);
+        *x = int_value.nCurValue;
+        if (inc_x) *inc_x = int_value.nInc;
+        MV_CC_GetIntValue(dev_handle, "OffsetY", &int_value);
+        *y = int_value.nCurValue;
+        if (inc_y) *inc_y = int_value.nInc;
+    }
+    else {
+        MV_CC_SetIntValue(dev_handle, "OffsetX", *x);
+        MV_CC_SetIntValue(dev_handle, "OffsetY", *y);
+    }
+}
+
 void Cam::time_exposure(bool read, float *val)
 {
     if (read) {

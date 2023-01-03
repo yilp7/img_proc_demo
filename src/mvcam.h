@@ -35,6 +35,9 @@ public:
     int free_img_buffer(MV_FRAME_OUT* frame);
 
     void get_frame_size(int &w, int &h);
+    void get_max_frame_size(int *w, int *h);
+    void frame_size(bool read, int *w, int *h, int *inc_w = NULL, int *inc_h = NULL);
+    void frame_offset(bool read, int *x, int *y, int *inc_x = NULL, int *inc_y = NULL);
     void time_exposure(bool read, float *val);
     void frame_rate(bool read, float *val);
     void gain_analog(bool read, float *val);

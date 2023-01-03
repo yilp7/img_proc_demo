@@ -31,6 +31,19 @@ void Display::update_roi(QPoint center)
     this->center = lefttop + temp / 2;
 }
 
+void Display::clear()
+{
+    QLabel::clear();
+
+    curr_scale = 0;
+
+    QPoint roi_center = lefttop + QPoint((int)(scale[curr_scale] * this->width() / 2), (int)(scale[curr_scale] * this->height() / 2));
+    update_roi(roi_center);
+
+    selection_v2.x = selection_v1.x = 0;
+    selection_v2.y = selection_v1.y = 0;
+}
+
 void Display::mousePressEvent(QMouseEvent *event)
 {
     QLabel::mousePressEvent(event);
@@ -42,13 +55,20 @@ void Display::mousePressEvent(QMouseEvent *event)
 //    qDebug("%s pressed\n", qPrintable(this->objectName()));
 
     if (!is_grabbing) return;
+
+    static QPoint curr_pos;
+    curr_pos = event->pos();
+    if (curr_pos.x() > this->rect().right()) curr_pos.setX(this->rect().right());
+    if (curr_pos.y() > this->rect().bottom()) curr_pos.setY(this->rect().bottom());
+
     pressed = true;
     prev_pos = event->pos();
     ori_pos = lefttop;
     if (mode == 1) {
-        selection_v2.x = selection_v1.x = event->pos().x();
-        selection_v2.y = selection_v1.y = event->pos().y();
-        emit start_pos(event->pos());
+        selection_v2.x = selection_v1.x = curr_pos.x();
+        selection_v2.y = selection_v1.y = curr_pos.y();
+//        emit start_pos(event->pos());
+        emit updated_pos(1, curr_pos);
     }
 }
 
@@ -57,7 +77,8 @@ void Display::mouseMoveEvent(QMouseEvent *event)
     QLabel::mouseMoveEvent(event);
 
     if (!is_grabbing) return;
-    if (geometry().contains(event->pos())) emit curr_pos(event->pos());
+//    if (geometry().contains(event->pos())) emit curr_pos(event->pos());
+    if (geometry().contains(event->pos())) emit updated_pos(0, event->pos());
     if (!pressed) return;
 //    qDebug("pos: %d, %d\n", event->x(), event->y());
 //    qDebug("pos: %d, %d\n", event->globalX(), event->globalY());
@@ -65,10 +86,17 @@ void Display::mouseMoveEvent(QMouseEvent *event)
 
     if (!mode) update_roi(ori_pos + QPoint((int)(scale[curr_scale] * this->width()), (int)(scale[curr_scale] * this->height())) / 2 - (event->pos() - prev_pos) * scale[curr_scale]);
 //    prev_pos = event->pos();
+
+    static QPoint curr_pos;
+    curr_pos = event->pos();
+    if (curr_pos.x() > this->rect().right()) curr_pos.setX(this->rect().right());
+    if (curr_pos.y() > this->rect().bottom()) curr_pos.setY(this->rect().bottom());
+
     if (mode == 1) {
-        selection_v2.x = event->pos().x();
-        selection_v2.y = event->pos().y();
-        emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
+        selection_v2.x = selection_v1.x = curr_pos.x();
+        selection_v2.y = selection_v1.y = curr_pos.y();
+//        emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
+        emit updated_pos(2, curr_pos - QPoint(selection_v1.x, selection_v1.y));
     }
 }
 
@@ -83,10 +111,12 @@ void Display::mouseReleaseEvent(QMouseEvent *event)
     if (mode == 1) {
         selection_v2.x = event->pos().x();
         selection_v2.y = event->pos().y();
-        emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
+//        emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
+        emit updated_pos(2, event->pos() - QPoint(selection_v1.x, selection_v1.y));
     }
     else if (mode == 2) {
-        emit ptz_target(event->pos());
+//        emit ptz_target(event->pos());
+        emit updated_pos(3, event->pos());
     }
 }
 
@@ -95,7 +125,7 @@ void Display::wheelEvent(QWheelEvent *event)
     QLabel::wheelEvent(event);
 
     if (!is_grabbing || mode) return;
-    QPoint center = lefttop + QPoint((int)(scale[curr_scale] * this->width() / 2), (int)(scale[curr_scale] * this->height() / 2));
+    QPoint roi_center = lefttop + QPoint((int)(scale[curr_scale] * this->width() / 2), (int)(scale[curr_scale] * this->height() / 2));
     QLabel::wheelEvent(event);
     if(event->delta() > 0) {
         if (curr_scale >= 4) return;
@@ -110,12 +140,15 @@ void Display::wheelEvent(QWheelEvent *event)
 //    if (curr_scale < 0) curr_scale = 0;
     qDebug("current scale: %dx%d", (int)(scale[curr_scale] * this->width()), (int)(scale[curr_scale] * this->height()));
 
-    update_roi(center);
+    update_roi(roi_center);
+//    selection_v1 *= scale[curr_scale];
+//    selection_v2 *= scale[curr_scale];
 }
 
-Ruler::Ruler(QWidget *parent) : QLabel(parent)
-  , vertical(false)
-  , interval(10)
+Ruler::Ruler(QWidget *parent) :
+    QLabel(parent),
+    vertical(false),
+    interval(10)
 {
 
 }
@@ -174,8 +207,8 @@ TitleButton::TitleButton(QString icon, QWidget *parent) : QPushButton(QIcon(icon
 
 void TitleButton::mouseMoveEvent(QMouseEvent *event) { setCursor(cursor_dark_pointer); }
 
-TitleBar::TitleBar(QWidget *parent)
-    : QFrame(parent),
+TitleBar::TitleBar(QWidget *parent) :
+    QFrame(parent),
     is_maximized(false),
     pressed(false),
     signal_receiver(NULL)
@@ -208,6 +241,10 @@ void TitleBar::setup(QObject *ptr)
     preferences = new Preferences();
     scan_config = new ScanConfig();
 
+    url = new TitleButton("", this);
+    url->setObjectName("URL_BTN");
+    connect(url, SIGNAL(clicked()), signal_receiver, SLOT(prompt_for_input_file()));
+
     settings = new TitleButton("", this);
     settings->setObjectName("SETTINGS_BTN");
     QMenu *settings_menu = new QMenu();
@@ -237,6 +274,7 @@ void TitleBar::setup(QObject *ptr)
     connect(preferences, SIGNAL(change_pixel_format(int)),    signal_receiver, SLOT(change_pixel_format(int)));
     connect(preferences, SIGNAL(get_baudrate(int)),           signal_receiver, SLOT(display_baudrate(int)));
     connect(preferences, SIGNAL(change_baudrate(int, int)),   signal_receiver, SLOT(set_baudrate(int, int)));
+    connect(preferences, SIGNAL(share_tcu_port(bool)),        signal_receiver, SLOT(set_tcu_as_shared_port(bool)));
     // TODO connect_to_tcp button clicked
     connect(preferences, SIGNAL(com_write(int, QByteArray)),  signal_receiver, SLOT(com_write_data(int, QByteArray)));
     connect(preferences, SIGNAL(rep_freq_unit_changed(int)),  signal_receiver, SLOT(setup_hz(int)));
@@ -278,6 +316,7 @@ void TitleBar::process_maximize()
 
 void TitleBar::resizeEvent(QResizeEvent *event)
 {
+    url->setGeometry(this->width() - 350, 5, 20, 20);
     settings->setGeometry(this->width() - 310, 5, 20, 20);
     capture->setGeometry(this->width() - 270, 5, 20, 20);
     cls->setGeometry(this->width() - 230, 5, 20, 20);
@@ -351,7 +390,7 @@ void AnimationLabel::draw()
 
 Tools::Tools(QWidget *parent) : QRadioButton(parent) {}
 
-Coordinate::Coordinate(QWidget *parent) : QFrame(parent), set_name(NULL), coord_x(NULL), coord_y(NULL) {}
+Coordinate::Coordinate(QWidget *parent) : QFrame(parent), pair(0, 0), set_name(NULL), coord_x(NULL), coord_y(NULL) {}
 
 void Coordinate::setup(QString name)
 {
@@ -379,6 +418,8 @@ void Coordinate::setup(QString name)
 
 void Coordinate::display_pos(QPoint p)
 {
+    pair.setX(p.x());
+    pair.setY(p.y());
     coord_x->setText(QString::asprintf("X: %04d", abs(p.x())));
     coord_y->setText(QString::asprintf("Y: %04d", abs(p.y())));
 }
@@ -397,4 +438,96 @@ void IndexLabel::mouseReleaseEvent(QMouseEvent *event)
 
     if(event->button() != Qt::LeftButton) return;
     emit index_label_clicked(pos_y);
+}
+
+StatusIcon::StatusIcon(QWidget *parent) :
+    QFrame(parent),
+    status_block(NULL),
+    status_dot(NULL),
+    status(StatusIcon::STATUS::NONE)
+{
+    status_block = new QLabel(this);
+    status_block->setObjectName(this->objectName() + "_BLOCK");
+    connect(this, SIGNAL(set_pixmap(QPixmap)), status_block, SLOT(setPixmap(QPixmap)), Qt::QueuedConnection);
+    connect(this, SIGNAL(set_text(QString)),   status_block, SLOT(setText(QString)), Qt::QueuedConnection);
+
+    status_dot = new QLabel(this);
+    status_dot->setGeometry(22, 20, 8, 8);
+    status_dot->setObjectName(this->objectName() + "_DOT");
+    connect(this, SIGNAL(change_status(QPixmap)), status_dot, SLOT(setPixmap(QPixmap)), Qt::QueuedConnection);
+    status_block->stackUnder(status_dot);
+}
+
+void StatusIcon::setup(QPixmap img)
+{
+    status_block->setGeometry(0, 0, this->width(), this->height());
+    status_block->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
+    emit set_pixmap(img.scaled(this->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+}
+
+void StatusIcon::setup(QString str)
+{
+    status_block->setGeometry(0, 0, this->width(), this->height());
+    status_block->setAlignment(Qt::AlignCenter);
+    emit set_text(str);
+}
+
+void StatusIcon::update_status(STATUS status)
+{
+    this->status = status;
+    emit change_status(get_status_dot(status));
+}
+
+const QPixmap StatusIcon::get_status_dot(STATUS status)
+{
+    const static QPixmap STATUS_NONE = QPixmap();
+    const static QPixmap STATUS_NOT_CONNECTED = QPixmap(":/status/dots/not_connected").scaled(8, 8, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    const static QPixmap STATUS_DISCONNECTED = QPixmap(":/status/dots/disconnected").scaled(8, 8, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    const static QPixmap STATUS_RECONNECTING = QPixmap(":/status/dots/reconnecting").scaled(8, 8, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    const static QPixmap STATUS_CONNECTED = QPixmap(":/status/dots/connected").scaled(8, 8, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    const static QPixmap STATUS_SET[5] = {STATUS_NONE, STATUS_NOT_CONNECTED, STATUS_DISCONNECTED, STATUS_RECONNECTING, STATUS_CONNECTED};
+
+    return STATUS_SET[status];
+}
+
+StatusBar::StatusBar(QWidget *parent) : QFrame(parent)
+{
+    cam_status = new StatusIcon(this);
+    cam_status->setGeometry(20, 0, 32, 32);
+    cam_status->setObjectName("CAM_STATUS");
+    cam_status->setup(QPixmap(":/status/dark/cam"));
+    tcu_status = new StatusIcon(this);
+    tcu_status->setGeometry(72, 0, 32, 32);
+    tcu_status->setObjectName("TCU_STATUS");
+    tcu_status->setup(QPixmap(":/status/dark/tcu"));
+    lens_status = new StatusIcon(this);
+    lens_status->setGeometry(124, 0, 32, 32);
+    lens_status->setObjectName("LENS_STATUS");
+    lens_status->setup(QPixmap(":/status/dark/lens"));
+    laser_status = new StatusIcon(this);
+    laser_status->setGeometry(176, 0, 32, 32);
+    laser_status->setObjectName("LASER_STATUS");
+    laser_status->setup(QPixmap(":/status/dark/laser"));
+    ptz_status = new StatusIcon(this);
+    ptz_status->setGeometry(228, 0, 32, 32);
+    ptz_status->setObjectName("PTZ_STATUS");
+    ptz_status->setup(QPixmap(":/status/dark/ptz"));
+
+    img_pixel_format = new StatusIcon(this);
+    img_pixel_format->setGeometry(280, 0, 48, 32);
+    img_pixel_format->setObjectName("IMG_PIXEL_FORMAT");
+    img_pixel_format->setup("MONO8");
+    img_pixel_depth = new StatusIcon(this);
+    img_pixel_depth->setGeometry(332, 0, 48, 32);
+    img_pixel_depth->setObjectName("IMG_PIXEL_DEPTH");
+    img_pixel_depth->setup("8-bit");
+    img_resolution = new StatusIcon(this);
+    img_resolution->setGeometry(384, 0, 48, 32);
+    img_resolution->setObjectName("IMG_RESOLUTION");
+    img_resolution->setup("");
+    result_cam_fps = new StatusIcon(this);
+    result_cam_fps->setGeometry(436, 0, 48, 32);
+    result_cam_fps->setObjectName("RESULT_CAM_FPS");
+    result_cam_fps->setup("");
 }

@@ -15,6 +15,9 @@ public:
 public:
     void update_roi(QPoint pos);
 
+public slots:
+    void clear();
+
 protected:
     // @override
     void mousePressEvent(QMouseEvent *event);
@@ -23,6 +26,8 @@ protected:
     void wheelEvent(QWheelEvent *event);
 
 signals:
+    // idx: 0: curr_pos, 1: start_pos, 2: shape_size, 3: ptz_target
+    void updated_pos(int idx, QPoint pos);
     void curr_pos(QPoint pos);
     void start_pos(QPoint pos);
     void shape_size(QPoint size);
@@ -103,16 +108,17 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *event);
 
 public:
-    InfoLabel    *icon;
-    InfoLabel    *title;
-    TitleButton  *settings;
-    TitleButton  *capture;
-    TitleButton  *cls;
-    TitleButton  *lang;
-    TitleButton  *theme;
-    TitleButton  *min;
-    TitleButton  *max;
-    TitleButton  *exit;
+    InfoLabel*   icon;
+    InfoLabel*   title;
+    TitleButton* url;
+    TitleButton* settings;
+    TitleButton* capture;
+    TitleButton* cls;
+    TitleButton* lang;
+    TitleButton* theme;
+    TitleButton* min;
+    TitleButton* max;
+    TitleButton* exit;
 
     bool         is_maximized;
     QPoint       prev_pos;
@@ -162,13 +168,15 @@ public:
     explicit Coordinate(QWidget *parent = 0);
     void setup(QString name);
 
-public slots:
+public:
     void display_pos(QPoint p);
 
 public:
-    InfoLabel *set_name;
-    InfoLabel *coord_x;
-    InfoLabel *coord_y;
+    QPoint     pair;
+
+    InfoLabel* set_name;
+    InfoLabel* coord_x;
+    InfoLabel* coord_y;
 };
 
 class IndexLabel : public QLabel
@@ -189,11 +197,53 @@ private:
     int pos_y;
 };
 
+class StatusIcon : public QFrame
+{
+    Q_OBJECT
+public:
+    enum STATUS {
+        NONE          = 0,
+        NOT_CONNECTED = 1,
+        DISCONNECTED  = 2,
+        RECONNECTING  = 3,
+        CONNECTED     = 4,
+    };
+    explicit StatusIcon(QWidget *parent);
+
+    void setup(QPixmap img);
+    void setup(QString str);
+
+    void update_status(StatusIcon::STATUS status);
+
+signals:
+    void set_pixmap(QPixmap status_block_image);
+    void change_status(QPixmap status_dot_image);
+    void set_text(QString status_block_text);
+
+private:
+    const QPixmap get_status_dot(StatusIcon::STATUS status);
+
+    QLabel* status_block;
+    QLabel* status_dot;
+    STATUS  status;
+};
+
 class StatusBar : public QFrame
 {
     Q_OBJECT
 public:
     explicit StatusBar(QWidget *parent);
+
+public:
+    StatusIcon* cam_status;
+    StatusIcon* tcu_status;
+    StatusIcon* lens_status;
+    StatusIcon* laser_status;
+    StatusIcon* ptz_status;
+    StatusIcon* img_pixel_format;
+    StatusIcon* img_pixel_depth;
+    StatusIcon* img_resolution;
+    StatusIcon* result_cam_fps;
 };
 
 #endif // MYWIDGET_H

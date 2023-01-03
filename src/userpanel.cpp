@@ -18,7 +18,7 @@ UserPanel::UserPanel(QWidget *parent)
     : QMainWindow(parent),
     mouse_pressed(false),
     ui(new Ui::UserPanel),
-    theme(0),
+    status_bar(NULL),
     pref(NULL),
     scan_config(NULL),
     laser_settings(NULL),
@@ -28,6 +28,10 @@ UserPanel::UserPanel(QWidget *parent)
     time_exposure_edit(5000),
     gain_analog_edit(0),
     frame_rate_edit(10),
+    ptr_tcu(NULL),
+    ptr_lens(NULL),
+    ptr_laser(NULL),
+    ptr_ptz(NULL),
     serial_port{NULL},
     serial_port_connected{false},
     tcp_port{NULL},
@@ -66,8 +70,10 @@ UserPanel::UserPanel(QWidget *parent)
     h(400),
     pixel_format(PixelType_Gvsp_Mono8),
     pixel_depth(8),
+    grab_image(false),
     h_grab_thread(NULL),
     grab_thread_state(false),
+    video_thread_state(false),
     h_joystick_thread(NULL),
     seq_idx(0),
     scan(false),
@@ -133,7 +139,7 @@ UserPanel::UserPanel(QWidget *parent)
 //    qDebug() << QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section('/', 0, -1);
     TEMP_SAVE_LOCATION = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
 
-    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s/%s);", theme ? "light" : "dark", hide_left ? "right" : "left"));
+    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s/%s);", app_theme ? "light" : "dark", hide_left ? "right" : "left"));
 
     connect(this, SIGNAL(set_pixmap(QPixmap)), ui->SOURCE_DISPLAY, SLOT(setPixmap(QPixmap)), Qt::QueuedConnection);
 
@@ -157,16 +163,16 @@ UserPanel::UserPanel(QWidget *parent)
     // - set-up COMs
 //    foreach (const QSerialPortInfo & info, QSerialPortInfo::availablePorts()) qDebug("%s\n", qPrintable(info.portName()));
     com_label[0] = ui->TCU_COM;
-    com_label[1] = ui->RANGE_COM;
-    com_label[2] = ui->LENS_COM;
-    com_label[3] = ui->LASER_COM;
-    com_label[4] = ui->PTZ_COM;
+    com_label[1] = ui->LENS_COM;
+    com_label[2] = ui->LASER_COM;
+    com_label[3] = ui->PTZ_COM;
+    com_label[4] = ui->RANGE_COM;
 
     com_edit[0] = ui->TCU_COM_EDIT;
-    com_edit[1] = ui->RANGE_COM_EDIT;
-    com_edit[2] = ui->LENS_COM_EDIT;
-    com_edit[3] = ui->LASER_COM_EDIT;
-    com_edit[4] = ui->PTZ_COM_EDIT;
+    com_edit[1] = ui->LENS_COM_EDIT;
+    com_edit[2] = ui->LASER_COM_EDIT;
+    com_edit[3] = ui->PTZ_COM_EDIT;
+    com_edit[4] = ui->RANGE_COM_EDIT;
 
 //    setup_com(com + 0, 0, com_edit[0]->text(), 9600);
 //    setup_com(com + 1, 1, com_edit[1]->text(), 115200);
@@ -242,34 +248,52 @@ UserPanel::UserPanel(QWidget *parent)
     ui->RULER_V->vertical = true;
     ui->ZOOM_TOOL->click();
     ui->CURR_COORD->setup("current");
-    connect(ui->SOURCE_DISPLAY, SIGNAL(curr_pos(QPoint)), ui->CURR_COORD, SLOT(display_pos(QPoint)));
+//    connect(ui->SOURCE_DISPLAY, SIGNAL(curr_pos(QPoint)), ui->CURR_COORD, SLOT(display_pos(QPoint)));
     ui->START_COORD->setup("start");
-    connect(ui->SOURCE_DISPLAY, SIGNAL(start_pos(QPoint)), ui->START_COORD, SLOT(display_pos(QPoint)));
+//    connect(ui->SOURCE_DISPLAY, SIGNAL(start_pos(QPoint)), ui->START_COORD, SLOT(display_pos(QPoint)));
     ui->SHAPE_INFO->setup("size");
-    connect(ui->SOURCE_DISPLAY, SIGNAL(shape_size(QPoint)), ui->SHAPE_INFO, SLOT(display_pos(QPoint)));
+//    connect(ui->SOURCE_DISPLAY, SIGNAL(shape_size(QPoint)), ui->SHAPE_INFO, SLOT(display_pos(QPoint)));
+    connect(ui->SOURCE_DISPLAY, &Display::updated_pos, this,
+        [this](int idx, QPoint pos) {
+            static QPoint converted_pos(0, 0);
+            static Display *disp = ui->SOURCE_DISPLAY;
+            converted_pos.setX(pos.x() * img_mem.cols / disp->width());
+            converted_pos.setY(pos.y() * img_mem.rows / disp->height());
+//            converted_pos /= 4;
+//            converted_pos *= 4;
+            switch (idx) {
+            case 0: ui->CURR_COORD->display_pos(converted_pos); break;
+            case 1: ui->START_COORD->display_pos(converted_pos); break;
+            case 2: ui->SHAPE_INFO->display_pos(converted_pos); break;
+            case 3: point_ptz_to_target(pos); break;
+            default: break;
+            }
+        });
+//    ui->SOFTWARE_CHECK->hide();
+//    ui->SOFTWARE_TRIGGER_BUTTON->hide();
 
     ptz_grp = new QButtonGroup(this);
-    ui->UP_LEFT_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/up_left"));
+    ui->UP_LEFT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/up_left"));
     ptz_grp->addButton(ui->UP_LEFT_BTN, 0);
-    ui->UP_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/up"));
+    ui->UP_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/up"));
     ptz_grp->addButton(ui->UP_BTN, 1);
-    ui->UP_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/up_right"));
+    ui->UP_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/up_right"));
     ptz_grp->addButton(ui->UP_RIGHT_BTN, 2);
-    ui->LEFT_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/left"));
+    ui->LEFT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/left"));
     ptz_grp->addButton(ui->LEFT_BTN, 3);
-    ui->SELF_TEST_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/self_test"));
+    ui->SELF_TEST_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
     ptz_grp->addButton(ui->SELF_TEST_BTN, 4);
-    ui->RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/right"));
+    ui->RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/right"));
     ptz_grp->addButton(ui->RIGHT_BTN, 5);
-    ui->DOWN_LEFT_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/down_left"));
+    ui->DOWN_LEFT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down_left"));
     ptz_grp->addButton(ui->DOWN_LEFT_BTN, 6);
-    ui->DOWN_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/down"));
+    ui->DOWN_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down"));
     ptz_grp->addButton(ui->DOWN_BTN, 7);
-    ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/down_right"));
+    ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down_right"));
     ptz_grp->addButton(ui->DOWN_RIGHT_BTN, 8);
     connect(ptz_grp, SIGNAL(buttonPressed(int)), this, SLOT(ptz_button_pressed(int)));
     connect(ptz_grp, SIGNAL(buttonReleased(int)), this, SLOT(ptz_button_released(int)));
-    ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/self_test"));
+    ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
 
     QSlider *speed_slider = ui->PTZ_SPEED_SLIDER;
     speed_slider->setMinimum(1);
@@ -308,6 +332,9 @@ UserPanel::UserPanel(QWidget *parent)
     pref = ui->TITLE->preferences;
     scan_config = ui->TITLE->scan_config;
 
+    // connect status bar to the main window
+    status_bar = ui->STATUS;
+
     // connect to joystick (windows xbox only)
     h_joystick_thread = new JoystickThread(this);
     h_joystick_thread->start();
@@ -316,23 +343,53 @@ UserPanel::UserPanel(QWidget *parent)
     connect(h_joystick_thread, SIGNAL(button_released(int)), this, SLOT(joystick_button_released(int)));
     connect(h_joystick_thread, SIGNAL(direction_changed(int)), this, SLOT(joystick_direction_changed(int)));
 
+//    qRegisterMetaType<QVideoFrame>("QVideoFrame&");
+//    video_input = new QMediaPlayer(this);
+//    video_surface = new VideoSurface(this);
+//    video_input->setVideoOutput(video_surface);
+//    connect(video_surface, &VideoSurface::frameAvailable, this,
+//        [this](QVideoFrame &current_frame) {
+//            video_surface->frame_count++;
+
+//            if (video_surface->frame_count == 1) start_static_display(current_frame.width(), current_frame.height(), true, 8, -2);
+
+//            current_frame.map(QAbstractVideoBuffer::ReadOnly);
+//            static cv::Mat converted_rgb;
+//            cv::cvtColor(cv::Mat(current_frame.height(), current_frame.width(), CV_8UC4, current_frame.bits(), current_frame.bytesPerLine()), converted_rgb, cv::COLOR_RGBA2BGR);
+//            img_q.push(converted_rgb);
+//            current_frame.unmap();
+//        }, Qt::QueuedConnection);
+
     laser_settings = new LaserSettings();
     connect(laser_settings, SIGNAL(com_write(int, QByteArray)), this, SLOT(com_write_data(int, QByteArray)));
 
     // right before gui display (init state)
-    QFile file_user_port("user_serial_port_com");
-    uchar com[5] = {0};
-    if (file_user_port.open(QIODevice::ReadOnly)) memcpy(com, file_user_port.readLine().simplified().data(), 5);
-    file_user_port.close();
-    for (int i = 0; i < 5; i++) com_edit[i]->setText(QString::number(com[i]));
+    // setup serial port with tcp socket
+    ptr_tcu   = new TCU(  ui->TCU_COM,   ui->TCU_COM_EDIT,   0, ui->STATUS->tcu_status, this);
+    ptr_lens  = new Lens( ui->LENS_COM,  ui->LENS_COM_EDIT,  1, ui->STATUS->lens_status, this);
+    ptr_laser = new Laser(ui->LASER_COM, ui->LASER_COM_EDIT, 2, ui->STATUS->laser_status, this);
+    ptr_ptz   = new PTZ(  ui->PTZ_COM,   ui->PTZ_COM_EDIT,   3, ui->STATUS->ptz_status, this);
+//    qDebug() << QThread::currentThread();
+    connect(ptr_tcu,   &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
+    connect(ptr_lens,  &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
+    connect(ptr_laser, &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
+    connect(ptr_ptz,   &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
 
-    for (int i = 0; i < 5; i++) serial_port[i] = new QSerialPort(this), setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600);
+    uchar com[5] = {0};
+    FILE *f = fopen("user_default", "r");
+    if (f) {
+        fread(com, 1, 5, f);
+        fclose(f);
+    }
+    for (int i = 0; i < 5; i++) com_edit[i]->setText(QString::number(com[i])), com_edit[i]->emit returnPressed();
+
+    for (int i = 0; i < 5; i++) serial_port[i] = new QSerialPort(this)/*, setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600)*/;
     for (int i = 0; i < 5; i++) tcp_port[i] = new QTcpSocket(this);
     on_ENUM_BUTTON_clicked();
     if (serial_port[0]->isOpen() && serial_port[3]->isOpen()) on_LASER_BTN_clicked();
 
-    // connect ptz targeting slots
-    connect(ui->SOURCE_DISPLAY, SIGNAL(ptz_target(QPoint)), this, SLOT(point_ptz_to_target(QPoint)));
+    // connect ptz targeting slots (moved to signal updated_pos)
+//    connect(ui->SOURCE_DISPLAY, SIGNAL(ptz_target(QPoint)), this, SLOT(point_ptz_to_target(QPoint)));
 
     // - set startup focus
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
@@ -505,6 +562,7 @@ void UserPanel::data_exchange(bool read){
 }
 
 int UserPanel::grab_thread_process() {
+    grab_thread_state = true;
     Display *disp = ui->SOURCE_DISPLAY;
 //    ProgSettings *settings = ui->TITLE->prog_settings;
     QImage stream;
@@ -512,13 +570,13 @@ int UserPanel::grab_thread_process() {
     int ww, hh, scan_img_count = -1;
     float weight = h / 1024.0; // font scale & thickness
     prev_3d = cv::Mat(h, w, CV_8UC3);
-    prev_img = cv::Mat(h, w, pixel_depth == 8 ? CV_8U : CV_16U);
+    prev_img = cv::Mat(h, w, CV_MAKETYPE(pixel_depth == 8 ? CV_8U : CV_16U, is_color ? 3 : 1));
 //    double *range = (double*)calloc(w * h, sizeof(double));
 #ifdef LVTONG
     cv::Mat fishnet_res;
     cv::dnn::Net net = cv::dnn::readNet("model/resnet18.onnx");
 #endif
-    while (grab_thread_state) {
+    while (grab_image) {
         while (img_q.size() > 5) img_q.pop();
 
         if (img_q.empty()) {
@@ -526,7 +584,6 @@ int UserPanel::grab_thread_process() {
             QThread::msleep(10);
             continue;
 #else
-//            QThread::msleep(10);
             img_mem = prev_img.clone();
             updated = false;
 #endif
@@ -535,7 +592,7 @@ int UserPanel::grab_thread_process() {
             img_mem = img_q.front();
             img_q.pop();
             updated = true;
-            if (device_type < 0) img_q.push(img_mem.clone());
+            if (device_type == -1) img_q.push(img_mem.clone());
         }
 
         image_mutex.lock();
@@ -544,7 +601,7 @@ int UserPanel::grab_thread_process() {
         if (updated) {
             // calc histogram (grayscale)
             memset(hist, 0, 256 * sizeof(uint));
-            for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * img_mem.cols)[j]]++;
+            if (!is_color) for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img_mem.data + i * img_mem.cols)[j]]++;
 
             // if the image needs flipping
             if (pref->symmetry) cv::flip(img_mem, img_mem, pref->symmetry - 2);
@@ -600,19 +657,19 @@ int UserPanel::grab_thread_process() {
 #endif
 
         // process frame average
-        if (seq_sum.empty()) seq_sum = cv::Mat::zeros(h, w, CV_16U);
-        if (frame_a_sum.empty()) frame_a_sum = cv::Mat::zeros(h, w, CV_16U);
-        if (frame_b_sum.empty()) frame_b_sum = cv::Mat::zeros(h, w, CV_16U);
+        if (seq_sum.empty()) seq_sum = cv::Mat::zeros(h, w, CV_MAKETYPE(CV_16U, is_color ? 3 : 1));
+        if (frame_a_sum.empty()) frame_a_sum = cv::Mat::zeros(h, w, CV_MAKETYPE(CV_16U, is_color ? 3 : 1));
+        if (frame_b_sum.empty()) frame_b_sum = cv::Mat::zeros(h, w, CV_MAKETYPE(CV_16U, is_color ? 3 : 1));
         if (ui->FRAME_AVG_CHECK->isChecked()) {
             if (updated) {
                 calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
-                if (seq[7].empty()) for (auto& m: seq) m = cv::Mat::zeros(h, w, CV_16U);
+                if (seq[7].empty()) for (auto& m: seq) m = cv::Mat::zeros(h, w, CV_MAKETYPE(CV_16U, is_color ? 3 : 1));
 
                 seq_sum -= seq[(seq_idx + 4) & 7];
 //                seq_sum -= seq[seq_idx];
                 if (frame_a_3d) frame_a_sum -= seq[seq_idx];
                 else            frame_b_sum -= seq[seq_idx];
-                img_mem.convertTo(seq[seq_idx], CV_16U);
+                img_mem.convertTo(seq[seq_idx], CV_MAKETYPE(CV_16U, is_color ? 3 : 1));
                 seq_sum += seq[seq_idx];
                 if (frame_a_3d) frame_a_sum += seq[seq_idx];
                 else            frame_b_sum += seq[seq_idx];
@@ -622,10 +679,10 @@ int UserPanel::grab_thread_process() {
                 seq_idx = (seq_idx + 1) & 7;
             }
 //            seq_sum.convertTo(modified_result, CV_8U, 1. / (calc_avg_option * (1 << (pixel_depth - 8))));
-            seq_sum.convertTo(modified_result, CV_8U, 1. / (4 * (1 << (pixel_depth - 8))));
+            seq_sum.convertTo(modified_result, CV_MAKETYPE(CV_8U, is_color ? 3 : 1), 1. / (4 * (1 << (pixel_depth - 8))));
         }
         else {
-            img_mem.convertTo(modified_result, CV_8U, 1. / (1 << (pixel_depth - 8)));
+            img_mem.convertTo(modified_result, CV_MAKETYPE(CV_8U, is_color ? 3 : 1), 1. / (1 << (pixel_depth - 8)));
         }
 
         // process 3d image construction from ABN frames
@@ -877,11 +934,11 @@ int UserPanel::grab_thread_process() {
         // image write / video record
         if (updated && save_original) {
             save_to_file(false);
-            if (device_type < 0) save_original = 0;
+            if (device_type == -1) save_original = 0;
         }
         if (updated && save_modified) {
             save_to_file(true);
-            if (device_type < 0) save_modified = 0;
+            if (device_type == -1) save_modified = 0;
         }
         if (updated && record_original) {
             cv::Mat temp = img_mem.clone();
@@ -913,6 +970,7 @@ int UserPanel::grab_thread_process() {
         image_mutex.unlock();
     }
 //    free(range);
+    grab_thread_state = false;
     return 0;
 }
 
@@ -1269,29 +1327,33 @@ bool UserPanel::load_image_tif(cv::Mat &img, QString filename)
 
 void UserPanel::set_theme()
 {
-    theme ^= 1;
+    app_theme ^= 1;
 
-    if (theme) qApp->setStyleSheet(theme_light);
+    if (app_theme) qApp->setStyleSheet(theme_light);
     else qApp->setStyleSheet(theme_dark);
 
-    cursor_curr_pointer   = theme ? cursor_light_pointer   : cursor_dark_pointer;
-    cursor_curr_resize_h  = theme ? cursor_light_resize_h  : cursor_dark_resize_h;
-    cursor_curr_resize_v  = theme ? cursor_light_resize_v  : cursor_dark_resize_v;
-    cursor_curr_resize_md = theme ? cursor_light_resize_md : cursor_dark_resize_md;
-    cursor_curr_resize_sd = theme ? cursor_light_resize_sd : cursor_dark_resize_sd;
+    cursor_curr_pointer   = app_theme ? cursor_light_pointer   : cursor_dark_pointer;
+    cursor_curr_resize_h  = app_theme ? cursor_light_resize_h  : cursor_dark_resize_h;
+    cursor_curr_resize_v  = app_theme ? cursor_light_resize_v  : cursor_dark_resize_v;
+    cursor_curr_resize_md = app_theme ? cursor_light_resize_md : cursor_dark_resize_md;
+    cursor_curr_resize_sd = app_theme ? cursor_light_resize_sd : cursor_dark_resize_sd;
 
-    ui->UP_LEFT_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/up_left"));
-    ui->UP_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/up"));
-    ui->UP_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/up_right"));
-    ui->LEFT_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/left"));
-    ui->SELF_TEST_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/self_test"));
-    ui->RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/right"));
-    ui->DOWN_LEFT_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/down_left"));
-    ui->DOWN_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/down"));
-    ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/down_right"));
-    ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(theme ? "light" : "dark") + "/self_test"));
+    ui->UP_LEFT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/up_left"));
+    ui->UP_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/up"));
+    ui->UP_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/up_right"));
+    ui->LEFT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/left"));
+    ui->SELF_TEST_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
+    ui->RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/right"));
+    ui->DOWN_LEFT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down_left"));
+    ui->DOWN_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down"));
+    ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down_right"));
+    ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
 
-    for (int i = 0 ; i < 5; i++) if (serial_port_connected[i]) com_label[i]->setStyleSheet(theme ? "color: #180D1C;" : "color: #B0C4DE;");
+//    for (int i = 0 ; i < 5; i++) if (serial_port_connected[i]) com_label[i]->setStyleSheet(app_theme ? "color: #180D1C;" : "color: #B0C4DE;");
+    ptr_tcu->set_theme();
+    ptr_lens->set_theme();
+    ptr_laser->set_theme();
+    ptr_ptz->set_theme();
 
     QFont temp_f(consolas);
     temp_f.setPixelSize(11);
@@ -1299,7 +1361,7 @@ void UserPanel::set_theme()
 
     setCursor(cursor_curr_pointer);
 
-    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s/%s);", theme ? "light" : "dark", hide_left ? "right" : "left"));
+    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s/%s);", app_theme ? "light" : "dark", hide_left ? "right" : "left"));
 }
 
 void UserPanel::stop_image_writing()
@@ -1346,7 +1408,7 @@ int UserPanel::shut_down() {
     if (record_original) on_SAVE_AVI_BUTTON_clicked();
     if (record_modified) on_SAVE_FINAL_BUTTON_clicked();
 
-    grab_thread_state = false;
+    grab_image = false;
     if (h_grab_thread) {
         h_grab_thread->quit();
         h_grab_thread->wait();
@@ -1388,6 +1450,7 @@ void UserPanel::enable_controls(bool cam_rdy) {
     ui->BINNING_CHECK->setEnabled(device_on && !start_grabbing);
     ui->SOFTWARE_CHECK->setEnabled(device_on && !start_grabbing && trigger_mode_on);
     ui->SOFTWARE_TRIGGER_BUTTON->setEnabled(start_grabbing && trigger_mode_on && trigger_by_software);
+    ui->IMG_REGION_BTN->setEnabled(device_on);
     ui->IMG_3D_CHECK->setEnabled(start_grabbing);
     ui->IMG_ENHANCE_CHECK->setEnabled(start_grabbing);
     ui->FRAME_AVG_CHECK->setEnabled(start_grabbing);
@@ -1418,10 +1481,10 @@ void UserPanel::save_to_file(bool save_result) {
 //    t_save.detach();
 
 //    if (!tp.append_task(std::bind(UserPanel::save_image_tif, tif_16, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full();
-    if (device_type < 0) {
-        UserPanel::save_image_bmp(temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
-        return;
-    }
+//    if (device_type < 0) {
+//        UserPanel::save_image_bmp(temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
+//        return;
+//    }
     // TODO implement 16bit result image processing/writing
     if (save_result) {
         if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp->clone(), save_location + "/res_bmp/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
@@ -1429,7 +1492,8 @@ void UserPanel::save_to_file(bool save_result) {
         switch (pixel_depth) {
         case  8: if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
         case 10:
-        case 12: if (!tp.append_task(std::bind(UserPanel::save_image_tif, temp->clone() * (1 << 16 - pixel_depth), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
+        case 12:
+        case 16: if (!tp.append_task(std::bind(UserPanel::save_image_tif, temp->clone() * (1 << 16 - pixel_depth), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
         default: break;
         }
     }
@@ -1466,7 +1530,7 @@ void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, 
         (*port)->clear();
         qDebug("COM%s connected\n", qPrintable(port_num));
         serial_port_connected[id] = true;
-        com_label[id]->setStyleSheet(theme ? "color: #180D1C;" : "color: #B0C4DE;");
+        com_label[id]->setStyleSheet(app_theme ? "color: #180D1C;" : "color: #B0C4DE;");
 
         (*port)->setBaudRate(baud_rate);
         (*port)->setDataBits(QSerialPort::Data8);
@@ -1478,7 +1542,7 @@ void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, 
         switch (id) {
         case 0:
 //            convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8);
-            communicate_display(0, convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+            ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
             update_delay();
             update_gate_width();
             change_mcp(5);
@@ -1498,14 +1562,12 @@ void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, 
     }
 
     // TODO: test for user utilities
-    QFile file_user_port("user_serial_port_com");
-    uchar com[5] = {0};
-    if (file_user_port.open(QIODevice::ReadOnly)) memcpy(com, file_user_port.readLine().simplified().data(), 5);
-    com[id] = port_num.toUInt() & 0xFF;
-    file_user_port.close();
-    file_user_port.open(QIODevice::WriteOnly);
-    file_user_port.write(QByteArray((char*)com, 5));
-    file_user_port.close();
+    FILE *f = fopen("user_default", "rb+");
+    if (!f) return;
+    uchar port_num_uchar = port_num.toUInt() & 0xFF;
+    fseek(f, id, SEEK_SET);
+    fwrite(&port_num_uchar, 1, 1, f);
+    fclose(f);
 }
 
 void UserPanel::on_ENUM_BUTTON_clicked()
@@ -1562,16 +1624,16 @@ void UserPanel::on_START_BUTTON_clicked()
     // TODO complete BayerGB process & display
     curr_cam->pixel_type(true, &pixel_format);
     switch (pixel_format) {
-    case PixelType_Gvsp_Mono8:       is_color = false; pixel_depth =  8; break;
-    case PixelType_Gvsp_Mono10:      is_color = false; pixel_depth = 10; break;
-    case PixelType_Gvsp_Mono12:      is_color = false; pixel_depth = 12; break;
-    case PixelType_Gvsp_BayerGB8:    is_color =  true; pixel_depth =  8; break;
-    case PixelType_Gvsp_RGB8_Packed: is_color =  true; pixel_depth =  8; break;
-    default:                         is_color = false; pixel_depth =  8; break;
+    case PixelType_Gvsp_Mono8:       is_color = false; update_pixel_depth( 8); break;
+    case PixelType_Gvsp_Mono10:      is_color = false; update_pixel_depth(10); break;
+    case PixelType_Gvsp_Mono12:      is_color = false; update_pixel_depth(12); break;
+    case PixelType_Gvsp_BayerGB8:    is_color =  true; update_pixel_depth( 8); break;
+    case PixelType_Gvsp_RGB8_Packed: is_color =  true; update_pixel_depth( 8); break;
+    default:                         is_color = false; update_pixel_depth( 8); break;
     }
 
     // adjust display size according to frame size
-    curr_cam->get_frame_size(w, h);
+    curr_cam->frame_size(true, &w, &h);
     qInfo("frame w: %d, h: %d", w, h);
 //    QRect region = ui->SOURCE_DISPLAY->geometry();
 //    region.setHeight(ui->SOURCE_DISPLAY->width() * h / w);
@@ -1644,25 +1706,25 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
 {
     if (!device_on || start_grabbing || curr_cam == NULL) return;
 
-    if (grab_thread_state || h_grab_thread) {
-        grab_thread_state = false;
+    if (grab_image || h_grab_thread) {
+        grab_image = false;
         h_grab_thread->quit();
         h_grab_thread->wait();
         delete h_grab_thread;
         h_grab_thread = NULL;
     }
 
-    grab_thread_state = true;
+    grab_image = true;
     h_grab_thread = new GrabThread((void*)this);
     if (h_grab_thread == NULL) {
-        grab_thread_state = false;
+        grab_image = false;
         QMessageBox::warning(this, "PROMPT", tr("Create thread fail"));
         return;
     }
     h_grab_thread->start();
 
     if (curr_cam->start_grabbing()) {
-        grab_thread_state = false;
+        grab_image = false;
         h_grab_thread->quit();
         h_grab_thread->wait();
         delete h_grab_thread;
@@ -1686,7 +1748,7 @@ void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
 
     if (!img_q.empty()) std::queue<cv::Mat>().swap(img_q);
 
-    grab_thread_state = false;
+    grab_image = false;
     if (h_grab_thread) {
         h_grab_thread->quit();
         h_grab_thread->wait();
@@ -1699,6 +1761,8 @@ void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
     QTimer::singleShot(10, this, SLOT(clean()));
     enable_controls(device_type);
     if (device_type == -1) ui->ENUM_BUTTON->click();
+//    if (device_type == -2) ui->ENUM_BUTTON->click(), video_input->stop(), video_surface->stop();
+    if (device_type == -2) ui->ENUM_BUTTON->click();
 
     curr_cam->stop_grabbing();
 }
@@ -1706,8 +1770,11 @@ void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
 void UserPanel::on_SAVE_BMP_BUTTON_clicked()
 {
     if (!QDir(save_location + "/ori_bmp").exists()) QDir().mkdir(save_location + "/ori_bmp");
-    save_original = !save_original;
-    ui->SAVE_BMP_BUTTON->setText(save_original ? tr("Stop") : tr("ORI"));
+    if (device_type == -1) save_original = 1;
+    else{
+        save_original = !save_original;
+        ui->SAVE_BMP_BUTTON->setText(save_original ? tr("Stop") : tr("ORI"));
+    }
 }
 
 void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
@@ -1742,10 +1809,10 @@ void UserPanel::on_SET_PARAMS_BUTTON_clicked()
     fps = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
 
     // CCD FREQUENCY
-    communicate_display(0, convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
+    ptr_tcu->communicate_display(convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
 
     // DUTY RATIO -> EXPO. TIME
-    communicate_display(0, convert_to_send_tcu(0x07, duty * 1.25e2), 7, 1, false);
+    ptr_tcu->communicate_display(convert_to_send_tcu(0x07, duty * 1.25e2), 7, 1, false);
 
     time_exposure_edit = duty;
     frame_rate_edit = fps;
@@ -1790,7 +1857,7 @@ void UserPanel::clean()
 {
     ui->SOURCE_DISPLAY->clear();
     ui->DATA_EXCHANGE->clear();
-    if (grab_thread_state) return;
+    if (grab_image) return;
     std::queue<cv::Mat>().swap(img_q);
     img_mem.release();
     modified_result.release();
@@ -1847,24 +1914,54 @@ void UserPanel::setup_laser(int laser_on)
     int change = laser_on ^ this->laser_on;
 //    qDebug() << QString::number(laser_on, 2);
 //    qDebug() << QString::number(change, 2);
-    for(int i = 0; i < 4; i++) if ((change >> i) & 1) communicate_display(0, convert_to_send_tcu(0x1A + i, laser_on & (1 << i) ? 8 : 4), 7, 1, false);
+    for(int i = 0; i < 4; i++) if ((change >> i) & 1) ptr_tcu->communicate_display(convert_to_send_tcu(0x1A + i, laser_on & (1 << i) ? 8 : 4), 7, 1, false);
     this->laser_on = laser_on;
 }
 
 void UserPanel::set_baudrate(int idx, int baudrate)
 {
-    if (serial_port[idx]->isOpen()) serial_port[idx]->setBaudRate(baudrate);
+//    if (serial_port[idx]->isOpen()) serial_port[idx]->setBaudRate(baudrate);
+    switch (idx) {
+    case 0: ptr_tcu->set_baudrate(baudrate); break;
+    case 1: break;
+    case 2: ptr_lens->set_baudrate(baudrate); break;
+    case 3: ptr_laser->set_baudrate(baudrate); break;
+    case 4: ptr_ptz->set_baudrate(baudrate); break;
+    default: break;
+    }
+}
+
+void UserPanel::set_tcu_as_shared_port(bool share)
+{
+    ptr_lens->share_port_from(share ? ptr_tcu : NULL);
 }
 
 void UserPanel::com_write_data(int com_idx, QByteArray data)
 {
-    communicate_display(com_idx, data, data.length(), 0, true);
+//    communicate_display(com_idx, data, data.length(), 0, true);
+    ControlPort *temp_port = NULL;
+    switch (com_idx) {
+    case 0: temp_port = ptr_tcu; break;
+    case 1: temp_port = ptr_lens; break;
+//    case 2: temp_port = ptr_laser; break;
+    case 3: temp_port = ptr_ptz; break;
+    default: break;
+    }
+    if (temp_port) temp_port->communicate_display(data, data.length(), 0, true);
 }
 
 void UserPanel::display_baudrate(int idx)
 {
 //    if (serial_port[idx]->isOpen()) ui->TITLE->prog_settings->display_baudrate(idx, serial_port[idx]->baudRate());
-    if (serial_port[idx]->isOpen()) pref->display_baudrate(idx, serial_port[idx]->baudRate());
+//    if (serial_port[idx]->isOpen()) pref->display_baudrate(idx, serial_port[idx]->baudRate());
+    switch (idx) {
+    case 0: pref->display_baudrate(idx,   ptr_tcu->get_baudrate()); break;
+    case 1: pref->display_baudrate(idx, 0); break;
+    case 2: pref->display_baudrate(idx,  ptr_lens->get_baudrate()); break;
+    case 3: pref->display_baudrate(idx, ptr_laser->get_baudrate()); break;
+    case 4: pref->display_baudrate(idx,   ptr_ptz->get_baudrate()); break;
+    default: break;
+    }
 }
 
 void UserPanel::set_dev_ip(int ip, int gateway)
@@ -1874,16 +1971,21 @@ void UserPanel::set_dev_ip(int ip, int gateway)
 
 void UserPanel::change_pixel_format(int pixel_format)
 {
+    bool was_playing = start_grabbing;
+    if (was_playing) ui->STOP_GRABBING_BUTTON->click();
+
     this->pixel_format = pixel_format;
     int ret = curr_cam->pixel_type(false, &pixel_format);
     switch (pixel_format) {
-    case PixelType_Gvsp_Mono8:       is_color = false; pixel_depth =  8; break;
-    case PixelType_Gvsp_Mono10:      is_color = false; pixel_depth = 10; break;
-    case PixelType_Gvsp_Mono12:      is_color = false; pixel_depth = 12; break;
-    case PixelType_Gvsp_BayerGB8:    is_color =  true; pixel_depth =  8; break;
-    case PixelType_Gvsp_RGB8_Packed: is_color =  true; pixel_depth =  8; break;
-    default:                         is_color = false; pixel_depth =  8; break;
+    case PixelType_Gvsp_Mono8:       is_color = false; update_pixel_depth( 8); break;
+    case PixelType_Gvsp_Mono10:      is_color = false; update_pixel_depth(10); break;
+    case PixelType_Gvsp_Mono12:      is_color = false; update_pixel_depth(12); break;
+    case PixelType_Gvsp_BayerGB8:    is_color =  true; update_pixel_depth( 8); break;
+    case PixelType_Gvsp_RGB8_Packed: is_color =  true; update_pixel_depth( 8); break;
+    default:                         is_color = false; update_pixel_depth( 8); break;
     }
+
+    if (was_playing) ui->START_GRABBING_BUTTON->click();
 }
 
 void UserPanel::update_lower_3d_thresh()
@@ -2024,6 +2126,18 @@ void UserPanel::joystick_direction_changed(int direction)
     }
 }
 
+void UserPanel::append_data(QString str)
+{
+    static QScrollBar *scroll_bar = ui->DATA_EXCHANGE->verticalScrollBar();
+    ui->DATA_EXCHANGE->append(str);
+    scroll_bar->setValue(scroll_bar->maximum());
+}
+
+void UserPanel::update_port_status(int connected_status)
+{
+    qDebug() << connected_status;
+}
+
 // FIXME update config i/o
 void UserPanel::export_config()
 {
@@ -2036,7 +2150,7 @@ void UserPanel::export_config()
     if (config.isOpen()) {
         QDataStream out(&config);
         convert_write(out, WIN_PREF);
-        convert_write(out, TCU);
+        convert_write(out, TCU_PARAMS);
         convert_write(out, SCAN);
         convert_write(out, IMG);
         convert_write(out, TCU_PREF);
@@ -2050,8 +2164,8 @@ void UserPanel::export_config()
 void UserPanel::prompt_for_config_file()
 {
 //    QString config_name = QFileDialog::getOpenFileName(this, tr("Load Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation), tr("*.ssy"));
-    QString config_name = QFileDialog::getOpenFileName(this, tr("Load Configuration"), save_location, tr("YJS config(*.ssy);;All Files()"));
-    load_config(config_name);
+    QString config_filename = QFileDialog::getOpenFileName(this, tr("Load Configuration"), save_location, tr("YJS config(*.ssy);;All Files()"));
+    load_config(config_filename);
 }
 
 void UserPanel::load_config(QString config_name)
@@ -2063,7 +2177,7 @@ void UserPanel::load_config(QString config_name)
     if (config.isOpen()) {
         QDataStream out(&config);
         read_success &= convert_read(out, WIN_PREF);
-        read_success &= convert_read(out, TCU);
+        read_success &= convert_read(out, TCU_PARAMS);
         read_success &= convert_read(out, SCAN);
         read_success &= convert_read(out, IMG);
         read_success &= convert_read(out, TCU_PREF);
@@ -2076,7 +2190,7 @@ void UserPanel::load_config(QString config_name)
 //        data_exchange(false);
         update_delay();
         update_gate_width();
-        communicate_display(0, convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+        ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
         ui->MCP_SLIDER->setValue(mcp);
         on_SET_PARAMS_BUTTON_clicked();
 //        ui->TITLE->prog_settings->data_exchange(false);
@@ -2092,8 +2206,30 @@ void UserPanel::load_config(QString config_name)
 
 void UserPanel::prompt_for_serial_file()
 {
-    QString config_name = QFileDialog::getOpenFileName(this, tr("Load SN Config"), save_location, tr("(*.csv);;All Files()"));
-    config_gatewidth(config_name);
+    QString serial_filename = QFileDialog::getOpenFileName(this, tr("Load SN Config"), save_location, tr("(*.csv);;All Files()"));
+    config_gatewidth(serial_filename);
+}
+
+void UserPanel::prompt_for_input_file()
+{
+    QDialog input_file_dialog(this, Qt::FramelessWindowHint);
+    QFormLayout form(&input_file_dialog);
+    form.setRowWrapPolicy(QFormLayout::WrapAllRows);
+
+    QLineEdit *file_path = new QLineEdit("rtsp://192.168.2.100/mainstream", &input_file_dialog);
+    form.addRow(new QLabel("video URL :  ", &input_file_dialog), file_path);
+
+    QDialogButtonBox button_box(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, Qt::Horizontal, &input_file_dialog);
+    form.addRow(&button_box);
+    QObject::connect(&button_box, SIGNAL(accepted()), &input_file_dialog, SLOT(accept()));
+    QObject::connect(&button_box, SIGNAL(rejected()), &input_file_dialog, SLOT(reject()));
+
+    input_file_dialog.setModal(true);
+    button_box.button(QDialogButtonBox::Ok)->setFocus();
+    button_box.button(QDialogButtonBox::Ok)->setDefault(true);
+
+    // Process when OK button is clicked
+    if (input_file_dialog.exec() == QDialog::Accepted) load_video_file(file_path->text(), true);
 }
 
 // convert data to be sent to TCU-COM to hex buffer
@@ -2198,7 +2334,7 @@ void UserPanel::update_delay()
 //            if (rep_freq < 10) rep_freq = 10;
         }
 
-        communicate_display(0, convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
+        ptr_tcu->communicate_display(convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
     }
 
 /*
@@ -2213,10 +2349,10 @@ void UserPanel::update_delay()
     communicate_display(com[0], 1, 7);
 */
     // DELAY A
-    communicate_display(0, convert_to_send_tcu(0x02, (delay_a_u * 1000 + delay_a_n) + offset_delay), 7, 1, false);
+    ptr_tcu->communicate_display(convert_to_send_tcu(0x02, (delay_a_u * 1000 + delay_a_n) + offset_delay), 7, 1, false);
 
     // DELAY B
-    communicate_display(0, convert_to_send_tcu(0x04, (delay_b_u * 1000 + delay_b_n) + offset_delay), 7, 1, false);
+    ptr_tcu->communicate_display(convert_to_send_tcu(0x04, (delay_b_u * 1000 + delay_b_n) + offset_delay), 7, 1, false);
 
     setup_hz(hz_unit);
     ui->DELAY_A_EDIT_U->setText(QString::asprintf("%d", delay_a_u));
@@ -2244,11 +2380,11 @@ void UserPanel::update_gate_width() {
         return;
     }
     // GATE WIDTH A
-    communicate_display(0, convert_to_send_tcu(0x03, gw_corrected), 7, 1, false);
+    ptr_tcu->communicate_display(convert_to_send_tcu(0x03, gw_corrected), 7, 1, false);
 
     // GATE WIDTH B
 //    send = gw - 18;
-    communicate_display(0, convert_to_send_tcu(0x05, gw_corrected), 7, 1, false);
+    ptr_tcu->communicate_display(convert_to_send_tcu(0x05, gw_corrected), 7, 1, false);
 
     ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view));
 //    gate_width_a_n = gate_width_b_n = laser_width_n = gw % 1000;
@@ -2272,12 +2408,13 @@ void UserPanel::filter_scan()
 
 void UserPanel::update_current()
 {
-    if (!serial_port[3]) return;
+//    if (!serial_port[3]) return;
 //    QString send = "DIOD1:CURR " + ui->CURRENT_EDIT->text() + "\r";
     QString send = "PCUR " + ui->CURRENT_EDIT->text() + "\r";
-    serial_port[3]->write(send.toLatin1().data(), send.length());
-    serial_port[3]->waitForBytesWritten(100);
-    serial_port[3]->readAll();
+//    serial_port[3]->write(send.toLatin1().data(), send.length());
+//    serial_port[3]->waitForBytesWritten(100);
+//    serial_port[3]->readAll();
+    ptr_laser->communicate_display(send.toLatin1(), send.length(), 0, true, false);
     qDebug() << send;
 }
 
@@ -2293,7 +2430,7 @@ void UserPanel::convert_write(QDataStream &out, const int TYPE)
 //        out << com_edit[0]->text().toInt() << com_edit[1]->text().toInt() << com_edit[2]->text().toInt() << com_edit[3]->text().toInt() << save_location.toUtf8().constData();
         out << save_location.toUtf8().constData();
     }
-    case TCU:
+    case TCU_PARAMS:
     {
         out << "TCU" << uchar('.');
         out << fps << duty << rep_freq << laser_width << mcp << delay_dist << delay_n_n << depth_of_view << stepping;
@@ -2344,7 +2481,7 @@ bool UserPanel::convert_read(QDataStream &out, const int TYPE)
 //        }
         out >> temp_str; save_location = QString::fromUtf8(temp_str);
     }
-    case TCU:
+    case TCU_PARAMS:
     {
         out >> temp_str; if (std::strcmp(temp_str, "TCU")) return false;
         out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
@@ -2467,7 +2604,7 @@ void UserPanel::on_DIST_BTN_clicked() {
     else if (distance < 6000) depth_of_view = 2000 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
     else                      depth_of_view = 3500 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
 
-    communicate_display(0, convert_to_send_tcu(0x1E, distance), 7, 1, true);
+    ptr_tcu->communicate_display(convert_to_send_tcu(0x1E, distance), 7, 1, true);
     ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - pref->delay_dist_offset));
 
     setup_hz(hz_unit);
@@ -2505,14 +2642,16 @@ void UserPanel::on_ZOOM_IN_BTN_pressed()
 {
     ui->ZOOM_IN_BTN->setText("x");
 
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
+    ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), 7, 1, false);
 }
 
 void UserPanel::on_ZOOM_OUT_BTN_pressed()
 {
     ui->ZOOM_OUT_BTN->setText("x");
 
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
+    ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), 7, 1, false);
 }
 
 void UserPanel::on_FOCUS_NEAR_BTN_pressed()
@@ -2523,15 +2662,22 @@ void UserPanel::on_FOCUS_NEAR_BTN_pressed()
 
 inline void UserPanel::focus_near()
 {
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
+    ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
 }
 
 inline void UserPanel::set_laser_preset_target(int *pos)
 {
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x81, uchar((pos[0] >> 8) & 0xFF), uchar(pos[0] & 0xFF), uchar((((pos[0] >> 8) & 0xFF) + (pos[0] & 0xFF) + 0x82) & 0xFF)}, 7), 7, 1, false);
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4F, uchar((pos[1] >> 8) & 0xFF), uchar(pos[1] & 0xFF), uchar((((pos[1] >> 8) & 0xFF) + (pos[1] & 0xFF) + 0x51) & 0xFF)}, 7), 7, 1, false);
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4E, uchar((pos[2] >> 8) & 0xFF), uchar(pos[2] & 0xFF), uchar((((pos[2] >> 8) & 0xFF) + (pos[2] & 0xFF) + 0x50) & 0xFF)}, 7), 7, 1, false);
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x81, uchar((pos[3] >> 8) & 0xFF), uchar(pos[3] & 0xFF), uchar((((pos[3] >> 8) & 0xFF) + (pos[3] & 0xFF) + 0x83) & 0xFF)}, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x81, uchar((pos[0] >> 8) & 0xFF), uchar(pos[0] & 0xFF), uchar((((pos[0] >> 8) & 0xFF) + (pos[0] & 0xFF) + 0x82) & 0xFF)}, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4F, uchar((pos[1] >> 8) & 0xFF), uchar(pos[1] & 0xFF), uchar((((pos[1] >> 8) & 0xFF) + (pos[1] & 0xFF) + 0x51) & 0xFF)}, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4E, uchar((pos[2] >> 8) & 0xFF), uchar(pos[2] & 0xFF), uchar((((pos[2] >> 8) & 0xFF) + (pos[2] & 0xFF) + 0x50) & 0xFF)}, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x81, uchar((pos[3] >> 8) & 0xFF), uchar(pos[3] & 0xFF), uchar((((pos[3] >> 8) & 0xFF) + (pos[3] & 0xFF) + 0x83) & 0xFF)}, 7), 7, 1, false);
+
+    ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x81, uchar((pos[0] >> 8) & 0xFF), uchar(pos[0] & 0xFF), uchar((((pos[0] >> 8) & 0xFF) + (pos[0] & 0xFF) + 0x82) & 0xFF)}, 7), 7, 1, false);
+    ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4F, uchar((pos[1] >> 8) & 0xFF), uchar(pos[1] & 0xFF), uchar((((pos[1] >> 8) & 0xFF) + (pos[1] & 0xFF) + 0x51) & 0xFF)}, 7), 7, 1, false);
+    ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x4E, uchar((pos[2] >> 8) & 0xFF), uchar(pos[2] & 0xFF), uchar((((pos[2] >> 8) & 0xFF) + (pos[2] & 0xFF) + 0x50) & 0xFF)}, 7), 7, 1, false);
+    ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x81, uchar((pos[3] >> 8) & 0xFF), uchar(pos[3] & 0xFF), uchar((((pos[3] >> 8) & 0xFF) + (pos[3] & 0xFF) + 0x83) & 0xFF)}, 7), 7, 1, false);
+
     delete[] pos;
 }
 
@@ -2603,12 +2749,15 @@ void UserPanel::on_FOCUS_FAR_BTN_pressed()
 
 inline void UserPanel::focus_far()
 {
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), 7, 1, false);
+    ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), 7, 1, false);
 }
 
 inline void UserPanel::lens_stop() {
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
+//    if (multi_laser_lenses) (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
+    ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
+    if (multi_laser_lenses) ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x02}, 7), 7, 1, false);
 }
 
 void UserPanel::set_zoom()
@@ -2627,7 +2776,8 @@ void UserPanel::set_zoom()
         sum += out[i];
     out[6] = sum & 0xFF;
 
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, QByteArray((char*)out, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(QByteArray((char*)out, 7), 7, 1, false);
+    ptr_lens->communicate_display(QByteArray((char*)out, 7), 7, 1, false);
 }
 
 void UserPanel::set_focus()
@@ -2646,13 +2796,14 @@ void UserPanel::set_focus()
         sum += out[i];
     out[6] = sum & 0xFF;
 
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, QByteArray((char*)out, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(QByteArray((char*)out, 7), 7, 1, false);
+    ptr_lens->communicate_display(QByteArray((char*)out, 7), 7, 1, false);
 }
 
 
 void UserPanel::start_laser()
 {
-    communicate_display(0, generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
+    ptr_tcu->communicate_display(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
     QTimer::singleShot(100000, this, SLOT(init_laser()));
 }
 
@@ -2661,29 +2812,32 @@ void UserPanel::init_laser()
     ui->LASER_BTN->setEnabled(true);
     ui->LASER_BTN->setText(tr("OFF"));
     ui->CURRENT_EDIT->setEnabled(true);
-    if (serial_port[3]) serial_port[3]->close();
-    setup_serial_port(serial_port + 3, 3, com_edit[3]->text(), 9600);
-    if (!serial_port[3]) return;
+//    if (serial_port[3]) serial_port[3]->close();
+//    setup_serial_port(serial_port + 3, 3, com_edit[3]->text(), 9600);
+//    if (!serial_port[3]) return;
 
     // enable laser com
-    serial_port[3]->write("MODE:RMT 1\r", 11);
-    serial_port[3]->waitForBytesWritten(100);
-    QThread::msleep(100);
-    serial_port[3]->readAll();
+//    serial_port[3]->write("MODE:RMT 1\r", 11);
+//    serial_port[3]->waitForBytesWritten(100);
+//    QThread::msleep(100);
+//    serial_port[3]->readAll();
+    ptr_laser->communicate_display(QByteArray("MODE:RMT 1\r"), 11, 0, true, false);
     qDebug() << QString("MODE:RMT 1\r");
 
     // start
-    serial_port[3]->write("ON\r", 3);
-    serial_port[3]->waitForBytesWritten(100);
-    QThread::msleep(100);
-    serial_port[3]->readAll();
+//    serial_port[3]->write("ON\r", 3);
+//    serial_port[3]->waitForBytesWritten(100);
+//    QThread::msleep(100);
+//    serial_port[3]->readAll();
+    ptr_laser->communicate_display(QByteArray("ON\r"), 3, 0, true, false);
     qDebug() << QString("ON\r");
 
     // enable external trigger
-    serial_port[3]->write("QSW:PRF 0\r", 10);
-    serial_port[3]->waitForBytesWritten(100);
-    QThread::msleep(100);
-    serial_port[3]->readAll();
+//    serial_port[3]->write("QSW:PRF 0\r", 10);
+//    serial_port[3]->waitForBytesWritten(100);
+//    QThread::msleep(100);
+//    serial_port[3]->readAll();
+    ptr_laser->communicate_display(QByteArray("QSW:PRF 0\r"), 10, 0, true, false);
     qDebug() << QString("QSW:PRF 0\r");
 
     update_current();
@@ -2705,7 +2859,7 @@ void UserPanel::change_mcp(int val)
 //    convert_to_send_tcu(0x0A, mcp);
 //    static QElapsedTimer t;
 //    if (!h_grab_thread || t.elapsed() > (fps > 9 ? 900 / fps : 100)) communicate_display(0, convert_to_send_tcu(0x0A, mcp), 7, 1, false), t.start();
-    communicate_display(0, convert_to_send_tcu(0x0A, mcp), 7, 1, false);
+    ptr_tcu->communicate_display(convert_to_send_tcu(0x0A, mcp), 7, 1, false);
 }
 
 void UserPanel::change_gain(int val)
@@ -2747,7 +2901,7 @@ void UserPanel::change_focus_speed(int val)
     t.restart();
 #endif
 
-    int temp_serial_port_id = pref->share_port && serial_port[0]->isOpen() ? 0 : 2;
+//    int temp_serial_port_id = pref->share_port && serial_port[0]->isOpen() ? 0 : 2;
 
     uchar out_data[9] = {0};
     out_data[0] = 0xB0;
@@ -2760,7 +2914,8 @@ void UserPanel::change_focus_speed(int val)
     out_data[7] = val;
 
     out_data[8] = (4 * (uint)val + 0xA2) & 0xFF;
-    communicate_display(temp_serial_port_id, QByteArray((char*)out_data, 9), 9, 0, false);
+//    communicate_display(temp_serial_port_id, QByteArray((char*)out_data, 9), 9, 0, false);
+    ptr_lens->communicate_display(QByteArray((char*)out_data, 9), 9, 0, false);
 
     out_data[0] = 0xB0;
     out_data[1] = 0x02;
@@ -2772,7 +2927,8 @@ void UserPanel::change_focus_speed(int val)
     out_data[7] = val;
 
     out_data[8] = (4 * (uint)val + 0xA3) & 0xFF;
-    if (multi_laser_lenses) communicate_display(temp_serial_port_id, QByteArray((char*)out_data, 9), 9, 0, false);
+//    if (multi_laser_lenses) communicate_display(temp_serial_port_id, QByteArray((char*)out_data, 9), 9, 0, false);
+    if (multi_laser_lenses) ptr_lens->communicate_display(QByteArray((char*)out_data, 9), 9, 0, false);
 }
 
 void UserPanel::on_ZOOM_IN_BTN_released()
@@ -2822,7 +2978,7 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             for (int i = 0; i < 5; i++) {
                 if (edit == com_edit[i]) {
                     if (serial_port[i]) serial_port[i]->close();
-                    setup_serial_port(serial_port + i, i, edit->text(), 9600);
+//                    setup_serial_port(serial_port + i, i, edit->text(), 9600);
                 }
             }
             if (edit == ui->FREQ_EDIT) {
@@ -2833,7 +2989,7 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
                 case 1: rep_freq = ui->FREQ_EDIT->text().toFloat() / 1000; break;
                 default: break;
                 }
-                communicate_display(0, convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
+                ptr_tcu->communicate_display(convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
             }
             else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
                 depth_of_view = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt()) * dist_ns;
@@ -2841,7 +2997,7 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             }
             else if (edit == ui->LASER_WIDTH_EDIT_U) {
                 laser_width = edit->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt();
-                communicate_display(0, convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+                ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
             }
             else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
                 if (edit->text().toInt() > 999) depth_of_view = edit->text().toInt() * dist_ns;
@@ -2858,7 +3014,7 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
                     laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000;
                     ui->LASER_WIDTH_EDIT_N->setText(QString::number(laser_width % 1000));
                 }
-                communicate_display(0, convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+                ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
             }
             else if (edit == ui->DELAY_A_EDIT_U) {
                 delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt()) * dist_ns;
@@ -3036,6 +3192,7 @@ void UserPanel::resizeEvent(QResizeEvent *event)
         region.setRect(10, 40, width, height);
     }
     ui->TITLE->resize(this->width(), 30);
+    ui->STATUS->setGeometry(0, this->height() - 32, this->width(), 32);
     ui->ZOOM_TOOL->move(region.x(), 15);
     ui->SELECT_TOOL->move(region.x() + 25, 15);
     ui->PTZ_TOOL->move(region.x() + 50, 15);
@@ -3202,9 +3359,24 @@ void UserPanel::dropEvent(QDropEvent *event)
 {
     QMainWindow::dropEvent(event);
 
+    static QMimeDatabase mime_db;
+
     if (event->mimeData()->urls().length() == 1) {
         QString file_name = event->mimeData()->urls().first().toLocalFile();
+        QFileInfo file_info = QFileInfo(file_name);
+        if (file_info.exists() && file_info.size() > 2e9) {
+            QMessageBox::warning(this, "PROMPT", tr("File size limit (2 Gb) exceeded"));
+            return;
+        }
+        // TODO: check file type before reading/processing file
+//        QMimeType file_type = mime_db.mimeTypeForFile(file_name);
+        if (mime_db.mimeTypeForFile(file_name).name().startsWith("video")) {
+            load_video_file(file_name);
+            return;
+        }
+
         if (!load_image_file(file_name, true)) load_config(file_name);
+
     }
     else {
         bool result = true, init = true;
@@ -3219,6 +3391,9 @@ void UserPanel::dropEvent(QDropEvent *event)
 
 bool UserPanel::load_image_file(QString filename, bool init)
 {
+    grab_image = false;
+    display_mutex.lock();
+
     QImage qimage_temp;
     cv::Mat mat_temp;
     bool tiff = false;
@@ -3246,38 +3421,214 @@ bool UserPanel::load_image_file(QString filename, bool init)
     if (tiff) img_q.push(mat_temp.clone());
     else      img_q.push(cv::Mat(h, w, is_color ? CV_8UC3 : CV_8UC1, (uchar*)qimage_temp.bits(), qimage_temp.bytesPerLine()).clone());
 
+    display_mutex.unlock();
     return true;
 }
 
-void UserPanel::start_static_display(int width, int height, bool is_color, int pixel_depth)
+void init_filter_graph(AVFormatContext *format_context, int video_stream_idx, AVFilterGraph *filter_graph, AVCodecContext *codec_context,
+                       AVFilterContext **buffersink_ctx, AVFilterContext **buffersrc_ctx) {
+    char args[512];
+    const AVFilter *buffersrc  = avfilter_get_by_name("buffer");
+    const AVFilter *buffersink = avfilter_get_by_name("buffersink");
+    static AVFilterInOut *outputs = avfilter_inout_alloc();
+    static AVFilterInOut *inputs  = avfilter_inout_alloc();
+    std::shared_ptr<AVFilterInOut*> deleter_input_filter(&inputs, avfilter_inout_free);
+    std::shared_ptr<AVFilterInOut*> deleter_output_filter(&outputs, avfilter_inout_free);
+
+    AVRational time_base = format_context->streams[video_stream_idx]->time_base;
+    enum AVPixelFormat pix_fmts[] = { AV_PIX_FMT_GRAY8, AV_PIX_FMT_NONE };
+
+    if (!outputs || !inputs || !filter_graph) return;
+
+    /* buffer video source: the decoded frames from the decoder will be inserted here. */
+    snprintf(args, sizeof(args), "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
+             codec_context->width, codec_context->height, codec_context->pix_fmt, time_base.num, time_base.den,
+             codec_context->sample_aspect_ratio.num, codec_context->sample_aspect_ratio.den);
+    qDebug() << args;
+
+    if (avfilter_graph_create_filter(buffersrc_ctx, buffersrc, "in", args, NULL, filter_graph) < 0) return;
+
+    /* buffer video sink: to terminate the filter chain. */
+    if (avfilter_graph_create_filter(buffersink_ctx, buffersink, "out", NULL, NULL, filter_graph) < 0) return;
+
+    if (av_opt_set_int_list(*buffersink_ctx, "pix_fmts", pix_fmts, AV_PIX_FMT_NONE, AV_OPT_SEARCH_CHILDREN) < 0) return;
+
+    outputs->name       = av_strdup("in");
+    outputs->filter_ctx = *buffersrc_ctx;
+    outputs->pad_idx    = 0;
+    outputs->next       = NULL;
+
+    inputs->name       = av_strdup("out");
+    inputs->filter_ctx = *buffersink_ctx;
+    inputs->pad_idx    = 0;
+    inputs->next       = NULL;
+
+    if (avfilter_graph_parse_ptr(filter_graph, "format=gray", &inputs, &outputs, NULL) < 0) return;
+
+    if (avfilter_graph_config(filter_graph, NULL) < 0) return;
+}
+
+int UserPanel::load_video_file(QString filename, bool format_gray)
 {
-    if (grab_thread_state || h_grab_thread) {
-        grab_thread_state = false;
+//    video_input->setMedia(QUrl(filename));
+//    video_input->setMuted(true);
+//    video_input->play();
+//    video_surface->frame_count = 0;
+    std::thread t([this, filename, format_gray](){
+        grab_image = false;
+        display_mutex.lock();
+
+        AVFormatContext *format_context = avformat_alloc_context();
+        // open input video
+        if (avformat_open_input(&format_context, filename.toUtf8().constData(), NULL, NULL) != 0) { display_mutex.unlock(); return -1; }
+
+        // fetch video info
+        if (avformat_find_stream_info(format_context, NULL) < 0) { display_mutex.unlock(); return -1; }
+//        std::shared_ptr<AVFormatContext*> closer_format_context(&format_context, avformat_close_input);
+
+        // find the first video stream
+        int video_stream_idx = -1;
+        for (int i = 0; i < format_context->nb_streams; i++) {
+            if (format_context->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+                video_stream_idx = i;
+                break;
+            }
+        }
+        if (video_stream_idx == -1) { display_mutex.unlock(); return -1; }
+
+        // point the codec parameter to the first stream's
+        static AVCodecParameters *codec_param;
+        codec_param = format_context->streams[video_stream_idx]->codecpar;
+
+        const AVCodec *codec = avcodec_find_decoder(codec_param->codec_id);
+        if (codec == NULL) { display_mutex.unlock(); return -2; }
+
+        AVCodecContext *codec_context = avcodec_alloc_context3(NULL);
+        if (avcodec_parameters_to_context(codec_context, codec_param) < 0) { display_mutex.unlock(); return -2; }
+        // close the decoder when the program exits
+//        std::shared_ptr<AVCodecContext> closer_codec_context(codec_context, avcodec_close);
+
+        if (avcodec_open2(codec_context, codec, NULL) < 0) { display_mutex.unlock(); return -2; }
+
+        // create frame
+        AVFrame *frame = av_frame_alloc();
+//        std::shared_ptr<AVFrame*> deleter_frame(&frame, av_frame_free);
+        AVFrame *frame_result = av_frame_alloc();
+//        std::shared_ptr<AVFrame*> deleter_frame_result(&frame_result, av_frame_free);
+        AVFrame *frame_filter = av_frame_alloc();
+        cv::Mat cv_frame(codec_context->height, codec_context->width, CV_MAKETYPE(CV_8U, format_gray ? 1 : 3));
+
+        // allocate data buffer
+        AVPixelFormat pixel_fmt = format_gray ? AV_PIX_FMT_NV12 : AV_PIX_FMT_RGB24;
+        int byte_num = av_image_get_buffer_size(pixel_fmt, codec_context->width, codec_context->height, 1);
+        uint8_t *buffer = (uint8_t *)av_malloc(byte_num * sizeof(uint8_t));
+//        std::shared_ptr<uint8_t> deleter_buffer(buffer, av_free);
+
+        av_image_fill_arrays(frame_result->data, frame_result->linesize, buffer, pixel_fmt, codec_context->width, codec_context->height, 1);
+
+        SwsContext *sws_context = sws_getContext(codec_context->width, codec_context->height, codec_context->pix_fmt,
+                                     codec_context->width, codec_context->height, pixel_fmt, SWS_BILINEAR, NULL, NULL, NULL);
+//        std::shared_ptr<SwsContext> deleter_sws_context(sws_context, sws_freeContext);
+
+        start_static_display(codec_context->width, codec_context->height, !format_gray, 8, -2);
+
+        AVPacket packet;
+        static AVFilterContext *buffersink_ctx = NULL;
+        static AVFilterContext *buffersrc_ctx = NULL;
+        AVFilterGraph *filter_graph = avfilter_graph_alloc();
+        if (format_gray) init_filter_graph(format_context, video_stream_idx, filter_graph, codec_context, &buffersink_ctx, &buffersrc_ctx);
+
+        AVRational time_base = format_context->streams[video_stream_idx]->time_base;
+        AVRational time_base_q = { 1, AV_TIME_BASE };
+        long long last_pts = AV_NOPTS_VALUE;
+        long long delay;
+        while (grab_image && av_read_frame(format_context, &packet) >= 0) {
+            // release packet allocated by av_read_frame after iteration
+            std::shared_ptr<AVPacket> deleter_packet(&packet, av_packet_unref);
+
+            // if the packet contains data of video stream
+            if (packet.stream_index == video_stream_idx) {
+                // decode packet
+                avcodec_send_packet(codec_context, &packet);
+                // returns 0 only after decoding the entire frame
+                if (avcodec_receive_frame(codec_context, frame) == 0) {
+                    if (format_gray) {
+                        // push the decoded frame into the filtergraph
+                        if (av_buffersrc_add_frame_flags(buffersrc_ctx, frame, AV_BUFFERSRC_FLAG_KEEP_REF) < 0) break;
+
+                        // pull filtered frames from the filtergraph
+                        int ret = av_buffersink_get_frame(buffersink_ctx, frame_filter);
+                        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
+                    }
+                    else {
+                        if (frame->pts != AV_NOPTS_VALUE) {
+                            if (last_pts != AV_NOPTS_VALUE) {
+                                delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q);
+                                if (delay > 0 && delay < 1000000) av_usleep(delay);
+                            }
+                            last_pts = frame->pts;
+                        }
+                        sws_scale(sws_context, frame->data, frame->linesize, 0, codec_context->height, frame_result->data, frame_result->linesize);
+                    }
+
+                    cv_frame.data = (format_gray ? frame_filter : frame_result)->data[0];
+                    img_q.push(cv_frame.clone());
+                }
+            }
+        }
+        avfilter_graph_free(&filter_graph);
+        sws_freeContext(sws_context);
+        av_free(&buffer);
+        av_frame_free(&frame_filter);
+        av_frame_free(&frame_result);
+        av_frame_free(&frame);
+        avcodec_free_context(&codec_context);
+        avformat_close_input(&format_context);
+
+        display_mutex.unlock();
+        return 0;
+    });
+    t.detach();
+
+    return 0;
+}
+
+void UserPanel::update_pixel_depth(int depth)
+{
+    this->pixel_depth = depth;
+    status_bar->img_pixel_depth->set_text(QString::number(depth) + "-bit");
+}
+
+void UserPanel::start_static_display(int width, int height, bool is_color, int pixel_depth, int device_type)
+{
+    if (grab_image || h_grab_thread) {
+        grab_image = false;
         if (h_grab_thread) {
             h_grab_thread->quit();
             h_grab_thread->wait();
             delete h_grab_thread;
             h_grab_thread = NULL;
         }
-        clean();
     }
+    while (grab_thread_state) ;
+    std::queue<cv::Mat>().swap(img_q);
 
     image_mutex.lock();
     w = width;
     h = height;
     this->is_color = is_color;
 //    pixel_depth = img.depth();
-    this->pixel_depth = pixel_depth;
-    device_type = -1;
+    update_pixel_depth(pixel_depth);
+    this->device_type = device_type;
     image_mutex.unlock();
 
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
 
-    grab_thread_state = true;
+    grab_image = true;
     h_grab_thread = new GrabThread((void*)this);
     if (h_grab_thread == NULL) {
-        grab_thread_state = false;
+        grab_image = false;
         QMessageBox::warning(this, "PROMPT", tr("Cannot display image"));
         return;
     }
@@ -3385,7 +3736,7 @@ void UserPanel::on_CONTINUE_SCAN_BUTTON_clicked()
     emit update_scan(true);
 
     update_delay();
-    communicate_display(0, convert_to_send_tcu(0x00, (uint)(1.25e5 / rep_freq)), 7, 1, false);
+    ptr_tcu->communicate_display(convert_to_send_tcu(0x00, (uint)(1.25e5 / rep_freq)), 7, 1, false);
 }
 
 void UserPanel::on_RESTART_SCAN_BUTTON_clicked()
@@ -3450,20 +3801,32 @@ void UserPanel::on_IRIS_OPEN_BTN_pressed()
 {
     ui->IRIS_OPEN_BTN->setText("x");
 
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x20, 0x00, 0x00, 0x22}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x01, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x02, 0x00, 0x00, 0x00, 0x04}, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+//    if (multi_laser_lenses) (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x20, 0x00, 0x00, 0x22}, 7), 7, 1, false);
+//    if (multi_laser_lenses) (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x01, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+//    if (multi_laser_lenses) (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x02, 0x00, 0x00, 0x00, 0x04}, 7), 7, 1, false);
+
+    ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+    if (multi_laser_lenses) ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x20, 0x00, 0x00, 0x22}, 7), 7, 1, false);
+    if (multi_laser_lenses) ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x01, 0x00, 0x00, 0x00, 0x03}, 7), 7, 1, false);
+    if (multi_laser_lenses) ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x02, 0x00, 0x00, 0x00, 0x04}, 7), 7, 1, false);
+
 }
 
 void UserPanel::on_IRIS_CLOSE_BTN_pressed()
 {
     ui->IRIS_CLOSE_BTN->setText("x");
 
-    communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x40, 0x00, 0x00, 0x42}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x80, 0x00, 0x00, 0x82}, 7), 7, 1, false);
-    if (multi_laser_lenses) communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x02, 0x04, 0x00, 0x00, 0x00, 0x06}, 7), 7, 1, false);
+//    (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
+//    if (multi_laser_lenses) (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x40, 0x00, 0x00, 0x42}, 7), 7, 1, false);
+//    if (multi_laser_lenses) (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x80, 0x00, 0x00, 0x82}, 7), 7, 1, false);
+//    if (multi_laser_lenses) (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x04, 0x00, 0x00, 0x00, 0x06}, 7), 7, 1, false);
+
+    ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), 7, 1, false);
+    if (multi_laser_lenses) ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x40, 0x00, 0x00, 0x42}, 7), 7, 1, false);
+    if (multi_laser_lenses) ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x00, 0x80, 0x00, 0x00, 0x82}, 7), 7, 1, false);
+    if (multi_laser_lenses) ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x02, 0x04, 0x00, 0x00, 0x00, 0x06}, 7), 7, 1, false);
+
 }
 
 void UserPanel::on_IRIS_OPEN_BTN_released()
@@ -3489,17 +3852,18 @@ void UserPanel::on_LASER_BTN_clicked()
 #ifdef LVTONG
     if (ui->LASER_BTN->text() == "ON") {
         ui->LASER_BTN->setEnabled(false);
-        communicate_display(0, generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
+        ptr_tcu->communicate_display(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
         QTimer::singleShot(4000, this, SLOT(start_laser()));
     }
     else {
-        if (serial_port[3] && serial_port[3]->isOpen()) {
-            serial_port[3]->write("OFF\r", 10);
-            serial_port[3]->waitForBytesWritten(100);
-            QThread::msleep(100);
-            serial_port[3]->readAll();
-        }
-        communicate_display(0, generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 7, 0, false);
+//        if (serial_port[3] && serial_port[3]->isOpen()) {
+//            serial_port[3]->write("OFF\r", 4);
+//            serial_port[3]->waitForBytesWritten(100);
+//            QThread::msleep(100);
+//            serial_port[3]->readAll();
+//        }
+        ptr_laser->communicate_display(QByteArray("OFF\r"), 4, 0, true, false);
+        ptr_tcu->communicate_display(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 7, 0, false);
 
         ui->LASER_BTN->setText(tr("ON"));
         ui->CURRENT_EDIT->setEnabled(false);
@@ -3514,10 +3878,12 @@ void UserPanel::on_LASER_BTN_clicked()
 
 void UserPanel::on_GET_LENS_PARAM_BTN_clicked()
 {
-    QByteArray read = communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
+//    QByteArray read = (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
+    QByteArray read = ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), 7, 7, true);
     zoom = ((read[4] & 0xFF) << 8) + read[5] & 0xFF;
 
-    read = communicate_display(pref->share_port && serial_port[0]->isOpen() ? 0 : 2, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
+//    read = (pref->share_port && serial_port[0]->isOpen() ? (ControlPort*) ptr_tcu : ptr_lens)->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
+    read = ptr_lens->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), 7, 7, true);
     focus = ((read[4] & 0xFF) << 8) + read[5] & 0xFF;
 
     ui->ZOOM_EDIT->setText(QString::asprintf("%d", zoom));
@@ -3535,7 +3901,7 @@ void UserPanel::on_HIDE_BTN_clicked()
     hide_left ^= 1;
     ui->LEFT->setGeometry(10, 40, hide_left ? 0 : 210, 631);
 //    ui->HIDE_BTN->setText(hide_left ? ">" : "<");
-    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s/%s);", theme ? "light" : "dark", hide_left ? "right" : "left"));
+    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s/%s);", app_theme ? "light" : "dark", hide_left ? "right" : "left"));
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
 }
@@ -3606,7 +3972,7 @@ void UserPanel::on_BINNING_CHECK_stateChanged(int arg1)
 {
     int binning = arg1 ? 2 : 1;
     curr_cam->binning(false, &binning);
-    curr_cam->get_frame_size(w, h);
+    curr_cam->frame_size(true, &w, &h);
     qInfo("frame w: %d, h: %d", w, h);
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
@@ -3676,7 +4042,7 @@ void UserPanel::send_ctrl_cmd(uchar dir)
     for (int i = 1; i < 6; i++) sum += buffer_out[i];
     buffer_out[6] = sum & 0xFF;
 
-    communicate_display(4, QByteArray((char*)buffer_out, 7), 7, 1, false);
+    ptr_ptz->communicate_display(QByteArray((char*)buffer_out, 7), 7, 1, false);
 }
 
 void UserPanel::ptz_button_pressed(int id) {
@@ -3698,7 +4064,7 @@ void UserPanel::ptz_button_pressed(int id) {
 void UserPanel::ptz_button_released(int id) {
 //    qDebug("%dr", id);
     if (id == 4) return;
-    communicate_display(4, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
+    ptr_ptz->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 }
 
 void UserPanel::on_PTZ_SPEED_SLIDER_valueChanged(int value)
@@ -3726,7 +4092,7 @@ void UserPanel::on_GET_ANGLE_BTN_clicked()
     buffer_out[4] = 0x00;
     buffer_out[5] = 0x00;
     buffer_out[6] = 0x52;
-    QByteArray read = communicate_display(4, QByteArray((char*)buffer_out, 7), 7, 7, true);
+    QByteArray read = ptr_ptz->communicate_display(QByteArray((char*)buffer_out, 7), 7, 7, true);
     angle_h = (((uchar)read[4] << 8) + (uchar)read[5]) / 100.0;
     ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", angle_h));
 
@@ -3734,7 +4100,7 @@ void UserPanel::on_GET_ANGLE_BTN_clicked()
 
     buffer_out[3] = 0x53;
     buffer_out[6] = 0x54;
-    read = communicate_display(4, QByteArray((char*)buffer_out, 7), 7, 7, true);
+    read = ptr_ptz->communicate_display(QByteArray((char*)buffer_out, 7), 7, 7, true);
     angle_v = (((uchar)read[4] << 8) + (uchar)read[5]) / 100.0;
     ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", angle_v > 40 ? angle_v - 360 : angle_v));
 }
@@ -3756,7 +4122,7 @@ void UserPanel::set_ptz_angle()
     sum = 0;
     for (int i = 1; i < 6; i++) sum += buffer_out[i];
     buffer_out[6] = sum & 0xFF;
-    communicate_display(4, QByteArray((char*)buffer_out, 7), 7, 0, false);
+    ptr_ptz->communicate_display(QByteArray((char*)buffer_out, 7), 7, 0, false);
     ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", angle_h));
 
     if (angle_v >  40) angle_v =  40;
@@ -3768,13 +4134,13 @@ void UserPanel::set_ptz_angle()
     sum = 0;
     for (int i = 1; i < 6; i++) sum += buffer_out[i];
     buffer_out[6] = sum & 0xFF;
-    communicate_display(4, QByteArray((char*)buffer_out, 7), 7, 0, false);
+    ptr_ptz->communicate_display(QByteArray((char*)buffer_out, 7), 7, 0, false);
     ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", angle_v));
 }
 
 void UserPanel::on_STOP_BTN_clicked()
 {
-    communicate_display(4, generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
+    ptr_ptz->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 }
 
 void UserPanel::point_ptz_to_target(QPoint target)
@@ -3824,32 +4190,154 @@ void UserPanel::display_fishnet_result(int result)
 void UserPanel::on_FIRE_LASER_BTN_clicked()
 {
     if (ui->FIRE_LASER_BTN->text() == "FIRE") {
-        serial_port[3]->write("MODE:STBY 0\r", 12);
-        serial_port[3]->waitForBytesWritten(100);
-        QThread::msleep(100);
-        serial_port[3]->readAll();
+//        serial_port[3]->write("MODE:STBY 0\r", 12);
+//        serial_port[3]->waitForBytesWritten(100);
+//        QThread::msleep(100);
+//        serial_port[3]->readAll();
+        ptr_laser->communicate_display(QByteArray("MODE:STBY 0\r"), 12, 0, true, false);
         qDebug() << QString("MODE:STBY 0\r");
 
-        serial_port[3]->write("ON\r", 3);
-        serial_port[3]->waitForBytesWritten(100);
-        QThread::msleep(100);
-        serial_port[3]->readAll();
+//        serial_port[3]->write("ON\r", 3);
+//        serial_port[3]->waitForBytesWritten(100);
+//        QThread::msleep(100);
+//        serial_port[3]->readAll();
+        ptr_laser->communicate_display(QByteArray("ON\r"), 3, 0, true, false);
         qDebug() << QString("ON\r");
 
         ui->FIRE_LASER_BTN->setText("STOP");
     } else {
-        serial_port[3]->write("OFF\r", 4);
-        serial_port[3]->waitForBytesWritten(100);
-        QThread::msleep(100);
-        serial_port[3]->readAll();
+//        serial_port[3]->write("OFF\r", 4);
+//        serial_port[3]->waitForBytesWritten(100);
+//        QThread::msleep(100);
+//        serial_port[3]->readAll();
+        ptr_laser->communicate_display(QByteArray("OFF\r"), 4, 0, true, false);
         qDebug() << QString("OFF\r");
 
-        serial_port[3]->write("MODE:STBY 1\r", 12);
-        serial_port[3]->waitForBytesWritten(100);
-        QThread::msleep(100);
-        serial_port[3]->readAll();
+//        serial_port[3]->write("MODE:STBY 1\r", 12);
+//        serial_port[3]->waitForBytesWritten(100);
+//        QThread::msleep(100);
+//        serial_port[3]->readAll();
+        ptr_laser->communicate_display(QByteArray("MODE:STBY 0\r"), 12, 0, true, false);
         qDebug() << QString("MODE:STBY 1\r");
 
         ui->FIRE_LASER_BTN->setText("FIRE");
+    }
+}
+
+void UserPanel::on_IMG_REGION_BTN_clicked()
+{
+    int max_w = 0, max_h = 0, new_w = 0, new_h = 0, new_x = 0, new_y = 0;
+    int inc_w = 1, inc_h = 1, inc_x = 1, inc_y = 1;
+    curr_cam->get_max_frame_size(&max_w, &max_h);
+    curr_cam->frame_size(true, &new_w, &new_h, &inc_w, &inc_h);
+    curr_cam->frame_offset(true, &new_x, &new_y, &inc_x, &inc_y);
+    if (ui->SHAPE_INFO->pair != QPoint(0, 0)) {
+        new_w = ui->SHAPE_INFO->pair.x();
+        new_h = ui->SHAPE_INFO->pair.y();
+        new_x += ui->START_COORD->pair.x();
+        new_y += ui->START_COORD->pair.y();
+    }
+
+    new_w = (new_w + inc_w / 2) / inc_w; new_w *= inc_w;
+    new_h = (new_h + inc_h / 2) / inc_h; new_h *= inc_h;
+    new_x = (new_x + inc_x / 2) / inc_x; new_x *= inc_x;
+    new_y = (new_y + inc_y / 2) / inc_y; new_y *= inc_y;
+
+    QDialog image_region_dialog(this, Qt::FramelessWindowHint);
+    QFormLayout form(&image_region_dialog);
+    form.setRowWrapPolicy(QFormLayout::WrapAllRows);
+    form.addRow(new QLabel("Region select:", &image_region_dialog));
+
+    QLabel *width = new QLabel("Width (max " + QString::number(max_w) + "): ", &image_region_dialog);
+    QSpinBox *width_spinbox = new QSpinBox(&image_region_dialog);
+    width_spinbox->resize(80, 20);
+    width_spinbox->setRange(0, max_w);
+    width_spinbox->setSingleStep(inc_w);
+    width_spinbox->setValue(new_w);
+    form.addRow(width, width_spinbox);
+
+    QLabel *height = new QLabel("Height (max " + QString::number(max_h) + "): ", &image_region_dialog);
+    QSpinBox *height_spinbox = new QSpinBox(&image_region_dialog);
+    height_spinbox->resize(80, 20);
+    height_spinbox->setRange(0, max_h);
+    height_spinbox->setSingleStep(inc_h);
+    height_spinbox->setValue(new_h);
+    form.addRow(height, height_spinbox);
+
+    QLabel *offset_x = new QLabel("Offset X (max " + QString::number(max_w - new_w)  + "): ", &image_region_dialog);
+    QSpinBox *x_spinbox = new QSpinBox(&image_region_dialog);
+    x_spinbox->resize(80, 20);
+    x_spinbox->setRange(0, max_w - new_w);
+    x_spinbox->setSingleStep(inc_x);
+    x_spinbox->setValue(new_x);
+    form.addRow(offset_x, x_spinbox);
+    connect(width_spinbox, &QSpinBox::editingFinished, x_spinbox,
+        [max_w, &offset_x, width_spinbox, x_spinbox]() {
+            x_spinbox->setMaximum(max_w - width_spinbox->value());
+            offset_x->setText("Offset X (max " + QString::number(max_w - width_spinbox->value())  + "): ");
+        });
+
+    QLabel *offset_y = new QLabel("Offset Y (max " + QString::number(max_h - new_h) + "): ", &image_region_dialog);
+    QSpinBox *y_spinbox = new QSpinBox(&image_region_dialog);
+    y_spinbox->resize(80, 20);
+    y_spinbox->setRange(0, max_h - new_h);
+    y_spinbox->setSingleStep(inc_y);
+    y_spinbox->setValue(new_y);
+    form.addRow(offset_y, y_spinbox);
+    connect(height_spinbox, &QSpinBox::editingFinished, y_spinbox,
+        [max_h, &offset_y, height_spinbox, y_spinbox]() {
+            y_spinbox->setMaximum(max_h - height_spinbox->value());
+            offset_y->setText("Offset Y (max " + QString::number(max_h - height_spinbox->value()) + "): ");
+        });
+
+    connect(width_spinbox, static_cast<void (QSpinBox::*)(int i)>(&QSpinBox::valueChanged), this,
+        [&new_w, &new_h, inc_w, inc_h, width_spinbox, height_spinbox](int val){
+            new_w = (width_spinbox->value() + inc_w / 2) / inc_w;  new_w *= inc_w;
+            new_h = (height_spinbox->value() + inc_h / 2) / inc_h; new_h *= inc_h;
+        });
+
+    connect(height_spinbox, static_cast<void (QSpinBox::*)(int i)>(&QSpinBox::valueChanged), this,
+        [&new_w, &new_h, inc_w, inc_h, width_spinbox, height_spinbox](int val){
+            new_w = (width_spinbox->value() + inc_w / 2) / inc_w;  new_w *= inc_w;
+            new_h = (height_spinbox->value() + inc_h / 2) / inc_h; new_h *= inc_h;
+        });
+
+    connect(x_spinbox, static_cast<void (QSpinBox::*)(int i)>(&QSpinBox::valueChanged), this,
+        [this, &new_x, &new_y, inc_x, inc_y, x_spinbox, y_spinbox](int val){
+            new_x = (x_spinbox->value() + inc_x / 2) / inc_x; new_x *= inc_x;
+            new_y = (y_spinbox->value() + inc_y / 2) / inc_y; new_y *= inc_y;
+            curr_cam->frame_offset(false, &new_x, &new_y);
+        });
+    connect(y_spinbox, static_cast<void (QSpinBox::*)(int i)>(&QSpinBox::valueChanged), this,
+        [this, &new_x, &new_y, inc_x, inc_y, x_spinbox, y_spinbox](int val){
+            new_x = (x_spinbox->value() + inc_x / 2) / inc_x; new_x *= inc_x;
+            new_y = (y_spinbox->value() + inc_y / 2) / inc_y; new_y *= inc_y;
+            curr_cam->frame_offset(false, &new_x, &new_y);
+        });
+
+    QDialogButtonBox button_box(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, Qt::Horizontal, &image_region_dialog);
+    form.addRow(&button_box);
+    QObject::connect(&button_box, SIGNAL(accepted()), &image_region_dialog, SLOT(accept()));
+    QObject::connect(&button_box, SIGNAL(rejected()), &image_region_dialog, SLOT(reject()));
+
+    image_region_dialog.setModal(true);
+    image_region_dialog.move(ui->IMG_GRAB_STATIC->mapToGlobal(QPoint()));
+    button_box.button(QDialogButtonBox::Ok)->setFocus();
+    button_box.button(QDialogButtonBox::Ok)->setDefault(true);
+
+    // Process when OK button is clicked
+    if (image_region_dialog.exec() == QDialog::Accepted) {
+        new_w = width_spinbox->value();
+        new_h = height_spinbox->value();
+        new_x = x_spinbox->value();
+        new_y = y_spinbox->value();
+        bool was_playing = start_grabbing;
+        if (was_playing) ui->STOP_GRABBING_BUTTON->click();
+        curr_cam->frame_offset(false, &new_x, &new_y);
+        curr_cam->frame_size(false, &new_w, &new_h);
+        if (device_on) curr_cam->frame_size(true, &w, &h);
+        QResizeEvent e(this->size(), this->size());
+        resizeEvent(&e);
+        if (was_playing) ui->START_GRABBING_BUTTON->click();
     }
 }

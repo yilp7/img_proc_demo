@@ -57,7 +57,7 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->SERIAL_TAB,   SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
     connect(ui->TCU_TAB,      SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
     connect(ui->IMG_PROC_TAB, SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
-    //[0]
+    //![0]
 
     //[1] set up ui for device config
     ui->IP_EDIT->setEnabled(false);
@@ -80,6 +80,7 @@ Preferences::Preferences(QWidget *parent) :
                 emit change_pixel_format(pixel_format[index]);
             });
     connect(ui->CAMERALINK_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ cameralink = arg1; });
+    //![1]
 
     //[2] set up ui for serial comm.
     ui->COM_LIST->addItem("TCU");
@@ -109,7 +110,7 @@ Preferences::Preferences(QWidget *parent) :
             [this](int index){ emit get_baudrate(index); });
     connect(ui->BAUDRATE_LIST, static_cast<void (QComboBox::*)(const QString &arg1)>(&QComboBox::activated), this,
             [this](const QString &arg1){ emit change_baudrate(ui->COM_LIST->currentIndex(), arg1.toInt()); });
-    connect(ui->SHARE_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ share_port = arg1; });
+    connect(ui->SHARE_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ share_port = arg1; emit share_tcu_port(arg1); });
     connect(ui->TCP_SERVER_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ use_tcp = arg1; });
     connect(ui->CONNECT_TCP_BTN, &QPushButton::clicked, this, [this](){ emit connect_tcp_btn_clicked();});
 
@@ -117,7 +118,7 @@ Preferences::Preferences(QWidget *parent) :
 //    temp.setPixelSize(11);
 //    ui->COM_DATA_EDT->setFont(temp);
     ui->COM_DATA_EDT->setFont(consolas);
-    //[2]
+    //![2]
 
     //[3] set up ui for tcu config
     ui->HZ_LIST->addItem("kHz");
@@ -167,15 +168,21 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->DELAY_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
                 emit delay_offset_changed(delay_dist_offset);
-                QFile file_user_offset("user_delay_offset");
-                file_user_offset.open(QIODevice::WriteOnly);
-                file_user_offset.write(QString::number((int)std::round(delay_dist_offset / dist_ns)).toLatin1());
-                file_user_offset.close();
+                FILE *f = fopen("user_default", "rb+");
+                if (!f) return;
+                uint delay_offset = std::round(delay_dist_offset / dist_ns);
+                fseek(f, 6, SEEK_SET);
+                fwrite(&delay_offset, 4, 1, f);
+                fclose(f);
     });
-    QFile file_user_offset("user_delay_offset");
-    file_user_offset.open(QIODevice::ReadOnly);
-    delay_dist_offset = file_user_offset.readLine().simplified().toInt() * dist_ns;
-    file_user_offset.close();
+    FILE *f = fopen("user_default", "r");
+    if (f) {
+        uint delay_offset;
+        fseek(f, 6, SEEK_SET);
+        fread(&delay_offset, 4, 1, f);
+        delay_dist_offset = delay_offset * dist_ns;
+        fclose(f);
+    }
 
     connect(ui->LASER_ENABLE_CHK, &QCheckBox::stateChanged, this,
             [this](int arg1){ send_cmd(arg1 ? "88 1F 00 00 00 01 99" : "88 1F 00 00 00 00 99"); });
@@ -186,7 +193,7 @@ Preferences::Preferences(QWidget *parent) :
     laser_grp->addButton(ui->LASER_CHK_4, 3);
     laser_grp->setExclusive(false);
     connect(laser_grp, SIGNAL(buttonToggled(int, bool)), SLOT(toggle_laser(int, bool)));
-    //[3]
+    //![3]
 
     //[4] set up ui for image proc
     connect(ui->LOWER_3D_THRESH_EDT, &QLineEdit::editingFinished, this,
@@ -216,7 +223,7 @@ Preferences::Preferences(QWidget *parent) :
     ui->FISHNET_THRESH->hide();
     ui->FISHNET_THRESH_EDIT->hide();
 #endif
-    //[4]
+    //![4]
     data_exchange(false);
 }
 

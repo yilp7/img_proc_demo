@@ -1,9 +1,6 @@
 #ifndef USERPANEL_H
 #define USERPANEL_H
 
-#include <QSerialPort>
-#include <QTcpSocket>
-
 #include "joystick.h"
 #include "threadpool.h"
 #include "imageproc.h"
@@ -11,6 +8,8 @@
 #include "mvcam.h"
 //#include "hqvscam.h"
 //#include "euresyscam.h"
+#include "controlport.h"
+
 #include "preferences.h"
 #include "scanconfig.h"
 #include "lasersettings.h"
@@ -42,11 +41,11 @@ class UserPanel : public QMainWindow
 // enumerations only
 public:
      enum PREF_TYPE {
-         WIN_PREF = 0,
-         TCU      = 1,
-         SCAN     = 2,
-         IMG      = 3,
-         TCU_PREF = 4,
+         WIN_PREF   = 0,
+         TCU_PARAMS = 1,
+         SCAN       = 2,
+         IMG        = 3,
+         TCU_PREF   = 4,
      };
 
 public:
@@ -59,6 +58,7 @@ public:
     // rename vid file in new thread
     static void move_to_dest(QString src, QString dst);
 
+    // TODO movw image io to a new class
     // image i/o
     static void save_image_bmp(cv::Mat img, QString filename);
     static void save_image_tif(cv::Mat img, QString filename);
@@ -77,6 +77,7 @@ public slots:
     void prompt_for_config_file();
     void load_config(QString config_name);
     void prompt_for_serial_file();
+    void prompt_for_input_file();
 
     // signaled in settings ui
     void setup_hz(int hz_unit);
@@ -85,6 +86,7 @@ public slots:
     void update_delay_offset(float delay_dist_offset);
     void setup_laser(int laser_on);
     void set_baudrate(int idx, int baudrate);
+    void set_tcu_as_shared_port(bool share);
     void com_write_data(int com_idx, QByteArray data);
     void display_baudrate(int idx);
     void set_dev_ip(int ip, int gateway);
@@ -95,6 +97,10 @@ public slots:
     void joystick_button_pressed(int btn);
     void joystick_button_released(int btn);
     void joystick_direction_changed(int direction);
+
+    // signaled by ControlPort
+    void append_data(QString str);
+    void update_port_status(int connected_status);
 
 private slots:
     // on clicking enum btn: enumerate devices
@@ -228,6 +234,8 @@ private slots:
 
     void on_FIRE_LASER_BTN_clicked();
 
+    void on_IMG_REGION_BTN_clicked();
+
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);
@@ -326,8 +334,12 @@ private:
     void send_ctrl_cmd(uchar dir);
 
     // static image display (drag & drop)
-    void start_static_display(int width, int height, bool is_color, int pixel_depth = 8);
+    void start_static_display(int width, int height, bool is_color, int pixel_depth = 8, int device_type = -1);
     bool load_image_file(QString filename, bool init);
+    int load_video_file(QString filename, bool format_gray = false);
+
+    // status display
+    void update_pixel_depth(int depth);
 
 public:
     bool                    mouse_pressed;
@@ -335,9 +347,7 @@ public:
 private:
     Ui::UserPanel*          ui;
 
-    // TODO: move theme to utils global
-    int                     theme;                      // 1: dark theme, 2: light theme
-
+    StatusBar*              status_bar;
     Preferences*            pref;
     ScanConfig*             scan_config;
     LaserSettings*          laser_settings;
@@ -347,6 +357,7 @@ private:
 
     QMutex                  image_mutex;                // img handle lock
     QMutex                  port_mutex;                 // port handle lock
+    QMutex                  display_mutex;              // display handle lock
     Cam*                    curr_cam;                   // current camera
     float                   time_exposure_edit;
     float                   gain_analog_edit;
@@ -355,6 +366,12 @@ private:
     QString                 TEMP_SAVE_LOCATION;         // temp location to save the image
     cv::VideoWriter         vid_out[2];                 // video writer for ORI/RES
 
+    TCU*                    ptr_tcu;
+    Lens*                   ptr_lens;
+    Laser*                  ptr_laser;
+    PTZ*                    ptr_ptz;
+
+    // TODO: port communication mostly moved to new class ControlPort
     QSerialPort*            serial_port[5];             // 0: tcu, 1: rangefinder, 2: lens, 3: laser, 4: PTZ
     bool                    serial_port_connected[5];
     QTcpSocket*             tcp_port[5];                // 0-1: 232, 2-4: 485
@@ -408,8 +425,10 @@ private:
     int                     pixel_format;               // for hik cam, use mono 8 for others
     int                     pixel_depth;                // pixel depth
 
+    bool                    grab_image;                 // whether thread should continue grabbing image
     GrabThread*             h_grab_thread;              // img-grab thread handle
-    bool                    grab_thread_state;          // whether thread is created
+    bool                    grab_thread_state;          // whether grabbing thread is on
+    bool                    video_thread_state;         // whether video reading thread is on
     JoystickThread*         h_joystick_thread;          // process joystick input
 
     cv::Mat                 img_mem;                    // right-side img display source (stream)
@@ -471,6 +490,9 @@ private:
     int                     ptz_speed;
     float                   angle_h;
     float                   angle_v;
+
+//    QMediaPlayer*           video_input;
+//    VideoSurface*           video_surface;
 
     // TEMP ONLY
     // TODO move to addons
