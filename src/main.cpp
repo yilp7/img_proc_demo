@@ -1,5 +1,8 @@
 #include "userpanel.h"
 
+//#define _DEBUG
+//#include "vld.h"
+
 #ifdef WIN32
 #include <DbgHelp.h>
 
