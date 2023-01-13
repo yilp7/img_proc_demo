@@ -25,8 +25,8 @@ set(EURESYS_DIR "${SDK_DIR}/euresys")
 set(OpenCV_DIR "${SDK_DIR}/opencv")
 set(FFMPEG_DIR "${SDK_DIR}/ffmpeg")
 
-#include_directories(${SDK_DIR}/VLD/include)
-#link_directories(${SDK_DIR}/VLD/lib)
+include_directories(${SDK_DIR}/VLD/include)
+link_directories(${SDK_DIR}/VLD/lib)
 
 # QtCreator supports the following variables for Android, which are identical to qmake Android variables.
 # Check http://doc.qt.io/qt-5/deployment-android.html for more information.
@@ -196,8 +196,6 @@ if (WIN32)
         ws2_32
         Secur32
         Bcrypt
-        # vld
-#        vld
     )
     if (BUILD_STATIC)
         string(LENGTH ${QT_DIR} LEN_QT_DIR)

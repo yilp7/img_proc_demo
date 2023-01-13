@@ -584,6 +584,7 @@ int UserPanel::grab_thread_process() {
             QThread::msleep(10);
             continue;
 #else
+//            if (device_type == -2) continue;
             img_mem = prev_img.clone();
             updated = false;
 #endif
@@ -908,6 +909,7 @@ int UserPanel::grab_thread_process() {
 //        ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         // use signal->slot instead of directly call
         emit set_pixmap(QPixmap::fromImage(stream.scaled(disp->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+//        qDebug() << QDateTime::currentDateTime().toString("ss.zzz");
 
         // process scan
         if (scan && updated) {
@@ -2213,11 +2215,15 @@ void UserPanel::prompt_for_serial_file()
 void UserPanel::prompt_for_input_file()
 {
     QDialog input_file_dialog(this, Qt::FramelessWindowHint);
+    input_file_dialog.resize(400, 80);
     QFormLayout form(&input_file_dialog);
-    form.setRowWrapPolicy(QFormLayout::WrapAllRows);
+    form.setRowWrapPolicy(QFormLayout::DontWrapRows);
 
+    QCheckBox *use_gray_format = new QCheckBox("gray", &input_file_dialog);
+//    use_gray_format->setChecked(true);
     QLineEdit *file_path = new QLineEdit("rtsp://192.168.2.100/mainstream", &input_file_dialog);
-    form.addRow(new QLabel("video URL :  ", &input_file_dialog), file_path);
+    form.addRow(new QLabel("video URL:                                   ", &input_file_dialog), use_gray_format);
+    form.addRow(file_path);
 
     QDialogButtonBox button_box(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, Qt::Horizontal, &input_file_dialog);
     form.addRow(&button_box);
@@ -2229,7 +2235,7 @@ void UserPanel::prompt_for_input_file()
     button_box.button(QDialogButtonBox::Ok)->setDefault(true);
 
     // Process when OK button is clicked
-    if (input_file_dialog.exec() == QDialog::Accepted) load_video_file(file_path->text(), true);
+    if (input_file_dialog.exec() == QDialog::Accepted) load_video_file(file_path->text(), use_gray_format->isChecked());
 }
 
 // convert data to be sent to TCU-COM to hex buffer
@@ -3391,7 +3397,7 @@ void UserPanel::dropEvent(QDropEvent *event)
 
 bool UserPanel::load_image_file(QString filename, bool init)
 {
-    grab_image = false;
+    if (device_type == -2) grab_image = false;
     if (!display_mutex.tryLock(1e3)) return false;
 
     QImage qimage_temp;
@@ -3476,10 +3482,11 @@ typedef struct {
 
 static int ffmpeg_interrupt_callback(void *p) {
     time_t *t0 = (time_t *)p;
-    if (*t0 > 0 && time(NULL) - *t0 > 3) return 1;
+    if (*t0 > 0 && time(NULL) - *t0 > 5) return 1;
     return 0;
 }
 
+// TODO: release ptrs after exited half-way
 int UserPanel::load_video_file(QString filename, bool format_gray)
 {
 //    video_input->setMedia(QUrl(filename));
@@ -3491,6 +3498,26 @@ int UserPanel::load_video_file(QString filename, bool format_gray)
         if (!display_mutex.tryLock(1e3)) return -1;
 
         AVFormatContext *format_context = avformat_alloc_context();
+        std::shared_ptr<AVFormatContext*> closer_format_context(&format_context, avformat_close_input);
+        AVCodecParameters *codec_param = NULL;
+//        std::shared_ptr<AVCodecParameters*> deleter_codec_param(&codec_param, avcodec_parameters_free);
+        const AVCodec *codec = NULL;
+        AVCodecContext *codec_context = avcodec_alloc_context3(NULL);
+        std::shared_ptr<AVCodecContext*> closer_codec_context(&codec_context, avcodec_free_context);
+        AVFrame *frame = av_frame_alloc();
+        std::shared_ptr<AVFrame*> deleter_frame(&frame, av_frame_free);
+        AVFrame *frame_result = av_frame_alloc();
+        std::shared_ptr<AVFrame*> deleter_frame_result(&frame_result, av_frame_free);
+        AVFrame *frame_filter = av_frame_alloc();
+        std::shared_ptr<AVFrame*> deleter_frame_filter(&frame_filter, av_frame_free);
+        uint8_t *buffer = NULL;
+        std::shared_ptr<uint8_t> deleter_buffer(buffer, av_free);
+        SwsContext *sws_context = NULL;
+        std::shared_ptr<SwsContext> deleter_sws_context(sws_context, sws_freeContext);
+        static AVFilterContext *buffersink_ctx = NULL;
+        static AVFilterContext *buffersrc_ctx = NULL;
+        AVFilterGraph *filter_graph = avfilter_graph_alloc();
+        std::shared_ptr<AVFilterGraph*> deleter_filter_graph(&filter_graph, avfilter_graph_free);
 
         // process timeout
         static time_t start_time = 0;
@@ -3504,7 +3531,6 @@ int UserPanel::load_video_file(QString filename, bool format_gray)
 
         // fetch video info
         if (avformat_find_stream_info(format_context, NULL) < 0) { display_mutex.unlock(); return -2; }
-//        std::shared_ptr<AVFormatContext*> closer_format_context(&format_context, avformat_close_input);
 
         // find the first video stream
         int video_stream_idx = -1;
@@ -3517,55 +3543,43 @@ int UserPanel::load_video_file(QString filename, bool format_gray)
         if (video_stream_idx == -1) { display_mutex.unlock(); return -2; }
 
         // point the codec parameter to the first stream's
-        static AVCodecParameters *codec_param;
         codec_param = format_context->streams[video_stream_idx]->codecpar;
 
-        const AVCodec *codec = avcodec_find_decoder(codec_param->codec_id);
+        fps = frame_rate_edit = std::round(format_context->streams[video_stream_idx]->r_frame_rate.num / format_context->streams[video_stream_idx]->r_frame_rate.den);
+
+        codec = avcodec_find_decoder(codec_param->codec_id);
         if (codec == NULL) { display_mutex.unlock(); return -3; }
 
-        AVCodecContext *codec_context = avcodec_alloc_context3(NULL);
         if (avcodec_parameters_to_context(codec_context, codec_param) < 0) { display_mutex.unlock(); return -3; }
-        // close the decoder when the program exits
-//        std::shared_ptr<AVCodecContext> closer_codec_context(codec_context, avcodec_close);
 
         if (avcodec_open2(codec_context, codec, NULL) < 0) { display_mutex.unlock(); return -3; }
 
-        // create frame
-        AVFrame *frame = av_frame_alloc();
-//        std::shared_ptr<AVFrame*> deleter_frame(&frame, av_frame_free);
-        AVFrame *frame_result = av_frame_alloc();
-//        std::shared_ptr<AVFrame*> deleter_frame_result(&frame_result, av_frame_free);
-        AVFrame *frame_filter = av_frame_alloc();
         cv::Mat cv_frame(codec_context->height, codec_context->width, CV_MAKETYPE(CV_8U, format_gray ? 1 : 3));
 
         // allocate data buffer
         AVPixelFormat pixel_fmt = format_gray ? AV_PIX_FMT_NV12 : AV_PIX_FMT_RGB24;
         int byte_num = av_image_get_buffer_size(pixel_fmt, codec_context->width, codec_context->height, 1);
-        uint8_t *buffer = (uint8_t *)av_malloc(byte_num * sizeof(uint8_t));
-//        std::shared_ptr<uint8_t> deleter_buffer(buffer, av_free);
+        buffer = (uint8_t *)av_malloc(byte_num * sizeof(uint8_t));
 
         av_image_fill_arrays(frame_result->data, frame_result->linesize, buffer, pixel_fmt, codec_context->width, codec_context->height, 1);
 
-        SwsContext *sws_context = sws_getContext(codec_context->width, codec_context->height, codec_context->pix_fmt,
+        sws_context = sws_getContext(codec_context->width, codec_context->height, codec_context->pix_fmt,
                                      codec_context->width, codec_context->height, pixel_fmt, SWS_BILINEAR, NULL, NULL, NULL);
-//        std::shared_ptr<SwsContext> deleter_sws_context(sws_context, sws_freeContext);
 
         start_static_display(codec_context->width, codec_context->height, !format_gray, 8, -2);
 
         AVPacket packet;
-        static AVFilterContext *buffersink_ctx = NULL;
-        static AVFilterContext *buffersrc_ctx = NULL;
-        AVFilterGraph *filter_graph = avfilter_graph_alloc();
         if (format_gray) init_filter_graph(format_context, video_stream_idx, filter_graph, codec_context, &buffersink_ctx, &buffersrc_ctx);
 
         AVRational time_base = format_context->streams[video_stream_idx]->time_base;
         AVRational time_base_q = { 1, AV_TIME_BASE };
         long long last_pts = AV_NOPTS_VALUE;
         long long delay;
+        QElapsedTimer elapsed_timer;
         int result;
         while (grab_image) {
             start_time = time(NULL);
-            if ((result = av_read_frame(format_context, &packet)) < 0) { qDebug() << result; continue; }
+            if ((result = av_read_frame(format_context, &packet)) < 0) continue;
 
             // release packet allocated by av_read_frame after iteration
             std::shared_ptr<AVPacket> deleter_packet(&packet, av_packet_unref);
@@ -3589,27 +3603,33 @@ int UserPanel::load_video_file(QString filename, bool format_gray)
                     else {
                         if (frame->pts != AV_NOPTS_VALUE) {
                             if (last_pts != AV_NOPTS_VALUE) {
-                                delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q);
+                                delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1000;
+//                                qDebug() << av_rescale_q(frame->pts - last_pts, time_base, time_base_q) << elapsed_timer.nsecsElapsed() / 1000;
                                 if (delay > 0 && delay < 1000000) av_usleep(delay);
+                                elapsed_timer.restart();
                             }
                             last_pts = frame->pts;
                         }
+//                        av_frame_unref(frame_result);
                         sws_scale(sws_context, frame->data, frame->linesize, 0, codec_context->height, frame_result->data, frame_result->linesize);
                     }
 
                     cv_frame.data = (format_gray ? frame_filter : frame_result)->data[0];
                     img_q.push(cv_frame.clone());
+
+                    av_frame_unref(frame);
                 }
             }
         }
-        avfilter_graph_free(&filter_graph);
-        sws_freeContext(sws_context);
-        av_free(&buffer);
-        av_frame_free(&frame_filter);
-        av_frame_free(&frame_result);
-        av_frame_free(&frame);
-        avcodec_free_context(&codec_context);
-        avformat_close_input(&format_context);
+//        avfilter_graph_free(&filter_graph);
+//        sws_freeContext(sws_context);
+//        av_free(&buffer);
+//        av_frame_free(&frame_filter);
+//        av_frame_free(&frame_result);
+//        av_frame_free(&frame);
+//        avcodec_free_context(&codec_context);
+//        avcodec_parameters_free(&codec_param);
+//        avformat_close_input(&format_context);
 
         display_mutex.unlock();
         return 0;
