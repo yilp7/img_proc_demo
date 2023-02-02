@@ -722,7 +722,8 @@ int UserPanel::grab_thread_process() {
                 switch (ui->ENHANCE_OPTIONS->currentIndex()) {
                 // histogram
                 case 1: {
-                    cv::equalizeHist(modified_result, modified_result);
+//                    cv::equalizeHist(modified_result, modified_result);
+                    ImageProc::hist_equalization(modified_result, modified_result);
                     break;
                 }
                 // laplace
@@ -744,7 +745,7 @@ int UserPanel::grab_thread_process() {
 //                }
                 // SP
                 case 3: {
-                    ImageProc::plateau_equl_hist(&modified_result, &modified_result, 4);
+                    ImageProc::plateau_equl_hist(modified_result, modified_result, 4);
                     break;
                 }
                 // accumulative
@@ -773,32 +774,33 @@ int UserPanel::grab_thread_process() {
                 // TODO rewrite sigmoid enchance
                 // sigmoid (nonlinear) (mergw log w/ 1/(1+exp))
                 case 5: {
-                    uchar *img = modified_result.data;
-                    cv::Mat img_log, img_nonLT = cv::Mat(h, w, CV_8U);
-                    modified_result.convertTo(img_log, CV_32F);
-                    modified_result += 1.0;
-                    cv::log(img_log, img_log);
-//                    img_log *= settings->log;
-                    img_log *= 1.2;
-                    double m = 0, kv = 0, mean = cv::mean(modified_result)[0];
-                    uchar p;
-                    for (int i = 0; i < h; i++) {
-                        for (int j = 0; j < w; j++) {
-                            p = img[i * modified_result.step + j];
-                            if (!p) {
-                                img_nonLT.data[i * img_nonLT.step + j] = 0;
-                                continue;
-                            }
-                            if      (p <=  60) kv = 7;
-                            else if (p <= 200) kv = 7 + (p - 60) / 70;
-                            else if (p <= 255) kv = 9 + (p - 200) / 55;
-                            m = kv * (p / (p + mean));
-                            img_nonLT.data[i * img_nonLT.step + j] = (int)(2 / (1 + exp(-m)) - 1) * 255 - p;
-                        }
-                    }
-                    cv::normalize(img_log, img_log, 0, 255, cv::NORM_MINMAX);
-                    cv::convertScaleAbs(img_log, img_log);
-                    modified_result = 0.05 * img_log + 0.05 * img_nonLT + 0.8 * modified_result;
+                    ImageProc::guided_image_filter(modified_result, modified_result, 60, 0.01, 1);
+//                    uchar *img = modified_result.data;
+//                    cv::Mat img_log, img_nonLT = cv::Mat(h, w, CV_8U);
+//                    modified_result.convertTo(img_log, CV_32F);
+//                    modified_result += 1.0;
+//                    cv::log(img_log, img_log);
+////                    img_log *= settings->log;
+//                    img_log *= 1.2;
+//                    double m = 0, kv = 0, mean = cv::mean(modified_result)[0];
+//                    uchar p;
+//                    for (int i = 0; i < h; i++) {
+//                        for (int j = 0; j < w; j++) {
+//                            p = img[i * modified_result.step + j];
+//                            if (!p) {
+//                                img_nonLT.data[i * img_nonLT.step + j] = 0;
+//                                continue;
+//                            }
+//                            if      (p <=  60) kv = 7;
+//                            else if (p <= 200) kv = 7 + (p - 60) / 70;
+//                            else if (p <= 255) kv = 9 + (p - 200) / 55;
+//                            m = kv * (p / (p + mean));
+//                            img_nonLT.data[i * img_nonLT.step + j] = (int)(2 / (1 + exp(-m)) - 1) * 255 - p;
+//                        }
+//                    }
+//                    cv::normalize(img_log, img_log, 0, 255, cv::NORM_MINMAX);
+//                    cv::convertScaleAbs(img_log, img_log);
+//                    modified_result = 0.05 * img_log + 0.05 * img_nonLT + 0.8 * modified_result;
                     break;
                 }
                 // adaptive
@@ -3397,7 +3399,7 @@ void UserPanel::dropEvent(QDropEvent *event)
 
 bool UserPanel::load_image_file(QString filename, bool init)
 {
-    if (device_type == -2) grab_image = false;
+    if (init) grab_image = false;
     if (!display_mutex.tryLock(1e3)) return false;
 
     QImage qimage_temp;

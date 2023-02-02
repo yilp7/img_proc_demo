@@ -336,7 +336,9 @@ private:
     // static image display (drag & drop)
     void start_static_display(int width, int height, bool is_color, int pixel_depth = 8, int device_type = -1);
     bool load_image_file(QString filename, bool init);
+    int open_video_file(QString filename, bool format_gray = false, void (*process_frame)(cv::Mat &frame) = NULL);
     int load_video_file(QString filename, bool format_gray = false);
+    int save_video_file(QString file_in, QString file_out, bool is_color = true);
 
     // status display
     void update_pixel_depth(int depth);

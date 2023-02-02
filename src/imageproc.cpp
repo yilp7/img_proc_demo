@@ -4,73 +4,103 @@
 //#define NOMINMAX
 //#include <windows.h>
 
-ImageProc::ImageProc()
-{
+ImageProc::ImageProc() {}
 
+void ImageProc::hist_equalization(cv::Mat &src, cv::Mat &res) {
+    std::vector<cv::Mat> channels;
+    cv::split(src, channels);
+    for (auto &m: channels) cv::equalizeHist(m, m);
+    cv::merge(channels, res);
 }
 
-void ImageProc::plateau_equl_hist(cv::Mat *in, cv::Mat *out, int method) {
-    int h = in->rows, w = in->cols;
-    uint hist[256] = {0}, hist_ori[256] = {0}, af_hist[256] = {0}, nonzero_hist[256] = {0};
-    int i, j, sum = 0, size = 0;
-    uchar eq_hist[256] = {0}, EI_hist[256] = {0};
-    uint nonzero_size = 0;
-    uint t_up = 10000, t_down = 200;
+void ImageProc::laplace_transform(cv::Mat &src, cv::Mat &res, cv::Mat kernel)
+{
+    if (kernel.empty()) kernel = (cv::Mat_<float>(3, 3) << 0, -1, 0, 0, 5, 0, 0, -1, 0);
+    std::vector<cv::Mat> channels;
+    cv::split(src, channels);
+    for (auto &m: channels) cv::filter2D(m, m, CV_8U, kernel);
+    cv::merge(channels, res);
+}
 
-    // calc # pixels of grayscale in[i][j]
-    uchar *img = in->data;
-    int step = in->step;
-    for (i = 0; i < h; i++) {
-        for (j = 0; j < w; j++)  hist_ori[(img + i * step)[j]]++;
+void ImageProc::plateau_equl_hist(cv::Mat &src, cv::Mat &res, int method) {
+    int h = src.rows, w = src.cols;
+    uint hist[256], hist_ori[256], af_hist[256], nonzero_hist[256];
+    int i, j, sum, size;
+    uchar eq_hist[256], EI_hist[256];
+    uint nonzero_size;
+    uint t_up, t_down;
+
+    std::vector<cv::Mat> channels;
+    cv::split(src, channels);
+    for (auto &m: channels) {
+        // init
+        memset(hist, 0, 256 * sizeof(uint));
+        memset(hist_ori, 0, 256 * sizeof(uint));
+        memset(af_hist, 0, 256 * sizeof(uint));
+        memset(nonzero_hist, 0, 256 * sizeof(uint));
+        sum = 0, size = 0;
+        memset(eq_hist, 0, 256 * sizeof(uchar));
+        memset(EI_hist, 0, 256 * sizeof(uchar));
+        nonzero_size = 0;
+        t_up = 10000, t_down = 200;
+
+        // calc # pixels of grayscale in[i][j]
+        uchar *ptr_src = m.data;
+        int step = m.step;
+        for (i = 0; i < h; i++) {
+            for (j = 0; j < w; j++)  hist_ori[(ptr_src + i * step)[j]]++;
+        }
+
+        for (i = 1; i < 255; i++) hist[i] = get_median(hist_ori + i - 1, 3); // to-do
+        hist[0] = hist_ori[0];
+        hist[255] = hist_ori[255];
+
+        for (i = 0; i < 256; i++)  if (hist[i]) nonzero_hist[nonzero_size++] = hist[i];
+
+        get_threshold(nonzero_hist, nonzero_size, t_up, t_down);
+
+        // update size
+        for (i = 0; i < 256; i++) {
+            if      (hist[i] > t_up)              size += t_up;
+            else if (hist[i] && hist[i] < t_down) size += t_down;
+            else                                  size += hist[i];
+        }
+
+        // map new greyscale
+        static float scale;
+        for (i = 0; i < 256; i++) {
+            // weight on level i, choose between (hist_sz-1.f) and (uzero_sz-1.f)
+            scale = 255.0 / (size - hist[i]);
+
+            if      (hist[i] > t_up)              sum += t_up;
+            else if (hist[i] && hist[i] < t_down) sum += t_down;
+            else                                  sum += hist[i];
+
+            eq_hist[i] = cv::saturate_cast<uchar>(sum * scale);
+        }
+
+        // initialize new image
+//        static cv::Mat temp(h, w, in->type());
+//        uchar *img_temp = temp.data;
+//        for (i = 0; i < h; i++) {
+//            for (j = 0; j < w; j++) (img_temp + i * step)[j] = eq_hist[(img + i * step)[j]];
+//        }
+
+//        for (i = 0; i < h; i++) {
+//            for (j = 0; j < w; j++) af_hist[(img_temp + i * step)[j]]++;
+//        }
+        for (i = 0; i < 256; i++) af_hist[eq_hist[i]] = hist[i];
+
+        equal_interval(af_hist, EI_hist, method);
+
+        uchar *ptr_res = m.data;
+        for (i = 0; i < h; i++) {
+//            for (j = 0; j < w; j++) (res + i * step)[j] = EI_hist[(img_temp + i * step)[j]];
+            for (j = 0; j < w; j++) (ptr_res + i * step)[j] = EI_hist[eq_hist[(ptr_src + i * step)[j]]];
+        }
     }
 
-    for (i = 1; i < 255; i++) hist[i] = get_median(hist_ori + i - 1, 3); // to-do
-    hist[0] = hist_ori[0];
-    hist[255] = hist_ori[255];
-
-    for (i = 0; i < 256; i++)  if (hist[i]) nonzero_hist[nonzero_size++] = hist[i];
-
-    get_threshold(nonzero_hist, nonzero_size, t_up, t_down);
-
-    // update size
-    for (i = 0; i < 256; i++) {
-        if      (hist[i] > t_up)              size += t_up;
-        else if (hist[i] && hist[i] < t_down) size += t_down;
-        else                                  size += hist[i];
-    }
-
-    // map new greyscale
-    static float scale;
-    for (i = 0; i < 256; i++) {
-        // weight on level i, choose between (hist_sz-1.f) and (uzero_sz-1.f)
-        scale = 255.0 / (size - hist[i]);
-
-        if      (hist[i] > t_up)              sum += t_up;
-        else if (hist[i] && hist[i] < t_down) sum += t_down;
-        else                                  sum += hist[i];
-
-        eq_hist[i] = cv::saturate_cast<uchar>(sum * scale);
-    }
-
-    // initialize new image
-//    static cv::Mat temp(h, w, in->type());
-//    uchar *img_temp = temp.data;
-//    for (i = 0; i < h; i++) {
-//        for (j = 0; j < w; j++) (img_temp + i * step)[j] = eq_hist[(img + i * step)[j]];
-//    }
-
-//    for (i = 0; i < h; i++) {
-//        for (j = 0; j < w; j++) af_hist[(img_temp + i * step)[j]]++;
-//    }
-    for (i = 0; i < 256; i++) af_hist[eq_hist[i]] = hist[i];
-
-    equal_interval(af_hist, EI_hist, method);
-
-    uchar *res = out->data;
-    for (i = 0; i < h; i++) {
-//        for (j = 0; j < w; j++) (res + i * step)[j] = EI_hist[(img_temp + i * step)[j]];
-        for (j = 0; j < w; j++) (res + i * step)[j] = EI_hist[eq_hist[(img + i * step)[j]]];
-    }
+    cv::merge(channels, res);
 }
 
 inline int ImageProc::get_median(uint *arr, int len) {
@@ -136,6 +166,62 @@ void ImageProc::equal_interval(uint *eq_hist, uchar *EI_hist, int num) {
         }
     }
     EI_hist[255] = 255;
+}
+
+void ImageProc::accumulative_enhance(cv::Mat &src, cv::Mat &res, float accu_base)
+{
+    std::vector<cv::Mat> channels;
+    cv::split(src, channels);
+    for (auto &m: channels) {
+        uchar *img = m.data;
+        int w = m.cols, h = m.rows, step = m.step;
+        uint max_val = 1 << (8 * (m.depth() / 2 + 1));
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < w; j++) {
+                uchar p = img[i * step + j];
+                if      (p < 0.250 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 2.4);}
+                else if (p < 0.439 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.8);}
+                else if (p < 0.565 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.6);}
+                else if (p < 0.628 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.5);}
+                else if (p < 0.691 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.4);}
+                else if (p < 0.753 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.25);}
+                else if (p < 0.785 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.2);}
+                else if (p < 0.816 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.15);}
+                else if (p < 0.848 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.125);}
+                else if (p < 0.879 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.1);}
+                else if (p < 0.942 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.05);}
+                else if (p < 1.000 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1);}
+            }
+        }
+    }
+    cv::merge(channels, res);
+}
+
+// low: 0, 0; high: 0.05, 1; gamma:1.2
+void ImageProc::adaptive_enhance(cv::Mat &src, cv::Mat &res, double low_in, double high_in, double low_out, double high_out, double gamma)
+{
+    double low = low_in * 255, high = high_in * 255; // (0, 12.75)
+    double bottom = low_out * 255, top = high_out * 255; // (0, 255)
+    double err_in = high - low, err_out = top - bottom; // (12.75, 255)
+    cv::Mat temp;
+
+    std::vector<cv::Mat> channels;
+    cv::split(src, channels);
+    for (auto &m: channels) {
+        m.convertTo(temp, CV_32FC1);
+        cv::pow((temp - low) / err_in, gamma, temp);
+        temp = temp * err_out + bottom;
+        cv::convertScaleAbs(temp, m);
+//        temp.convertTo(m, m.type());
+    }
+    cv::merge(channels, res);
+
+    // intensity transform
+//    for(int y = 0; y < in->rows; y++) {
+//        for (int x = 0; x < in->cols; x++) {
+//            out->data[x + y * out->step] = cv::saturate_cast<uchar>(pow((in->data[x + y * in->step] - low) / err_in, gamma) * err_out + bottom);
+//        }
+//    }
 }
 
 void ImageProc::gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw, double *range, double range_thresh)
@@ -537,51 +623,6 @@ void ImageProc::paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double
     res = img_3d.clone();
 }
 
-void ImageProc::accumulative_enhance(cv::Mat &src, cv::Mat &res, float accu_base)
-{
-    uchar *img = src.data;
-    int w = src.cols, h = src.rows, step = src.step;
-    uint max_val = 1 << (8 * (src.depth() / 2 + 1));
-    for (int i = 0; i < h; i++) {
-        for (int j = 0; j < w; j++) {
-            uchar p = img[i * step + j];
-            if      (p < 0.250 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 2.4);}
-            else if (p < 0.439 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.8);}
-            else if (p < 0.565 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.6);}
-            else if (p < 0.628 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.5);}
-            else if (p < 0.691 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.4);}
-            else if (p < 0.753 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.25);}
-            else if (p < 0.785 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.2);}
-            else if (p < 0.816 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.15);}
-            else if (p < 0.848 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.125);}
-            else if (p < 0.879 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.1);}
-            else if (p < 0.942 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1.05);}
-            else if (p < 1.000 * max_val) {img[i * step + j] = cv::saturate_cast<uchar>(p * accu_base * 1);}
-        }
-    }
-}
-
-// low: 0, 0; high: 0.05, 1; gamma:1.2
-void ImageProc::adaptive_enhance(cv::Mat &src, cv::Mat &res, double low_in, double high_in, double low_out, double high_out, double gamma)
-{
-    double low = low_in * 255, high = high_in * 255; // (0, 12.75)
-    double bottom = low_out * 255, top = high_out * 255; // (0, 255)
-    double err_in = high - low, err_out = top - bottom; // (12.75, 255)
-
-    cv::Mat temp;
-    src.convertTo(temp, CV_32FC1);
-    cv::pow((temp - low) / err_in, gamma, temp);
-    temp = temp * err_out + bottom;
-    temp.convertTo(res, src.type());
-
-    // intensity transform
-//    for(int y = 0; y < in->rows; y++) {
-//        for (int x = 0; x < in->cols; x++) {
-//            out->data[x + y * out->step] = cv::saturate_cast<uchar>(pow((in->data[x + y * in->step] - low) / err_in, gamma) * err_out + bottom);
-//        }
-//    }
-}
-
 void ImageProc::haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega, float t0, int guided_radius, float eps)
 {
 //    LARGE_INTEGER t1, t2, tc;
@@ -612,7 +653,7 @@ void ImageProc::haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega
     cv::Mat transmission(h, w, CV_32FC1);
     dark.convertTo(transmission, CV_32FC1);
     transmission = 1 - omega * transmission / A_avg;
-    guided_filter(transmission, src, guided_radius, eps, 3);
+    guided_image_filter(transmission, src, guided_radius, eps, 3);
 //    cv::imwrite("res/transmission.bmp", transmission * 255.0);
 
 //    QueryPerformanceCounter(&t2);
@@ -654,6 +695,36 @@ void ImageProc::brightness_and_contrast(cv::Mat &src, cv::Mat &res, float gamma)
     }
 }
 
+void ImageProc::guided_image_filter(cv::Mat &img, cv::Mat &guidance, int r, float eps, int fast)
+{
+    cv::Mat I_f, p_f;
+    cv::Mat mean_p, mean_I, corr_I, corr_Ip, var_I, cov_Ip, a, b, mean_a, mean_b;
+    if (guidance.channels() == 3) cv::cvtColor(guidance, I_f, cv::COLOR_RGB2GRAY);
+    else I_f = guidance.clone();
+    I_f.convertTo(I_f, CV_32FC1);
+    img.convertTo(p_f, CV_32FC1);
+    cv::resize(I_f, I_f, cv::Size(guidance.cols / fast, guidance.rows / fast));
+    cv::resize(p_f, p_f, cv::Size(img.cols / fast, img.rows / fast));
+    I_f /= 255.0;
+
+    cv::boxFilter(I_f, mean_I, CV_32FC1, cv::Size(2 * r + 1, 2 * r + 1));
+    cv::boxFilter(p_f, mean_p, CV_32FC1, cv::Size(2 * r + 1, 2 * r + 1));
+    cv::boxFilter(I_f.mul(I_f), corr_I, CV_32FC1, cv::Size(2 * r + 1, 2 *r + 1));
+    cv::boxFilter(I_f.mul(p_f), corr_Ip, CV_32FC1, cv::Size(2 * r + 1, 2 * r + 1));
+
+    var_I = corr_I - mean_I.mul(mean_I);
+    cov_Ip = corr_Ip - mean_I.mul(mean_p);
+
+    a = cov_Ip.mul(1 / (var_I + eps));
+    b = mean_p - a.mul(mean_I);
+
+    cv::boxFilter(a, mean_a, CV_32FC1, cv::Size(2 * r + 1, 2 * r + 1));
+    cv::boxFilter(b, mean_b, CV_32FC1, cv::Size(2 * r + 1, 2 * r + 1));
+
+    p_f = mean_a.mul(I_f) + mean_b;
+    cv::resize(p_f, p_f, img.size());
+    p_f.convertTo(img, img.type());
+}
 std::vector<uchar> ImageProc::estimate_atmospheric_light_avg(cv::Mat &src, cv::Mat &dark)
 {
     uchar *ptr = dark.data;
@@ -732,35 +803,4 @@ void ImageProc::dark_channel(cv::Mat &src, cv::Mat &dark, cv::Mat &inter, int r)
             ptr2[i * w + j] = curr_min;
         }
     }
-}
-
-void ImageProc::guided_filter(cv::Mat &p, cv::Mat &I, int r, float eps, int fast)
-{
-    cv::Mat I_f, p_f;
-    cv::Mat mean_p, mean_I, corr_I, corr_Ip, var_I, cov_Ip, a, b, mean_a, mean_b;
-    if (I.channels() == 3) cv::cvtColor(I, I_f, cv::COLOR_RGB2GRAY);
-    else I_f = I.clone();
-    I_f.convertTo(I_f, CV_32FC1);
-    p.convertTo(p_f, CV_32FC1);
-    cv::resize(I_f, I_f, cv::Size(I.cols / fast, I.rows / fast));
-    cv::resize(p_f, p_f, cv::Size(p.cols / fast, p.rows / fast));
-    I_f /= 255.0;
-
-    cv::boxFilter(I_f, mean_I, CV_32FC1, cv::Size(2 * r + 1, 2 * r + 1));
-    cv::boxFilter(p_f, mean_p, CV_32FC1, cv::Size(2 * r + 1, 2 * r + 1));
-    cv::boxFilter(I_f.mul(I_f), corr_I, CV_32FC1, cv::Size(2 * r + 1, 2 *r + 1));
-    cv::boxFilter(I_f.mul(p_f), corr_Ip, CV_32FC1, cv::Size(2 * r + 1, 2 * r + 1));
-
-    var_I = corr_I - mean_I.mul(mean_I);
-    cov_Ip = corr_Ip - mean_I.mul(mean_p);
-
-    a = cov_Ip.mul(1 / (var_I + eps));
-    b = mean_p - a.mul(mean_I);
-
-    cv::boxFilter(a, mean_a, CV_32FC1, cv::Size(2 * r + 1, 2 * r + 1));
-    cv::boxFilter(b, mean_b, CV_32FC1, cv::Size(2 * r + 1, 2 * r + 1));
-
-    p_f = mean_a.mul(I_f) + mean_b;
-    cv::resize(p_f, p_f, p.size());
-    p_f.convertTo(p, p.type());
 }
