@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.5)
 
 project(Demo_combined LANGUAGES CXX)
 
@@ -17,6 +17,7 @@ set(Hik_SDK_DIR "${SDK_DIR}/mvs")
 set(HQV_DIR "${SDK_DIR}/HQV")
 set(EURESYS_DIR "${SDK_DIR}/euresys")
 set(OpenCV_DIR "${SDK_DIR}/opencv")
+set(FFMPEG_DIR "${SDK_DIR}/ffmpeg")
 
 # QtCreator supports the following variables for Android, which are identical to qmake Android variables.
 # Check http://doc.qt.io/qt-5/deployment-android.html for more information.
@@ -38,11 +39,13 @@ include_directories(${Hik_SDK_DIR}/include)
 include_directories(${HQV_DIR}/include)
 include_directories(${EURESYS_DIR}/include)
 include_directories(${OpenCV_DIR}/include)
+include_directories(${FFMPEG_DIR}/include)
 
 link_directories(${Hik_SDK_DIR}/lib)
 link_directories(${HQV_DIR}/lib)
 link_directories(${EURESYS_DIR}/lib)
 link_directories(${OpenCV_DIR}/lib)
+link_directories(${FFMPEG_DIR}/lib/x64)
 
 set(SOURCE_FILES
 	main.cpp
@@ -88,6 +91,21 @@ set(PROJECT_LIBS
 	opencv_imgcodecs454
 	opencv_imgproc454
 	opencv_videoio454
+    # ffmpeg
+    avcodec
+    avformat
+    avutil
+    avfilter
+    swscale
+    swresample
+    postproc
+    libx264
+    # win lib for ffmpeg
+    Strmiids
+    Mfuuid
+    ws2_32
+    Secur32
+    Bcrypt
 )
 
 add_executable(Demo_param WIN32 ${SOURCE_FILES})

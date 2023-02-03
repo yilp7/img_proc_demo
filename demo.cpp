@@ -1,4 +1,4 @@
-﻿#include "demo.h"
+#include "demo.h"
 #include "./ui_demo_dev.h"
 
 GrabThread::GrabThread(void *info)
@@ -110,10 +110,13 @@ Demo::Demo(QWidget *parent)
     save_original(false),
     save_modified(false),
     image_3d(false),
+    is_color(false),
     w(640),
     h(400),
+    grab_image(false),
     h_grab_thread(NULL),
     grab_thread_state(false),
+    video_thread_state(false),
     h_mouse_thread(NULL),
     seq_idx(0),
     scan(false),
@@ -471,12 +474,13 @@ void Demo::data_exchange(bool read){
 }
 
 int Demo::grab_thread_process() {
+    grab_thread_state = true;
     Display *disp = ui->SOURCE_DISPLAY;
     ProgSettings *settings = ui->TITLE->prog_settings;
     QImage stream;
     cv::Mat sobel;
     float weight = h / 1024.0; // font scale & thickness
-    while (grab_thread_state) {
+    while (grab_image) {
         if (img_q.empty()) {
             QThread::msleep(5);
             continue;
@@ -496,7 +500,7 @@ int Demo::grab_thread_process() {
         if (settings->central_symmetry) cv::flip(img_mem, img_mem, -1);
 
         // mcp self-adaptive
-        if (auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
+        if (!is_color && auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
             int thresh_num = img_mem.total() / 200, thresh = 255;
             while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
             if (thresh > 240) emit update_mcp_in_thread(mcp - sqrt(thresh - 240));
@@ -508,33 +512,33 @@ int Demo::grab_thread_process() {
         }
 
         // tenengrad (sobel) auto-focus
-        cv::Sobel(img_mem, sobel, CV_16U, 1, 1);
-        clarity[2] = clarity[1], clarity[1] = clarity[0], clarity[0] = cv::mean(sobel)[0] * 1000;
-        if (focus_direction) {
-            if (clarity[2] > clarity[1] && clarity[1] > clarity[0]) {
-                focus_direction *= -2;
-                // TODO not yet well implemented
-                if (abs(focus_direction) > 7) lens_stop(), focus_direction = 0;
-                else if (focus_direction > 0) lens_stop(), change_focus_speed(8), focus_far();
-                else if (focus_direction < 0) lens_stop(), change_focus_speed(16), focus_near();
-            }
-        }
+//        cv::Sobel(img_mem, sobel, CV_16U, 1, 1);
+//        clarity[2] = clarity[1], clarity[1] = clarity[0], clarity[0] = cv::mean(sobel)[0] * 1000;
+//        if (focus_direction) {
+//            if (clarity[2] > clarity[1] && clarity[1] > clarity[0]) {
+//                focus_direction *= -2;
+//                // TODO not yet well implemented
+//                if (abs(focus_direction) > 7) lens_stop(), focus_direction = 0;
+//                else if (focus_direction > 0) lens_stop(), change_focus_speed(8), focus_far();
+//                else if (focus_direction < 0) lens_stop(), change_focus_speed(16), focus_near();
+//            }
+//        }
 
         // process frame average
-        if (seq_sum.empty()) seq_sum = cv::Mat::zeros(h, w, CV_16U);
+        if (seq_sum.empty()) seq_sum = cv::Mat::zeros(h, w, CV_MAKETYPE(CV_16U, is_color ? 3 : 1));
         if (ui->FRAME_AVG_CHECK->isChecked()) {
             calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 5 + 5;
-            if (seq[9].empty()) for (auto& m: seq) m = cv::Mat::zeros(h, w, CV_16U);
+            if (seq[9].empty()) for (auto& m: seq) m = cv::Mat::zeros(h, w, CV_MAKETYPE(CV_16U, is_color ? 3 : 1));
 
             img_mem.convertTo(seq[seq_idx], CV_16U);
             for(int i = 0; i < calc_avg_option; i++) seq_sum += seq[i];
 
             seq_idx = (seq_idx + 1) % calc_avg_option;
 
-            seq_sum.convertTo(modified_result, CV_8U, 1.0 / calc_avg_option);
+            seq_sum.convertTo(modified_result, CV_MAKETYPE(CV_8U, is_color ? 3 : 1), 1.0 / calc_avg_option);
             seq_sum.release();
         }
-        else modified_result = img_mem.clone();
+        else img_mem.convertTo(modified_result, CV_MAKETYPE(CV_8U, is_color ? 3 : 1));
 
         // process 3d image construction from ABN frames
         if (image_3d) {
@@ -672,24 +676,24 @@ int Demo::grab_thread_process() {
             }
 
             // display grayscale histogram of current image
-            if (ui->HISTOGRAM_RADIO->isChecked()) {
-                if (modified_result.channels() != 1) continue;
-                uchar *img = modified_result.data;
-                int step = modified_result.step;
-                memset(hist, 0, 256 * sizeof(uint));
-                for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img + i * step)[j]]++;
-                uint max = 0;
-                for (int i = 1; i < 256; i++) {
-                    // discard abnormal value
-//                    if (hist[i] > 50000) hist[i] = 0;
-                    if (hist[i] > max) max = hist[i];
-                }
-                cv::Mat hist_image(225, 256, CV_8UC3, cv::Scalar(56, 64, 72));
-                for (int i = 0; i < 256; i++) {
-                    cv::rectangle(hist_image, cv::Point(i, 225), cv::Point(i + 2, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
-                }
-                ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
-            }
+//            if (ui->HISTOGRAM_RADIO->isChecked()) {
+//                if (modified_result.channels() != 1) continue;
+//                uchar *img = modified_result.data;
+//                int step = modified_result.step;
+//                memset(hist, 0, 256 * sizeof(uint));
+//                for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(img + i * step)[j]]++;
+//                uint max = 0;
+//                for (int i = 1; i < 256; i++) {
+//                    // discard abnormal value
+////                    if (hist[i] > 50000) hist[i] = 0;
+//                    if (hist[i] > max) max = hist[i];
+//                }
+//                cv::Mat hist_image(225, 256, CV_8UC3, cv::Scalar(56, 64, 72));
+//                for (int i = 0; i < 256; i++) {
+//                    cv::rectangle(hist_image, cv::Point(i, 225), cv::Point(i + 2, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
+//                }
+//                ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+//            }
 
             // put info (dist, dov, time) as text on image
             if (ui->INFO_CHECK->isChecked()) {
@@ -716,7 +720,7 @@ int Demo::grab_thread_process() {
         if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(cropped_img, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
 
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
-        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, image_3d ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, image_3d || is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
         ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 
         // process scan
@@ -730,8 +734,14 @@ int Demo::grab_thread_process() {
         if (scan && std::round(delay_dist) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
 
         // image write / video record
-        if (save_original) save_to_file(false);
-        if (save_modified) save_to_file(true);
+        if (save_original) {
+            save_to_file(false);
+            if (device_type == -1) save_original = 0;
+        }
+        if (save_modified) {
+            save_to_file(true);
+            if (device_type == -1) save_modified = 0;
+        }
         if (record_original) {
             if (base_unit == 2) cv::putText(img_mem, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             else cv::putText(img_mem, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
@@ -744,11 +754,13 @@ int Demo::grab_thread_process() {
                 else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(w - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
+            if (is_color || image_3d) cv::cvtColor(modified_result, modified_result, cv::COLOR_RGB2BGR);
             vid_out[1].write(modified_result);
         }
 
         image_mutex.unlock();
     }
+    grab_thread_state = false;
     return 0;
 }
 
@@ -882,7 +894,7 @@ int Demo::shut_down() {
     if (record_original) on_SAVE_AVI_BUTTON_clicked();
     if (record_modified) on_SAVE_FINAL_BUTTON_clicked();
 
-    grab_thread_state = false;
+    grab_image = false;
     if (h_grab_thread) {
         h_grab_thread->quit();
         h_grab_thread->wait();
@@ -1042,6 +1054,7 @@ void Demo::on_START_BUTTON_clicked()
     }
     device_on = true;
     enable_controls(true);
+    is_color = false;
 
     curr_cam->set_frame_callback(&img_q);
 
@@ -1127,17 +1140,17 @@ void Demo::on_START_GRABBING_BUTTON_clicked()
 {
     if (!device_on || start_grabbing || curr_cam == NULL) return;
 
-    grab_thread_state = true;
+    grab_image = true;
     h_grab_thread = new GrabThread((void*)this);
     if (h_grab_thread == NULL) {
-        grab_thread_state = false;
+        grab_image = false;
         QMessageBox::warning(this, "PROMPT", tr("Create thread fail"));
         return;
     }
     h_grab_thread->start();
 
     if (curr_cam->start_grabbing()) {
-        grab_thread_state = false;
+        grab_image = false;
         h_grab_thread->quit();
         h_grab_thread->wait();
         delete h_grab_thread;
@@ -1145,7 +1158,7 @@ void Demo::on_START_GRABBING_BUTTON_clicked()
         return;
     }
     start_grabbing = true;
-    ui->SOURCE_DISPLAY->grab = true;
+    ui->SOURCE_DISPLAY->is_grabbing = true;
     enable_controls(true);
 }
 
@@ -1158,7 +1171,7 @@ void Demo::on_STOP_GRABBING_BUTTON_clicked()
 
     if (!img_q.empty()) std::queue<cv::Mat>().swap(img_q);
 
-    grab_thread_state = false;
+    grab_image = false;
     if (h_grab_thread) {
         h_grab_thread->quit();
         h_grab_thread->wait();
@@ -1167,9 +1180,13 @@ void Demo::on_STOP_GRABBING_BUTTON_clicked()
     }
 
     start_grabbing = false;
-    ui->SOURCE_DISPLAY->grab = false;
+    ui->SOURCE_DISPLAY->is_grabbing = false;
     ui->SOURCE_DISPLAY->clear();
-    enable_controls(true);
+
+    enable_controls(device_type);
+    if (device_type == -1) ui->ENUM_BUTTON->click();
+//    if (device_type == -2) ui->ENUM_BUTTON->click(), video_input->stop(), video_surface->stop();
+    if (device_type == -2) ui->ENUM_BUTTON->click();
 }
 
 void Demo::on_SAVE_BMP_BUTTON_clicked()
@@ -1197,7 +1214,7 @@ void Demo::on_SAVE_FINAL_BUTTON_clicked()
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         image_mutex.lock();
         res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi");
-        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), image_3d);
+        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w, h), image_3d || is_color);
         image_mutex.unlock();
     }
     record_modified = !record_modified;
@@ -1254,7 +1271,7 @@ void Demo::clean()
 {
     ui->SOURCE_DISPLAY->clear();
     ui->DATA_EXCHANGE->clear();
-    if (grab_thread_state) return;
+    if (grab_image) return;
     std::queue<cv::Mat>().swap(img_q);
     img_mem.release();
     modified_result.release();
@@ -2380,8 +2397,301 @@ void Demo::dropEvent(QDropEvent *event)
 {
     QMainWindow::dropEvent(event);
 
-    QString config_name = event->mimeData()->urls().first().toLocalFile();
-    load_config(config_name);
+    static QMimeDatabase mime_db;
+
+    if (event->mimeData()->urls().length() == 1) {
+        QString file_name = event->mimeData()->urls().first().toLocalFile();
+        QFileInfo file_info = QFileInfo(file_name);
+        if (file_info.exists() && file_info.size() > 2e9) {
+            QMessageBox::warning(this, "PROMPT", tr("File size limit (2 Gb) exceeded"));
+            return;
+        }
+        // TODO: check file type before reading/processing file
+//        QMimeType file_type = mime_db.mimeTypeForFile(file_name);
+        if (mime_db.mimeTypeForFile(file_name).name().startsWith("video")) {
+            load_video_file(file_name);
+            return;
+        }
+
+        if (!load_image_file(file_name, true)) load_config(file_name);
+
+    }
+    else {
+        bool result = true, init = true;
+        for (QUrl path : event->mimeData()->urls()) {
+            bool temp = load_image_file(path.toLocalFile(), init);
+            if (init) init = !temp;
+            result |= temp;
+        }
+        if (!result) QMessageBox::warning(this, "PROMPT", tr("Some of the image files cannot be read"));
+    }
+}
+
+bool Demo::load_image_file(QString filename, bool init)
+{
+    if (init) grab_image = false;
+    if (!display_mutex.tryLock(1e3)) return false;
+
+    QImage qimage_temp;
+    cv::Mat mat_temp;
+
+    if (!qimage_temp.load(filename)) return false;
+
+    if (device_on) {
+        QMessageBox::warning(this, "PROMPT", tr("Cannot read local image while cam is on"));
+        return true;
+    }
+
+    if (init) start_static_display(qimage_temp.width(), qimage_temp.height(), qimage_temp.format() != QImage::Format_Indexed8);
+    qimage_temp = qimage_temp.convertToFormat(is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+
+    img_q.push(cv::Mat(h, w, is_color ? CV_8UC3 : CV_8UC1, (uchar*)qimage_temp.bits(), qimage_temp.bytesPerLine()).clone());
+
+    display_mutex.unlock();
+    return true;
+}
+
+void Demo::start_static_display(int width, int height, bool is_color, int pixel_depth, int device_type)
+{
+    if (grab_image || h_grab_thread) {
+        grab_image = false;
+        if (h_grab_thread) {
+            h_grab_thread->quit();
+            h_grab_thread->wait();
+            delete h_grab_thread;
+            h_grab_thread = NULL;
+        }
+    }
+    while (grab_thread_state) ;
+    std::queue<cv::Mat>().swap(img_q);
+
+    image_mutex.lock();
+    w = width;
+    h = height;
+    this->is_color = is_color;
+//    pixel_depth = img.depth();
+//    this->pixel_depth = pixel_depth;
+    this->device_type = device_type;
+    image_mutex.unlock();
+
+    QResizeEvent e(this->size(), this->size());
+    resizeEvent(&e);
+
+    grab_image = true;
+    h_grab_thread = new GrabThread((void*)this);
+    if (h_grab_thread == NULL) {
+        grab_image = false;
+        QMessageBox::warning(this, "PROMPT", tr("Cannot display image"));
+        return;
+    }
+    h_grab_thread->start();
+    start_grabbing = true;
+    ui->SOURCE_DISPLAY->is_grabbing = true;
+    enable_controls(true);
+    ui->START_BUTTON->setEnabled(false);
+}
+
+void init_filter_graph(AVFormatContext *format_context, int video_stream_idx, AVFilterGraph *filter_graph, AVCodecContext *codec_context,
+                       AVFilterContext **buffersink_ctx, AVFilterContext **buffersrc_ctx) {
+    char args[512];
+    const AVFilter *buffersrc  = avfilter_get_by_name("buffer");
+    const AVFilter *buffersink = avfilter_get_by_name("buffersink");
+    AVFilterInOut *outputs = avfilter_inout_alloc();
+    AVFilterInOut *inputs  = avfilter_inout_alloc();
+//    std::shared_ptr<AVFilterInOut*> deleter_input_filter(&inputs, avfilter_inout_free);
+//    std::shared_ptr<AVFilterInOut*> deleter_output_filter(&outputs, avfilter_inout_free);
+
+    AVRational time_base = format_context->streams[video_stream_idx]->time_base;
+    static enum AVPixelFormat pix_fmts[] = { AV_PIX_FMT_GRAY8, AV_PIX_FMT_NONE };
+
+    if (!outputs || !inputs || !filter_graph) return;
+
+    /* buffer video source: the decoded frames from the decoder will be inserted here. */
+    snprintf(args, sizeof(args), "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
+             codec_context->width, codec_context->height, codec_context->pix_fmt, time_base.num, time_base.den,
+             codec_context->sample_aspect_ratio.num, codec_context->sample_aspect_ratio.den);
+
+    if (avfilter_graph_create_filter(buffersrc_ctx, buffersrc, "in", args, NULL, filter_graph) < 0) return;
+
+    /* buffer video sink: to terminate the filter chain. */
+    if (avfilter_graph_create_filter(buffersink_ctx, buffersink, "out", NULL, NULL, filter_graph) < 0) return;
+
+    if (av_opt_set_int_list(*buffersink_ctx, "pix_fmts", pix_fmts, AV_PIX_FMT_NONE, AV_OPT_SEARCH_CHILDREN) < 0) return;
+
+    outputs->name       = av_strdup("in");
+    outputs->filter_ctx = *buffersrc_ctx;
+    outputs->pad_idx    = 0;
+    outputs->next       = NULL;
+
+    inputs->name       = av_strdup("out");
+    inputs->filter_ctx = *buffersink_ctx;
+    inputs->pad_idx    = 0;
+    inputs->next       = NULL;
+
+    if (avfilter_graph_parse_ptr(filter_graph, "format=gray", &inputs, &outputs, NULL) < 0) return;
+
+    if (avfilter_graph_config(filter_graph, NULL) < 0) return;
+
+    avfilter_inout_free(&inputs);
+    avfilter_inout_free(&outputs);
+}
+
+static int ffmpeg_interrupt_callback(void *p) {
+    time_t *t0 = (time_t *)p;
+    if (*t0 > 0 && time(NULL) - *t0 > 5) return 1;
+    return 0;
+}
+
+int Demo::load_video_file(QString filename, bool format_gray)
+{
+//    video_input->setMedia(QUrl(filename));
+//    video_input->setMuted(true);
+//    video_input->play();
+//    video_surface->frame_count = 0;
+    std::thread t([this, filename, format_gray](){
+        grab_image = false;
+        if (!display_mutex.tryLock(1e3)) return -1;
+
+        AVFormatContext *format_context = avformat_alloc_context();
+        std::shared_ptr<AVFormatContext*> closer_format_context(&format_context, avformat_close_input);
+        AVCodecParameters *codec_param = NULL;
+//        std::shared_ptr<AVCodecParameters*> deleter_codec_param(&codec_param, avcodec_parameters_free);
+        const AVCodec *codec = NULL;
+        AVCodecContext *codec_context = avcodec_alloc_context3(NULL);
+        std::shared_ptr<AVCodecContext*> closer_codec_context(&codec_context, avcodec_free_context);
+        AVFrame *frame = av_frame_alloc();
+        std::shared_ptr<AVFrame*> deleter_frame(&frame, av_frame_free);
+        AVFrame *frame_result = av_frame_alloc();
+        std::shared_ptr<AVFrame*> deleter_frame_result(&frame_result, av_frame_free);
+        AVFrame *frame_filter = av_frame_alloc();
+        std::shared_ptr<AVFrame*> deleter_frame_filter(&frame_filter, av_frame_free);
+        uint8_t *buffer = NULL;
+        std::shared_ptr<uint8_t> deleter_buffer(buffer, av_free);
+        SwsContext *sws_context = NULL;
+        std::shared_ptr<SwsContext> deleter_sws_context(sws_context, sws_freeContext);
+        static AVFilterContext *buffersink_ctx = NULL;
+        static AVFilterContext *buffersrc_ctx = NULL;
+        AVFilterGraph *filter_graph = avfilter_graph_alloc();
+        std::shared_ptr<AVFilterGraph*> deleter_filter_graph(&filter_graph, avfilter_graph_free);
+
+        // process timeout
+        static time_t start_time = 0;
+
+        format_context->interrupt_callback.callback = ffmpeg_interrupt_callback;
+        format_context->interrupt_callback.opaque = &start_time;
+
+        // open input video
+        start_time = time(NULL);
+        if (avformat_open_input(&format_context, filename.toUtf8().constData(), NULL, NULL) != 0) { display_mutex.unlock(); return -2; }
+
+        // fetch video info
+        if (avformat_find_stream_info(format_context, NULL) < 0) { display_mutex.unlock(); return -2; }
+
+        // find the first video stream
+        int video_stream_idx = -1;
+        for (int i = 0; i < format_context->nb_streams; i++) {
+            if (format_context->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+                video_stream_idx = i;
+                break;
+            }
+        }
+        if (video_stream_idx == -1) { display_mutex.unlock(); return -2; }
+
+        // point the codec parameter to the first stream's
+        codec_param = format_context->streams[video_stream_idx]->codecpar;
+
+        fps = frame_rate_edit = std::round(format_context->streams[video_stream_idx]->r_frame_rate.num / format_context->streams[video_stream_idx]->r_frame_rate.den);
+
+        codec = avcodec_find_decoder(codec_param->codec_id);
+        if (codec == NULL) { display_mutex.unlock(); return -3; }
+
+        if (avcodec_parameters_to_context(codec_context, codec_param) < 0) { display_mutex.unlock(); return -3; }
+
+        if (avcodec_open2(codec_context, codec, NULL) < 0) { display_mutex.unlock(); return -3; }
+
+        cv::Mat cv_frame(codec_context->height, codec_context->width, CV_MAKETYPE(CV_8U, format_gray ? 1 : 3));
+
+        // allocate data buffer
+        AVPixelFormat pixel_fmt = format_gray ? AV_PIX_FMT_NV12 : AV_PIX_FMT_RGB24;
+        int byte_num = av_image_get_buffer_size(pixel_fmt, codec_context->width, codec_context->height, 1);
+        buffer = (uint8_t *)av_malloc(byte_num * sizeof(uint8_t));
+
+        av_image_fill_arrays(frame_result->data, frame_result->linesize, buffer, pixel_fmt, codec_context->width, codec_context->height, 1);
+
+        sws_context = sws_getContext(codec_context->width, codec_context->height, codec_context->pix_fmt,
+                                     codec_context->width, codec_context->height, pixel_fmt, SWS_BILINEAR, NULL, NULL, NULL);
+
+        start_static_display(codec_context->width, codec_context->height, !format_gray, 8, -2);
+
+        AVPacket packet;
+        if (format_gray) init_filter_graph(format_context, video_stream_idx, filter_graph, codec_context, &buffersink_ctx, &buffersrc_ctx);
+
+        AVRational time_base = format_context->streams[video_stream_idx]->time_base;
+        AVRational time_base_q = { 1, AV_TIME_BASE };
+        long long last_pts = AV_NOPTS_VALUE;
+        long long delay;
+        QElapsedTimer elapsed_timer;
+        int result;
+        while (grab_image) {
+            start_time = time(NULL);
+            if ((result = av_read_frame(format_context, &packet)) < 0) continue;
+
+            // release packet allocated by av_read_frame after iteration
+            std::shared_ptr<AVPacket> deleter_packet(&packet, av_packet_unref);
+
+            // if the packet contains data of video stream
+            if (packet.stream_index == video_stream_idx) {
+                // decode packet
+                avcodec_send_packet(codec_context, &packet);
+                // returns 0 only after decoding the entire frame
+                if (avcodec_receive_frame(codec_context, frame) == 0) {
+//                    qDebug() << QDateTime::currentDateTime().toString("hh:MM:ss.zzz");
+                    if (format_gray) {
+                        // push the decoded frame into the filtergraph
+                        if (av_buffersrc_add_frame_flags(buffersrc_ctx, frame, AV_BUFFERSRC_FLAG_KEEP_REF) < 0) break;
+
+                        // pull filtered frames from the filtergraph
+                        av_frame_unref(frame_filter);
+                        int ret = av_buffersink_get_frame(buffersink_ctx, frame_filter);
+                        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
+                    }
+                    else {
+                        if (frame->pts != AV_NOPTS_VALUE) {
+                            if (last_pts != AV_NOPTS_VALUE) {
+                                delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1000;
+//                                qDebug() << av_rescale_q(frame->pts - last_pts, time_base, time_base_q) << elapsed_timer.nsecsElapsed() / 1000;
+                                if (delay > 0 && delay < 1000000) av_usleep(delay);
+                                elapsed_timer.restart();
+                            }
+                            last_pts = frame->pts;
+                        }
+//                        av_frame_unref(frame_result);
+                        sws_scale(sws_context, frame->data, frame->linesize, 0, codec_context->height, frame_result->data, frame_result->linesize);
+                    }
+
+                    cv_frame.data = (format_gray ? frame_filter : frame_result)->data[0];
+                    img_q.push(cv_frame.clone());
+
+                    av_frame_unref(frame);
+                }
+            }
+        }
+//        avfilter_graph_free(&filter_graph);
+//        sws_freeContext(sws_context);
+//        av_free(&buffer);
+//        av_frame_free(&frame_filter);
+//        av_frame_free(&frame_result);
+//        av_frame_free(&frame);
+//        avcodec_free_context(&codec_context);
+//        avcodec_parameters_free(&codec_param);
+//        avformat_close_input(&format_context);
+
+        display_mutex.unlock();
+        return 0;
+    });
+    t.detach();
+
+    return 0;
 }
 
 void Demo::showEvent(QShowEvent *event)
@@ -2515,9 +2825,12 @@ void Demo::on_FRAME_AVG_CHECK_stateChanged(int arg1)
 
 void Demo::on_SAVE_RESULT_BUTTON_clicked()
 {
-    save_modified = !save_modified;
     if (save_modified && !QDir(save_location + "/res_bmp").exists()) QDir().mkdir(save_location + "/res_bmp");
-    ui->SAVE_RESULT_BUTTON->setText(save_modified ? tr("Stop") : tr("Capture"));
+    if (device_type == -1) save_modified = 1;
+    else {
+        save_modified = !save_modified;
+        ui->SAVE_RESULT_BUTTON->setText(save_modified ? tr("Stop") : tr("Capture"));
+    }
 }
 
 void Demo::on_LASER_ZOOM_IN_BTN_pressed()

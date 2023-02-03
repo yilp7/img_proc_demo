@@ -1,4 +1,4 @@
-﻿#ifndef DEMO_H
+#ifndef DEMO_H
 #define DEMO_H
 
 #include <QSerialPort>
@@ -11,6 +11,17 @@
 //#include "mvcam.h"
 //#include "hqvscam.h"
 //#include "euresyscam.h"
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libswscale/swscale.h>
+#include <libavutil/imgutils.h>
+#include <libavfilter/buffersink.h>
+#include <libavfilter/buffersrc.h>
+#include <libavutil/opt.h>
+#include <libavutil/time.h>
+}
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class Demo; }
@@ -292,6 +303,11 @@ private:
     void convert_write(QDataStream &out, const int TYPE);
     bool convert_read(QDataStream &out, const int TYPE);
 
+    // static image/video display
+    bool load_image_file(QString filename, bool init);
+    void start_static_display(int width, int height, bool is_color, int pixel_depth = 8, int device_type = -1);
+    int load_video_file(QString filename, bool format_gray = false);
+
 public:
     bool                    mouse_pressed;
 
@@ -303,6 +319,7 @@ private:
     bool                    trigger_by_software;        // whether the device gets trigger signal from sw
 
     QMutex                  image_mutex;                // img handle lock
+    QMutex                  display_mutex;
     QMutex                  port_mutex;                 // port handle lock
     Cam*                    curr_cam;                   // current camera
     float                   time_exposure_edit;
@@ -358,12 +375,15 @@ private:
     bool                    save_scan;
     bool                    image_3d;                   // whether to build a 3d image
     int                     trigger_source;             // where the device gets the trigger signal
+    bool                    is_color;
 
     int                     w;                          // image width
     int                     h;                          // image height
 
+    bool                    grab_image;                 // whether thread should continue grabbing image
     GrabThread*             h_grab_thread;              // img-grab thread handle
-    bool                    grab_thread_state;          // whether thread is created
+    bool                    grab_thread_state;          // whether grabbing thread is on
+    bool                    video_thread_state;         // whether video reading thread is on
     MouseThread*            h_mouse_thread;             // processes mouse img
 
     cv::Mat                 img_mem;                    // right-side img display source (stream)

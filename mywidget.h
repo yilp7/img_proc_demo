@@ -30,7 +30,7 @@ public:
     QPoint    center;
     QPoint    prev_pos; // start position of mouse when image is dragged
     QPoint    ori_pos;  // start position of roi when image is dragged
-    bool      grab;
+    bool      is_grabbing;
     bool      drag;
     int       curr_scale;
     float     scale[5];

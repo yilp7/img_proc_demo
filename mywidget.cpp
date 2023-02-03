@@ -1,14 +1,14 @@
-﻿#include "mywidget.h"
+#include "mywidget.h"
 
 Display::Display(QWidget *parent) : QLabel(parent)
   , lefttop(0, 0)
   , center(0, 0)
-  , grab(false)
+  , is_grabbing(false)
   , drag(false)
   , curr_scale(0)
 //  , scale{ QSize(640, 512), QSize(480, 384), QSize(320, 256), QSize(160, 128), QSize(80, 64)}
 //  , scale{ QSize(640, 400), QSize(480, 300), QSize(320, 200), QSize(160, 100), QSize(80, 50)}
-  , scale{ 1.0, 2.0 / 3, 1.0 / 2, 1.0 / 4, 1.0 / 8}
+  , scale{ 1.0f, 2.0f / 3, 1.0f / 2, 1.0f / 4, 1.0f / 8}
   , pressed(false)
 {
 
@@ -40,7 +40,7 @@ void Display::mousePressEvent(QMouseEvent *event)
 //    qDebug("pos: %d, %d\n", event->globalX(), event->globalY());
 //    qDebug("%s pressed\n", qPrintable(this->objectName()));
 
-    if (!grab) return;
+    if (!is_grabbing) return;
     pressed = true;
     prev_pos = event->pos();
     ori_pos = lefttop;
@@ -54,7 +54,7 @@ void Display::mouseMoveEvent(QMouseEvent *event)
 {
     QLabel::mouseMoveEvent(event);
 
-    if (!grab) return;
+    if (!is_grabbing) return;
     if (geometry().contains(event->pos())) emit curr_pos(event->pos());
     if (!pressed) return;
 //    qDebug("pos: %d, %d\n", event->x(), event->y());
@@ -74,7 +74,7 @@ void Display::mouseReleaseEvent(QMouseEvent *event)
     QLabel::mouseReleaseEvent(event);
 
     if(event->button() != Qt::LeftButton) return;
-    if (!grab) return;
+    if (!is_grabbing) return;
 
     pressed = false;
     if (drag) return;
@@ -87,7 +87,7 @@ void Display::wheelEvent(QWheelEvent *event)
 {
     QLabel::wheelEvent(event);
 
-    if (!grab) return;
+    if (!is_grabbing) return;
     QPoint center = lefttop + QPoint((int)(scale[curr_scale] * this->width() / 2), (int)(scale[curr_scale] * this->height() / 2));
     QLabel::wheelEvent(event);
     if(event->delta() > 0) {
