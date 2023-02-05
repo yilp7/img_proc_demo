@@ -14,9 +14,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(BUILD_STATIC 0)
 
 if (CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(SDK_DIR "${PROJECT_SOURCE_DIR}/sdk64")
+    set(SDK_DIR "${PROJECT_SOURCE_DIR}/../SDK/sdk64")
 else()
-    set(SDK_DIR "${PROJECT_SOURCE_DIR}/sdk32")
+    set(SDK_DIR "${PROJECT_SOURCE_DIR}/../SDK/sdk32")
 endif()
 
 set(Hik_SDK_DIR "${SDK_DIR}/mvs")

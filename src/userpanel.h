@@ -92,6 +92,7 @@ public slots:
     void set_dev_ip(int ip, int gateway);
     void change_pixel_format(int pixel_format);
     void update_lower_3d_thresh();
+    void save_current_video();
 
     // signaled by joystick input
     void joystick_button_pressed(int btn);
@@ -253,6 +254,9 @@ signals:
     // task queue full in thread pool
     void task_queue_full();
 
+    // local video (or stream) stopped playing
+    void video_stopped();
+
 #ifdef LVTONG
     // update fishnet result in thread
     void update_fishnet_result(int res);
@@ -336,9 +340,7 @@ private:
     // static image display (drag & drop)
     void start_static_display(int width, int height, bool is_color, int pixel_depth = 8, int device_type = -1);
     bool load_image_file(QString filename, bool init);
-    int open_video_file(QString filename, bool format_gray = false, void (*process_frame)(cv::Mat &frame) = NULL);
-    int load_video_file(QString filename, bool format_gray = false);
-    int save_video_file(QString file_in, QString file_out, bool is_color = true);
+    int load_video_file(QString filename, bool format_gray = false, void (*process_frame)(cv::Mat &frame, void *ptr) = NULL, void *ptr = NULL, bool display = true);
 
     // status display
     void update_pixel_depth(int depth);
@@ -366,7 +368,10 @@ private:
     float                   frame_rate_edit;
     QString                 save_location;              // where to save the image
     QString                 TEMP_SAVE_LOCATION;         // temp location to save the image
-    cv::VideoWriter         vid_out[2];                 // video writer for ORI/RES
+    cv::VideoWriter         vid_out[3];                 // video writer for ORI/RES
+    QString                 current_video_filename;     // name of the imported video file (if not a stream)
+    QString                 output_filename;            // target output name when exporting video
+    QString                 temp_output_filename;       // temp save location of target output file
 
     TCU*                    ptr_tcu;
     Lens*                   ptr_lens;

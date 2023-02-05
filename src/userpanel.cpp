@@ -360,6 +360,16 @@ UserPanel::UserPanel(QWidget *parent)
 //            current_frame.unmap();
 //        }, Qt::QueuedConnection);
 
+    connect(this, &UserPanel::video_stopped, this,
+            [this](){
+                vid_out[2].release();
+                if (!temp_output_filename.isEmpty() && !output_filename.isEmpty()) {
+                    std::thread t(UserPanel::move_to_dest, temp_output_filename.trimmed(), output_filename.trimmed());
+                    t.detach();
+                }
+                temp_output_filename = output_filename = "";
+            });
+
     laser_settings = new LaserSettings();
     connect(laser_settings, SIGNAL(com_write(int, QByteArray)), this, SLOT(com_write_data(int, QByteArray)));
 
@@ -986,6 +996,7 @@ inline bool UserPanel::is_maximized()
 // used when moving temp recorded vid to destination
 void UserPanel::move_to_dest(QString src, QString dst)
 {
+    qDebug() << src << "->" << dst;
     QFile::rename(src, dst);
 }
 
@@ -1997,6 +2008,27 @@ void UserPanel::update_lower_3d_thresh()
     ui->RANGE_THRESH_EDIT->setText(QString::number((int)(pref->lower_3d_thresh * (1 << pixel_depth))));
 }
 
+// TODO implement function to prompt for output filename and video conversion
+void UserPanel::save_current_video()
+{
+    if (device_type != -2 || current_video_filename.isEmpty()) return;
+    output_filename = QFileDialog::getSaveFileName(this, tr("Name the Output Video"), save_location,
+                                                tr("MPEG-4 Video           (*.mp4);;\
+                                                    Audio Video Interleaved(*.avi);;\
+                                                    All Files              (*.*)"));
+    if (output_filename.isEmpty()) { temp_output_filename.clear(); return; }
+
+    srand(time(NULL));
+    temp_output_filename = TEMP_SAVE_LOCATION + "/" + QString::number(rand(), 16) + ".mp4";
+    vid_out[2].open(temp_output_filename.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit, cv::Size(w, h), true);
+    load_video_file(current_video_filename, false,
+                    [](cv::Mat &frame, void *ptr){
+                        cv::Mat frame_swapped;
+                        cv::cvtColor(frame, frame_swapped, cv::COLOR_RGB2BGR);
+                        (*(cv::VideoWriter*)ptr).write(frame_swapped);
+                    }, vid_out + 2, false);
+}
+
 void UserPanel::joystick_button_pressed(int btn)
 {
     switch (btn) {
@@ -2237,7 +2269,7 @@ void UserPanel::prompt_for_input_file()
     button_box.button(QDialogButtonBox::Ok)->setDefault(true);
 
     // Process when OK button is clicked
-    if (input_file_dialog.exec() == QDialog::Accepted) load_video_file(file_path->text(), use_gray_format->isChecked());
+    if (input_file_dialog.exec() == QDialog::Accepted) load_video_file(file_path->text(), use_gray_format->isChecked(), [](cv::Mat &frame, void* ptr){ (*(std::queue<cv::Mat>*)ptr).push(frame.clone()); }, &(this->img_q));
 }
 
 // convert data to be sent to TCU-COM to hex buffer
@@ -3379,7 +3411,7 @@ void UserPanel::dropEvent(QDropEvent *event)
         // TODO: check file type before reading/processing file
 //        QMimeType file_type = mime_db.mimeTypeForFile(file_name);
         if (mime_db.mimeTypeForFile(file_name).name().startsWith("video")) {
-            load_video_file(file_name);
+            load_video_file(current_video_filename = file_name, false, [](cv::Mat &frame, void* ptr){ (*(std::queue<cv::Mat>*)ptr).push(frame.clone()); }, &(this->img_q));
             return;
         }
 
@@ -3478,26 +3510,25 @@ void init_filter_graph(AVFormatContext *format_context, int video_stream_idx, AV
     avfilter_inout_free(&outputs);
 }
 
-typedef struct {
-    time_t lasttime;
-} VidTimer;
-
 static int ffmpeg_interrupt_callback(void *p) {
     time_t *t0 = (time_t *)p;
-    if (*t0 > 0 && time(NULL) - *t0 > 5) return 1;
+    if (*t0 > 0 && time(NULL) - *t0 > 10) return 1;
     return 0;
 }
 
 // TODO: release ptrs after exited half-way
-int UserPanel::load_video_file(QString filename, bool format_gray)
+int UserPanel::load_video_file(QString filename, bool format_gray, void (*process_frame)(cv::Mat &, void *), void *ptr, bool display)
 {
 //    video_input->setMedia(QUrl(filename));
 //    video_input->setMuted(true);
 //    video_input->play();
 //    video_surface->frame_count = 0;
-    std::thread t([this, filename, format_gray](){
-        grab_image = false;
-        if (!display_mutex.tryLock(1e3)) return -1;
+    std::thread t([this, filename, format_gray, process_frame, ptr, display](){
+        if (current_video_filename != filename) current_video_filename = "";
+        if (display) {
+            grab_image = false;
+            if (!display_mutex.tryLock(1e3)) return -1;
+        }
 
         AVFormatContext *format_context = avformat_alloc_context();
         std::shared_ptr<AVFormatContext*> closer_format_context(&format_context, avformat_close_input);
@@ -3522,17 +3553,17 @@ int UserPanel::load_video_file(QString filename, bool format_gray)
         std::shared_ptr<AVFilterGraph*> deleter_filter_graph(&filter_graph, avfilter_graph_free);
 
         // process timeout
-        static time_t start_time = 0;
+        time_t start_time = 0;
 
         format_context->interrupt_callback.callback = ffmpeg_interrupt_callback;
         format_context->interrupt_callback.opaque = &start_time;
 
         // open input video
         start_time = time(NULL);
-        if (avformat_open_input(&format_context, filename.toUtf8().constData(), NULL, NULL) != 0) { display_mutex.unlock(); return -2; }
+        if (avformat_open_input(&format_context, filename.toUtf8().constData(), NULL, NULL) != 0) { if (display) display_mutex.unlock(); return -2; }
 
         // fetch video info
-        if (avformat_find_stream_info(format_context, NULL) < 0) { display_mutex.unlock(); return -2; }
+        if (avformat_find_stream_info(format_context, NULL) < 0) { if (display) display_mutex.unlock(); return -2; }
 
         // find the first video stream
         int video_stream_idx = -1;
@@ -3542,19 +3573,19 @@ int UserPanel::load_video_file(QString filename, bool format_gray)
                 break;
             }
         }
-        if (video_stream_idx == -1) { display_mutex.unlock(); return -2; }
+        if (video_stream_idx == -1) { if (display) display_mutex.unlock(); return -2; }
 
         // point the codec parameter to the first stream's
         codec_param = format_context->streams[video_stream_idx]->codecpar;
 
-        fps = frame_rate_edit = std::round(format_context->streams[video_stream_idx]->r_frame_rate.num / format_context->streams[video_stream_idx]->r_frame_rate.den);
+        if (display) fps = frame_rate_edit = std::round(format_context->streams[video_stream_idx]->r_frame_rate.num / format_context->streams[video_stream_idx]->r_frame_rate.den);
 
         codec = avcodec_find_decoder(codec_param->codec_id);
-        if (codec == NULL) { display_mutex.unlock(); return -3; }
+        if (codec == NULL) { if (display) display_mutex.unlock(); return -3; }
 
-        if (avcodec_parameters_to_context(codec_context, codec_param) < 0) { display_mutex.unlock(); return -3; }
+        if (avcodec_parameters_to_context(codec_context, codec_param) < 0) { if (display) display_mutex.unlock(); return -3; }
 
-        if (avcodec_open2(codec_context, codec, NULL) < 0) { display_mutex.unlock(); return -3; }
+        if (avcodec_open2(codec_context, codec, NULL) < 0) { if (display) display_mutex.unlock(); return -3; }
 
         cv::Mat cv_frame(codec_context->height, codec_context->width, CV_MAKETYPE(CV_8U, format_gray ? 1 : 3));
 
@@ -3568,7 +3599,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray)
         sws_context = sws_getContext(codec_context->width, codec_context->height, codec_context->pix_fmt,
                                      codec_context->width, codec_context->height, pixel_fmt, SWS_BILINEAR, NULL, NULL, NULL);
 
-        start_static_display(codec_context->width, codec_context->height, !format_gray, 8, -2);
+        if (display) start_static_display(codec_context->width, codec_context->height, !format_gray, 8, -2);
 
         AVPacket packet;
         if (format_gray) init_filter_graph(format_context, video_stream_idx, filter_graph, codec_context, &buffersink_ctx, &buffersrc_ctx);
@@ -3581,7 +3612,11 @@ int UserPanel::load_video_file(QString filename, bool format_gray)
         int result;
         while (grab_image) {
             start_time = time(NULL);
-            if ((result = av_read_frame(format_context, &packet)) < 0) continue;
+            if ((result = av_read_frame(format_context, &packet)) < 0) {
+//                if (result == AVERROR_EOF) grab_image = false;
+                if (result == AVERROR_EOF) break;
+                continue;
+            }
 
             // release packet allocated by av_read_frame after iteration
             std::shared_ptr<AVPacket> deleter_packet(&packet, av_packet_unref);
@@ -3603,7 +3638,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray)
                         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
                     }
                     else {
-                        if (frame->pts != AV_NOPTS_VALUE) {
+                        if (display && frame->pts != AV_NOPTS_VALUE) {
                             if (last_pts != AV_NOPTS_VALUE) {
                                 delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1000;
 //                                qDebug() << av_rescale_q(frame->pts - last_pts, time_base, time_base_q) << elapsed_timer.nsecsElapsed() / 1000;
@@ -3617,7 +3652,9 @@ int UserPanel::load_video_file(QString filename, bool format_gray)
                     }
 
                     cv_frame.data = (format_gray ? frame_filter : frame_result)->data[0];
-                    img_q.push(cv_frame.clone());
+
+                    if (process_frame) (*process_frame)(cv_frame, ptr);
+//                    img_q.push(cv_frame.clone());
 
                     av_frame_unref(frame);
                 }
@@ -3633,7 +3670,9 @@ int UserPanel::load_video_file(QString filename, bool format_gray)
 //        avcodec_parameters_free(&codec_param);
 //        avformat_close_input(&format_context);
 
-        display_mutex.unlock();
+        if (display) display_mutex.unlock();
+
+        if (!display) this->video_stopped();
         return 0;
     });
     t.detach();
