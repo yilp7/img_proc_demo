@@ -1,6 +1,6 @@
 #include "mvcam.h"
 
-Cam::Cam() {dev_handle = NULL; cameralink = false;}
+Cam::Cam() {dev_handle = NULL; cameralink = false; gige_dev_list = {0}; usb3_dev_list = {0}; curr_idx = 0; }
 Cam::~Cam() {if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;}
 
 cv::Mat img; // hik
@@ -8,23 +8,25 @@ cv::Mat img; // hik
 int Cam::search_for_devices()
 {
     device_type = 0;
-    MV_CC_DEVICE_INFO_LIST st_dev_list = {0};
     // FIXME: error 2 -2146885623
-    MV_CC_EnumDevices(MV_GIGE_DEVICE | MV_USB_DEVICE, &st_dev_list);
-    if (st_dev_list.nDeviceNum) {
+    MV_CC_EnumDevices(MV_GIGE_DEVICE, &gige_dev_list);
+    MV_CC_EnumDevices(MV_USB_DEVICE,  &usb3_dev_list);
+    if (gige_dev_list.nDeviceNum) {
         device_type = 1;
-        int ret = MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
+        int ret = MV_CC_CreateHandle(&dev_handle, gige_dev_list.pDeviceInfo[0]);
+    }
+    else if (usb3_dev_list.nDeviceNum) {
+        device_type = 1;
+        int ret = MV_CC_CreateHandle(&dev_handle, usb3_dev_list.pDeviceInfo[0]);
     }
 
     return device_type;
 }
 
-int Cam::start() {
-    // get and store devices list to m_stDevList
-    MV_CC_DEVICE_INFO_LIST st_dev_list;
-    MV_CC_EnumDevices(MV_GIGE_DEVICE | MV_USB_DEVICE, &st_dev_list);
+int Cam::start(int idx) {
+    curr_idx = idx;
     if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;
-    int ret = MV_CC_CreateHandle(&dev_handle, st_dev_list.pDeviceInfo[0]);
+    int ret = MV_CC_CreateHandle(&dev_handle, idx < gige_dev_list.nDeviceNum ? gige_dev_list.pDeviceInfo[idx] : usb3_dev_list.pDeviceInfo[idx - gige_dev_list.nDeviceNum]);
     device_type = 1;
 
     ret = MV_CC_OpenDevice(dev_handle);
@@ -192,13 +194,10 @@ void Cam::binning(bool read, int *val)
 int Cam::ip_address(bool read, int *ip, int *gateway, int *nic_address)
 {
     if (read) {
-        MV_CC_DEVICE_INFO_LIST st_dev_list = {0};
-        MV_CC_EnumDevices(MV_GIGE_DEVICE, &st_dev_list);
-        if (st_dev_list.nDeviceNum) {
-            *ip = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nCurrentIp;
-            *gateway = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nDefultGateWay;
-            if (nic_address) *nic_address = st_dev_list.pDeviceInfo[0]->SpecialInfo.stGigEInfo.nNetExport;
-        }
+        if (curr_idx >= gige_dev_list.nDeviceNum) return 0;
+        *ip = gige_dev_list.pDeviceInfo[curr_idx]->SpecialInfo.stGigEInfo.nCurrentIp;
+        *gateway = gige_dev_list.pDeviceInfo[curr_idx]->SpecialInfo.stGigEInfo.nDefultGateWay;
+        if (nic_address) *nic_address = gige_dev_list.pDeviceInfo[curr_idx]->SpecialInfo.stGigEInfo.nNetExport;
         return 0;
     }
     else {

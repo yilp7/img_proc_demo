@@ -1,6 +1,6 @@
 #include "threadpool.h"
 
-ThreadPool::ThreadPool(int num): _thread_num(num), _is_running(false) {}
+ThreadPool::ThreadPool(int num): _is_running(false), _thread_num(num) {}
 
 ThreadPool::~ThreadPool()
 {

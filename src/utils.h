@@ -5,12 +5,21 @@
 #include <QtWidgets>
 #include <QtSerialPort>
 #include <QtNetwork>
+
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
+#ifdef LVTONG
 #include <opencv2/dnn.hpp>
+#endif
 #include <opencv2/videoio.hpp>
+
 #include "PixelType.h"
+
+//#include "cam.h"
+#include "mvcam.h"
+//#include "hqvscam.h"
+//#include "euresyscam.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>

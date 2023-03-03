@@ -4,10 +4,6 @@
 #include "joystick.h"
 #include "threadpool.h"
 #include "imageproc.h"
-//#include "cam.h"
-#include "mvcam.h"
-//#include "hqvscam.h"
-//#include "euresyscam.h"
 #include "controlport.h"
 
 #include "preferences.h"
@@ -89,10 +85,13 @@ public slots:
     void set_tcu_as_shared_port(bool share);
     void com_write_data(int com_idx, QByteArray data);
     void display_baudrate(int idx);
+    void update_dev_ip();
     void set_dev_ip(int ip, int gateway);
     void change_pixel_format(int pixel_format);
     void update_lower_3d_thresh();
+    void reset_custom_3d_params();
     void save_current_video();
+    void set_tcu_type(int idx);
 
     // signaled by joystick input
     void joystick_button_pressed(int btn);
@@ -237,6 +236,8 @@ private slots:
 
     void on_IMG_REGION_BTN_clicked();
 
+    void on_SWITCH_TCU_UI_BTN_clicked();
+
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);
@@ -256,6 +257,10 @@ signals:
 
     // local video (or stream) stopped playing
     void video_stopped();
+
+    // update device list in preferences ui
+    void update_device_list(int, QStringList);
+    void device_connection_status_changed(int, QStringList);
 
 #ifdef LVTONG
     // update fishnet result in thread
@@ -345,6 +350,12 @@ private:
     // status display
     void update_pixel_depth(int depth);
 
+    // tcu_type
+    void update_tcu_param_pos(QLabel *u_unit, QLineEdit *n_input, QLabel *n_unit, QLineEdit *p_input);
+    uint get_width_in_us(float val);
+    uint get_width_in_ns(float val);
+    uint get_width_in_ps(float val);
+
 public:
     bool                    mouse_pressed;
 
@@ -378,22 +389,15 @@ private:
     Laser*                  ptr_laser;
     PTZ*                    ptr_ptz;
 
-    // TODO: port communication mostly moved to new class ControlPort
+    // WARNING port communication mostly moved to new class ControlPort
     QSerialPort*            serial_port[5];             // 0: tcu, 1: rangefinder, 2: lens, 3: laser, 4: PTZ
     bool                    serial_port_connected[5];
     QTcpSocket*             tcp_port[5];                // 0-1: 232, 2-4: 485
     bool                    use_tcp[5];
     bool                    share_serial_port;          // whether using a single comm for serial communication
-    float                   rep_freq;
-    int                     laser_width_u, laser_width_n;
-    int                     gate_width_a_u, gate_width_a_n;
-    int                     delay_a_u, delay_a_n, delay_b_u, delay_b_n, delay_n_n;
     float                   stepping;
     int                     hz_unit;
     int                     base_unit;
-    int                     fps;
-    int                     duty;
-    int                     mcp;
     int                     laser_on;
     uint                    zoom;
     uint                    focus;
@@ -493,7 +497,7 @@ private:
     int                     offset_delay;
     int                     offset_gatewidth;
 
-    QButtonGroup*           ptz_grp;                   // ptz button group
+    QButtonGroup*           ptz_grp;                    // ptz button group
     int                     ptz_speed;
     float                   angle_h;
     float                   angle_v;
@@ -503,7 +507,7 @@ private:
 
     // TEMP ONLY
     // TODO move to addons
-    PluginInterface*        pluginInterface;           // for ir with visible light
+    PluginInterface*        pluginInterface;            // for ir with visible light
 
 };
 #endif // USERPANEL_H

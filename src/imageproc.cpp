@@ -393,7 +393,6 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
 #endif
     double max = 0, min = 65535;
     int i, j;
-    double R = delay * 1e-9 * c / 2;
     int image_depth = (src1.depth() / 2 + 1) * 8;
     uchar *uc_ptr;
 
@@ -417,7 +416,8 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
     temp2.convertTo(temp2, CV_32FC1);
 //    range_mat = R + gw * 1e-9 * c / 2 / (temp1 / temp2 + 1);
     cv::multiply(temp1, 1 / temp2, range_mat, 1, CV_32FC1);
-    range_mat = R + gw * 1e-9 * c / 2 / (range_mat + 1);
+    range_mat = delay * 1e-9 * c / 2 + gw * 1e-9 * c / 2 / (range_mat + 1);
+
 //    QueryPerformanceCounter(&t2);
 //    printf("- calc distance: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
 //    t1 = t2;
@@ -623,6 +623,20 @@ void ImageProc::paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double
     res = img_3d.clone();
 }
 
+void ImageProc::split_img(cv::Mat &src, cv::Mat &res)
+{
+    static cv::Mat temp;
+    temp = src.clone();
+    int w = src.cols, h = src.rows, step = src.step;
+    int half_w = src.cols / 2, half_h = src.rows / 2;
+    uchar *ptr_src = temp.data, *ptr_res = res.data;
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            ptr_res[i * step + j] = ptr_src[(2 * (i % half_h) + i / half_h) * step + 2 * (j % half_w) + j / half_w];
+        }
+    }
+}
+
 void ImageProc::haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega, float t0, int guided_radius, float eps)
 {
 //    LARGE_INTEGER t1, t2, tc;
@@ -779,6 +793,7 @@ std::vector<uchar> ImageProc::estimate_atmospheric_light_brightest(cv::Mat &src,
 //        for (int k = 0; k < 3; k++) _A[k] = std::accumulate(max_heap.begin(), max_heap.end(), (uint)0, [ptr1, w, ch, step, k](uint res, const std::pair<uchar, int>& a){ return res + ptr1[a.second / w * step + a.second % w * ch + k]; });
 //        for (int k = 0; k < 3; k++) A[k] = _A[k] / heap_size;
 //    }
+    return A;
 }
 
 void ImageProc::dark_channel(cv::Mat &src, cv::Mat &dark, cv::Mat &inter, int r)

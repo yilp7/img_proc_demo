@@ -1,7 +1,7 @@
 #include "controlport.h"
 #include "userpanel.h"
 
-ControlPort::ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent) :
+ControlPort::ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Preferences *pref, QObject *parent) :
     QObject{parent},
     connected_to_serial(false),
     connected_to_tcp(false),
@@ -19,6 +19,7 @@ ControlPort::ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *
     this->edt = edit;
     this->idx = index;
     this->status_icon = status_icon;
+    this->pref = pref;
     //![0]
 
     //[1] set up timer for communication status check
@@ -93,10 +94,14 @@ void ControlPort::setup_serial_port()
     fclose(f);
 }
 
-void ControlPort::setup_tcp_port(QString ip, int port)
+bool ControlPort::setup_tcp_port(QString ip, int port, bool connect)
 {
-    tcp_port->connectToHost(ip, port);
-    connected_to_tcp = tcp_port->waitForConnected(1000);
+    if (connect) {
+        tcp_port->connectToHost(ip, port);
+        return use_tcp = connected_to_tcp = tcp_port->waitForConnected(1000);
+    }
+        tcp_port->disconnectFromHost();
+        return use_tcp = false;
 }
 
 inline QByteArray ControlPort::generate_ba(uchar *data, int len)
@@ -153,64 +158,171 @@ void ControlPort::share_port_from(ControlPort *port)
     shared_from = port ? port->idx : -1;
 }
 
+int ControlPort::status()
+{
+    if (use_tcp) return connected_to_tcp ? 1 : 0;
+    else return connected_to_serial ? 2 : 0;
+}
+
 void ControlPort::set_theme()
 {
     lbl->setStyleSheet(app_theme ? "color: #180D1C;" : "color: #B0C4DE;");
 }
 
-TCU::TCU(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent, uint init_width) : ControlPort(label, edit, index, status_icon, parent)
-{
-    int u = init_width / 1000, n = init_width % 1000;
-    rep_freq = 3e4f;
-    laser_width_u = u, laser_width_n = n;
-    delay_a_u = 0, delay_a_n = 500;
-    delay_b_u = 0, delay_b_n = 500;
-    gate_width_a_u = u, gate_width_a_n = n;
-    gate_width_b_u = u, gate_width_b_n = n;
-    fps = 10, duty = 5000;
-    mcp = 5;
-    laser_on = 0;
-
-    dist_ns = 3e8 * 1e-9 / 2;
-#ifdef LVTONG
-    dist_ns *= 0.75;
+TCU::TCU(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Preferences *pref, ScanConfig *sc, QObject *parent, uint init_width) :
+    ControlPort(label, edit, index, status_icon, pref, parent),
+    tcu_type(0),
+    scan_mode(0),
+    rep_freq(30),
+    laser_width(init_width),
+    delay_a(500),
+    delay_b(500),
+    gate_width_a(init_width),
+    gate_width_b(init_width),
+    ccd_freq(10),
+    duty(5000),
+    mcp(5),
+    laser_on(0b0000),
+    tcu_dist(1500),
+#ifndef LVTONG
+    dist_ns(3e8 * 1e-9 / 2),
+#else
+    dist_ns(3e8 * 1e-9 / 2 * 0.75),
 #endif
-    delay_n_n = 0;
-    delay_dist = (delay_a_u * 1000 + delay_a_n) * dist_ns;
-    depth_of_view = (gate_width_a_u * 1000 + gate_width_a_n) * dist_ns;
+    delay_n(0),
+    gate_width_n(0),
+    delay_dist(delay_a * dist_ns),
+    depth_of_view(gate_width_a * dist_ns)
+{
+
 }
 
-bool TCU::set_tcu_param(TCU::TCU_PARAMS param, uint val)
+int TCU::set_user_param(TCU::USER_PARAMS cmd, float val)
 {
-    QByteArray out(7, 0x00);
-    out[0] = 0x88;
-    out[1] = param;
-    out[6] = 0x99;
+    if (cmd < 0x0100) {
+        switch (cmd) {
+        case REPEATED_FREQ: rep_freq = val;     set_tcu_param(cmd, 1.25e5 / rep_freq); break;
+        case LASER_WIDTH  : laser_width = val;  set_tcu_param(cmd, (laser_width/* + pref->laser_width_offset*/) / 8); break;
+        case DELAY_A      : delay_a = val;      set_tcu_param(cmd, delay_a + pref->delay_offset); break;
+        case GATE_WIDTH_A : gate_width_a = val; set_tcu_param(cmd, gate_width_a/* + pref->gate_width_offset*/); break;
+        case DELAY_B      : delay_b = val;      set_tcu_param(cmd, delay_a + pref->delay_offset); break;
+        case GATE_WIDTH_B : gate_width_b = val; set_tcu_param(cmd, gate_width_b/* + pref->gate_width_offset*/); break;
+        case CCD_FREQ     : ccd_freq = val;     set_tcu_param(cmd, 1.25e8 / ccd_freq); break;
+        case DUTY         : duty = val;         set_tcu_param(cmd, duty * 1.25e2); break;
+        case MCP          : mcp = val;          set_tcu_param(cmd, val); break;
+        case LASER1       :                     set_tcu_param(cmd, val); break;
+        case LASER2       :                     set_tcu_param(cmd, val); break;
+        case LASER3       :                     set_tcu_param(cmd, val); break;
+        case LASER4       :                     set_tcu_param(cmd, val); break;
+        case DIST         : tcu_dist = val;     set_tcu_param(cmd, val); break;
+        case TOGGLE_LASER :                     set_tcu_param(cmd, val); break;
+        default: break;
+        }
+    }
+    else {
+        switch (cmd) {
+        case DELAY_N:
+            delay_n = val;
+            break;
+        case GATE_WIDTH_N:
+            gate_width_n = val;
+            break;
+        case EST_DIST: {
+            delay_dist = val;
+            delay_a = delay_dist / dist_ns;
+            delay_b = delay_a + delay_n;
 
-    out[5] = val & 0xFF; val >>= 8;
-    out[4] = val & 0xFF; val >>= 8;
-    out[3] = val & 0xFF; val >>= 8;
-    out[2] = val & 0xFF;
+            if (scan_mode) rep_freq = scan_config->rep_freq;
+            else {
+                // change repeated frequency according to delay: rep frequency (kHz) <= 1s / delay (μs)
+                if (pref->auto_rep_freq) {
+                    rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000) : 30;
+                    if (rep_freq > 30) rep_freq = 30;
+//                        if (rep_freq < 10) rep_freq = 10;
+                }
+                set_tcu_param(TCU::REPEATED_FREQ, std::round(1.25e5 / rep_freq));
+            }
+            set_tcu_param(TCU::DELAY_A, std::round(delay_a + pref->delay_offset));
+            set_tcu_param(TCU::DELAY_B, std::round(delay_b + pref->delay_offset));
 
-    communicate_display(out, 7, 1, false);
-    return false;
+            break;
+        }
+        case EST_DOV: {
+            int gw = std::round(val / dist_ns), gw_corrected_a = gw/* + pref->gate_width_offset*/, gw_corrected_b = gw + gate_width_n/* + pref->gate_width_offset*/;
+            if (gw_corrected_a < 100) gw_corrected_a = gw_lut[gw_corrected_a];
+            if (gw_corrected_b < 100) gw_corrected_b = gw_lut[gw_corrected_b];
+            if (gw_corrected_a == -1 || gw_corrected_b == -1) return -1;
+
+            gate_width_a = (depth_of_view = val) / dist_ns;
+            gate_width_b = gate_width_a + gate_width_n;
+            set_tcu_param(TCU::GATE_WIDTH_A, std::round(gw_corrected_a));
+            set_tcu_param(TCU::GATE_WIDTH_B, std::round(gw_corrected_b));
+            break;
+        }
+        case LASER_ON: {
+            int change = laser_on ^ int(val);
+            for(int i = 0; i < 4; i++) if ((change >> i) & 1) set_tcu_param(TCU::USER_PARAMS(TCU::LASER1 + i), int(val) & (1 << i) ? 8 : 4);
+            laser_on = val;
+            break;
+        }
+        default: break;
+        }
+    }
+
+    return 0;
 }
 
-bool TCU::set_user_param(TCU::USER_PARAMS cmd, uint val)
+int TCU::set_tcu_param(TCU::USER_PARAMS param, float val)
 {
-    switch (cmd) {
-    case DELAY_N:
-        delay_n_n = val;
-        break;
-    case EST_DIST: {
-        break;
+    uint integer_part = std::round(val);
+    uint decimal_part = 0;
+
+    switch (tcu_type) {
+    case 0: {
+        QByteArray out(7, 0x00);
+        out[0] = 0x88;
+        out[1] = param;
+        out[6] = 0x99;
+
+        out[5] = integer_part & 0xFF; integer_part >>= 8;
+        out[4] = integer_part & 0xFF; integer_part >>= 8;
+        out[3] = integer_part & 0xFF; integer_part >>= 8;
+        out[2] = integer_part & 0xFF;
+
+        communicate_display(out, 7, 1, false);
+        return false;
     }
-    case EST_DOV:
-        break;
-    case LASER_ON:
-        break;
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    {
+        switch (param) {
+        case DELAY_A:
+        case DELAY_B:
+        case GATE_WIDTH_A:
+        case GATE_WIDTH_B:
+            integer_part = (val >= tcu_type - 1) ? std::round(val - (uint(val) - tcu_type + 1) % 4) : 0;
+            decimal_part = std::round((val - integer_part) / 0.05);
+        default: break;
+        }
+
+        QByteArray out(8, 0x00);
+        out[0] = 0x88;
+        out[1] = param;
+        out[7] = 0x99;
+
+        out[6] = decimal_part;
+        out[5] = integer_part & 0xFF; integer_part >>= 8;
+        out[4] = integer_part & 0xFF; integer_part >>= 8;
+        out[3] = integer_part & 0xFF; integer_part >>= 8;
+        out[2] = integer_part & 0xFF;
+
+        communicate_display(out, 8, 1, false);
+        return false;
     }
-    return false;
+    default: return false;
+    }
 }
 
 void TCU::try_communicate()
@@ -224,7 +336,7 @@ void TCU::try_communicate()
     else                             successive_count = 0;
 }
 
-Lens::Lens(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent, int init_speed) : ControlPort(label, edit, index, status_icon, parent)
+Lens::Lens(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Preferences *pref, QObject *parent, int init_speed) : ControlPort(label, edit, index, status_icon, pref, parent)
 {
     zoom = focus = laser = 0;
     speed = init_speed;
@@ -249,7 +361,7 @@ void Lens::try_communicate()
     else                             successive_count = 0;
 }
 
-Laser::Laser(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent) : ControlPort(label, edit, index, status_icon, parent) {}
+Laser::Laser(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Preferences *pref, QObject *parent) : ControlPort(label, edit, index, status_icon, pref, parent) {}
 
 void Laser::try_communicate()
 {
@@ -262,7 +374,7 @@ void Laser::try_communicate()
     else                             successive_count = 0;
 }
 
-PTZ::PTZ(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent, int init_speed) : ControlPort(label, edit, index, status_icon, parent)
+PTZ::PTZ(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Preferences *pref, QObject *parent, int init_speed) : ControlPort(label, edit, index, status_icon, pref, parent)
 {
     angle_h = angle_v = 0;
     ptz_speed = init_speed;

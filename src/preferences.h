@@ -31,12 +31,21 @@ protected:
     void showEvent(QShowEvent *event);
 
 private slots:
+    // ui
     void jump_to_content(int pos);
+
+    // device
+    void update_device_list(int cmd, QStringList dev_list = QStringList()); // 0: switch status, 1: update available devices
+
+    // serial port
     void send_cmd(QString str);
+
+    // TCU
     void toggle_laser(int id, bool on);
 
 signals:
     // device
+    void query_dev_ip();
     void set_dev_ip(int ip, int gateway);
     void change_pixel_format(int format);
 
@@ -48,6 +57,7 @@ signals:
     void com_write(int idx, QByteArray data);
 
     // tcu config
+    void tcu_type_changed(int idx);
     void rep_freq_unit_changed(int idx);
     void base_unit_changed(int idx);
     void max_dist_changed(float dist);
@@ -56,6 +66,7 @@ signals:
 
     // image process
     void lower_3d_thresh_updated();
+    void query_tcu_param();
 
 public:
     Ui::Preferences* ui;
@@ -65,9 +76,11 @@ public:
     QPoint           prev_pos;
 
     // device
+    int              device_idx;
     int              symmetry;
     int              pixel_type;
     bool             cameralink;
+    bool             split;
 
     // serial comm.
     int              port_idx;
@@ -81,7 +94,7 @@ public:
     int              hz_unit;   // 0: kHz, 1:Hz
     int              base_unit; // 0: ns, 1: μs, 2: m
     float            max_dist;
-    float            delay_dist_offset; // distance offset (from hardware)
+    float            delay_offset; // distance offset (from hardware)
     bool             laser_enable;
     QButtonGroup*    laser_grp;
     int              laser_on; // does not rely on laser_enable
@@ -100,6 +113,9 @@ public:
     double           lower_3d_thresh;
     double           upper_3d_thresh;
     bool             truncate_3d;
+    bool             custom_3d_param;
+    float            custom_3d_delay;
+    float            custom_3d_gate_width;
     bool             fishnet_recog;
     float            fishnet_thresh;
 

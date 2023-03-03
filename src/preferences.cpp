@@ -5,8 +5,10 @@ Preferences::Preferences(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::Preferences),
     pressed(false),
+    device_idx(0),
     symmetry(0),
     cameralink(false),
+    split(false),
     port_idx(0),
     share_port(false),
     use_tcp(false),
@@ -24,7 +26,7 @@ Preferences::Preferences(QWidget *parent) :
 #else
     max_dist(15000),
 #endif
-    delay_dist_offset(0),
+    delay_offset(0),
     laser_grp(NULL),
     laser_on(0),
     accu_base(1),
@@ -40,6 +42,9 @@ Preferences::Preferences(QWidget *parent) :
     lower_3d_thresh(0),
     upper_3d_thresh(0.981),
     truncate_3d(false),
+    custom_3d_param(false),
+    custom_3d_delay(0),
+    custom_3d_gate_width(0),
     fishnet_recog(false),
     fishnet_thresh(0.99)
 {
@@ -62,6 +67,8 @@ Preferences::Preferences(QWidget *parent) :
     //[1] set up ui for device config
     ui->IP_EDIT->setEnabled(false);
     ui->DEVICE_LIST->installEventFilter(this);
+    connect(ui->DEVICE_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
+            [this](int index){ device_idx = index; emit query_dev_ip(); });
     ui->FLIP_OPTION_LIST->addItem("None");
     ui->FLIP_OPTION_LIST->addItem("Both");
     ui->FLIP_OPTION_LIST->addItem("X");
@@ -80,6 +87,7 @@ Preferences::Preferences(QWidget *parent) :
                 emit change_pixel_format(pixel_format[index]);
             });
     connect(ui->CAMERALINK_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ cameralink = arg1; });
+    connect(ui->SPLIT_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ split = arg1; });
     //![1]
 
     //[2] set up ui for serial comm.
@@ -121,6 +129,13 @@ Preferences::Preferences(QWidget *parent) :
     //![2]
 
     //[3] set up ui for tcu config
+    ui->TCU_LIST->addItem("default");
+    ui->TCU_LIST->addItem("#0 50ps step");
+    ui->TCU_LIST->addItem("#1 50ps step");
+    ui->TCU_LIST->addItem("#2 50ps step");
+    ui->TCU_LIST->addItem("#3 50ps step");
+    ui->TCU_LIST->installEventFilter(this);
+
     ui->HZ_LIST->addItem("kHz");
     ui->HZ_LIST->addItem("Hz");
     ui->HZ_LIST->installEventFilter(this);
@@ -132,6 +147,8 @@ Preferences::Preferences(QWidget *parent) :
     ui->UNIT_LIST->setCurrentIndex(0);
     ui->UNIT_LIST->installEventFilter(this);
 
+    connect(ui->TCU_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
+            [this](int index){ emit tcu_type_changed(index); });
     connect(ui->AUTO_REP_FREQ_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ auto_rep_freq = arg1; });
     connect(ui->AUTO_MCP_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ auto_mcp = arg1; });
     connect(ui->HZ_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
@@ -143,21 +160,21 @@ Preferences::Preferences(QWidget *parent) :
                 case 0: // ns
                     ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns)));
                     ui->MAX_DIST_UNIT->setText("ns");
-                    ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_dist_offset / dist_ns)));
+                    ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset / dist_ns)));
                     ui->DELAY_OFFSET_UNIT->setText("ns");
                     break;
                 case 1: // μs
                     ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns / 1000)));
 //                    ui->MAX_DIST_UNIT->setText(QString::fromLocal8Bit("μs"));
                     ui->MAX_DIST_UNIT->setText("μs");
-                    ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_dist_offset / dist_ns / 1000)));
+                    ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset / dist_ns / 1000)));
 //                    ui->DELAY_OFFSET_UNIT->setText(QString::fromLocal8Bit("μs"));
                     ui->DELAY_OFFSET_UNIT->setText("μs");
                     break;
                 case 2: // m
                     ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist)));
                     ui->MAX_DIST_UNIT->setText("m");
-                    ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_dist_offset)));
+                    ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset)));
                     ui->DELAY_OFFSET_UNIT->setText("m");
                     break;
                 default: break;
@@ -167,20 +184,20 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->MAX_DIST_EDT, &QLineEdit::editingFinished, this, [this](){ emit max_dist_changed(max_dist); });
     connect(ui->DELAY_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
-                emit delay_offset_changed(delay_dist_offset);
+                emit delay_offset_changed(delay_offset);
                 FILE *f = fopen("user_default", "rb+");
                 if (!f) return;
-                uint delay_offset = std::round(delay_dist_offset / dist_ns);
-                fseek(f, 6, SEEK_SET);
-                fwrite(&delay_offset, 4, 1, f);
+                uint delay_offset_uint = std::round(delay_offset / dist_ns);
+                fseek(f, 5, SEEK_SET);
+                fwrite(&delay_offset_uint, 4, 1, f);
                 fclose(f);
     });
-    FILE *f = fopen("user_default", "r");
+    FILE *f = fopen("user_default", "rb");
     if (f) {
-        uint delay_offset;
-        fseek(f, 6, SEEK_SET);
-        fread(&delay_offset, 4, 1, f);
-        delay_dist_offset = delay_offset * dist_ns;
+        uint delay_offset_uint;
+        fseek(f, 5, SEEK_SET);
+        fread(&delay_offset_uint, 4, 1, f);
+        delay_offset = delay_offset_uint * dist_ns;
         fclose(f);
     }
 
@@ -210,6 +227,13 @@ Preferences::Preferences(QWidget *parent) :
             [this](int index){ colormap = index; });
     connect(ui->TRUNCATE_3D_CHK, &QCheckBox::stateChanged, this,
             [this](int arg1){ truncate_3d = arg1; });
+    connect(ui->CUSTOM_3D_PARAM_CHK, &QCheckBox::stateChanged, this,
+            [this](int arg1){
+                custom_3d_param = arg1;
+                ui->CUSTOM_3D_DELAY_EDT->setEnabled(arg1);
+                ui->CUSTOM_3D_GW_EDT->setEnabled(arg1);
+                emit query_tcu_param();
+            });
 #ifdef LVTONG
     connect(ui->FISHNET_RECOG_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ fishnet_recog = arg1; });
     connect(ui->FISHNET_THRESH_EDIT, &QLineEdit::editingFinished, this,
@@ -247,6 +271,9 @@ void Preferences::data_exchange(bool read)
         colormap = ui->COLORMAP_3D_LIST->currentIndex();
         lower_3d_thresh = ui->LOWER_3D_THRESH_EDT->text().toFloat();
         upper_3d_thresh = ui->UPPER_3D_THRESH_EDT->text().toFloat();
+        custom_3d_param = ui->CUSTOM_3D_PARAM_CHK->isChecked();
+        custom_3d_delay = ui->CUSTOM_3D_DELAY_EDT->text().toFloat();
+        custom_3d_gate_width = ui->CUSTOM_3D_GW_EDT->text().toFloat();
 #ifdef LVTONG
         fishnet_recog = ui->FISHNET_RECOG_CHK->isChecked();
         fishnet_thresh = ui->FISHNET_THRESH_EDIT->text().toFloat();
@@ -258,17 +285,17 @@ void Preferences::data_exchange(bool read)
         // ns
         case 0:
             max_dist = ui->MAX_DIST_EDT->text().toInt() * dist_ns;
-            delay_dist_offset = ui->DELAY_OFFSET_EDT->text().toInt() * dist_ns;
+            delay_offset = ui->DELAY_OFFSET_EDT->text().toInt() * dist_ns;
             break;
         // μs
         case 1:
             max_dist = ui->MAX_DIST_EDT->text().toInt() * dist_ns * 1000;
-            delay_dist_offset = ui->DELAY_OFFSET_EDT->text().toInt() * dist_ns * 1000;
+            delay_offset = ui->DELAY_OFFSET_EDT->text().toInt() * dist_ns * 1000;
             break;
         // m
         case 2:
             max_dist = ui->MAX_DIST_EDT->text().toInt();
-            delay_dist_offset = ui->DELAY_OFFSET_EDT->text().toInt();
+            delay_offset = ui->DELAY_OFFSET_EDT->text().toInt();
             break;
         default: break;
         }
@@ -291,6 +318,9 @@ void Preferences::data_exchange(bool read)
         ui->COLORMAP_3D_LIST->setCurrentIndex(colormap);
         ui->LOWER_3D_THRESH_EDT->setText(QString::number(lower_3d_thresh, 'f', 3));
         ui->UPPER_3D_THRESH_EDT->setText(QString::number(upper_3d_thresh, 'f', 3));
+        ui->CUSTOM_3D_PARAM_CHK->setChecked(custom_3d_param);
+        ui->CUSTOM_3D_DELAY_EDT->setText(QString::number((int)std::round(custom_3d_delay)));
+        ui->CUSTOM_3D_GW_EDT->setText(QString::number((int)std::round(custom_3d_gate_width)));
 #ifdef LVTONG
         ui->FISHNET_RECOG_CHK->setChecked(fishnet_recog);
         ui->FISHNET_THRESH_EDIT->setText(QString::number(fishnet_thresh, 'f', 2));
@@ -302,17 +332,17 @@ void Preferences::data_exchange(bool read)
         // ns
         case 0:
             ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns)));
-            ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_dist_offset / dist_ns)));
+            ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset / dist_ns)));
             break;
         // μs
         case 1:
             ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns / 1000)));
-            ui->DELAY_OFFSET_EDT->setText(QString::number(delay_dist_offset / dist_ns / 1000, 'f', 2));
+            ui->DELAY_OFFSET_EDT->setText(QString::number(delay_offset / dist_ns / 1000, 'f', 2));
             break;
         // m
         case 2:
             ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist)));
-            ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_dist_offset)));
+            ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset)));
             break;
         default: break;
         }
@@ -444,6 +474,15 @@ void Preferences::jump_to_content(int pos)
     ui->PREFERENCES->verticalScrollBar()->setSliderPosition(pos);
 }
 
+void Preferences::update_device_list(int cmd, QStringList dev_list)
+{
+    switch (cmd) {
+    case 0: ui->DEVICE_LIST->setEnabled(!ui->DEVICE_LIST->isEnabled()); break;
+    case 1: ui->DEVICE_LIST->clear(); ui->DEVICE_LIST->addItems(dev_list); break;
+    default: break;
+    }
+}
+
 void Preferences::send_cmd(QString str)
 {
     QString send_str = str.simplified();
@@ -451,7 +490,7 @@ void Preferences::send_cmd(QString str)
     send_str.replace(" ", "");
     bool ok;
     QByteArray cmd(send_str.length() / 2, 0x00);
-    for (int i = 0; i < send_str.length() / 2; i++) cmd[i] = send_str.mid(i * 2, 2).toInt(&ok, 16);
+    for (int i = 0; i < send_str.length() / 2; i++) cmd[i] = send_str.midRef(i * 2, 2).toInt(&ok, 16);
 
     emit com_write(ui->COM_LIST->currentIndex(), cmd);
 }

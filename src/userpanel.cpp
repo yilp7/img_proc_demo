@@ -37,14 +37,9 @@ UserPanel::UserPanel(QWidget *parent)
     tcp_port{NULL},
     use_tcp{false},
     share_serial_port(false),
-    rep_freq(30),
-    delay_n_n(0),
     stepping(10),
     hz_unit(0),
     base_unit(0),
-    fps(10),
-    duty(5000),
-    mcp(5),
     laser_on(0b0001),
     zoom(0),
     focus(0),
@@ -126,12 +121,18 @@ UserPanel::UserPanel(QWidget *parent)
     ui->MID->setMouseTracking(true);
     ui->RIGHT->setMouseTracking(true);
     ui->TITLE->setMouseTracking(true);
+    ui->STATUS->setMouseTracking(true);
     setMouseTracking(true);
     setCursor(cursor_curr_pointer);
 
     tp.start();
 
     dist_ns = c * 1e-9 / 2;
+
+    // connect title bar to the main window (UserPanel*)
+    ui->TITLE->setup(this);
+    pref = ui->TITLE->preferences;
+    scan_config = ui->TITLE->scan_config;
 
     // initialization
     // - default save path
@@ -302,15 +303,8 @@ UserPanel::UserPanel(QWidget *parent)
     speed_slider->setValue(16);
     ui->PTZ_SPEED_EDIT->setText("16");
 
-    // initialize gatewidth lut
-    for (int i = 0; i < 100; i++) gw_lut[i] = i;
-
     scan_q.push_back(-1);
 //    setup_stepping(0);
-
-    // - write default params
-    data_exchange(false);
-    enable_controls(false);
 
     // set up display info (left bottom corner)
     ui->DATA_EXCHANGE->document()->setMaximumBlockCount(200);
@@ -326,11 +320,6 @@ UserPanel::UserPanel(QWidget *parent)
     display_grp->addButton(ui->PTZ_RADIO);
     display_grp->setExclusive(true);
     // TODO change continuous/trigger exclusive
-
-    // connect title bar to the main window (UserPanel*)
-    ui->TITLE->setup(this);
-    pref = ui->TITLE->preferences;
-    scan_config = ui->TITLE->scan_config;
 
     // connect status bar to the main window
     status_bar = ui->STATUS;
@@ -360,6 +349,11 @@ UserPanel::UserPanel(QWidget *parent)
 //            current_frame.unmap();
 //        }, Qt::QueuedConnection);
 
+    // update enumerated device-list
+    connect(this, SIGNAL(update_device_list(int, QStringList)), pref, SLOT(update_device_list(int, QStringList)));
+    connect(this, SIGNAL(device_connection_status_changed(int, QStringList)), pref, SLOT(update_device_list(int, QStringList)));
+
+    // process post-video stuff
     connect(this, &UserPanel::video_stopped, this,
             [this](){
                 vid_out[2].release();
@@ -375,10 +369,10 @@ UserPanel::UserPanel(QWidget *parent)
 
     // right before gui display (init state)
     // setup serial port with tcp socket
-    ptr_tcu   = new TCU(  ui->TCU_COM,   ui->TCU_COM_EDIT,   0, ui->STATUS->tcu_status, this);
-    ptr_lens  = new Lens( ui->LENS_COM,  ui->LENS_COM_EDIT,  1, ui->STATUS->lens_status, this);
-    ptr_laser = new Laser(ui->LASER_COM, ui->LASER_COM_EDIT, 2, ui->STATUS->laser_status, this);
-    ptr_ptz   = new PTZ(  ui->PTZ_COM,   ui->PTZ_COM_EDIT,   3, ui->STATUS->ptz_status, this);
+    ptr_tcu   = new TCU(  ui->TCU_COM,   ui->TCU_COM_EDIT,   0, ui->STATUS->tcu_status,   pref, scan_config, this);
+    ptr_lens  = new Lens( ui->LENS_COM,  ui->LENS_COM_EDIT,  1, ui->STATUS->lens_status,  pref, this);
+    ptr_laser = new Laser(ui->LASER_COM, ui->LASER_COM_EDIT, 2, ui->STATUS->laser_status, pref, this);
+    ptr_ptz   = new PTZ(  ui->PTZ_COM,   ui->PTZ_COM_EDIT,   3, ui->STATUS->ptz_status,   pref, this);
 //    qDebug() << QThread::currentThread();
     connect(ptr_tcu,   &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
     connect(ptr_lens,  &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
@@ -386,7 +380,7 @@ UserPanel::UserPanel(QWidget *parent)
     connect(ptr_ptz,   &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
 
     uchar com[5] = {0};
-    FILE *f = fopen("user_default", "r");
+    FILE *f = fopen("user_default", "rb");
     if (f) {
         fread(com, 1, 5, f);
         fclose(f);
@@ -395,13 +389,29 @@ UserPanel::UserPanel(QWidget *parent)
 
     for (int i = 0; i < 5; i++) serial_port[i] = new QSerialPort(this)/*, setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600)*/;
     for (int i = 0; i < 5; i++) tcp_port[i] = new QTcpSocket(this);
-    on_ENUM_BUTTON_clicked();
     if (serial_port[0]->isOpen() && serial_port[3]->isOpen()) on_LASER_BTN_clicked();
 
     // connect ptz targeting slots (moved to signal updated_pos)
 //    connect(ui->SOURCE_DISPLAY, SIGNAL(ptz_target(QPoint)), this, SLOT(point_ptz_to_target(QPoint)));
 
+    // init ui
+    ui->LASER_WIDTH_EDIT_P->hide();
+    ui->DELAY_A_EDIT_P->hide();
+    ui->DELAY_B_EDIT_P->hide();
+    ui->GATE_WIDTH_A_EDIT_P->hide();
+    ui->GATE_WIDTH_B_EDIT_P->hide();
+    ui->DELAY_DIFF_GRP->hide();
+    ui->GATE_WIDTH_DIFF_GRP->hide();
+
+    // - write default params
+    data_exchange(false);
+    enable_controls(false);
+
+    // initialize gatewidth lut
+    for (int i = 0; i < 100; i++) ptr_tcu->gw_lut[i] = i;
+
     // - set startup focus
+    ui->ENUM_BUTTON->click();
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
 
 #ifdef LVTONG
@@ -490,19 +500,19 @@ void UserPanel::data_exchange(bool read){
 
         switch (hz_unit) {
         // kHz
-        case 0: rep_freq = ui->FREQ_EDIT->text().toFloat(); break;
+        case 0: ptr_tcu->rep_freq = ui->FREQ_EDIT->text().toFloat(); break;
         // Hz
-        case 1: rep_freq = ui->FREQ_EDIT->text().toFloat() / 1000; break;
+        case 1: ptr_tcu->rep_freq = ui->FREQ_EDIT->text().toFloat() / 1000; break;
         default: break;
         }
-        laser_width_u = ui->LASER_WIDTH_EDIT_U->text().toInt();
-        laser_width_n = ui->LASER_WIDTH_EDIT_N->text().toInt();
-        gate_width_a_u = ui->GATE_WIDTH_A_EDIT_U->text().toInt();
-        gate_width_a_n = ui->GATE_WIDTH_A_EDIT_N->text().toInt();
-        delay_a_u = ui->DELAY_A_EDIT_U->text().toInt();
-        delay_a_n = ui->DELAY_A_EDIT_N->text().toInt();
-//        gate_width_b_u = ui->GATE_WIDTH_B_EDIT_U->text().toInt();
-//        gate_width_b_n = ui->GATE_WIDTH_B_EDIT_N->text().toInt();
+        ptr_tcu->laser_width = ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt() + ui->LASER_WIDTH_EDIT_P->text().toInt() / 1000.;
+        ptr_tcu->gate_width_a = ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt() + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.;
+        ptr_tcu->gate_width_b = ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt() + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000.;
+        ptr_tcu->delay_a = ui->DELAY_A_EDIT_U->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt() + ui->DELAY_A_EDIT_P->text().toInt() / 1000.;
+        ptr_tcu->delay_b = ui->DELAY_B_EDIT_U->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt() + ui->DELAY_A_EDIT_P->text().toInt() / 1000.;
+        ptr_tcu->gate_width_n = ui->GATE_WIDTH_N_EDIT_N->text().toFloat();
+        ptr_tcu->delay_n = ui->DELAY_N_EDIT_N->text().toFloat();
+
         switch (base_unit) {
         // ns
         case 0: stepping = ui->STEPPING_EDIT->text().toFloat(); break;
@@ -512,20 +522,16 @@ void UserPanel::data_exchange(bool read){
         case 2: stepping = ui->STEPPING_EDIT->text().toFloat() / dist_ns; break;
         default: break;
         }
-        delay_b_u = ui->DELAY_B_EDIT_U->text().toInt();
-        delay_b_n = ui->DELAY_B_EDIT_N->text().toInt();
-        delay_n_n = ui->DELAY_N_EDIT_N->text().toInt();
         // use toFloat() since float representation in line edit
-        fps = ui->CCD_FREQ_EDIT->text().toFloat();
-        duty = ui->DUTY_EDIT->text().toFloat() * 1000;
-        mcp = ui->MCP_EDIT->text().toInt();
+        ptr_tcu->ccd_freq = ui->CCD_FREQ_EDIT->text().toFloat();
+        ptr_tcu->duty = ui->DUTY_EDIT->text().toFloat() * 1000;
+        ptr_tcu->mcp = ui->MCP_EDIT->text().toInt();
 
         zoom = ui->ZOOM_EDIT->text().toInt();
         focus = ui->FOCUS_EDIT->text().toInt();
 
-        laser_width = laser_width_u * 1000 + laser_width_n;
-        delay_dist = std::round((delay_a_u * 1000 + delay_a_n) * dist_ns);
-        depth_of_view = std::round((gate_width_a_u * 1000 + gate_width_a_n) * dist_ns);
+        delay_dist = std::round(ptr_tcu->delay_a * dist_ns);
+        depth_of_view = std::round(ptr_tcu->gate_width_a * dist_ns);
     }
     else {
 //        ui->DEVICE_SELECTION->setCurrentIndex(device_idx);
@@ -539,30 +545,32 @@ void UserPanel::data_exchange(bool read){
         ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
         ui->FILE_PATH_EDIT->setText(save_location);
 
-        delay_a_u = std::round(delay_dist / dist_ns) / 1000;
-        delay_a_n = (int)std::round(delay_dist / dist_ns) % 1000;
-        delay_b_u = std::round(delay_dist / dist_ns + delay_n_n) / 1000;
-        delay_b_n = (int)std::round(delay_dist / dist_ns + delay_n_n) % 1000;
-        gate_width_a_u = std::round(depth_of_view / dist_ns) / 1000;
-        gate_width_a_n = (int)std::round(depth_of_view / dist_ns) % 1000;
-        laser_width_u = laser_width / 1000;
-        laser_width_n = laser_width % 1000;
+        ptr_tcu->gate_width_a = depth_of_view / dist_ns;
+        ptr_tcu->gate_width_a = ptr_tcu->gate_width_a + ptr_tcu->gate_width_n;
+        ptr_tcu->delay_a = delay_dist / dist_ns;
+        ptr_tcu->delay_b = ptr_tcu->delay_a + ptr_tcu->delay_n;
 
         setup_hz(hz_unit);
-        ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", laser_width_u));
-        ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%d", laser_width_n));
-        ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", gate_width_a_u));
-        ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%d", gate_width_a_n));
-        ui->DELAY_A_EDIT_U->setText(QString::asprintf("%d", delay_a_u));
-        ui->DELAY_A_EDIT_N->setText(QString::asprintf("%d", delay_a_n));
-//        ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf("%d", gate_width_b_u));
-//        ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%d", gate_width_b_n));
-        ui->DELAY_B_EDIT_U->setText(QString::asprintf("%d", delay_b_u));
-        ui->DELAY_B_EDIT_N->setText(QString::asprintf("%d", delay_b_n));
-        ui->DELAY_N_EDIT_N->setText(QString::asprintf("%d", delay_n_n));
+        ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->laser_width)));
+        ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->laser_width)));
+        ui->LASER_WIDTH_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->laser_width)));
+        ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->gate_width_a)));
+        ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->gate_width_a)));
+        ui->GATE_WIDTH_A_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->gate_width_a)));
+        ui->DELAY_A_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->delay_a)));
+        ui->DELAY_A_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->delay_a)));
+        ui->DELAY_A_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->delay_a)));
+        ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->gate_width_b)));
+        ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->gate_width_b)));
+        ui->GATE_WIDTH_B_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->gate_width_b)));
+        ui->DELAY_B_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->delay_b)));
+        ui->DELAY_B_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->delay_b)));
+        ui->DELAY_B_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->delay_b)));
+        ui->GATE_WIDTH_N_EDIT_N->setText(QString::asprintf("%d", int(std::round(ptr_tcu->gate_width_n))));
+        ui->DELAY_N_EDIT_N->setText(QString::asprintf("%d", int(std::round(ptr_tcu->delay_n))));
         ui->DELAY_SLIDER->setValue(delay_dist);
-        ui->MCP_SLIDER->setValue(mcp);
-        ui->MCP_EDIT->setText(QString::number(mcp));
+        ui->MCP_SLIDER->setValue(ptr_tcu->mcp);
+        ui->MCP_EDIT->setText(QString::number(ptr_tcu->mcp));
 
         setup_stepping(base_unit);
 
@@ -621,11 +629,11 @@ int UserPanel::grab_thread_process() {
             if (pref->auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
                 int thresh_num = img_mem.total() / 200, thresh = 1 << pixel_depth;
                 while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-                if (thresh > (1 << pixel_depth) * 0.94) emit update_mcp_in_thread(mcp - sqrt(thresh - (1 << pixel_depth) * 0.94));
+                if (thresh > (1 << pixel_depth) * 0.94) emit update_mcp_in_thread(ptr_tcu->mcp - sqrt(thresh - (1 << pixel_depth) * 0.94));
 //                qDebug() << "high" << thresh;
 //                thresh_num = img_mem.total() / 100, thresh = 255;
 //                while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-                if (thresh < (1 << pixel_depth) * 0.39) emit update_mcp_in_thread(mcp + sqrt((1 << pixel_depth) * 0.39 - thresh));
+                if (thresh < (1 << pixel_depth) * 0.39) emit update_mcp_in_thread(ptr_tcu->mcp + sqrt((1 << pixel_depth) * 0.39 - thresh));
 //                qDebug() << "low" << thresh;
             }
         }
@@ -696,6 +704,8 @@ int UserPanel::grab_thread_process() {
             img_mem.convertTo(modified_result, CV_MAKETYPE(CV_8U, is_color ? 3 : 1), 1. / (1 << (pixel_depth - 8)));
         }
 
+        if (pref->split) ImageProc::split_img(modified_result, modified_result);
+
         // process 3d image construction from ABN frames
         if (ui->IMG_3D_CHECK->isChecked()) {
             ww = w + 104;
@@ -708,14 +718,16 @@ int UserPanel::grab_thread_process() {
                     static cv::Mat frame_a_avg, frame_b_avg;
                     frame_a_sum.convertTo(frame_a_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
                     frame_b_sum.convertTo(frame_b_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
-                    ImageProc::gated3D_v2(frame_b_avg, frame_a_avg, modified_result, (delay_dist - pref->delay_dist_offset) / dist_ns,
-                                          depth_of_view / dist_ns, pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d);
+                    ImageProc::gated3D_v2(frame_b_avg, frame_a_avg, modified_result,
+                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toInt() : (delay_dist - pref->delay_offset) / dist_ns,
+                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toInt() : depth_of_view / dist_ns,
+                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d);
                 }
                 else {
-                    if (frame_a_3d) ImageProc::gated3D_v2(prev_img, img_mem, modified_result, (delay_dist - pref->delay_dist_offset) / dist_ns,
-                                                          depth_of_view / dist_ns, pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d);
-                    else            ImageProc::gated3D_v2(img_mem, prev_img, modified_result, (delay_dist - pref->delay_dist_offset) / dist_ns,
-                                                          depth_of_view / dist_ns, pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d);
+                    ImageProc::gated3D_v2(frame_a_3d ? prev_img : img_mem, frame_a_3d ? img_mem : prev_img, modified_result,
+                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toInt() : (delay_dist - pref->delay_offset) / dist_ns,
+                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toInt() : depth_of_view / dist_ns,
+                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d);
                 }
                 frame_a_3d ^= 1;
                 prev_3d = modified_result.clone();
@@ -1502,13 +1514,23 @@ void UserPanel::save_to_file(bool save_result) {
 //    }
     // TODO implement 16bit result image processing/writing
     if (save_result) {
-        if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp->clone(), save_location + "/res_bmp/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
+        QString dt = QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz");
+        cv::Mat temp_clone = temp->clone();
+        if (pref->split) {
+            if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp_clone(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp"))) emit task_queue_full();
+            if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp_clone(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp"))) emit task_queue_full();
+            if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp_clone(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp"))) emit task_queue_full();
+            if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp_clone(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp"))) emit task_queue_full();
+        }
+        if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp_clone, save_location + "/res_bmp/" + dt + ".bmp"))) emit task_queue_full();
     } else {
         switch (pixel_depth) {
-        case  8: if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
+        case  8:
+            if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
         case 10:
         case 12:
-        case 16: if (!tp.append_task(std::bind(UserPanel::save_image_tif, temp->clone() * (1 << 16 - pixel_depth), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
+        case 16:
+            if (!tp.append_task(std::bind(UserPanel::save_image_tif, temp->clone() * (1 << (16 - pixel_depth)), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
         default: break;
         }
     }
@@ -1523,7 +1545,7 @@ void UserPanel::save_scan_img() {
     if (scan_config->capture_scan_ori) {
 //        std::thread t_ori(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
 //        t_ori.detach();
-        tp.append_task(std::bind(save_image_bmp, img_mem.clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp"));
+        tp.append_task(std::bind(save_image_bmp, img_mem.clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
     }
 //    dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), modified_result);
@@ -1532,7 +1554,7 @@ void UserPanel::save_scan_img() {
     if (scan_config->capture_scan_res) {
 //        std::thread t_res(save_image_bmp, modified_result, save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
 //        t_res.detach();
-        tp.append_task(std::bind(save_image_bmp, modified_result.clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp"));
+        tp.append_task(std::bind(save_image_bmp, modified_result.clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
     }
 }
 
@@ -1557,7 +1579,8 @@ void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, 
         switch (id) {
         case 0:
 //            convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8);
-            ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+//            ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+            ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
             update_delay();
             update_gate_width();
             change_mcp(5);
@@ -1592,24 +1615,23 @@ void UserPanel::on_ENUM_BUTTON_clicked()
 //    if (ui->TITLE->prog_settings->cameralink) curr_cam->cameralink = true;
     curr_cam->cameralink = pref->cameralink;
     enable_controls(device_type = curr_cam->search_for_devices());
-//    ui->TITLE->prog_settings->enable_ip_editing(device_type == 1);
-    pref->enable_ip_editing(device_type == 1);
-    if (device_type) {
-        int ip, gateway, nic_address;
-        curr_cam->ip_address(true, &ip, &gateway, &nic_address);
-//        ui->TITLE->prog_settings->config_ip(true, ip, gateway);
-        pref->config_ip(true, ip, gateway, nic_address);
-    }
+    update_dev_ip();
+    QStringList sl;
+    for (int i = 0; i < curr_cam->gige_dev_list.nDeviceNum; i++)
+        sl << QString::asprintf("%s %s", curr_cam->gige_dev_list.pDeviceInfo[i]->SpecialInfo.stGigEInfo.chModelName, curr_cam->gige_dev_list.pDeviceInfo[i]->SpecialInfo.stGigEInfo.chManufacturerName);
+    for (int i = 0; i < curr_cam->usb3_dev_list.nDeviceNum; i++)
+        sl << QString::asprintf("%s %s", curr_cam->usb3_dev_list.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chModelName, curr_cam->usb3_dev_list.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chManufacturerName);
+    emit update_device_list(1, sl);
 }
 
 void UserPanel::on_START_BUTTON_clicked()
 {
     if (device_on) return;
     gain_analog_edit = ui->GAIN_EDIT->text().toFloat();
-    duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
-    fps = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
+    ptr_tcu->duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
+    ptr_tcu->ccd_freq = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
 
-    if (curr_cam->start()) {
+    if (curr_cam->start(pref->device_idx)) {
         QMessageBox::warning(this, "PROMPT", tr("start failed"));
         return;
     }
@@ -1660,6 +1682,7 @@ void UserPanel::on_START_BUTTON_clicked()
 
 //    ui->TITLE->prog_settings->set_pixel_format(0);
     pref->set_pixel_format(0);
+    emit device_connection_status_changed(0, QStringList());
 }
 
 void UserPanel::on_SHUTDOWN_BUTTON_clicked()
@@ -1670,14 +1693,15 @@ void UserPanel::on_SHUTDOWN_BUTTON_clicked()
     ui->FRAME_AVG_CHECK->setChecked(false);
     ui->IMG_3D_CHECK->setChecked(false);
     on_ENUM_BUTTON_clicked();
-    clean();
+    QTimer::singleShot(10, this, SLOT(clean()));
+    emit device_connection_status_changed(0, QStringList());
 }
 
 void UserPanel::on_CONTINUOUS_RADIO_clicked()
 {
     gain_analog_edit = ui->GAIN_EDIT->text().toFloat();
-    duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
-    fps = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
+    ptr_tcu->duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
+    ptr_tcu->ccd_freq = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
 
     ui->CONTINUOUS_RADIO->setChecked(true);
     ui->TRIGGER_RADIO->setChecked(false);
@@ -1691,8 +1715,8 @@ void UserPanel::on_CONTINUOUS_RADIO_clicked()
 void UserPanel::on_TRIGGER_RADIO_clicked()
 {
     gain_analog_edit = ui->GAIN_EDIT->text().toFloat();
-    duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
-    fps = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
+    ptr_tcu->duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
+    ptr_tcu->ccd_freq = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
 
     ui->CONTINUOUS_RADIO->setChecked(false);
     ui->TRIGGER_RADIO->setChecked(true);
@@ -1820,17 +1844,19 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
 void UserPanel::on_SET_PARAMS_BUTTON_clicked()
 {
     gain_analog_edit = ui->GAIN_EDIT->text().toFloat();
-    duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
-    fps = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
+    time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
+    frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
 
     // CCD FREQUENCY
-    ptr_tcu->communicate_display(convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
+//    ptr_tcu->communicate_display(convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
+    ptr_tcu->set_user_param(TCU::CCD_FREQ, frame_rate_edit);
 
     // DUTY RATIO -> EXPO. TIME
-    ptr_tcu->communicate_display(convert_to_send_tcu(0x07, duty * 1.25e2), 7, 1, false);
+//    ptr_tcu->communicate_display(convert_to_send_tcu(0x07, duty * 1.25e2), 7, 1, false);
+    ptr_tcu->set_user_param(TCU::DUTY, time_exposure_edit);
 
-    time_exposure_edit = duty;
-    frame_rate_edit = fps;
+//    time_exposure_edit = ptr_tcu->duty;
+//    frame_rate_edit = ptr_tcu->fps;
     if (device_on) {
         curr_cam->time_exposure(false, &time_exposure_edit);
         curr_cam->frame_rate(false, &frame_rate_edit);
@@ -1890,9 +1916,9 @@ void UserPanel::setup_hz(int hz_unit)
     this->hz_unit = hz_unit;
     switch (hz_unit) {
     // kHz
-    case 0: ui->FREQ_UNIT->setText("kHz"); ui->FREQ_EDIT->setText(QString::number((int)rep_freq)); break;
+    case 0: ui->FREQ_UNIT->setText("kHz"); ui->FREQ_EDIT->setText(QString::number(ptr_tcu->rep_freq, 'f', 2)); break;
     // Hz
-    case 1: ui->FREQ_UNIT->setText("Hz"); ui->FREQ_EDIT->setText(QString::number((int)(rep_freq * 1000))); break;
+    case 1: ui->FREQ_UNIT->setText("Hz"); ui->FREQ_EDIT->setText(QString::number((int)(ptr_tcu->rep_freq * 1000))); break;
     default: break;
     }
 }
@@ -1920,17 +1946,13 @@ void UserPanel::setup_max_dist(float max_dist)
 
 void UserPanel::update_delay_offset(float delay_dist_offset)
 {
-    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - pref->delay_dist_offset));
+    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - pref->delay_offset));
 }
 
 // e.g. laser_on: 0b1110 -> laser[1], laser[2] and laser[3] are on, laser[0] is off
 void UserPanel::setup_laser(int laser_on)
 {
-    int change = laser_on ^ this->laser_on;
-//    qDebug() << QString::number(laser_on, 2);
-//    qDebug() << QString::number(change, 2);
-    for(int i = 0; i < 4; i++) if ((change >> i) & 1) ptr_tcu->communicate_display(convert_to_send_tcu(0x1A + i, laser_on & (1 << i) ? 8 : 4), 7, 1, false);
-    this->laser_on = laser_on;
+    ptr_tcu->set_user_param(TCU::LASER_ON, laser_on);
 }
 
 void UserPanel::set_baudrate(int idx, int baudrate)
@@ -1979,6 +2001,18 @@ void UserPanel::display_baudrate(int idx)
     }
 }
 
+void UserPanel::update_dev_ip()
+{
+//    ui->TITLE->prog_settings->enable_ip_editing(device_type == 1);
+    pref->enable_ip_editing(device_type == 1 && pref->device_idx < curr_cam->gige_dev_list.nDeviceNum);
+    if (device_type) {
+        int ip, gateway, nic_address;
+        curr_cam->ip_address(true, &ip, &gateway, &nic_address);
+//        ui->TITLE->prog_settings->config_ip(true, ip, gateway);
+        pref->config_ip(true, ip, gateway, nic_address);
+    }
+}
+
 void UserPanel::set_dev_ip(int ip, int gateway)
 {
     qDebug() << "modify ip: " << hex << curr_cam->ip_address(false, &ip, &gateway);
@@ -2008,6 +2042,12 @@ void UserPanel::update_lower_3d_thresh()
     ui->RANGE_THRESH_EDIT->setText(QString::number((int)(pref->lower_3d_thresh * (1 << pixel_depth))));
 }
 
+void UserPanel::reset_custom_3d_params()
+{
+    pref->ui->CUSTOM_3D_DELAY_EDT->setText(QString::number((int)std::round(ptr_tcu->delay_a)));
+    pref->ui->CUSTOM_3D_GW_EDT->setText(QString::number((int)std::round(ptr_tcu->gate_width_a)));
+}
+
 // TODO implement function to prompt for output filename and video conversion
 void UserPanel::save_current_video()
 {
@@ -2026,7 +2066,26 @@ void UserPanel::save_current_video()
                         cv::Mat frame_swapped;
                         cv::cvtColor(frame, frame_swapped, cv::COLOR_RGB2BGR);
                         (*(cv::VideoWriter*)ptr).write(frame_swapped);
-                    }, vid_out + 2, false);
+    }, vid_out + 2, false);
+}
+
+void UserPanel::set_tcu_type(int idx)
+{
+    int diff = 0;
+    if (ptr_tcu->tcu_type == 0 && idx) diff = 1;
+    if (ptr_tcu->tcu_type && idx == 0) diff = -1;
+    ptr_tcu->tcu_type = idx;
+    ui->DELAY_A->resize(QSize(ui->DELAY_A->width() + 12 * diff, ui->DELAY_A->height()));
+    ui->DELAY_B->resize(QSize(ui->DELAY_B->width() + 12 * diff, ui->DELAY_B->height()));
+    ui->DELAY_GRP->move(idx ? -6 : 0, 100);
+    ui->GATE_WIDTH_A->resize(QSize(ui->GATE_WIDTH_A->width() + 12 * diff, ui->GATE_WIDTH_A->height()));
+    ui->GATE_WIDTH_B->resize(QSize(ui->GATE_WIDTH_B->width() + 12 * diff, ui->GATE_WIDTH_B->height()));
+    ui->GATE_WIDTH_GRP->move(idx ? -6 : 0, 180);
+//    update_tcu_param_pos(ui->LASER_WIDTH_UNIT_U, ui->LASER_WIDTH_EDIT_N, ui->LASER_WIDTH_UNIT_N, ui->LASER_WIDTH_EDIT_P);
+    if (diff) update_tcu_param_pos(ui->DELAY_A_UNIT_U, ui->DELAY_A_EDIT_N, ui->DELAY_A_UNIT_N, ui->DELAY_A_EDIT_P);
+    if (diff) update_tcu_param_pos(ui->DELAY_B_UNIT_U, ui->DELAY_B_EDIT_N, ui->DELAY_B_UNIT_N, ui->DELAY_B_EDIT_P);
+    if (diff) update_tcu_param_pos(ui->GATE_WIDTH_A_UNIT_U, ui->GATE_WIDTH_A_EDIT_N, ui->GATE_WIDTH_A_UNIT_N, ui->GATE_WIDTH_A_EDIT_P);
+    if (diff) update_tcu_param_pos(ui->GATE_WIDTH_B_UNIT_U, ui->GATE_WIDTH_B_EDIT_N, ui->GATE_WIDTH_B_UNIT_N, ui->GATE_WIDTH_B_EDIT_P);
 }
 
 void UserPanel::joystick_button_pressed(int btn)
@@ -2041,14 +2100,14 @@ void UserPanel::joystick_button_pressed(int btn)
         joybtn_L2 = true;
         if      (joybtn_X) on_ZOOM_IN_BTN_pressed(),       lens_adjust_ongoing = 0b001;
         else if (joybtn_Y) on_FOCUS_NEAR_BTN_pressed(),    lens_adjust_ongoing = 0b010;
-        else if (joybtn_A) on_IRIS_OPEN_BTN_pressed(), lens_adjust_ongoing = 0b100;
+        else if (joybtn_A) on_IRIS_OPEN_BTN_pressed(),     lens_adjust_ongoing = 0b100;
         break;
     case JoystickThread::BUTTON::R1: joybtn_R1 = true; break;
     case JoystickThread::BUTTON::R2:
         joybtn_R2 = true;
         if      (joybtn_X) on_ZOOM_OUT_BTN_pressed(),       lens_adjust_ongoing = 0b001;
         else if (joybtn_Y) on_FOCUS_FAR_BTN_pressed(),      lens_adjust_ongoing = 0b010;
-        else if (joybtn_A) on_IRIS_CLOSE_BTN_pressed(), lens_adjust_ongoing = 0b100;
+        else if (joybtn_A) on_IRIS_CLOSE_BTN_pressed(),     lens_adjust_ongoing = 0b100;
         break;
     case JoystickThread::BUTTON::HOME:
     case JoystickThread::BUTTON::SELECT:
@@ -2226,8 +2285,9 @@ void UserPanel::load_config(QString config_name)
 //        data_exchange(false);
         update_delay();
         update_gate_width();
-        ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
-        ui->MCP_SLIDER->setValue(mcp);
+//        ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+        ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
+        ui->MCP_SLIDER->setValue(ptr_tcu->mcp);
         on_SET_PARAMS_BUTTON_clicked();
 //        ui->TITLE->prog_settings->data_exchange(false);
         pref->data_exchange(false);
@@ -2344,98 +2404,61 @@ QByteArray UserPanel::communicate_display(int id, QByteArray write, int write_si
 void UserPanel::update_delay()
 {
 //    qDebug() << sender();
-//    static QElapsedTimer t;
-//    if (t.elapsed() < (fps > 9 ? 900 / fps : 100)) return;
-//    t.start();
+#ifndef LVTONG
+    static QElapsedTimer t;
+    if (t.elapsed() < (ptr_tcu->ccd_freq > 9 ? 900 / ptr_tcu->ccd_freq : 100)) return;
+    t.start();
+#endif
 
     // REPEATED FREQUENCY
+    // FIXME check if delay_dist + offset is valid
     if (delay_dist < 0) delay_dist = 0;
     if (delay_dist > max_dist) delay_dist = max_dist;
 //    qDebug("estimated distance: %f\n", delay_dist);
 
-    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - pref->delay_dist_offset));
+    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - pref->delay_offset));
     if (!qobject_cast<QSlider*>(sender())) ui->DELAY_SLIDER->setValue(delay_dist);
 
-    int delay = std::round(delay_dist / dist_ns);
-    delay_a_u = delay / 1000;
-    delay_a_n = delay % 1000;
-    delay_b_u = (delay + delay_n_n) / 1000;
-    delay_b_n = (delay + delay_n_n) % 1000;
-
-    if (scan) {
-        rep_freq = scan_config->rep_freq;
-    }
-    else {
-        // change repeated frequency according to delay: rep frequency (kHz) <= 1s / delay (μs)
-//        if (ui->TITLE->prog_settings->auto_rep_freq) {
-        if (pref->auto_rep_freq) {
-            rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000) : 30;
-            if (rep_freq > 30) rep_freq = 30;
-//            if (rep_freq < 10) rep_freq = 10;
-        }
-
-        ptr_tcu->communicate_display(convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
-    }
-
-/*
-    // DAC1
-    send = dac1;
-    convert_to_send_tcu(0x09, send);
-    communicate_display(com_tcu, 1, 7);
-
-    // DAC2
-    send = mcp;
-    convert_to_send_tcu(0x0A, send);
-    communicate_display(com[0], 1, 7);
-*/
-    // DELAY A
-    ptr_tcu->communicate_display(convert_to_send_tcu(0x02, (delay_a_u * 1000 + delay_a_n) + offset_delay), 7, 1, false);
-
-    // DELAY B
-    ptr_tcu->communicate_display(convert_to_send_tcu(0x04, (delay_b_u * 1000 + delay_b_n) + offset_delay), 7, 1, false);
+    ptr_tcu->set_user_param(TCU::EST_DIST, delay_dist);
 
     setup_hz(hz_unit);
-    ui->DELAY_A_EDIT_U->setText(QString::asprintf("%d", delay_a_u));
-    ui->DELAY_A_EDIT_N->setText(QString::asprintf("%d", delay_a_n));
-    ui->DELAY_B_EDIT_U->setText(QString::asprintf("%d", delay_b_u));
-    ui->DELAY_B_EDIT_N->setText(QString::asprintf("%d", delay_b_n));
+    ui->DELAY_A_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->delay_a)));
+    ui->DELAY_A_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->delay_a)));
+    ui->DELAY_A_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->delay_a)));
+    ui->DELAY_B_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->delay_b)));
+    ui->DELAY_B_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->delay_b)));
+    ui->DELAY_B_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->delay_b)));
+
 }
 
 void UserPanel::update_gate_width() {
 #ifndef LVTONG
     static QElapsedTimer t;
-    if (t.elapsed() < (fps > 9 ? 900 / fps : 100)) return;
+    if (t.elapsed() < (ptr_tcu->ccd_freq > 9 ? 900 / ptr_tcu->ccd_freq : 100)) return;
     t.restart();
 #endif
-
+    // TODO add max gate width in pref
     if (depth_of_view < 0) depth_of_view = 0;
     if (depth_of_view > 1500) depth_of_view = 1500;
 
-    int gw = std::round(depth_of_view / dist_ns), gw_corrected = gw + offset_gatewidth;
-    if (gw < 100) gw_corrected = gw_lut[gw];
-    if (gw_corrected == -1) {
-        ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", gate_width_a_u));
-        ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%d", gate_width_a_n));
+    if (ptr_tcu->set_user_param(TCU::EST_DOV, depth_of_view) == -1) {
+        depth_of_view = ptr_tcu->gate_width_a * dist_ns;
+        ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->gate_width_a)));
+        ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->gate_width_a)));
+        ui->GATE_WIDTH_A_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->gate_width_a)));
+        ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->gate_width_b)));
+        ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->gate_width_b)));
+        ui->GATE_WIDTH_B_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->gate_width_b)));
         QMessageBox::warning(this, "PROMPT", tr("gatewidth not supported"));
         return;
     }
-    // GATE WIDTH A
-    ptr_tcu->communicate_display(convert_to_send_tcu(0x03, gw_corrected), 7, 1, false);
 
-    // GATE WIDTH B
-//    send = gw - 18;
-    ptr_tcu->communicate_display(convert_to_send_tcu(0x05, gw_corrected), 7, 1, false);
-
-    ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view));
-//    gate_width_a_n = gate_width_b_n = laser_width_n = gw % 1000;
-//    gate_width_a_u = gate_width_b_u = laser_width_u = gw / 1000;
-    gate_width_a_n = gw % 1000;
-    gate_width_a_u = gw / 1000;
-
-    ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", gate_width_a_u));
-    ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%d", gate_width_a_n));
-//        ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf("%d", gate_width_b_u));
-//        ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%d", gate_width_b_n));
+    ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->gate_width_a)));
+    ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->gate_width_a)));
+    ui->GATE_WIDTH_A_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->gate_width_a)));
+    ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->gate_width_b)));
+    ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->gate_width_b)));
+    ui->GATE_WIDTH_B_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->gate_width_b)));
 }
 
 void UserPanel::filter_scan()
@@ -2473,7 +2496,7 @@ void UserPanel::convert_write(QDataStream &out, const int TYPE)
     case TCU_PARAMS:
     {
         out << "TCU" << uchar('.');
-        out << fps << duty << rep_freq << laser_width << mcp << delay_dist << delay_n_n << depth_of_view << stepping;
+        out << ptr_tcu->ccd_freq << ptr_tcu->duty << ptr_tcu->rep_freq << ptr_tcu->laser_width << ptr_tcu->mcp << delay_dist << ptr_tcu->delay_n << depth_of_view << stepping;
     }
     case SCAN:
     {
@@ -2525,7 +2548,7 @@ bool UserPanel::convert_read(QDataStream &out, const int TYPE)
     {
         out >> temp_str; if (std::strcmp(temp_str, "TCU")) return false;
         out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
-        out >> fps >> duty >> rep_freq >> laser_width >> mcp >> delay_dist >> delay_n_n >> depth_of_view >> stepping;
+        out >> ptr_tcu->ccd_freq >> ptr_tcu->duty >> ptr_tcu->rep_freq >> ptr_tcu->laser_width >> ptr_tcu->mcp >> delay_dist >> ptr_tcu->delay_n >> depth_of_view >> stepping;
     }
     case SCAN:
     {
@@ -2579,7 +2602,7 @@ void UserPanel::read_gatewidth_lookup_table(QFile *fp)
     QList<QByteArray> line_sep;
     while (!fp->atEnd()) {
         line_sep = fp->readLine().split(',');
-        gw_lut[line_sep[0].toInt()] = line_sep[1].toInt();
+        ptr_tcu->gw_lut[line_sep[0].toInt()] = line_sep[1].toInt();
     }
 }
 
@@ -2587,23 +2610,31 @@ void UserPanel::connect_to_serial_server_tcp()
 {
     QString ip = "192.168.1.233";
     bool connected = false;
-    tcp_port[0]->connectToHost(ip, 10001);
-    tcp_port[2]->connectToHost(ip, 10002);
-    connected |= tcp_port[0]->waitForConnected(3000);
-    connected |= tcp_port[2]->waitForConnected(3000);
-    tcp_port[4] = tcp_port[2];
-    for (int i = 0; i < 5; i++) use_tcp[i] = connected;
+//    tcp_port[0]->connectToHost(ip, 10001);
+//    tcp_port[2]->connectToHost(ip, 10002);
+//    connected |= tcp_port[0]->waitForConnected(3000);
+//    connected |= tcp_port[2]->waitForConnected(3000);
+//    tcp_port[4] = tcp_port[2];
+//    for (int i = 0; i < 5; i++) use_tcp[i] = connected;
+    connected |= ptr_tcu->  setup_tcp_port(ip, 10001, true);
+    connected |= ptr_lens-> setup_tcp_port(ip, 10002, true);
+//    connected |= ptr_laser->setup_tcp_port(ip, 10000, true);
+//    connected |= ptr_ptz->  setup_tcp_port(ip, 10000, true);
+    ptr_ptz->share_port_from(ptr_lens);
     if (connected) QMessageBox::information(this, "serial port server", "connected to server");
     else           QMessageBox::information(this, "serial port server", "cannot connect to server");
 }
 
 void UserPanel::disconnect_from_serial_server_tcp()
 {
-    for (int i = 0; i < 4; i++) {
-        tcp_port[i]->disconnectFromHost();
-    }
+//    for (int i = 0; i < 4; i++) tcp_port[i]->disconnectFromHost();
+    ptr_tcu->  setup_tcp_port("", 0, false);
+    ptr_lens-> setup_tcp_port("", 0, false);
+//    ptr_laser->setup_tcp_port("", 0, false);
+//    ptr_ptz->  setup_tcp_port("", 0, false);
+    ptr_ptz->share_port_from(nullptr);
     QMessageBox::information(this, "serial port server", "disconnected from server");
-    for (int i = 0; i < 5; i++) use_tcp[i] = false;
+//    for (int i = 0; i < 5; i++) use_tcp[i] = false;
 }
 
 void UserPanel::on_DIST_BTN_clicked() {
@@ -2632,32 +2663,37 @@ void UserPanel::on_DIST_BTN_clicked() {
 //    data_exchange(true);
 
     // change delay and gate width according to distance
-    delay_dist = distance + pref->delay_dist_offset;
+    delay_dist = distance + pref->delay_offset;
     update_delay();
 //    update_gate_width();
 //    change_mcp(150);
 
-    rep_freq = 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000);
-    if (rep_freq > 30) rep_freq = 30;
-    if      (distance < 1000) depth_of_view =  500 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
-    else if (distance < 3000) depth_of_view = 1000 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
-    else if (distance < 6000) depth_of_view = 2000 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
-    else                      depth_of_view = 3500 * dist_ns, laser_width = std::round(depth_of_view / dist_ns);
+    ptr_tcu->rep_freq = 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000);
+    if (ptr_tcu->rep_freq > 30) ptr_tcu->rep_freq = 30;
+    if      (distance < 1000) depth_of_view =  500 * dist_ns, ptr_tcu->laser_width = std::round(depth_of_view / dist_ns);
+    else if (distance < 3000) depth_of_view = 1000 * dist_ns, ptr_tcu->laser_width = std::round(depth_of_view / dist_ns);
+    else if (distance < 6000) depth_of_view = 2000 * dist_ns, ptr_tcu->laser_width = std::round(depth_of_view / dist_ns);
+    else                      depth_of_view = 3500 * dist_ns, ptr_tcu->laser_width = std::round(depth_of_view / dist_ns);
 
     ptr_tcu->communicate_display(convert_to_send_tcu(0x1E, distance), 7, 1, true);
-    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - pref->delay_dist_offset));
+    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - pref->delay_offset));
 
     setup_hz(hz_unit);
-    ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", laser_width_u));
-    ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%d", laser_width_n));
-    ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", gate_width_a_u));
-    ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%d", gate_width_a_n));
-    ui->DELAY_A_EDIT_U->setText(QString::asprintf("%d", delay_a_u));
-    ui->DELAY_A_EDIT_N->setText(QString::asprintf("%d", delay_a_n));
-//        ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf("%d", gate_width_b_u));
-//        ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%d", gate_width_b_n));
-    ui->DELAY_B_EDIT_U->setText(QString::asprintf("%d", delay_b_u));
-    ui->DELAY_B_EDIT_N->setText(QString::asprintf("%d", delay_b_n));
+    ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->laser_width)));
+    ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->laser_width)));
+    ui->LASER_WIDTH_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->laser_width)));
+    ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->gate_width_a)));
+    ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->gate_width_a)));
+    ui->GATE_WIDTH_A_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->gate_width_a)));
+    ui->DELAY_A_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->delay_a)));
+    ui->DELAY_A_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->delay_a)));
+    ui->DELAY_A_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->delay_a)));
+    ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->gate_width_b)));
+    ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->gate_width_b)));
+    ui->GATE_WIDTH_B_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->gate_width_b)));
+    ui->DELAY_B_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->delay_b)));
+    ui->DELAY_B_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->delay_b)));
+    ui->DELAY_B_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->delay_b)));
 }
 
 void UserPanel::on_IMG_3D_CHECK_stateChanged(int arg1)
@@ -2893,13 +2929,13 @@ void UserPanel::change_mcp(int val)
     ui->MCP_EDIT->setText(QString::number(val));
     ui->MCP_SLIDER->setValue(val);
 
-    if (val == mcp) return;
-    mcp = val;
+    if (val == ptr_tcu->mcp) return;
 
 //    convert_to_send_tcu(0x0A, mcp);
 //    static QElapsedTimer t;
 //    if (!h_grab_thread || t.elapsed() > (fps > 9 ? 900 / fps : 100)) communicate_display(0, convert_to_send_tcu(0x0A, mcp), 7, 1, false), t.start();
-    ptr_tcu->communicate_display(convert_to_send_tcu(0x0A, mcp), 7, 1, false);
+//    ptr_tcu->communicate_display(convert_to_send_tcu(0x0A, mcp), 7, 1, false);
+    ptr_tcu->set_user_param(TCU::MCP, val);
 }
 
 void UserPanel::change_gain(int val)
@@ -3024,58 +3060,98 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             if (edit == ui->FREQ_EDIT) {
                 switch (hz_unit) {
                 // kHz
-                case 0: rep_freq = ui->FREQ_EDIT->text().toFloat(); break;
+                case 0: ptr_tcu->rep_freq = ui->FREQ_EDIT->text().toFloat(); break;
                 // Hz
-                case 1: rep_freq = ui->FREQ_EDIT->text().toFloat() / 1000; break;
+                case 1: ptr_tcu->rep_freq = ui->FREQ_EDIT->text().toFloat() / 1000; break;
                 default: break;
                 }
-                ptr_tcu->communicate_display(convert_to_send_tcu(0x00, 1.25e5 / rep_freq), 7, 1, false);
-            }
-            else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
-                depth_of_view = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt()) * dist_ns;
-                update_gate_width();
+//                ptr_tcu->communicate_display(convert_to_send_tcu(0x00, 1.25e5 / ptr_tcu->rep_freq), 7, 1, false);
+                ptr_tcu->set_user_param(TCU::REPEATED_FREQ, ptr_tcu->rep_freq);
             }
             else if (edit == ui->LASER_WIDTH_EDIT_U) {
-                laser_width = edit->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt();
-                ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+                ptr_tcu->laser_width = edit->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt() + ui->LASER_WIDTH_EDIT_P->text().toInt() / 1000.;
+//                ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+                ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
             }
-            else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
-                if (edit->text().toInt() > 999) depth_of_view = edit->text().toInt() * dist_ns;
-                else depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000) * dist_ns;
+            else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
+                depth_of_view = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt() + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.) * dist_ns;
+                update_gate_width();
+            }
+            else if (edit == ui->GATE_WIDTH_B_EDIT_U) {
+                depth_of_view = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt() + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - ptr_tcu->gate_width_n) * dist_ns;
                 update_gate_width();
             }
             else if (edit == ui->LASER_WIDTH_EDIT_N) {
                 if (edit->text().toInt() > 999) {
-                    laser_width = edit->text().toInt();
-                    ui->LASER_WIDTH_EDIT_U->setText(QString::number(laser_width / 1000));
-                    ui->LASER_WIDTH_EDIT_N->setText(QString::number(laser_width % 1000));
+                    ptr_tcu->laser_width = edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.;
+                    ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->laser_width)));
+                    ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->laser_width)));
+                    ui->LASER_WIDTH_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->laser_width)));
                 }
                 else {
-                    laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000;
-                    ui->LASER_WIDTH_EDIT_N->setText(QString::number(laser_width % 1000));
+                    ptr_tcu->laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.;
+                    ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->laser_width)));
+                    ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->laser_width)));
+                    ui->LASER_WIDTH_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->laser_width)));
                 }
-                ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+//                ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+                ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
+            }
+            else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
+                if (edit->text().toInt() > 999) depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.) * dist_ns;
+                else depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.) * dist_ns;
+                update_gate_width();
+            }
+            else if (edit == ui->GATE_WIDTH_B_EDIT_N) {
+                if (edit->text().toInt() > 999) depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - ptr_tcu->gate_width_n) * dist_ns;
+                else depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - ptr_tcu->gate_width_n) * dist_ns;
+                update_gate_width();
+            }
+            else if (edit == ui->LASER_WIDTH_EDIT_P) {
+                ptr_tcu->laser_width = edit->text().toInt() / 1000. + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt();
+//                ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
+                ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
+            }
+            else if (edit == ui->GATE_WIDTH_A_EDIT_P) {
+                depth_of_view = (edit->text().toInt() / 1000. + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt()) * dist_ns;
+                update_gate_width();
+            }
+            else if (edit == ui->GATE_WIDTH_B_EDIT_P) {
+                depth_of_view = (edit->text().toInt() / 1000. + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt() - ptr_tcu->gate_width_n) * dist_ns;
+                update_gate_width();
             }
             else if (edit == ui->DELAY_A_EDIT_U) {
-                delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt()) * dist_ns;
+                delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt() + ui->DELAY_A_EDIT_P->text().toInt() / 1000.) * dist_ns;
                 update_delay();
             }
             else if (edit == ui->DELAY_B_EDIT_U) {
-                delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt() - delay_n_n) * dist_ns;
+                delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt() + ui->DELAY_A_EDIT_P->text().toInt() / 1000. - ptr_tcu->delay_n) * dist_ns;
                 update_delay();
             }
             else if (edit == ui->DELAY_A_EDIT_N) {
-                if (edit->text().toInt() > 999) delay_dist = edit->text().toInt() * dist_ns;
-                else delay_dist = (edit->text().toInt() + ui->DELAY_A_EDIT_U->text().toInt() * 1000) * dist_ns;
+                if (edit->text().toInt() > 999) delay_dist = (edit->text().toInt() + ui->DELAY_A_EDIT_P->text().toInt() / 1000.) * dist_ns;
+                else delay_dist = (edit->text().toInt() + ui->DELAY_A_EDIT_U->text().toInt() * 1000+ ui->DELAY_A_EDIT_P->text().toInt() / 1000.) * dist_ns;
                 update_delay();
             }
             else if (edit == ui->DELAY_B_EDIT_N) {
-                if (edit->text().toInt() > 999) delay_dist = edit->text().toInt() * dist_ns;
-                else delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000 - delay_n_n) * dist_ns;
+                if (edit->text().toInt() > 999) delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_P->text().toInt() / 1000.) * dist_ns - ptr_tcu->delay_n;
+                else delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000 + ui->DELAY_B_EDIT_P->text().toInt() / 1000. - ptr_tcu->delay_n) * dist_ns;
                 update_delay();
             }
+            else if (edit == ui->DELAY_A_EDIT_P) {
+                delay_dist = (edit->text().toInt() / 1000. + ui->DELAY_A_EDIT_U->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt()) * dist_ns;
+                update_delay();
+            }
+            else if (edit == ui->DELAY_B_EDIT_P) {
+                delay_dist = (edit->text().toInt() / 1000. + ui->DELAY_B_EDIT_U->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt() - ptr_tcu->delay_n) * dist_ns;
+                update_delay();
+            }
+            else if (edit == ui->GATE_WIDTH_N_EDIT_N) {
+                ptr_tcu->gate_width_n = edit->text().toInt();
+                update_gate_width();
+            }
             else if (edit == ui->DELAY_N_EDIT_N) {
-                delay_n_n = edit->text().toInt();
+                ptr_tcu->delay_n = edit->text().toInt();
                 update_delay();
             }
             else if (edit == ui->MCP_EDIT) {
@@ -3173,7 +3249,9 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             prompt_for_config_file();
             break;
         case Qt::Key_Q:
-            std::accumulate(use_tcp, use_tcp + 5, 0) ? disconnect_from_serial_server_tcp() : connect_to_serial_server_tcp();
+//            std::accumulate(use_tcp, use_tcp + 5, 0) ? disconnect_from_serial_server_tcp() : connect_to_serial_server_tcp();
+            ptr_tcu->status() == 1 || ptr_lens->status() == 1 || ptr_laser->status() == 1 || ptr_ptz->status() == 1 ?
+                        disconnect_from_serial_server_tcp() : connect_to_serial_server_tcp();
             break;
         case Qt::Key_L:
             laser_settings->show();
@@ -3216,10 +3294,10 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     QPoint center = ui->SOURCE_DISPLAY->center;
 
     int mid_width = window.width() - 12 - grp_width - 10 - ui->LEFT->width();
-    ui->MID->setGeometry(10 + ui->LEFT->width(), 40, mid_width, window.height() - 50);
+    ui->MID->setGeometry(10 + ui->LEFT->width(), 40, mid_width, window.height() - 40 - ui->STATUS->height());
     int width = mid_width - 20, height = width * h / ww;
 //    qDebug("width %d, height %d\n", width, height);
-    int height_constraint = window.height() - 30 - 50 - 32,
+    int height_constraint = ui->MID->height() - 30 - 24, // bottom padding 24 pixels
         width_constraint = height_constraint * ww / h;
 //    qDebug("width_constraint %d, height_constraint %d\n", width_constraint, height_constraint);
     if (width < width_constraint) width_constraint = width, height_constraint = width_constraint * h / ww;
@@ -3567,7 +3645,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
 
         // find the first video stream
         int video_stream_idx = -1;
-        for (int i = 0; i < format_context->nb_streams; i++) {
+        for (uint i = 0; i < format_context->nb_streams; i++) {
             if (format_context->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
                 video_stream_idx = i;
                 break;
@@ -3578,7 +3656,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
         // point the codec parameter to the first stream's
         codec_param = format_context->streams[video_stream_idx]->codecpar;
 
-        if (display) fps = frame_rate_edit = std::round(format_context->streams[video_stream_idx]->r_frame_rate.num / format_context->streams[video_stream_idx]->r_frame_rate.den);
+        if (display) ptr_tcu->ccd_freq = frame_rate_edit = std::round(format_context->streams[video_stream_idx]->r_frame_rate.num / format_context->streams[video_stream_idx]->r_frame_rate.den);
 
         codec = avcodec_find_decoder(codec_param->codec_id);
         if (codec == NULL) { if (display) display_mutex.unlock(); return -3; }
@@ -3686,6 +3764,47 @@ void UserPanel::update_pixel_depth(int depth)
     status_bar->img_pixel_depth->set_text(QString::number(depth) + "-bit");
 }
 
+inline void UserPanel::update_tcu_param_pos(QLabel *u_unit, QLineEdit *n_input, QLabel *n_unit, QLineEdit *p_input)
+{
+    switch (ptr_tcu->tcu_type) {
+    case 0:
+        u_unit->setText("μs");
+        n_unit->setText("ns");
+        u_unit->move(u_unit->pos() + QPoint(3, 0));
+        n_input->move(n_input->pos() + QPoint(14, 0));
+        n_unit->move(n_unit->pos() + QPoint(17, 0));
+        p_input->hide();
+        break;
+    case 1:
+    case 2:
+    case 3:
+        u_unit->setText(",");
+        n_unit->setText(".");
+        u_unit->move(u_unit->pos() - QPoint(3, 0));
+        n_input->move(n_input->pos() - QPoint(14, 0));
+        n_unit->move(n_unit->pos() - QPoint(17, 0));
+        p_input->show();
+        break;
+    default: break;
+    }
+}
+
+inline uint UserPanel::get_width_in_us(float val)
+{
+    return uint(val + 0.001) / 1000;
+}
+
+inline uint UserPanel::get_width_in_ns(float val)
+{
+    return uint(val + 0.001) % 1000;
+}
+
+inline uint UserPanel::get_width_in_ps(float val)
+{
+    static float ONE = 1;
+    return std::round(std::modf(val + 0.001, &ONE) * 20.) * 50;
+}
+
 void UserPanel::start_static_display(int width, int height, bool is_color, int pixel_depth, int device_type)
 {
     if (grab_image || h_grab_thread) {
@@ -3770,7 +3889,7 @@ void UserPanel::on_SCAN_BUTTON_clicked()
         scan_sum = cv::Mat::zeros(h, w, CV_64F);
         scan_idx = 0;
 
-        rep_freq = scan_config->rep_freq;
+        ptr_tcu->rep_freq = scan_config->rep_freq;
         delay_dist = scan_config->starting_delay * dist_ns;
         scan_stopping_delay = scan_config->ending_delay;
         scan_step = scan_config->step_size_delay * dist_ns;
@@ -3794,7 +3913,7 @@ void UserPanel::on_SCAN_BUTTON_clicked()
                                            "gate width:         %06d ns\n"
                                            "MCP:                %03d",
                                            scan_config->starting_delay, scan_config->ending_delay, scan_config->frame_count, scan_config->step_size_delay,
-                                           (int)rep_freq, laser_width, gate_width_a_u * 1000 + gate_width_a_n, mcp).toUtf8());
+                                           (int)ptr_tcu->rep_freq, (int)ptr_tcu->laser_width, (int)ptr_tcu->gate_width_a, ptr_tcu->mcp).toUtf8());
             params.close();
         }
 
@@ -3823,7 +3942,8 @@ void UserPanel::on_CONTINUE_SCAN_BUTTON_clicked()
     emit update_scan(true);
 
     update_delay();
-    ptr_tcu->communicate_display(convert_to_send_tcu(0x00, (uint)(1.25e5 / rep_freq)), 7, 1, false);
+//    ptr_tcu->communicate_display(convert_to_send_tcu(0x00, (uint)(1.25e5 / ptr_tcu->rep_freq)), 7, 1, false);
+    ptr_tcu->set_user_param(TCU::REPEATED_FREQ, ptr_tcu->rep_freq);
 }
 
 void UserPanel::on_RESTART_SCAN_BUTTON_clicked()
@@ -4102,7 +4222,7 @@ void UserPanel::transparent_transmission_file(int id)
 
 void UserPanel::config_gatewidth(QString filename)
 {
-    for (int i = 0; i < 100; i++) gw_lut[i] = -1;
+    for (int i = 0; i < 100; i++) ptr_tcu->gw_lut[i] = -1;
     QFile config_file(filename);
     config_file.open(QIODevice::ReadOnly);
     if (!config_file.isOpen()) QMessageBox::warning(this, "PROMPT", tr("cannot open config file"));
@@ -4112,7 +4232,7 @@ void UserPanel::config_gatewidth(QString filename)
         // ori: user input, res: output to tcu
         int ori = line.left(line.indexOf(',')).toInt();
         int res = line.right(line.length() - line.indexOf(',') - 1).toInt();
-        gw_lut[ori] = res;
+        ptr_tcu->gw_lut[ori] = res;
     }
 }
 
@@ -4318,12 +4438,12 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
     curr_cam->get_max_frame_size(&max_w, &max_h);
     curr_cam->frame_size(true, &new_w, &new_h, &inc_w, &inc_h);
     curr_cam->frame_offset(true, &new_x, &new_y, &inc_x, &inc_y);
-    if (ui->SHAPE_INFO->pair != QPoint(0, 0)) {
-        new_w = ui->SHAPE_INFO->pair.x();
-        new_h = ui->SHAPE_INFO->pair.y();
-        new_x += ui->START_COORD->pair.x();
-        new_y += ui->START_COORD->pair.y();
-    }
+    new_w = ui->SHAPE_INFO->pair.x();
+    new_h = ui->SHAPE_INFO->pair.y();
+    new_x += ui->START_COORD->pair.x();
+    new_y += ui->START_COORD->pair.y();
+    if (new_w == 0) new_w = max_w;
+    if (new_h == 0) new_h = max_h;
 
     new_w = (new_w + inc_w / 2) / inc_w; new_w *= inc_w;
     new_h = (new_h + inc_h / 2) / inc_h; new_h *= inc_h;
@@ -4427,4 +4547,22 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
         resizeEvent(&e);
         if (was_playing) ui->START_GRABBING_BUTTON->click();
     }
+}
+
+void UserPanel::on_SWITCH_TCU_UI_BTN_clicked()
+{
+    static int show_diff = 1;
+    if (show_diff) {
+        ui->DELAY_B_GRP->hide();
+        ui->GATE_WIDTH_B_GRP->hide();
+        ui->DELAY_DIFF_GRP->show();
+        ui->GATE_WIDTH_DIFF_GRP->show();
+    }
+    else {
+        ui->DELAY_B_GRP->show();
+        ui->GATE_WIDTH_B_GRP->show();
+        ui->DELAY_DIFF_GRP->hide();
+        ui->GATE_WIDTH_DIFF_GRP->hide();
+    }
+    show_diff ^= 1;
 }

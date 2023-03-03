@@ -111,16 +111,18 @@ int main(int argc, char *argv[])
 //    qDebug() << QTextCodec::availableCodecs();
 
     FILE *f = NULL;
-    if (!(f = fopen("user_default", "r"))) {
-        f = fopen("user_default", "w");
-        uchar ZERO = 0;
+    if (!(f = fopen("user_default", "rb"))) {
+        f = fopen("user_default", "wb");
+        uchar ZERO[10] = {0};
         // uchar(com) * 5 + delay_offset(uint) + eof = 10
         fwrite(&ZERO, 1, 10, f);
     }
     fclose(f);
 
+#ifdef WIN32
     int attr = GetFileAttributes("user_default");
     if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) SetFileAttributes("user_default", attr | FILE_ATTRIBUTE_HIDDEN);
+#endif
 
     QApplication a(argc, argv);
 

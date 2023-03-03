@@ -8,7 +8,7 @@ class ControlPort : public QObject
 {
     Q_OBJECT
 public:
-    ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr);
+    ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, Preferences *pref = nullptr, QObject *parent = nullptr);
     ~ControlPort();
 
 signals:
@@ -19,16 +19,15 @@ public slots:
     virtual void try_communicate() = 0;
 
     void setup_serial_port();
-    void setup_tcp_port(QString ip, int port);
+    bool setup_tcp_port(QString ip, int port, bool connect);
 
-// WARNING: will become public after a full transfer of com communication
-//protected:
 public:
     QByteArray generate_ba(uchar *data, int len);
     int get_baudrate();
     bool set_baudrate(int baudrate);
     QByteArray communicate_display(QByteArray write, int write_size, int read_size, bool fb = false, bool display = true);
     void share_port_from(ControlPort *port);
+    int status();
 
     void set_theme();
 
@@ -37,6 +36,7 @@ protected:
     QLabel*      lbl;
     QLineEdit*   edt;
     StatusIcon*  status_icon;
+    Preferences* pref;
     int          idx; // 0: TCU, 1: lens, 2: laser, 3: ptz
     bool         connected_to_serial;
     bool         connected_to_tcp;
@@ -58,7 +58,7 @@ protected:
 class TCU : public ControlPort {
     Q_OBJECT
 public:
-    enum TCU_PARAMS {
+    enum USER_PARAMS {
         REPEATED_FREQ = 0x00,
         LASER_WIDTH   = 0x01,
         DELAY_A       = 0x02,
@@ -66,7 +66,7 @@ public:
         DELAY_B       = 0x04,
         GATE_WIDTH_B  = 0x05,
         CCD_FREQ      = 0x06,
-        TIME_EXPO     = 0x07,
+        DUTY          = 0x07,
         MCP           = 0x0A,
         LASER1        = 0x1A,
         LASER2        = 0x1B,
@@ -74,39 +74,53 @@ public:
         LASER4        = 0x1D,
         DIST          = 0x1E,
         TOGGLE_LASER  = 0x1F,
-    };
 
-    enum USER_PARAMS {
         DELAY_N       = 0x0100,
-        EST_DIST      = 0x0101,
-        EST_DOV       = 0x0102,
-        LASER_ON      = 0x0103,
+        GATE_WIDTH_N  = 0x0101,
+        EST_DIST      = 0x0102,
+        EST_DOV       = 0x0103,
+        LASER_ON      = 0x0104,
     };
 
-    TCU(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr, uint init_width = 500);
+    TCU(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, Preferences *pref = nullptr,
+        ScanConfig *sc = nullptr, QObject *parent = nullptr, uint init_width = 500);
 
-    bool set_tcu_param(TCU::TCU_PARAMS param, uint val);
-    bool set_user_param(TCU::USER_PARAMS param, uint val);
-    bool set_user_param(TCU::USER_PARAMS param, float val);
+    int set_user_param(TCU::USER_PARAMS param, float val);
 
 public slots:
     void try_communicate() override;
 
 private:
+    int set_tcu_param(TCU::USER_PARAMS param, float val);
+
+public:
+    // 0: default, head(88) cmd(00) data(MM NN PP QQ) tail(99)
+    // 1: step-50ps, head(88) cmd(00) data(MM NN PP QQ SS) tail(99), SS->step by 50ps (max 80)
+    int   tcu_type;
+    bool  scan_mode; // 0: default, 1: scan
+
     // TCU params
-    float rep_freq;
-    uint  laser_width_u, laser_width_n;
-    uint  delay_a_u, delay_a_n, delay_b_u, delay_b_n;
-    uint  gate_width_a_u, gate_width_a_n, gate_width_b_u, gate_width_b_n;
-    uint  fps, duty;
+    float rep_freq;                   // unit: kHz
+    float laser_width;                // unit: ns
+    float delay_a, delay_b;           // unit: ns
+    float gate_width_a, gate_width_b; // unit: ns
+    float ccd_freq;                        // unit: frame/s
+    float duty;                       // unit: ns
     uint  mcp;
     uint  laser_on;
+    uint  tcu_dist;                   // unit: m
 
     // user params
-    float dist_ns;
-    uint  delay_n_n;
-    uint  delay_dist;
-    uint  depth_of_view;
+    float dist_ns;                    // unit: m/ns
+    float delay_n;                    // unit: ns
+    float gate_width_n;               // unit: ns
+    float delay_dist;                 // unit: m
+    float depth_of_view;              // unit: m
+
+    int   gw_lut[100];                // lookup table for gatewidth config by serial
+
+private:
+    ScanConfig *scan_config;
 };
 
 class Lens : public ControlPort {
@@ -130,7 +144,7 @@ public:
         ADDRESS       = 0x101,
     };
 
-    Lens(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr, int init_speed = 32);
+    Lens(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, Preferences *pref = nullptr, QObject *parent = nullptr, int init_speed = 32);
 
 public slots:
     void try_communicate() override;
@@ -145,7 +159,7 @@ private:
 class Laser : public ControlPort {
     Q_OBJECT
 public:
-    Laser(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr);
+    Laser(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, Preferences *pref = nullptr, QObject *parent = nullptr);
 
 public slots:
     void try_communicate() override;
@@ -173,7 +187,7 @@ public:
         ADDRESS    = 0x101,
     };
 
-    PTZ(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr, int init_speed = 16);
+    PTZ(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, Preferences *pref = nullptr, QObject *parent = nullptr, int init_speed = 16);
 
 public slots:
     void try_communicate() override;

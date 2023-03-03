@@ -14,8 +14,11 @@ private:
 
 public:
     // 0: no device; 1: MvCam; 2: HqvCam
-    int  device_type;
-    bool cameralink;
+    int                    device_type;
+    bool                   cameralink;
+    MV_CC_DEVICE_INFO_LIST gige_dev_list;
+    MV_CC_DEVICE_INFO_LIST usb3_dev_list;
+    int                    curr_idx;
 
 public:
     Cam();
@@ -23,7 +26,7 @@ public:
 
     int search_for_devices();
 
-    int start();
+    int start(int idx = 0);
     int shut_down();
 
     int set_frame_callback(void *user);
