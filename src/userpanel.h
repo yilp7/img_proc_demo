@@ -79,7 +79,9 @@ public slots:
     void setup_hz(int hz_unit);
     void setup_stepping(int base_unit);
     void setup_max_dist(float max_dist);
-    void update_delay_offset(float delay_dist_offset);
+    void update_delay_offset(float dist_offset);
+    void update_gate_width_offset(float dov_offset);
+    void update_laser_offset(float laser_offset);
     void setup_laser(int laser_on);
     void set_baudrate(int idx, int baudrate);
     void set_tcu_as_shared_port(bool share);
@@ -320,6 +322,7 @@ private:
     QByteArray communicate_display(int id, QByteArray write, int write_size, int read_size, bool fb);
 
     // update gate width
+    void update_laser_width();
     void update_gate_width();
 
     // filter mat by brightness
@@ -402,8 +405,7 @@ private:
     uint                    zoom;
     uint                    focus;
     int                     distance;                   // dist read from rangefinder
-    float                   max_dist;
-    int                     laser_width;
+    float                   laser_width;
     float                   delay_dist;                 // estimated distance calculated from delay
     float                   depth_of_view;              // depth of view from gate width
     int                     focus_direction;
@@ -452,6 +454,7 @@ private:
     cv::Mat                 frame_a_sum;
     cv::Mat                 frame_b_sum;
     uint                    hist[256];                  // display histogram
+    cv::Mat                 hist_mat;
     int                     seq_idx;                    // frame-average current index
 
     QLabel*                 com_label[5];               // for com communication

@@ -77,13 +77,14 @@ public:
 
         DELAY_N       = 0x0100,
         GATE_WIDTH_N  = 0x0101,
-        EST_DIST      = 0x0102,
-        EST_DOV       = 0x0103,
-        LASER_ON      = 0x0104,
+        LASER_USR     = 0x0102,
+        EST_DIST      = 0x0103,
+        EST_DOV       = 0x0104,
+        LASER_ON      = 0x0105,
     };
 
     TCU(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, Preferences *pref = nullptr,
-        ScanConfig *sc = nullptr, QObject *parent = nullptr, uint init_width = 500);
+        ScanConfig *sc = nullptr, QObject *parent = nullptr, uint init_width = 100);
 
     int set_user_param(TCU::USER_PARAMS param, float val);
 

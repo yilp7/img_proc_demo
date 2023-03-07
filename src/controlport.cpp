@@ -202,11 +202,11 @@ int TCU::set_user_param(TCU::USER_PARAMS cmd, float val)
     if (cmd < 0x0100) {
         switch (cmd) {
         case REPEATED_FREQ: rep_freq = val;     set_tcu_param(cmd, 1.25e5 / rep_freq); break;
-        case LASER_WIDTH  : laser_width = val;  set_tcu_param(cmd, (laser_width/* + pref->laser_width_offset*/) / 8); break;
-        case DELAY_A      : delay_a = val;      set_tcu_param(cmd, delay_a + pref->delay_offset); break;
-        case GATE_WIDTH_A : gate_width_a = val; set_tcu_param(cmd, gate_width_a/* + pref->gate_width_offset*/); break;
-        case DELAY_B      : delay_b = val;      set_tcu_param(cmd, delay_a + pref->delay_offset); break;
-        case GATE_WIDTH_B : gate_width_b = val; set_tcu_param(cmd, gate_width_b/* + pref->gate_width_offset*/); break;
+        case LASER_WIDTH  : laser_width = val;  set_tcu_param(cmd, laser_width / 8); break;
+        case DELAY_A      : delay_a = val;      set_tcu_param(cmd, delay_a); break;
+        case GATE_WIDTH_A : gate_width_a = val; set_tcu_param(cmd, gate_width_a); break;
+        case DELAY_B      : delay_b = val;      set_tcu_param(cmd, delay_b); break;
+        case GATE_WIDTH_B : gate_width_b = val; set_tcu_param(cmd, gate_width_b); break;
         case CCD_FREQ     : ccd_freq = val;     set_tcu_param(cmd, 1.25e8 / ccd_freq); break;
         case DUTY         : duty = val;         set_tcu_param(cmd, duty * 1.25e2); break;
         case MCP          : mcp = val;          set_tcu_param(cmd, val); break;
@@ -226,6 +226,9 @@ int TCU::set_user_param(TCU::USER_PARAMS cmd, float val)
             break;
         case GATE_WIDTH_N:
             gate_width_n = val;
+            break;
+        case LASER_USR:
+            set_tcu_param(TCU::LASER_WIDTH, val + pref->laser_width_offset);
             break;
         case EST_DIST: {
             delay_dist = val;
@@ -248,7 +251,8 @@ int TCU::set_user_param(TCU::USER_PARAMS cmd, float val)
             break;
         }
         case EST_DOV: {
-            int gw = std::round(val / dist_ns), gw_corrected_a = gw/* + pref->gate_width_offset*/, gw_corrected_b = gw + gate_width_n/* + pref->gate_width_offset*/;
+            int gw = std::round(val / dist_ns), gw_corrected_a = gw + pref->gate_width_offset, gw_corrected_b = gw + gate_width_n + pref->gate_width_offset;
+            if (gw_corrected_a < 0 || gw_corrected_b < 0) return -1;
             if (gw_corrected_a < 100) gw_corrected_a = gw_lut[gw_corrected_a];
             if (gw_corrected_b < 100) gw_corrected_b = gw_lut[gw_corrected_b];
             if (gw_corrected_a == -1 || gw_corrected_b == -1) return -1;

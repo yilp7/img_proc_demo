@@ -1,4 +1,5 @@
 #include "userpanel.h"
+#include "version.h"
 
 //#define _DEBUG
 //#include "vld.h"
@@ -110,14 +111,26 @@ int main(int argc, char *argv[])
 //    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
 //    qDebug() << QTextCodec::availableCodecs();
 
-    FILE *f = NULL;
-    if (!(f = fopen("user_default", "rb"))) {
-        f = fopen("user_default", "wb");
-        uchar ZERO[10] = {0};
-        // uchar(com) * 5 + delay_offset(uint) + eof = 10
-        fwrite(&ZERO, 1, 10, f);
+    uchar INIT[20] = {VER_MAJOR, VER_MINOR, VER_PATCH, VER_TWEAK, 0};
+    QFile user_file("user_default");
+    QDataStream user_file_binary;
+    bool reset_user_file = !user_file.exists();
+    if (user_file.exists()) {
+        user_file.open(QIODevice::ReadOnly);
+        // version * 4 + uchar(com) * 5 + offset(uint) * 3 + reserved(uint) = 20
+        reset_user_file |= user_file.size() - 20;
+        user_file_binary.setDevice(&user_file);
+        uchar ver[4];
+        user_file_binary.readRawData((char*)ver, 4);
+        reset_user_file |= ver[0] + ver[1] + ver[2] + ver[3] - VER_MAJOR - VER_MINOR - VER_PATCH - VER_TWEAK;
+        user_file.close();
     }
-    fclose(f);
+    if (reset_user_file) {
+        user_file.open(QIODevice::WriteOnly);
+        user_file_binary.setDevice(&user_file);
+        user_file_binary.writeRawData((char*)INIT, 20);
+        user_file.close();
+    }
 
 #ifdef WIN32
     int attr = GetFileAttributes("user_default");

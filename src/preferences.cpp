@@ -27,6 +27,10 @@ Preferences::Preferences(QWidget *parent) :
     max_dist(15000),
 #endif
     delay_offset(0),
+    max_dov(750),
+    gate_width_offset(0),
+    max_laser_width(5000),
+    laser_width_offset(0),
     laser_grp(NULL),
     laser_on(0),
     accu_base(1),
@@ -52,19 +56,21 @@ Preferences::Preferences(QWidget *parent) :
 
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
 
-    //[0] set up ui for info tabs
-    ui->DEVICES_TAB ->setup(0, ui->SEP_0->pos().y() + 10);
-    ui->SERIAL_TAB  ->setup(0, ui->SEP_1->pos().y() + 10);
-    ui->TCU_TAB     ->setup(0, ui->SEP_2->pos().y() + 10);
-    ui->IMG_PROC_TAB->setup(0, ui->SEP_3->pos().y() + 10);
+//[0] set up ui for info tabs
+    ui->DEVICES_TAB  ->setup(0, ui->SEP_0->pos().y() + 10);
+    ui->SERIAL_TAB   ->setup(0, ui->SEP_1->pos().y() + 10);
+    ui->TCU_TAB      ->setup(0, ui->SEP_2->pos().y() + 10);
+    ui->SAVE_LOAD_TAB->setup(0, ui->SEP_3->pos().y() + 10);
+    ui->IMG_PROC_TAB ->setup(0, ui->SEP_4->pos().y() + 10);
 
-    connect(ui->DEVICES_TAB,  SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
-    connect(ui->SERIAL_TAB,   SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
-    connect(ui->TCU_TAB,      SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
-    connect(ui->IMG_PROC_TAB, SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
-    //![0]
+    connect(ui->DEVICES_TAB,   SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
+    connect(ui->SERIAL_TAB,    SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
+    connect(ui->TCU_TAB,       SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
+    connect(ui->SAVE_LOAD_TAB, SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
+    connect(ui->IMG_PROC_TAB,  SIGNAL(index_label_clicked(int)), SLOT(jump_to_content(int)));
+//![0]
 
-    //[1] set up ui for device config
+//[1] set up ui for device config
     ui->IP_EDIT->setEnabled(false);
     ui->DEVICE_LIST->installEventFilter(this);
     connect(ui->DEVICE_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
@@ -88,9 +94,9 @@ Preferences::Preferences(QWidget *parent) :
             });
     connect(ui->CAMERALINK_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ cameralink = arg1; });
     connect(ui->SPLIT_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ split = arg1; });
-    //![1]
+//![1]
 
-    //[2] set up ui for serial comm.
+//[2] set up ui for serial comm.
     ui->COM_LIST->addItem("TCU");
     ui->COM_LIST->addItem("RANGE");
 #ifdef ICMOS
@@ -102,6 +108,18 @@ Preferences::Preferences(QWidget *parent) :
 #endif
     ui->COM_LIST->addItem("PTZ");
     ui->COM_LIST->installEventFilter(this);
+
+    QStringList available_ports;
+    for (const QSerialPortInfo &info: QSerialPortInfo::availablePorts()) available_ports << info.portName();
+    ui->AVAILABLE_COM_LIST->addItems(available_ports);
+    ui->AVAILABLE_COM_LIST->installEventFilter(this);
+    connect(ui->REFRESH_AVAILABLE_PORTS_BTN, &QPushButton::clicked, this,
+            [this](){
+                QStringList available_ports;
+                for (const QSerialPortInfo &info: QSerialPortInfo::availablePorts()) available_ports << info.portName();
+                ui->AVAILABLE_COM_LIST->clear();
+                ui->AVAILABLE_COM_LIST->addItems(available_ports);
+            });
 
     ui->BAUDRATE_LIST->addItem("------");
     ui->BAUDRATE_LIST->addItem("  1200");
@@ -120,15 +138,14 @@ Preferences::Preferences(QWidget *parent) :
             [this](const QString &arg1){ emit change_baudrate(ui->COM_LIST->currentIndex(), arg1.toInt()); });
     connect(ui->SHARE_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ share_port = arg1; emit share_tcu_port(arg1); });
     connect(ui->TCP_SERVER_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ use_tcp = arg1; });
-    connect(ui->CONNECT_TCP_BTN, &QPushButton::clicked, this, [this](){ emit connect_tcp_btn_clicked();});
 
 //    QFont temp = QFont(consolas);
 //    temp.setPixelSize(11);
 //    ui->COM_DATA_EDT->setFont(temp);
     ui->COM_DATA_EDT->setFont(consolas);
-    //![2]
+//![2]
 
-    //[3] set up ui for tcu config
+//[3] set up ui for tcu config
     ui->TCU_LIST->addItem("default");
     ui->TCU_LIST->addItem("#0 50ps step");
     ui->TCU_LIST->addItem("#1 50ps step");
@@ -162,20 +179,30 @@ Preferences::Preferences(QWidget *parent) :
                     ui->MAX_DIST_UNIT->setText("ns");
                     ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset / dist_ns)));
                     ui->DELAY_OFFSET_UNIT->setText("ns");
+                    ui->MAX_DOV_EDT->setText(QString::number(std::round(max_dov / dist_ns)));
+                    ui->MAX_DOV_UNIT->setText("ns");
+                    ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(std::round(gate_width_offset / dist_ns)));
+                    ui->GATE_WIDTH_OFFSET_UNIT->setText("ns");
                     break;
                 case 1: // μs
                     ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns / 1000)));
-//                    ui->MAX_DIST_UNIT->setText(QString::fromLocal8Bit("μs"));
                     ui->MAX_DIST_UNIT->setText("μs");
                     ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset / dist_ns / 1000)));
-//                    ui->DELAY_OFFSET_UNIT->setText(QString::fromLocal8Bit("μs"));
                     ui->DELAY_OFFSET_UNIT->setText("μs");
+                    ui->MAX_DOV_EDT->setText(QString::number(std::round(max_dov / dist_ns / 1000)));
+                    ui->MAX_DOV_UNIT->setText("μs");
+                    ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(std::round(gate_width_offset / dist_ns / 1000)));
+                    ui->GATE_WIDTH_OFFSET_UNIT->setText("μs");
                     break;
                 case 2: // m
                     ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist)));
                     ui->MAX_DIST_UNIT->setText("m");
                     ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset)));
                     ui->DELAY_OFFSET_UNIT->setText("m");
+                    ui->MAX_DOV_EDT->setText(QString::number(std::round(max_dov)));
+                    ui->MAX_DOV_UNIT->setText("m");
+                    ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(std::round(gate_width_offset)));
+                    ui->GATE_WIDTH_OFFSET_UNIT->setText("m");
                     break;
                 default: break;
                 }
@@ -187,17 +214,43 @@ Preferences::Preferences(QWidget *parent) :
                 emit delay_offset_changed(delay_offset);
                 FILE *f = fopen("user_default", "rb+");
                 if (!f) return;
-                uint delay_offset_uint = std::round(delay_offset / dist_ns);
+                int delay_offset_int = std::round(delay_offset / dist_ns);
                 fseek(f, 5, SEEK_SET);
-                fwrite(&delay_offset_uint, 4, 1, f);
+                fwrite(&delay_offset_int, 4, 1, f);
+                fclose(f);
+    });
+    connect(ui->MAX_DOV_EDT, &QLineEdit::editingFinished, this, [this](){ emit max_dov_changed(max_dov); });
+    connect(ui->GATE_WIDTH_OFFSET_EDT, &QLineEdit::editingFinished, this,
+            [this](){
+                emit gate_width_offset_changed(gate_width_offset);
+                FILE *f = fopen("user_default", "rb+");
+                if (!f) return;
+                int gate_width_offset_int = std::round(gate_width_offset / dist_ns);
+                fseek(f, 9, SEEK_SET);
+                fwrite(&gate_width_offset_int, 4, 1, f);
+                fclose(f);
+    });
+    connect(ui->MAX_LASER_EDT, &QLineEdit::editingFinished, this, [this](){ emit max_laser_changed(max_laser_width); });
+    connect(ui->LASER_OFFSET_EDT, &QLineEdit::editingFinished, this,
+            [this](){
+                emit laser_offset_changed(laser_width_offset);
+                FILE *f = fopen("user_default", "rb+");
+                if (!f) return;
+                int laser_offset_int = std::round(laser_width_offset);
+                fseek(f, 13, SEEK_SET);
+                fwrite(&laser_offset_int, 4, 1, f);
                 fclose(f);
     });
     FILE *f = fopen("user_default", "rb");
     if (f) {
-        uint delay_offset_uint;
+        int delay_offset_int, gate_width_offset_int, laser_offset_int;
         fseek(f, 5, SEEK_SET);
-        fread(&delay_offset_uint, 4, 1, f);
-        delay_offset = delay_offset_uint * dist_ns;
+        fread(&delay_offset_int, 4, 1, f);
+        delay_offset = delay_offset_int * dist_ns;
+        fread(&gate_width_offset_int, 4, 1, f);
+        gate_width_offset = gate_width_offset_int * dist_ns;
+        fread(&laser_offset_int, 4, 1, f);
+        laser_width_offset = laser_offset_int;
         fclose(f);
     }
 
@@ -210,9 +263,18 @@ Preferences::Preferences(QWidget *parent) :
     laser_grp->addButton(ui->LASER_CHK_4, 3);
     laser_grp->setExclusive(false);
     connect(laser_grp, SIGNAL(buttonToggled(int, bool)), SLOT(toggle_laser(int, bool)));
-    //![3]
+//![3]
 
-    //[4] set up ui for image proc
+//[4]
+    connect(ui->SAVE_INFO_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ save_info = arg1; });
+    QFont temp_f(consolas);
+    temp_f.setPixelSize(11);
+    ui->CUSTOM_INFO_EDT->setFont(temp_f);
+    connect(ui->CUSTOM_INFO_CHK, &QCheckBox::stateChanged, this,
+            [this](int arg1){ custom_topleft_info = arg1; ui->CUSTOM_INFO_EDT->setEnabled(arg1); });
+//![4]
+
+//[5] set up ui for image proc
     connect(ui->LOWER_3D_THRESH_EDT, &QLineEdit::editingFinished, this,
             [this](){ if (lower_3d_thresh < 0) lower_3d_thresh = 0; emit lower_3d_thresh_updated(); });
     connect(ui->UPPER_3D_THRESH_EDT, &QLineEdit::editingFinished, this,
@@ -247,7 +309,7 @@ Preferences::Preferences(QWidget *parent) :
     ui->FISHNET_THRESH->hide();
     ui->FISHNET_THRESH_EDIT->hide();
 #endif
-    //![4]
+    //![5]
     data_exchange(false);
 }
 
@@ -286,16 +348,28 @@ void Preferences::data_exchange(bool read)
         case 0:
             max_dist = ui->MAX_DIST_EDT->text().toInt() * dist_ns;
             delay_offset = ui->DELAY_OFFSET_EDT->text().toInt() * dist_ns;
+            max_dov = ui->MAX_DOV_EDT->text().toInt() * dist_ns;
+            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toInt() * dist_ns;
+            max_laser_width = ui->MAX_LASER_EDT->text().toInt();
+            laser_width_offset = ui->LASER_OFFSET_EDT->text().toInt();
             break;
         // μs
         case 1:
             max_dist = ui->MAX_DIST_EDT->text().toInt() * dist_ns * 1000;
             delay_offset = ui->DELAY_OFFSET_EDT->text().toInt() * dist_ns * 1000;
+            max_dov = ui->MAX_DOV_EDT->text().toInt() * dist_ns * 1000;
+            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toInt() * dist_ns * 1000;
+            max_laser_width = ui->MAX_LASER_EDT->text().toInt();
+            laser_width_offset = ui->LASER_OFFSET_EDT->text().toInt();
             break;
         // m
         case 2:
-            max_dist = ui->MAX_DIST_EDT->text().toInt();
-            delay_offset = ui->DELAY_OFFSET_EDT->text().toInt();
+            max_dist = ui->MAX_DIST_EDT->text().toFloat();
+            delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat();
+            max_dov = ui->MAX_DOV_EDT->text().toFloat();
+            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat();
+            max_laser_width = ui->MAX_LASER_EDT->text().toInt();
+            laser_width_offset = ui->LASER_OFFSET_EDT->text().toInt();
             break;
         default: break;
         }
@@ -333,16 +407,28 @@ void Preferences::data_exchange(bool read)
         case 0:
             ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns)));
             ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset / dist_ns)));
+            ui->MAX_DOV_EDT->setText(QString::number(std::round(max_dov / dist_ns)));
+            ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(std::round(gate_width_offset / dist_ns)));
+            ui->MAX_LASER_EDT->setText(QString::number(std::round(max_laser_width)));
+            ui->LASER_OFFSET_EDT->setText(QString::number(std::round(laser_width_offset)));
             break;
         // μs
         case 1:
             ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns / 1000)));
             ui->DELAY_OFFSET_EDT->setText(QString::number(delay_offset / dist_ns / 1000, 'f', 2));
+            ui->MAX_DOV_EDT->setText(QString::number(std::round(max_dov / dist_ns / 1000)));
+            ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(gate_width_offset / dist_ns / 1000, 'f', 2));
+            ui->MAX_LASER_EDT->setText(QString::number(std::round(max_laser_width)));
+            ui->LASER_OFFSET_EDT->setText(QString::number(std::round(laser_width_offset)));
             break;
         // m
         case 2:
             ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist)));
             ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset)));
+            ui->MAX_DOV_EDT->setText(QString::number(std::round(max_dov)));
+            ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(std::round(gate_width_offset)));
+            ui->MAX_LASER_EDT->setText(QString::number(std::round(max_laser_width)));
+            ui->LASER_OFFSET_EDT->setText(QString::number(std::round(laser_width_offset)));
             break;
         default: break;
         }

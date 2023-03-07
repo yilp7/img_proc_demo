@@ -375,7 +375,7 @@ void ImageProc::gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay
 }
 
 void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw,
-                           int colormap, double lower_thresh, double upper_thresh, bool trim)
+                           int colormap, double lower_thresh, double upper_thresh, bool trim, cv::Mat *hist_mat)
 {
 //    LARGE_INTEGER t1, t2, tc;
 //    QueryPerformanceFrequency(&tc);
@@ -438,23 +438,24 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
 //    QueryPerformanceCounter(&t2);
 //    printf("-     normalize: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
 //    t1 = t2;
-/*
-    uint hist[256] = {0};
-    memset(hist, 0, 256);
-    uchar *img = img_3d_gray.data;
-    int step = img_3d_gray.step;
-    memset(hist, 0, 256 * sizeof(uint));
-    for (int i = 0; i < img_3d_gray.rows; i++) for (int j = 0; j < img_3d_gray.cols; j++) hist[(img + i * step)[j]]++;
-    uint _max = 0;
-    for (int i = 1; i < 256; i++) {
-        if (hist[i] > _max) _max = hist[i];
+
+    if (hist_mat) {
+        static uint hist[256] = {0};
+        memset(hist, 0, 256);
+        uchar *img = img_3d_gray.data;
+        int step = img_3d_gray.step;
+        memset(hist, 0, 256 * sizeof(uint));
+        for (int i = 0; i < img_3d_gray.rows; i++) for (int j = 0; j < img_3d_gray.cols; j++) hist[(img + i * step)[j]]++;
+        uint _max = 0;
+        for (int i = 1; i < 256; i++) {
+            if (hist[i] > _max) _max = hist[i];
+        }
+        *hist_mat = cv::Mat(225, 256, CV_8UC3, cv::Scalar(56, 64, 72));
+        for (int i = 1; i < 256; i++) {
+            cv::rectangle(*hist_mat, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / _max), cv::Scalar(202, 225, 255));
+        }
     }
-    cv::Mat hist_image(225, 256, CV_8UC3, cv::Scalar(56, 64, 72));
-    for (int i = 0; i < 256; i++) {
-        cv::rectangle(hist_image, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / _max), cv::Scalar(202, 225, 255));
-    }
-    cv::imwrite("../aaa.bmp", hist_image);
-*/
+
     int step_gray = gray_bar.step;
     int bar_gray = 255;
     uc_ptr = gray_bar.data;

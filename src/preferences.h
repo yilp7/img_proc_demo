@@ -53,7 +53,6 @@ signals:
     void get_baudrate(int com_idx);
     void change_baudrate(int idx, int baudrate);
     void share_tcu_port(bool share);
-    void connect_tcp_btn_clicked();
     void com_write(int idx, QByteArray data);
 
     // tcu config
@@ -61,7 +60,11 @@ signals:
     void rep_freq_unit_changed(int idx);
     void base_unit_changed(int idx);
     void max_dist_changed(float dist);
+    void max_dov_changed(float dov);
+    void max_laser_changed(float laser_width);
     void delay_offset_changed(float dist);
+    void gate_width_offset_changed(float dov);
+    void laser_offset_changed(float laser_width);
     void laser_toggled(int config);
 
     // image process
@@ -75,19 +78,19 @@ public:
     bool             pressed;
     QPoint           prev_pos;
 
-    // device
+    // 1 device
     int              device_idx;
     int              symmetry;
     int              pixel_type;
     bool             cameralink;
     bool             split;
 
-    // serial comm.
+    // 2 serial comm.
     int              port_idx;
     bool             share_port;
     bool             use_tcp;
 
-    // tcu config
+    // 3 tcu config
     float            dist_ns;
     bool             auto_rep_freq;
     bool             auto_mcp;
@@ -95,11 +98,19 @@ public:
     int              base_unit; // 0: ns, 1: μs, 2: m
     float            max_dist;
     float            delay_offset; // distance offset (from hardware)
+    float            max_dov;
+    float            gate_width_offset; // depth offset (from hardware)
+    float            max_laser_width;
+    float            laser_width_offset; // laser width offset (from hardware)
     bool             laser_enable;
     QButtonGroup*    laser_grp;
     int              laser_on; // does not rely on laser_enable
 
-    // img proc
+    // 4 save options
+    bool             save_info;
+    bool             custom_topleft_info;
+
+    // 5 img proc
     float            accu_base;
     float            gamma;
     float            low_in;

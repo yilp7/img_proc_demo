@@ -44,10 +44,9 @@ UserPanel::UserPanel(QWidget *parent)
     zoom(0),
     focus(0),
     distance(0),
-    max_dist(15000),
-    laser_width(500),
-    delay_dist(75),
-    depth_of_view(75),
+    laser_width(100),
+    delay_dist(15),
+    depth_of_view(15),
     focus_direction(0),
     curr_laser_idx(-1),
     display_option(1),
@@ -189,7 +188,7 @@ UserPanel::UserPanel(QWidget *parent)
     connect(ui->MCP_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_mcp(int)));
 
     ui->DELAY_SLIDER->setMinimum(0);
-    ui->DELAY_SLIDER->setMaximum(max_dist);
+    ui->DELAY_SLIDER->setMaximum(pref->max_dist);
     ui->DELAY_SLIDER->setSingleStep(10);
     ui->DELAY_SLIDER->setPageStep(100);
     ui->DELAY_SLIDER->setValue(0);
@@ -295,6 +294,7 @@ UserPanel::UserPanel(QWidget *parent)
     connect(ptz_grp, SIGNAL(buttonPressed(int)), this, SLOT(ptz_button_pressed(int)));
     connect(ptz_grp, SIGNAL(buttonReleased(int)), this, SLOT(ptz_button_released(int)));
     ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
+    pref->ui->REFRESH_AVAILABLE_PORTS_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
 
     QSlider *speed_slider = ui->PTZ_SPEED_SLIDER;
     speed_slider->setMinimum(1);
@@ -463,7 +463,6 @@ UserPanel::UserPanel(QWidget *parent)
     ui->DELAY_B_EDIT_U->setEnabled(false);
     ui->DELAY_B_EDIT_N->setEnabled(false);
 
-    max_dist = 6000;
 //    ui->TITLE->prog_settings->max_dist = 6000;
 //    ui->TITLE->prog_settings->data_exchange(false);
 //    ui->TITLE->prog_settings->max_dist_changed(6000);
@@ -546,7 +545,7 @@ void UserPanel::data_exchange(bool read){
         ui->FILE_PATH_EDIT->setText(save_location);
 
         ptr_tcu->gate_width_a = depth_of_view / dist_ns;
-        ptr_tcu->gate_width_a = ptr_tcu->gate_width_a + ptr_tcu->gate_width_n;
+        ptr_tcu->gate_width_b = ptr_tcu->gate_width_a + ptr_tcu->gate_width_n;
         ptr_tcu->delay_a = delay_dist / dist_ns;
         ptr_tcu->delay_b = ptr_tcu->delay_a + ptr_tcu->delay_n;
 
@@ -719,15 +718,15 @@ int UserPanel::grab_thread_process() {
                     frame_a_sum.convertTo(frame_a_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
                     frame_b_sum.convertTo(frame_b_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
                     ImageProc::gated3D_v2(frame_b_avg, frame_a_avg, modified_result,
-                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toInt() : (delay_dist - pref->delay_offset) / dist_ns,
-                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toInt() : depth_of_view / dist_ns,
-                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d);
+                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - pref->delay_offset) / dist_ns,
+                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - pref->gate_width_offset) / dist_ns,
+                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &hist_mat);
                 }
                 else {
                     ImageProc::gated3D_v2(frame_a_3d ? prev_img : img_mem, frame_a_3d ? img_mem : prev_img, modified_result,
-                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toInt() : (delay_dist - pref->delay_offset) / dist_ns,
-                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toInt() : depth_of_view / dist_ns,
-                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d);
+                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - pref->delay_offset) / dist_ns,
+                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - pref->gate_width_offset) / dist_ns,
+                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &hist_mat);
                 }
                 frame_a_3d ^= 1;
                 prev_3d = modified_result.clone();
@@ -873,9 +872,10 @@ int UserPanel::grab_thread_process() {
             ImageProc::brightness_and_contrast(modified_result, modified_result, std::exp(ui->CONTRAST_SLIDER->value() / 10.), ui->BRIGHTNESS_SLIDER->value() * 12.8);
             // map [0, 20] to [0, +inf) using tan
             ImageProc::brightness_and_contrast(modified_result, modified_result, tan((20 - ui->GAMMA_SLIDER->value()) / 40. * M_PI));
-
-            // display grayscale histogram of current image
-            if (ui->HISTOGRAM_RADIO->isChecked() && modified_result.channels() == 1) {
+        }
+        // display the gray-value histogram of the current grayscale image, or the distance histogram of the current 3D image
+        if (ui->HISTOGRAM_RADIO->isChecked()) {
+            if (modified_result.channels() == 1) {
                 uchar *img = modified_result.data;
                 int step = modified_result.step;
                 memset(hist, 0, 256 * sizeof(uint));
@@ -883,49 +883,53 @@ int UserPanel::grab_thread_process() {
                 uint max = 0;
                 for (int i = 1; i < 256; i++) {
                     // discard abnormal value
-//                    if (hist[i] > 50000) hist[i] = 0;
+                    //                    if (hist[i] > 50000) hist[i] = 0;
                     if (hist[i] > max) max = hist[i];
                 }
-                cv::Mat hist_image(225, 256, CV_8UC3, cv::Scalar(56, 64, 72));
-                for (int i = 0; i < 256; i++) {
-                    cv::rectangle(hist_image, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
+                hist_mat = cv::Mat(225, 256, CV_8UC3, cv::Scalar(56, 64, 72));
+                for (int i = 1; i < 256; i++) {
+                    cv::rectangle(hist_mat, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
                 }
-                // TODO change to signal/slots
-                ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_image.data, hist_image.cols, hist_image.rows, hist_image.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
             }
-            // FIXME possible crash when move scaled image to bottom-right corner
-            // crop the region to display
+            // TODO change to signal/slots
+            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+        }
+        // FIXME possible crash when move scaled image to bottom-right corner
+        // crop the region to display
 //            cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? ww + 104 : ww) / disp->width(), disp->display_region.br() * (image_3d ? ww + 104 : ww) / disp->width());
-            cv::Rect region = cv::Rect(disp->display_region.tl() * ww / disp->width(), disp->display_region.br() * ww / disp->width());
-            if (region.height > hh) region.height = hh;
+        cv::Rect region = cv::Rect(disp->display_region.tl() * ww / disp->width(), disp->display_region.br() * ww / disp->width());
+        if (region.height > hh) region.height = hh;
 //            qDebug("region x: %d y: %d, w: %d, h: %d\n", region.x, region.y, region.width, region.height);
 //            qDebug("image  w: %d, h: %d\n", modified_result.cols, modified_result.rows);
-            modified_result = modified_result(region);
-            cv::resize(modified_result, modified_result, cv::Size(ww, hh));
+        modified_result = modified_result(region);
+        cv::resize(modified_result, modified_result, cv::Size(ww, hh));
 
-            // put info (dist, dov, time) as text on image
-            if (ui->INFO_CHECK->isChecked()) {
-                if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+        // put info (dist, dov, time) as text on image
+        QString info_tcu = pref->custom_topleft_info ?
+                    pref->ui->CUSTOM_INFO_EDT->text() :
+                    base_unit == 2 ? QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view) :
+                                     QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns));
+        QString info_time = QDateTime::currentDateTime().toString("hh:mm:ss:zzz");
+        if (ui->INFO_CHECK->isChecked()) {
+            cv::putText(modified_result, info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            cv::putText(modified_result, info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
 #ifdef LVTONG
-                static int baseline = 0;
-                if (pref->fishnet_recog) {
+            static int baseline = 0;
+            if (pref->fishnet_recog) {
 //                    cv::putText(modified_result, "FISHNET", cv::Point(ww - 40 - cv::getTextSize("FISHNET", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                    cv::putText(modified_result, is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                }
+                cv::putText(modified_result, is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            }
 #endif
-            }
-
-            // resize to display size
-            cv::resize(modified_result, img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
-            // draw the center cross
-            if (!image_3d && ui->CENTER_CHECK->isChecked()) {
-                for (int i = img_display.cols / 2 - 9; i < img_display.cols / 2 + 10; i++) img_display.at<uchar>(img_display.rows / 2, i) = img_display.at<uchar>(img_display.rows / 2, i) > 127 ? 0 : 255;
-                for (int i = img_display.rows / 2 - 9; i < img_display.rows / 2 + 10; i++) img_display.at<uchar>(i, img_display.cols / 2) = img_display.at<uchar>(i, img_display.cols / 2) > 127 ? 0 : 255;
-            }
-            if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(img_display, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
         }
+
+        // resize to display size
+        cv::resize(modified_result, img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
+        // draw the center cross
+        if (!image_3d && ui->CENTER_CHECK->isChecked()) {
+            for (int i = img_display.cols / 2 - 9; i < img_display.cols / 2 + 10; i++) img_display.at<uchar>(img_display.rows / 2, i) = img_display.at<uchar>(img_display.rows / 2, i) > 127 ? 0 : 255;
+            for (int i = img_display.rows / 2 - 9; i < img_display.rows / 2 + 10; i++) img_display.at<uchar>(i, img_display.cols / 2) = img_display.at<uchar>(i, img_display.cols / 2) > 127 ? 0 : 255;
+        }
+        if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(img_display, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
 
         // image display
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
@@ -968,25 +972,27 @@ int UserPanel::grab_thread_process() {
         }
         if (updated && record_original) {
             cv::Mat temp = img_mem.clone();
-            if (base_unit == 2) cv::putText(temp, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            else cv::putText(temp, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            cv::putText(temp, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), weight * 2);
+            if (pref->save_info) {
+                cv::putText(temp, info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                cv::putText(temp, info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            }
             if (is_color) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
             vid_out[0].write(temp);
         }
         if (updated && record_modified) {
             cv::Mat temp = modified_result.clone();
             if (!image_3d && !ui->INFO_CHECK->isChecked()) {
-                if (base_unit == 2) cv::putText(modified_result, QString::asprintf("DIST %05d m DOV %04d m", (int)delay_dist, (int)depth_of_view).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                else cv::putText(modified_result, QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns)).toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                cv::putText(modified_result, QDateTime::currentDateTime().toString("hh:mm:ss:zzz").toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                if (pref->save_info) {
+                    cv::putText(modified_result, info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    cv::putText(modified_result, info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
 #ifdef LVTONG
-                static int baseline = 0;
-                if (pref->fishnet_recog) {
-//                    cv::putText(modified_result, "FISHNET", cv::Point(ww - 40 - cv::getTextSize("FISHNET", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                    cv::putText(modified_result, is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                }
+                    static int baseline = 0;
+                    if (pref->fishnet_recog) {
+//                        cv::putText(modified_result, "FISHNET", cv::Point(ww - 40 - cv::getTextSize("FISHNET", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                        cv::putText(modified_result, is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    }
 #endif
+                }
             }
             if (is_color || image_3d) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
             vid_out[1].write(temp);
@@ -1375,6 +1381,7 @@ void UserPanel::set_theme()
     ui->DOWN_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down"));
     ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down_right"));
     ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
+    pref->ui->REFRESH_AVAILABLE_PORTS_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
 
 //    for (int i = 0 ; i < 5; i++) if (serial_port_connected[i]) com_label[i]->setStyleSheet(app_theme ? "color: #180D1C;" : "color: #B0C4DE;");
     ptr_tcu->set_theme();
@@ -1580,7 +1587,8 @@ void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, 
         case 0:
 //            convert_to_send_tcu(0x01, (laser_width_u * 1000 + laser_width_n + 8) / 8);
 //            ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
-            ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
+//            ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
+            ptr_tcu->set_user_param(TCU::LASER_USR, ptr_tcu->laser_width);
             update_delay();
             update_gate_width();
             change_mcp(5);
@@ -1940,13 +1948,22 @@ void UserPanel::setup_stepping(int base_unit)
 
 void UserPanel::setup_max_dist(float max_dist)
 {
-    this->max_dist = max_dist;
     ui->DELAY_SLIDER->setMaximum(max_dist);
 }
 
-void UserPanel::update_delay_offset(float delay_dist_offset)
+void UserPanel::update_delay_offset(float dist_offset)
 {
     ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - pref->delay_offset));
+}
+
+void UserPanel::update_gate_width_offset(float dov_offset)
+{
+    ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view - pref->gate_width_offset));
+}
+
+void UserPanel::update_laser_offset(float laser_offset)
+{
+
 }
 
 // e.g. laser_on: 0b1110 -> laser[1], laser[2] and laser[3] are on, laser[0] is off
@@ -2286,7 +2303,8 @@ void UserPanel::load_config(QString config_name)
         update_delay();
         update_gate_width();
 //        ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
-        ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
+//        ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
+        ptr_tcu->set_user_param(TCU::LASER_USR, ptr_tcu->laser_width);
         ui->MCP_SLIDER->setValue(ptr_tcu->mcp);
         on_SET_PARAMS_BUTTON_clicked();
 //        ui->TITLE->prog_settings->data_exchange(false);
@@ -2401,6 +2419,24 @@ QByteArray UserPanel::communicate_display(int id, QByteArray write, int write_si
     return read;
 }
 
+void UserPanel::update_laser_width()
+{
+#ifndef LVTONG
+    static QElapsedTimer t;
+    if (t.elapsed() < (ptr_tcu->ccd_freq > 9 ? 900 / ptr_tcu->ccd_freq : 100)) return;
+    t.start();
+#endif
+    if (laser_width < 0) laser_width = 0;
+    if (laser_width > pref->max_laser_width) laser_width = pref->max_laser_width;
+
+//    ptr_tcu->set_user_param(TCU::LASER_WIDTH, laser_width);
+    ptr_tcu->set_user_param(TCU::LASER_USR, laser_width);
+
+    ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->laser_width)));
+    ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->laser_width)));
+    ui->LASER_WIDTH_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->laser_width)));
+}
+
 void UserPanel::update_delay()
 {
 //    qDebug() << sender();
@@ -2413,7 +2449,7 @@ void UserPanel::update_delay()
     // REPEATED FREQUENCY
     // FIXME check if delay_dist + offset is valid
     if (delay_dist < 0) delay_dist = 0;
-    if (delay_dist > max_dist) delay_dist = max_dist;
+    if (delay_dist > pref->max_dist) delay_dist = pref->max_dist;
 //    qDebug("estimated distance: %f\n", delay_dist);
 
     ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - pref->delay_offset));
@@ -2439,7 +2475,7 @@ void UserPanel::update_gate_width() {
 #endif
     // TODO add max gate width in pref
     if (depth_of_view < 0) depth_of_view = 0;
-    if (depth_of_view > 1500) depth_of_view = 1500;
+    if (depth_of_view > pref->max_dov) depth_of_view = pref->max_dov;
 
     if (ptr_tcu->set_user_param(TCU::EST_DOV, depth_of_view) == -1) {
         depth_of_view = ptr_tcu->gate_width_a * dist_ns;
@@ -2452,6 +2488,8 @@ void UserPanel::update_gate_width() {
         QMessageBox::warning(this, "PROMPT", tr("gatewidth not supported"));
         return;
     }
+
+    ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view - pref->gate_width_offset));
 
     ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->gate_width_a)));
     ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->gate_width_a)));
@@ -2608,7 +2646,7 @@ void UserPanel::read_gatewidth_lookup_table(QFile *fp)
 
 void UserPanel::connect_to_serial_server_tcp()
 {
-    QString ip = "192.168.1.233";
+//    QString ip = "192.168.1.233";
     bool connected = false;
 //    tcp_port[0]->connectToHost(ip, 10001);
 //    tcp_port[2]->connectToHost(ip, 10002);
@@ -2616,8 +2654,8 @@ void UserPanel::connect_to_serial_server_tcp()
 //    connected |= tcp_port[2]->waitForConnected(3000);
 //    tcp_port[4] = tcp_port[2];
 //    for (int i = 0; i < 5; i++) use_tcp[i] = connected;
-    connected |= ptr_tcu->  setup_tcp_port(ip, 10001, true);
-    connected |= ptr_lens-> setup_tcp_port(ip, 10002, true);
+    connected |= ptr_tcu->  setup_tcp_port(pref->ui->TCP_SERVER_IP_EDIT->text(), 10001, true);
+    connected |= ptr_lens-> setup_tcp_port(pref->ui->TCP_SERVER_IP_EDIT->text(), 10002, true);
 //    connected |= ptr_laser->setup_tcp_port(ip, 10000, true);
 //    connected |= ptr_ptz->  setup_tcp_port(ip, 10000, true);
     ptr_ptz->share_port_from(ptr_lens);
@@ -2654,7 +2692,7 @@ void UserPanel::on_DIST_BTN_clicked() {
     }
     else {
         bool ok = false;
-        distance = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", 100, 100, max_dist, 100, &ok, Qt::FramelessWindowHint);
+        distance = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", 100, 100, pref->max_dist, 100, &ok, Qt::FramelessWindowHint);
         if (!ok) return;
     }
 
@@ -3069,9 +3107,10 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
                 ptr_tcu->set_user_param(TCU::REPEATED_FREQ, ptr_tcu->rep_freq);
             }
             else if (edit == ui->LASER_WIDTH_EDIT_U) {
-                ptr_tcu->laser_width = edit->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt() + ui->LASER_WIDTH_EDIT_P->text().toInt() / 1000.;
+                laser_width = edit->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt() + ui->LASER_WIDTH_EDIT_P->text().toInt() / 1000.;
 //                ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
-                ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
+//                ptr_tcu->set_user_param(TCU::LASER_WIDTH, laser_width);
+                update_laser_width();
             }
             else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
                 depth_of_view = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt() + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.) * dist_ns;
@@ -3083,19 +3122,14 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             }
             else if (edit == ui->LASER_WIDTH_EDIT_N) {
                 if (edit->text().toInt() > 999) {
-                    ptr_tcu->laser_width = edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.;
-                    ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->laser_width)));
-                    ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->laser_width)));
-                    ui->LASER_WIDTH_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->laser_width)));
+                    laser_width = edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.;
                 }
                 else {
-                    ptr_tcu->laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.;
-                    ui->LASER_WIDTH_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->laser_width)));
-                    ui->LASER_WIDTH_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->laser_width)));
-                    ui->LASER_WIDTH_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->laser_width)));
+                    laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.;
                 }
 //                ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
-                ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
+//                ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
+                update_laser_width();
             }
             else if (edit == ui->GATE_WIDTH_A_EDIT_N) {
                 if (edit->text().toInt() > 999) depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.) * dist_ns;
@@ -3108,9 +3142,10 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
                 update_gate_width();
             }
             else if (edit == ui->LASER_WIDTH_EDIT_P) {
-                ptr_tcu->laser_width = edit->text().toInt() / 1000. + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt();
+                laser_width = edit->text().toInt() / 1000. + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt();
 //                ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
-                ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
+//                ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
+                update_laser_width();
             }
             else if (edit == ui->GATE_WIDTH_A_EDIT_P) {
                 depth_of_view = (edit->text().toInt() / 1000. + ui->GATE_WIDTH_A_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt()) * dist_ns;
@@ -3470,7 +3505,7 @@ void UserPanel::dragEnterEvent(QDragEnterEvent *event)
 {
     QMainWindow::dragEnterEvent(event);
 
-    if (event->mimeData()->urls().length() < 6) event->acceptProposedAction();
+    if (event->mimeData()->urls().length() < 9) event->acceptProposedAction();
 }
 
 void UserPanel::dropEvent(QDropEvent *event)
