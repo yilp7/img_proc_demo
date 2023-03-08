@@ -2123,7 +2123,7 @@
        <enum>Qt::ClickFocus</enum>
       </property>
       <property name="text">
-       <string>255</string>
+       <string>5</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>

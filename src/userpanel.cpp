@@ -114,7 +114,8 @@ UserPanel::UserPanel(QWidget *parent)
 //    bg_painter.drawRoundRect(bg.rect(), 1, 2);
 //    setMask(bg);
 
-    trans.load("project_zh.qm");
+    trans.load("zh_cn.qm");
+
     ui->CENTRAL->setMouseTracking(true);
     ui->LEFT->setMouseTracking(true);
     ui->MID->setMouseTracking(true);
@@ -132,6 +133,15 @@ UserPanel::UserPanel(QWidget *parent)
     ui->TITLE->setup(this);
     pref = ui->TITLE->preferences;
     scan_config = ui->TITLE->scan_config;
+
+    FILE *f = fopen("user_default", "rb");
+    if (f) {
+        bool is_en;
+        fseek(f, 22, SEEK_SET);
+        fread(&is_en, 1, 1, f);
+        fclose(f);
+        if (is_en) switch_language();
+    }
 
     // initialization
     // - default save path
@@ -380,7 +390,7 @@ UserPanel::UserPanel(QWidget *parent)
     connect(ptr_ptz,   &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
 
     uchar com[5] = {0};
-    FILE *f = fopen("user_default", "rb");
+    f = fopen("user_default", "rb");
     if (f) {
         fread(com, 1, 5, f);
         fclose(f);
@@ -1396,6 +1406,12 @@ void UserPanel::set_theme()
     setCursor(cursor_curr_pointer);
 
     ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s/%s);", app_theme ? "light" : "dark", hide_left ? "right" : "left"));
+
+    FILE *f = fopen("user_default", "rb+");
+    if (!f) return;
+    fseek(f, 22, SEEK_SET);
+    fwrite(&app_theme, 1, 1, f);
+    fclose(f);
 }
 
 void UserPanel::stop_image_writing()
@@ -1412,10 +1428,13 @@ void UserPanel::stop_image_writing()
 // FIXME font change when switching language
 void UserPanel::switch_language()
 {
-    en ? (qApp->removeTranslator(&trans), qApp->setFont(monaco)) : (qApp->installTranslator(&trans), qApp->setFont(consolas));
+    en ^= 1;
+    en ? QApplication::installTranslator(&trans) : QApplication::removeTranslator(&trans);
+//    en ? QApplication::setFont(consolas) : QApplication::setFont(monaco);
     ui->retranslateUi(this);
 //    ui->TITLE->prog_settings->switch_language(en, &trans);
-    pref->switch_language(en, &trans);
+    pref->ui->retranslateUi(pref);
+//    pref->switch_language(en, &trans);
 //    int idx = ui->ENHANCE_OPTIONS->currentIndex();
 //    ui->ENHANCE_OPTIONS->clear();
 //    ui->ENHANCE_OPTIONS->addItem(tr("None"));
@@ -1424,7 +1443,12 @@ void UserPanel::switch_language()
 //    ui->ENHANCE_OPTIONS->addItem(tr("Log-based"));
 //    ui->ENHANCE_OPTIONS->addItem(tr("Gamma-based"));
 //    ui->ENHANCE_OPTIONS->setCurrentIndex(idx);
-    en ^= 1;
+
+    FILE *f = fopen("user_default", "rb+");
+    if (!f) return;
+    fseek(f, 21, SEEK_SET);
+    fwrite(&en, 1, 1, f);
+    fclose(f);
 }
 
 void UserPanel::closeEvent(QCloseEvent *event)
@@ -1607,7 +1631,6 @@ void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, 
         com_label[id]->setStyleSheet("color: #CD5C5C;");
     }
 
-    // TODO: test for user utilities
     FILE *f = fopen("user_default", "rb+");
     if (!f) return;
     uchar port_num_uchar = port_num.toUInt() & 0xFF;
@@ -4113,7 +4136,7 @@ void UserPanel::on_LASER_BTN_clicked()
     }
 #else
     pref->ui->LASER_ENABLE_CHK->click();
-    ui->LASER_BTN->setText(ui->LASER_BTN->text() == "ON" ? tr("OFF") : tr("ON"));
+    ui->LASER_BTN->setText(ui->LASER_BTN->text() == tr("ON") ? tr("OFF") : tr("ON"));
 
 #endif
 }

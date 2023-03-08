@@ -111,14 +111,15 @@ int main(int argc, char *argv[])
 //    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
 //    qDebug() << QTextCodec::availableCodecs();
 
-    uchar INIT[20] = {VER_MAJOR, VER_MINOR, VER_PATCH, VER_TWEAK, 0};
+    const uint user_file_length = 23;
+    uchar INIT[user_file_length] = {VER_MAJOR, VER_MINOR, VER_PATCH, VER_TWEAK, 0};
     QFile user_file("user_default");
     QDataStream user_file_binary;
     bool reset_user_file = !user_file.exists();
     if (user_file.exists()) {
         user_file.open(QIODevice::ReadOnly);
-        // version * 4 + uchar(com) * 5 + offset(uint) * 3 + reserved(uint) = 20
-        reset_user_file |= user_file.size() - 20;
+        // version(uchar) * 4 + com(uchar) * 5 + offset(uint) * 3 + theme(uchar) + language(uchar) = 23
+        reset_user_file |= user_file.size() - user_file_length;
         user_file_binary.setDevice(&user_file);
         uchar ver[4];
         user_file_binary.readRawData((char*)ver, 4);
@@ -128,7 +129,7 @@ int main(int argc, char *argv[])
     if (reset_user_file) {
         user_file.open(QIODevice::WriteOnly);
         user_file_binary.setDevice(&user_file);
-        user_file_binary.writeRawData((char*)INIT, 20);
+        user_file_binary.writeRawData((char*)INIT, user_file_length);
         user_file.close();
     }
 
@@ -156,6 +157,7 @@ int main(int argc, char *argv[])
 //    consolas.setLetterSpacing(QFont::PercentageSpacing, 120);
 
     a.setFont(monaco);
+
     QFile style(":/style/style_dark.qss");
     style.open(QIODevice::ReadOnly);
     theme_dark = style.readAll();
@@ -167,19 +169,31 @@ int main(int argc, char *argv[])
 
     app_theme = 0;
 
-    cursor_curr_pointer = cursor_dark_pointer = QCursor(QPixmap(":/cursor/dark/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0);
-    cursor_curr_resize_h = cursor_dark_resize_h = QCursor(QPixmap(":/cursor/dark/resize_h").scaled(20, 20));
-    cursor_curr_resize_v = cursor_dark_resize_v = QCursor(QPixmap(":/cursor/dark/resize_v").scaled(20, 20));
-    cursor_curr_resize_md = cursor_dark_resize_md = QCursor(QPixmap(":/cursor/dark/resize_md").scaled(16, 16));
-    cursor_curr_resize_sd = cursor_dark_resize_sd = QCursor(QPixmap(":/cursor/dark/resize_sd").scaled(16, 16));
+    cursor_dark_pointer   = QCursor(QPixmap(":/cursor/dark/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0);
+    cursor_dark_resize_h  = QCursor(QPixmap(":/cursor/dark/resize_h").scaled(20, 20));
+    cursor_dark_resize_v  = QCursor(QPixmap(":/cursor/dark/resize_v").scaled(20, 20));
+    cursor_dark_resize_md = QCursor(QPixmap(":/cursor/dark/resize_md").scaled(16, 16));
+    cursor_dark_resize_sd = QCursor(QPixmap(":/cursor/dark/resize_sd").scaled(16, 16));
 
-    cursor_light_pointer = QCursor(QPixmap(":/cursor/light/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0);
-    cursor_light_resize_h = QCursor(QPixmap(":/cursor/light/resize_h").scaled(20, 20));
-    cursor_light_resize_v = QCursor(QPixmap(":/cursor/light/resize_v").scaled(20, 20));
+    cursor_light_pointer   = QCursor(QPixmap(":/cursor/light/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0);
+    cursor_light_resize_h  = QCursor(QPixmap(":/cursor/light/resize_h").scaled(20, 20));
+    cursor_light_resize_v  = QCursor(QPixmap(":/cursor/light/resize_v").scaled(20, 20));
     cursor_light_resize_md = QCursor(QPixmap(":/cursor/light/resize_md").scaled(16, 16));
     cursor_light_resize_sd = QCursor(QPixmap(":/cursor/light/resize_sd").scaled(16, 16));
 
-    a.setStyleSheet(theme_dark);
+    FILE *f = fopen("user_default", "rb");
+    if (f) {
+        fseek(f, 22, SEEK_SET);
+        fread(&app_theme, 1, 1, f);
+        fclose(f);
+    }
+
+    a.setStyleSheet(app_theme ? theme_light : theme_dark);
+    cursor_curr_pointer   = app_theme ? cursor_light_pointer   : cursor_dark_pointer;
+    cursor_curr_resize_h  = app_theme ? cursor_light_resize_h  : cursor_dark_resize_h;
+    cursor_curr_resize_v  = app_theme ? cursor_light_resize_v  : cursor_dark_resize_v;
+    cursor_curr_resize_md = app_theme ? cursor_light_resize_md : cursor_dark_resize_md;
+    cursor_curr_resize_sd = app_theme ? cursor_light_resize_sd : cursor_dark_resize_sd;
 
 //    a.setWindowIcon(QIcon(":/tools/brush"));
 
