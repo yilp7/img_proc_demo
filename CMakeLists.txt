@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(GLI_user_panel LANGUAGES CXX VERSION 0.5.4.0)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.6.1.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -36,7 +36,7 @@ link_directories(${SDK_DIR}/VLD/lib)
 # They need to be set before the find_package(Qt5 ...) call.
 
 find_package(QT NAMES Qt5 REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort Network REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort Network DataVisualization REQUIRED)
 
 if (WIN32)
     include_directories(${Hik_SDK_DIR}/include/win)
@@ -124,6 +124,9 @@ set(SOURCE_FILES
     src/controlport.cpp
 #    src/videosurface.h
 #    src/videosurface.cpp
+    src/distance3dview.h
+    src/distance3dview.cpp
+    src/distance3dview.ui
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss
@@ -256,15 +259,15 @@ endif()
 
 add_executable(GLI_params WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(GLI_params PRIVATE PARAM=1)
-qt5_use_modules(GLI_params Widgets SerialPort Network)
+qt5_use_modules(GLI_params Widgets SerialPort Network DataVisualization)
 target_link_libraries(GLI_params ${PROJECT_LIBS})
 
 add_executable(ICMOS WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(ICMOS PRIVATE ICMOS=1)
-qt5_use_modules(ICMOS Widgets SerialPort Network)
+qt5_use_modules(ICMOS Widgets SerialPort Network DataVisualization)
 target_link_libraries(ICMOS ${PROJECT_LIBS})
 
 add_executable(LvTong WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(LvTong PRIVATE LVTONG=1)
-qt5_use_modules(LvTong Widgets SerialPort Network)
+qt5_use_modules(LvTong Widgets SerialPort Network DataVisualization)
 target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn454)

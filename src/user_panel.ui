@@ -710,7 +710,7 @@
        <bool>false</bool>
       </property>
       <property name="text">
-       <string>Zoom</string>
+       <string>Radius</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
@@ -834,25 +834,25 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>53</width>
+        <width>60</width>
         <height>20</height>
        </rect>
       </property>
       <property name="text">
-       <string>data</string>
+       <string>DATA</string>
       </property>
      </widget>
-     <widget class="QRadioButton" name="HISTOGRAM_RADIO">
+     <widget class="QRadioButton" name="ANALYSIS_RADIO">
       <property name="geometry">
        <rect>
-        <x>60</x>
+        <x>70</x>
         <y>0</y>
-        <width>53</width>
+        <width>60</width>
         <height>20</height>
        </rect>
       </property>
       <property name="text">
-       <string>hist</string>
+       <string>ANLYS</string>
       </property>
      </widget>
      <widget class="QLabel" name="HIST_DISPLAY">
@@ -899,9 +899,9 @@
      <widget class="QRadioButton" name="PTZ_RADIO">
       <property name="geometry">
        <rect>
-        <x>120</x>
+        <x>140</x>
         <y>0</y>
-        <width>53</width>
+        <width>60</width>
         <height>20</height>
        </rect>
       </property>
@@ -1273,7 +1273,7 @@
      </widget>
      <zorder>PTZ_GRP</zorder>
      <zorder>COM_DATA_RADIO</zorder>
-     <zorder>HISTOGRAM_RADIO</zorder>
+     <zorder>ANALYSIS_RADIO</zorder>
      <zorder>HIST_DISPLAY</zorder>
      <zorder>DATA_EXCHANGE</zorder>
      <zorder>PTZ_RADIO</zorder>

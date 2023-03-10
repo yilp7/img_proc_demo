@@ -89,7 +89,7 @@ void ControlPort::setup_serial_port()
     FILE *f = fopen("user_default", "rb+");
     if (!f) return;
     uchar port_num_uchar = edt->text().toUInt() & 0xFF;
-    fseek(f, idx, SEEK_SET);
+    fseek(f, 4 + idx, SEEK_SET);
     fwrite(&port_num_uchar, 1, 1, f);
     fclose(f);
 }
@@ -166,7 +166,7 @@ int ControlPort::status()
 
 void ControlPort::set_theme()
 {
-    lbl->setStyleSheet(app_theme ? "color: #180D1C;" : "color: #B0C4DE;");
+    lbl->setStyleSheet(connected_to_serial ? (app_theme ? "color: #180D1C;" : "color: #B0C4DE;") : "color: #CD5C5C;");
 }
 
 TCU::TCU(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Preferences *pref, ScanConfig *sc, QObject *parent, uint init_width) :
@@ -228,7 +228,8 @@ int TCU::set_user_param(TCU::USER_PARAMS cmd, float val)
             gate_width_n = val;
             break;
         case LASER_USR:
-            set_tcu_param(TCU::LASER_WIDTH, val + pref->laser_width_offset);
+            laser_width = val;
+            set_tcu_param(TCU::LASER_WIDTH, (val + pref->laser_width_offset) / 8);
             break;
         case EST_DIST: {
             delay_dist = val;

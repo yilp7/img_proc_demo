@@ -12,7 +12,13 @@ Display::Display(QWidget *parent) :
     scale{ 1.0f, 2.0f / 3, 1.0f / 2, 1.0f / 4, 1.0f / 8},
     pressed(false)
 {
-
+    setContextMenuPolicy(Qt::ActionsContextMenu);
+    QAction *add_to_roi = new QAction("add selection to roi", this);
+    this->addAction(add_to_roi);
+    connect(add_to_roi, &QAction::triggered, this, [this](){ emit add_roi(selection_v1, selection_v2); });
+    QAction *clear_all_rois = new QAction("clear all rois", this);
+    this->addAction(clear_all_rois);
+    connect(clear_all_rois, &QAction::triggered, this, [this](){ emit clear_roi(); });
 }
 
 void Display::update_roi(QPoint center)
@@ -48,27 +54,35 @@ void Display::mousePressEvent(QMouseEvent *event)
 {
     QLabel::mousePressEvent(event);
 
-    if(event->button() != Qt::LeftButton) return;
+    switch(event->button()) {
+    case Qt::LeftButton: {
+//        qDebug("pos: %d, %d\n", event->x(), event->y());
+//        qDebug("pos: %d, %d\n", event->globalX(), event->globalY());
+//        qDebug("%s pressed\n", qPrintable(this->objectName()));
 
-//    qDebug("pos: %d, %d\n", event->x(), event->y());
-//    qDebug("pos: %d, %d\n", event->globalX(), event->globalY());
-//    qDebug("%s pressed\n", qPrintable(this->objectName()));
+        if (!is_grabbing) return;
 
-    if (!is_grabbing) return;
+        static QPoint curr_pos;
+        curr_pos = event->pos();
+        if (curr_pos.x() > this->rect().right()) curr_pos.setX(this->rect().right());
+        if (curr_pos.y() > this->rect().bottom()) curr_pos.setY(this->rect().bottom());
 
-    static QPoint curr_pos;
-    curr_pos = event->pos();
-    if (curr_pos.x() > this->rect().right()) curr_pos.setX(this->rect().right());
-    if (curr_pos.y() > this->rect().bottom()) curr_pos.setY(this->rect().bottom());
-
-    pressed = true;
-    prev_pos = event->pos();
-    ori_pos = lefttop;
-    if (mode == 1) {
-        selection_v2.x = selection_v1.x = curr_pos.x();
-        selection_v2.y = selection_v1.y = curr_pos.y();
-//        emit start_pos(event->pos());
-        emit updated_pos(1, curr_pos);
+        pressed = true;
+        prev_pos = event->pos();
+        ori_pos = lefttop;
+        if (mode == 1) {
+            selection_v2.x = selection_v1.x = curr_pos.x();
+            selection_v2.y = selection_v1.y = curr_pos.y();
+    //        emit start_pos(event->pos());
+            emit updated_pos(1, curr_pos);
+        }
+        break;
+    }
+    case Qt::RightButton: {
+        // TODO filter cursor position
+//        this->actions().at(0)->setEnabled(false);
+    }
+    default: break;
     }
 }
 
@@ -93,8 +107,8 @@ void Display::mouseMoveEvent(QMouseEvent *event)
     if (curr_pos.y() > this->rect().bottom()) curr_pos.setY(this->rect().bottom());
 
     if (mode == 1) {
-        selection_v2.x = selection_v1.x = curr_pos.x();
-        selection_v2.y = selection_v1.y = curr_pos.y();
+        selection_v2.x /*= selection_v1.x */= curr_pos.x();
+        selection_v2.y /*= selection_v1.y */= curr_pos.y();
 //        emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
         emit updated_pos(2, curr_pos - QPoint(selection_v1.x, selection_v1.y));
     }

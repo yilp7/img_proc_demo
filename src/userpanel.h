@@ -9,6 +9,7 @@
 #include "preferences.h"
 #include "scanconfig.h"
 #include "lasersettings.h"
+#include "distance3dview.h"
 #include "plugininterface.h"
 
 QT_BEGIN_NAMESPACE
@@ -198,7 +199,7 @@ private slots:
 
     // change misc. display
     void on_COM_DATA_RADIO_clicked();
-    void on_HISTOGRAM_RADIO_clicked();
+    void on_ANALYSIS_RADIO_clicked();
     void on_PTZ_RADIO_clicked();
 
     // choose how mouse works in DISPLAY
@@ -263,6 +264,9 @@ signals:
     // update device list in preferences ui
     void update_device_list(int, QStringList);
     void device_connection_status_changed(int, QStringList);
+
+    // update distance matrix in 3d view
+    void update_dist_mat(cv::Mat, double, double);
 
 #ifdef LVTONG
     // update fishnet result in thread
@@ -361,6 +365,7 @@ private:
 
 public:
     bool                    mouse_pressed;
+    std::vector<cv::Rect>   list_roi;                   // user-selected roi
 
 private:
     Ui::UserPanel*          ui;
@@ -415,10 +420,10 @@ private:
     int                     display_option;             // data display option: 1: com data; 2: histogram
     QButtonGroup*           display_grp;
 
-    std::queue<cv::Mat>     img_q;                      // image queue in grab_thread
+    std::queue<cv::Mat>     q_img;                      // image queue in grab_thread
     bool                    updated;                    // whether the program get a new image from stream
     // TODO add other scan features
-    std::deque<float>       scan_q;                     // objects' distance found while scanning
+    std::deque<float>       q_scan;                     // objects' distance found while scanning
 
     int                     device_type;                // 1: hik gige
     bool                    device_on;                  // whether curr device is on
@@ -456,6 +461,8 @@ private:
     uint                    hist[256];                  // display histogram
     cv::Mat                 hist_mat;
     int                     seq_idx;                    // frame-average current index
+    cv::Mat                 dist_mat;
+    cv::Mat                 user_mask;
 
     QLabel*                 com_label[5];               // for com communication
     QLineEdit*              com_edit[5];
@@ -490,15 +497,10 @@ private:
     uint                    lens_adjust_ongoing;
     bool                    ptz_adjust_ongoing;
 
-    bool                    en;                         // for language switching
+    uchar                   lang;                       // 0: en_us, 1: zh_cn
     QTranslator             trans;
 
     ThreadPool              tp;
-
-    int                     gw_lut[100];                // lookup table for gatewidth config by serial
-    int                     offset_laser_width;
-    int                     offset_delay;
-    int                     offset_gatewidth;
 
     QButtonGroup*           ptz_grp;                    // ptz button group
     int                     ptz_speed;

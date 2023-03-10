@@ -92,16 +92,16 @@ UserPanel::UserPanel(QWidget *parent)
     joybtn_R2(false),
     lens_adjust_ongoing(0),
     ptz_adjust_ongoing(0),
-    en(false),
+    lang(0),
     tp(40),
-    offset_laser_width(0),
-    offset_delay(0),
-    offset_gatewidth(0),
     ptz_grp(NULL),
     ptz_speed(16)
 {
     ui->setupUi(this);
     wnd = this;
+
+    Distance3DView *v = new Distance3DView(nullptr, this, &list_roi);
+    v->show();
 
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
     // TODO complete rounded rect for main window
@@ -136,8 +136,8 @@ UserPanel::UserPanel(QWidget *parent)
 
     FILE *f = fopen("user_default", "rb");
     if (f) {
-        bool is_en;
-        fseek(f, 22, SEEK_SET);
+        uchar is_en;
+        fseek(f, 21, SEEK_SET);
         fread(&is_en, 1, 1, f);
         fclose(f);
         if (is_en) switch_language();
@@ -152,6 +152,19 @@ UserPanel::UserPanel(QWidget *parent)
     ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s/%s);", app_theme ? "light" : "dark", hide_left ? "right" : "left"));
 
     connect(this, SIGNAL(set_pixmap(QPixmap)), ui->SOURCE_DISPLAY, SLOT(setPixmap(QPixmap)), Qt::QueuedConnection);
+    connect(ui->SOURCE_DISPLAY, &Display::add_roi, this,
+            [this](cv::Point p1, cv::Point p2){
+                if (!grab_image) return;
+                cv::Rect roi = cv::Rect(p1 * w / ui->SOURCE_DISPLAY->width(), p2 * w / ui->SOURCE_DISPLAY->width());
+                list_roi.push_back(roi);
+                user_mask(roi).setTo(255);
+            });
+    connect(ui->SOURCE_DISPLAY, &Display::clear_roi, this,
+            [this](){
+                if (!grab_image) return;
+                std::vector<cv::Rect>().swap(list_roi);
+                user_mask = 0;
+            });
 
     // - image operations
     QComboBox *enhance_options = ui->ENHANCE_OPTIONS;
@@ -313,7 +326,7 @@ UserPanel::UserPanel(QWidget *parent)
     speed_slider->setValue(16);
     ui->PTZ_SPEED_EDIT->setText("16");
 
-    scan_q.push_back(-1);
+    q_scan.push_back(-1);
 //    setup_stepping(0);
 
     // set up display info (left bottom corner)
@@ -326,7 +339,7 @@ UserPanel::UserPanel(QWidget *parent)
 
     display_grp = new QButtonGroup(this);
     display_grp->addButton(ui->COM_DATA_RADIO);
-    display_grp->addButton(ui->HISTOGRAM_RADIO);
+    display_grp->addButton(ui->ANALYSIS_RADIO);
     display_grp->addButton(ui->PTZ_RADIO);
     display_grp->setExclusive(true);
     // TODO change continuous/trigger exclusive
@@ -392,6 +405,7 @@ UserPanel::UserPanel(QWidget *parent)
     uchar com[5] = {0};
     f = fopen("user_default", "rb");
     if (f) {
+        fseek(f, 4, SEEK_SET);
         fread(com, 1, 5, f);
         fclose(f);
     }
@@ -598,15 +612,16 @@ int UserPanel::grab_thread_process() {
     float weight = h / 1024.0; // font scale & thickness
     prev_3d = cv::Mat(h, w, CV_8UC3);
     prev_img = cv::Mat(h, w, CV_MAKETYPE(pixel_depth == 8 ? CV_8U : CV_16U, is_color ? 3 : 1));
+    user_mask = cv::Mat::zeros(h, w, CV_8UC1);
 //    double *range = (double*)calloc(w * h, sizeof(double));
 #ifdef LVTONG
     cv::Mat fishnet_res;
     cv::dnn::Net net = cv::dnn::readNet("model/resnet18.onnx");
 #endif
     while (grab_image) {
-        while (img_q.size() > 5) img_q.pop();
+        while (q_img.size() > 5) q_img.pop();
 
-        if (img_q.empty()) {
+        if (q_img.empty()) {
 #ifdef LVTONG
             QThread::msleep(10);
             continue;
@@ -617,10 +632,10 @@ int UserPanel::grab_thread_process() {
 #endif
         }
         else {
-            img_mem = img_q.front();
-            img_q.pop();
+            img_mem = q_img.front();
+            q_img.pop();
             updated = true;
-            if (device_type == -1) img_q.push(img_mem.clone());
+            if (device_type == -1) q_img.push(img_mem.clone());
         }
 
         image_mutex.lock();
@@ -719,6 +734,7 @@ int UserPanel::grab_thread_process() {
         if (ui->IMG_3D_CHECK->isChecked()) {
             ww = w + 104;
             hh = h;
+            static double dist_min = 0, dist_max = 0;
 //            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
 //            if (prev_3d.empty()) cv::cvtColor(img_mem, prev_3d, cv::COLOR_GRAY2RGB);
             if (updated) {
@@ -730,18 +746,21 @@ int UserPanel::grab_thread_process() {
                     ImageProc::gated3D_v2(frame_b_avg, frame_a_avg, modified_result,
                                           pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - pref->delay_offset) / dist_ns,
                                           pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - pref->gate_width_offset) / dist_ns,
-                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &hist_mat);
+                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &dist_mat, &dist_min, &dist_max);
                 }
                 else {
                     ImageProc::gated3D_v2(frame_a_3d ? prev_img : img_mem, frame_a_3d ? img_mem : prev_img, modified_result,
                                           pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - pref->delay_offset) / dist_ns,
                                           pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - pref->gate_width_offset) / dist_ns,
-                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &hist_mat);
+                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &dist_mat, &dist_min, &dist_max);
                 }
                 frame_a_3d ^= 1;
                 prev_3d = modified_result.clone();
             }
             else modified_result = prev_3d;
+            static cv::Mat masked_dist;
+            if (list_roi.size()) dist_mat.copyTo(masked_dist, user_mask), emit update_dist_mat(masked_dist, dist_min, dist_max);
+            else emit update_dist_mat(dist_mat, dist_min, dist_max);
 
             cv::resize(modified_result, img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
         }
@@ -884,7 +903,7 @@ int UserPanel::grab_thread_process() {
             ImageProc::brightness_and_contrast(modified_result, modified_result, tan((20 - ui->GAMMA_SLIDER->value()) / 40. * M_PI));
         }
         // display the gray-value histogram of the current grayscale image, or the distance histogram of the current 3D image
-        if (ui->HISTOGRAM_RADIO->isChecked()) {
+        if (ui->ANALYSIS_RADIO->isChecked()) {
             if (modified_result.channels() == 1) {
                 uchar *img = modified_result.data;
                 int step = modified_result.step;
@@ -926,7 +945,7 @@ int UserPanel::grab_thread_process() {
 #ifdef LVTONG
             static int baseline = 0;
             if (pref->fishnet_recog) {
-//                    cv::putText(modified_result, "FISHNET", cv::Point(ww - 40 - cv::getTextSize("FISHNET", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+//                cv::putText(modified_result, "FISHNET", cv::Point(ww - 40 - cv::getTextSize("FISHNET", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result, is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
 #endif
@@ -1428,9 +1447,9 @@ void UserPanel::stop_image_writing()
 // FIXME font change when switching language
 void UserPanel::switch_language()
 {
-    en ^= 1;
-    en ? QApplication::installTranslator(&trans) : QApplication::removeTranslator(&trans);
-//    en ? QApplication::setFont(consolas) : QApplication::setFont(monaco);
+    lang ^= 1;
+    lang ? QApplication::installTranslator(&trans) : QApplication::removeTranslator(&trans);
+//    lang ? QApplication::setFont(consolas) : QApplication::setFont(monaco);
     ui->retranslateUi(this);
 //    ui->TITLE->prog_settings->switch_language(en, &trans);
     pref->ui->retranslateUi(pref);
@@ -1447,7 +1466,7 @@ void UserPanel::switch_language()
     FILE *f = fopen("user_default", "rb+");
     if (!f) return;
     fseek(f, 21, SEEK_SET);
-    fwrite(&en, 1, 1, f);
+    fwrite(&lang, 1, 1, f);
     fclose(f);
 }
 
@@ -1474,7 +1493,7 @@ int UserPanel::shut_down() {
         h_grab_thread = NULL;
     }
 
-    if (!img_q.empty()) std::queue<cv::Mat>().swap(img_q);
+    if (!q_img.empty()) std::queue<cv::Mat>().swap(q_img);
 
     if (curr_cam) curr_cam->shut_down();
     if (curr_cam) delete curr_cam, curr_cam = NULL;
@@ -1669,7 +1688,7 @@ void UserPanel::on_START_BUTTON_clicked()
     device_on = true;
     enable_controls(true);
 
-    curr_cam->set_frame_callback(&img_q);
+    curr_cam->set_frame_callback(&q_img);
 
     on_SET_PARAMS_BUTTON_clicked();
     ui->GAIN_SLIDER->setMinimum(0);
@@ -1816,7 +1835,7 @@ void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
 
     if (record_original) on_SAVE_AVI_BUTTON_clicked();
 
-    if (!img_q.empty()) std::queue<cv::Mat>().swap(img_q);
+    if (!q_img.empty()) std::queue<cv::Mat>().swap(q_img);
 
     grab_image = false;
     if (h_grab_thread) {
@@ -1930,7 +1949,7 @@ void UserPanel::clean()
     ui->SOURCE_DISPLAY->clear();
     ui->DATA_EXCHANGE->clear();
     if (grab_image) return;
-    std::queue<cv::Mat>().swap(img_q);
+    std::queue<cv::Mat>().swap(q_img);
     img_mem.release();
     modified_result.release();
     img_display.release();
@@ -2370,7 +2389,7 @@ void UserPanel::prompt_for_input_file()
     button_box.button(QDialogButtonBox::Ok)->setDefault(true);
 
     // Process when OK button is clicked
-    if (input_file_dialog.exec() == QDialog::Accepted) load_video_file(file_path->text(), use_gray_format->isChecked(), [](cv::Mat &frame, void* ptr){ (*(std::queue<cv::Mat>*)ptr).push(frame.clone()); }, &(this->img_q));
+    if (input_file_dialog.exec() == QDialog::Accepted) load_video_file(file_path->text(), use_gray_format->isChecked(), [](cv::Mat &frame, void* ptr){ (*(std::queue<cv::Mat>*)ptr).push(frame.clone()); }, &(this->q_img));
 }
 
 // convert data to be sent to TCU-COM to hex buffer
@@ -3112,12 +3131,12 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             edit = qobject_cast<QLineEdit*>(this->focusWidget());
             if (!edit) break;
 
-            for (int i = 0; i < 5; i++) {
-                if (edit == com_edit[i]) {
-                    if (serial_port[i]) serial_port[i]->close();
-//                    setup_serial_port(serial_port + i, i, edit->text(), 9600);
-                }
-            }
+//            for (int i = 0; i < 5; i++) {
+//                if (edit == com_edit[i]) {
+////                    if (serial_port[i]) serial_port[i]->close();
+////                    setup_serial_port(serial_port + i, i, edit->text(), 9600);
+//                }
+//            }
             if (edit == ui->FREQ_EDIT) {
                 switch (hz_unit) {
                 // kHz
@@ -3547,7 +3566,7 @@ void UserPanel::dropEvent(QDropEvent *event)
         // TODO: check file type before reading/processing file
 //        QMimeType file_type = mime_db.mimeTypeForFile(file_name);
         if (mime_db.mimeTypeForFile(file_name).name().startsWith("video")) {
-            load_video_file(current_video_filename = file_name, false, [](cv::Mat &frame, void* ptr){ (*(std::queue<cv::Mat>*)ptr).push(frame.clone()); }, &(this->img_q));
+            load_video_file(current_video_filename = file_name, false, [](cv::Mat &frame, void* ptr){ (*(std::queue<cv::Mat>*)ptr).push(frame.clone()); }, &(this->q_img));
             return;
         }
 
@@ -3594,8 +3613,8 @@ bool UserPanel::load_image_file(QString filename, bool init)
     }
     qimage_temp = qimage_temp.convertToFormat(is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
 
-    if (tiff) img_q.push(mat_temp.clone());
-    else      img_q.push(cv::Mat(h, w, is_color ? CV_8UC3 : CV_8UC1, (uchar*)qimage_temp.bits(), qimage_temp.bytesPerLine()).clone());
+    if (tiff) q_img.push(mat_temp.clone());
+    else      q_img.push(cv::Mat(h, w, is_color ? CV_8UC3 : CV_8UC1, (uchar*)qimage_temp.bits(), qimage_temp.bytesPerLine()).clone());
 
     display_mutex.unlock();
     return true;
@@ -3875,7 +3894,7 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int p
         }
     }
     while (grab_thread_state) ;
-    std::queue<cv::Mat>().swap(img_q);
+    std::queue<cv::Mat>().swap(q_img);
 
     image_mutex.lock();
     w = width;
@@ -4179,7 +4198,7 @@ void UserPanel::on_COM_DATA_RADIO_clicked()
     ui->PTZ_GRP->hide();
 }
 
-void UserPanel::on_HISTOGRAM_RADIO_clicked()
+void UserPanel::on_ANALYSIS_RADIO_clicked()
 {
     display_option = 1;
     ui->DATA_EXCHANGE->hide();
@@ -4209,6 +4228,7 @@ void UserPanel::on_ZOOM_TOOL_clicked()
     ui->SELECT_TOOL->setChecked(false);
     ui->PTZ_TOOL->setChecked(false);
     ui->SOURCE_DISPLAY->mode = 0;
+    ui->SOURCE_DISPLAY->setContextMenuPolicy(Qt::PreventContextMenu);
 }
 
 void UserPanel::on_SELECT_TOOL_clicked()
@@ -4216,6 +4236,7 @@ void UserPanel::on_SELECT_TOOL_clicked()
     ui->ZOOM_TOOL->setChecked(false);
     ui->PTZ_TOOL->setChecked(false);
     ui->SOURCE_DISPLAY->mode = 1;
+    ui->SOURCE_DISPLAY->setContextMenuPolicy(Qt::ActionsContextMenu);
 }
 
 void UserPanel::on_PTZ_TOOL_clicked()
@@ -4223,6 +4244,7 @@ void UserPanel::on_PTZ_TOOL_clicked()
     ui->ZOOM_TOOL->setChecked(false);
     ui->SELECT_TOOL->setChecked(false);
     ui->SOURCE_DISPLAY->mode = 2;
+    ui->SOURCE_DISPLAY->setContextMenuPolicy(Qt::PreventContextMenu);
 }
 
 void UserPanel::on_FILE_PATH_EDIT_editingFinished()

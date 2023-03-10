@@ -32,6 +32,8 @@ signals:
     void start_pos(QPoint pos);
     void shape_size(QPoint size);
     void ptz_target(QPoint pos);
+    void add_roi(cv::Point p1, cv::Point p2);
+    void clear_roi();
 
 public:
     QPoint    lefttop;

@@ -4,6 +4,11 @@ QMainWindow {
 	border-radius: 5px;
 }
 
+#Distance3DView {
+	background-color: #F4F4EA;
+	color: #190505;
+}
+
 /* title bar */
 TitleBar {
 	background-color: #C3954C;

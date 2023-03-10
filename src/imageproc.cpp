@@ -375,7 +375,7 @@ void ImageProc::gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay
 }
 
 void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw,
-                           int colormap, double lower_thresh, double upper_thresh, bool trim, cv::Mat *hist_mat)
+                           int colormap, double lower_thresh, double upper_thresh, bool trim, cv::Mat *dist_mat, double *d_min, double *d_max)
 {
 //    LARGE_INTEGER t1, t2, tc;
 //    QueryPerformanceFrequency(&tc);
@@ -433,12 +433,14 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
 //        printf("- trim distance: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
 //        t1 = t2;
     }
+    if (dist_mat) *dist_mat = range_mat.clone();
+
     cv::minMaxIdx(range_mat, &min, &max, 0, 0, mask);
     cv::normalize(range_mat, img_3d_gray, 0, 255, cv::NORM_MINMAX, CV_8UC1, mask);
 //    QueryPerformanceCounter(&t2);
 //    printf("-     normalize: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
 //    t1 = t2;
-
+/*
     if (hist_mat) {
         static uint hist[256] = {0};
         memset(hist, 0, 256);
@@ -455,7 +457,7 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
             cv::rectangle(*hist_mat, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / _max), cv::Scalar(202, 225, 255));
         }
     }
-
+*/
     int step_gray = gray_bar.step;
     int bar_gray = 255;
     uc_ptr = gray_bar.data;
@@ -485,6 +487,8 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
     cv::putText(res, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT / 2 - 15), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
     sprintf(text, "%.2f", max);
     cv::putText(res, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT - 10), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
+    *d_min = min;
+    *d_max = max;
 }
 
 void ImageProc::paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double start_pos, double end_pos)
