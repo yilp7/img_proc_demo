@@ -1,4 +1,7 @@
-﻿#include "demo.h"
+#include "demo.h"
+
+#include <QtPlugin>
+Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
 
 #include <DbgHelp.h>
 

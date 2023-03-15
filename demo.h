@@ -1,7 +1,8 @@
-﻿#ifndef DEMO_H
+#ifndef DEMO_H
 #define DEMO_H
 
 #include <QSerialPort>
+#include <QtNetwork>
 #include <windows.h>
 
 #include "threadpool.h"
@@ -277,7 +278,7 @@ private:
 
     // update data to data-display; fb: whether reading feedback from com
     QByteArray generate_ba(uchar *data, int len);
-    QByteArray communicate_display(QSerialPort *com, QByteArray write, int write_size, int read_size, bool fb);
+    QByteArray communicate_display(int id, QByteArray write, int write_size, int read_size, bool fb);
 
     // update gate width
     void update_gate_width();
@@ -291,6 +292,10 @@ private:
     // write/read params to config file
     void convert_write(QDataStream &out, const int TYPE);
     bool convert_read(QDataStream &out, const int TYPE);
+
+    // connect to serial port using tcp socket
+    void connect_to_serial_server_tcp();
+    void disconnect_from_serial_server_tcp();
 
 public:
     bool                    mouse_pressed;
@@ -312,7 +317,9 @@ private:
     QString                 TEMP_SAVE_LOCATION;         // temp location to save the image
     cv::VideoWriter         vid_out[2];                 // video writer for ORI/RES
 
-    QSerialPort*            com[4];                     // 0: tcu, 1: rangefinder, 2: lens, 3: laser
+    QSerialPort*            serial_port[4];                     // 0: tcu, 1: rangefinder, 2: lens, 3: laser
+    QTcpSocket*             tcp_port[4];
+    bool                    use_tcp[4];
     bool                    share_serial_port;          // whether using a single comm for serial communication
     uchar                   out_buffer[7];              // write buffer for serial communication
     uchar                   in_buffer[7];               // read buffer for serial communication
