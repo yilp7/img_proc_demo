@@ -4,11 +4,25 @@
 #include "utils.h"
 #include "mywidget.h"
 
-class ControlPort : public QObject
+struct PortData {
+    QByteArray write;
+    int write_size;
+    int read_size;
+    bool fb;
+    bool heartbeat;
+};
+
+class ControlPort : public QThread
 {
     Q_OBJECT
 public:
-    ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, Preferences *pref = nullptr, QObject *parent = nullptr);
+    enum PortStatus {
+        NOT_CONNECTED    = 0x00,
+        SERIAL_CONNECTED = 0x01,
+        TCP_CONNECTED    = 0x10,
+    };
+
+    ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr);
     ~ControlPort();
 
 signals:
@@ -21,22 +35,29 @@ public slots:
     void setup_serial_port();
     bool setup_tcp_port(QString ip, int port, bool connect);
 
+    QByteArray communicate_display(QByteArray write, int write_size, int read_size, bool fb = false, bool heartbeat = false);
+
 public:
     QByteArray generate_ba(uchar *data, int len);
     int get_baudrate();
     bool set_baudrate(int baudrate);
-    QByteArray communicate_display(QByteArray write, int write_size, int read_size, bool fb = false, bool display = true);
+    bool get_tcp_status();
+    void set_tcp_status(bool use_tcp);
     void share_port_from(ControlPort *port);
-    int status();
-
+    int get_port_status();
     void set_theme();
+    void quit_thread();
+
+protected:
+    void run() override;
 
 // TODO: determine if thread implementation is needed
 protected:
+    bool thread_interrupt;
+
     QLabel*      lbl;
     QLineEdit*   edt;
     StatusIcon*  status_icon;
-    Preferences* pref;
     int          idx; // 0: TCU, 1: lens, 2: laser, 3: ptz
     bool         connected_to_serial;
     bool         connected_to_tcp;
@@ -48,11 +69,25 @@ protected:
     int          shared_from; // -1: none, 0-3: refer to idx
     ControlPort* shared_port;
 
+    std::queue<PortData> q;
+
     QTimer*      timer;
     int          time_interval;
     bool         write_succeeded;
     int          count_threshold;
     int          successive_count;
+};
+
+struct TCUDataGroup {
+    float rep_freq;
+    float laser_width;
+    float delay_a;
+    float gate_width_a;
+    float delay_b;
+    float gate_width_b;
+    float ccd_freq;
+    float duty;
+    uint  mcp;
 };
 
 class TCU : public ControlPort {
@@ -83,10 +118,10 @@ public:
         LASER_ON      = 0x0105,
     };
 
-    TCU(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, Preferences *pref = nullptr,
-        ScanConfig *sc = nullptr, QObject *parent = nullptr, uint init_width = 100);
+    TCU(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, ScanConfig* sc = nullptr, QObject *parent = nullptr, uint init_width = 100);
 
     int set_user_param(TCU::USER_PARAMS param, float val);
+    TCUDataGroup get_tcu_params();
 
 public slots:
     void try_communicate() override;
@@ -118,6 +153,12 @@ public:
     float delay_dist;                 // unit: m
     float depth_of_view;              // unit: m
 
+    // configuration
+    bool  auto_rep_freq;
+    float laser_offset;
+    float delay_offset;
+    float gate_width_offset;
+
     int   gw_lut[100];                // lookup table for gatewidth config by serial
 
 private:
@@ -145,7 +186,7 @@ public:
         ADDRESS       = 0x101,
     };
 
-    Lens(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, Preferences *pref = nullptr, QObject *parent = nullptr, int init_speed = 32);
+    Lens(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr, int init_speed = 32);
 
 public slots:
     void try_communicate() override;
@@ -160,7 +201,7 @@ private:
 class Laser : public ControlPort {
     Q_OBJECT
 public:
-    Laser(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, Preferences *pref = nullptr, QObject *parent = nullptr);
+    Laser(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr);
 
 public slots:
     void try_communicate() override;
@@ -188,7 +229,7 @@ public:
         ADDRESS    = 0x101,
     };
 
-    PTZ(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, Preferences *pref = nullptr, QObject *parent = nullptr, int init_speed = 16);
+    PTZ(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr, int init_speed = 16);
 
 public slots:
     void try_communicate() override;

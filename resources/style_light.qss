@@ -482,3 +482,26 @@ QScrollBar::add-line:vertical {
 	width: 8px;
 	background: transparent;
 }*/
+
+/* aliasing ui */
+QTableView {
+	background-color: #282828;
+	color: #292929;
+	border: #C07010;
+	gridline-color: #C07010;
+	alternate-background-color: #C8C8C8;
+	selection-color: #000000;
+	selection-background-color: #82BE64;
+}
+
+QTableView::item:!alternate:!selected {
+	background-color: #DCDCDC;
+}
+
+QHeaderView::section {
+	background: qlineargradient();
+	color: #F0F0F0;
+	padding-left: 4px;
+	border: 1px solid #C07010;
+	min-height: 30px;
+}

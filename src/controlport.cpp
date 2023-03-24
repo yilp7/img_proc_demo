@@ -1,8 +1,9 @@
 #include "controlport.h"
 #include "userpanel.h"
 
-ControlPort::ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Preferences *pref, QObject *parent) :
-    QObject{parent},
+ControlPort::ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent) :
+    QThread{parent},
+    thread_interrupt(false),
     connected_to_serial(false),
     connected_to_tcp(false),
     use_tcp(false),
@@ -19,7 +20,6 @@ ControlPort::ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *
     this->edt = edit;
     this->idx = index;
     this->status_icon = status_icon;
-    this->pref = pref;
     //![0]
 
     //[1] set up timer for communication status check
@@ -121,34 +121,46 @@ bool ControlPort::set_baudrate(int baudrate)
     return serial_port->setBaudRate(baudrate);
 }
 
-// send and receive data from any ports, and display in main window
-QByteArray ControlPort::communicate_display(QByteArray write, int write_size, int read_size, bool fb, bool display) {
-    if (shared_port) return shared_port->communicate_display(write, write_size, read_size, fb, display);
+bool ControlPort::get_tcp_status()
+{
+    return use_tcp;
+}
 
-    port_mutex.lock();
+void ControlPort::set_tcp_status(bool use_tcp)
+{
+    this->use_tcp = use_tcp;
+}
+
+// send and receive data from any ports, and display in main window
+QByteArray ControlPort::communicate_display(QByteArray write, int write_size, int read_size, bool fb, bool heartbeat) {
+    if (shared_port) return shared_port->communicate_display(write, write_size, read_size, fb, heartbeat);
+
+//    port_mutex.lock();
     QByteArray read;
     QString str_s("sent    "), str_r("received");
 
     for (char i = 0; i < write_size; i++) str_s += QString::asprintf(" %02X", (uchar)write[i]);
-    if (display) emit port_io(str_s);
+    if (!heartbeat) emit port_io(str_s);
 
     QIODevice *port = use_tcp ? (QIODevice*)tcp_port : (QIODevice*)serial_port;
 
     if (!port->isOpen()) {
-        port_mutex.unlock();
+//        port_mutex.unlock();
         return QByteArray();
     }
+    port->readAll();
     port->write(write, write_size);
     write_succeeded = port->waitForBytesWritten(10);
 
-    if (fb) port->waitForReadyRead(10);
+    if (fb) port->waitForReadyRead(20);
 
     read = read_size ? port->read(read_size) : port->readAll();
+//    read = port->readAll();
     for (char i = 0; i < read.size(); i++) str_r += QString::asprintf(" %02X", (uchar)read[i]);
-    if (display) emit port_io(str_r);
+    if (!heartbeat) emit port_io(str_r);
 
-    port_mutex.unlock();
-    QThread().msleep(10);
+//    port_mutex.unlock();
+    QThread().msleep(1);
     return read;
 }
 
@@ -158,10 +170,10 @@ void ControlPort::share_port_from(ControlPort *port)
     shared_from = port ? port->idx : -1;
 }
 
-int ControlPort::status()
+int ControlPort::get_port_status()
 {
-    if (use_tcp) return connected_to_tcp ? 1 : 0;
-    else return connected_to_serial ? 2 : 0;
+    return (connected_to_tcp ? PortStatus::TCP_CONNECTED : PortStatus::NOT_CONNECTED) |
+           (connected_to_serial ? PortStatus::SERIAL_CONNECTED : PortStatus::NOT_CONNECTED);
 }
 
 void ControlPort::set_theme()
@@ -169,8 +181,38 @@ void ControlPort::set_theme()
     lbl->setStyleSheet(connected_to_serial ? (app_theme ? "color: #180D1C;" : "color: #B0C4DE;") : "color: #CD5C5C;");
 }
 
-TCU::TCU(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Preferences *pref, ScanConfig *sc, QObject *parent, uint init_width) :
-    ControlPort(label, edit, index, status_icon, pref, parent),
+void ControlPort::quit_thread()
+{
+    thread_interrupt = true;
+    quit();
+    wait();
+}
+
+void ControlPort::run()
+{
+    while (!thread_interrupt) {
+        if (q.empty()) { QThread::msleep(10); continue; }
+        PortData temp = q.front();
+        q.pop();
+        QByteArray read = communicate_display(temp.write, temp.write_size, temp.read_size, temp.fb, temp.heartbeat);
+        if (temp.heartbeat) {
+            switch (idx) {
+            case 0:
+                if (read != QByteArray(1, 0x15)) successive_count++;
+                else                             successive_count = 0;
+                break;
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+            default: break;
+            }
+        }
+    }
+}
+
+TCU::TCU(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, ScanConfig *sc, QObject *parent, uint init_width) :
+    ControlPort(label, edit, index, status_icon, parent),
     tcu_type(0),
     scan_mode(0),
     rep_freq(30),
@@ -192,7 +234,12 @@ TCU::TCU(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Pre
     delay_n(0),
     gate_width_n(0),
     delay_dist(delay_a * dist_ns),
-    depth_of_view(gate_width_a * dist_ns)
+    depth_of_view(gate_width_a * dist_ns),
+    auto_rep_freq(true),
+    laser_offset(0),
+    delay_offset(0),
+    gate_width_offset(0),
+    scan_config(sc)
 {
 
 }
@@ -229,7 +276,7 @@ int TCU::set_user_param(TCU::USER_PARAMS cmd, float val)
             break;
         case LASER_USR:
             laser_width = val;
-            set_tcu_param(TCU::LASER_WIDTH, (val + pref->laser_width_offset) / 8);
+            set_tcu_param(TCU::LASER_WIDTH, (val + laser_offset) / 8);
             break;
         case EST_DIST: {
             delay_dist = val;
@@ -237,22 +284,20 @@ int TCU::set_user_param(TCU::USER_PARAMS cmd, float val)
             delay_b = delay_a + delay_n;
 
             if (scan_mode) rep_freq = scan_config->rep_freq;
-            else {
+            else if (auto_rep_freq) {
                 // change repeated frequency according to delay: rep frequency (kHz) <= 1s / delay (μs)
-                if (pref->auto_rep_freq) {
-                    rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000) : 30;
-                    if (rep_freq > 30) rep_freq = 30;
+                rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000) : 30;
+                if (rep_freq > 30) rep_freq = 30;
 //                        if (rep_freq < 10) rep_freq = 10;
-                }
                 set_tcu_param(TCU::REPEATED_FREQ, std::round(1.25e5 / rep_freq));
             }
-            set_tcu_param(TCU::DELAY_A, std::round(delay_a + pref->delay_offset));
-            set_tcu_param(TCU::DELAY_B, std::round(delay_b + pref->delay_offset));
+            set_tcu_param(TCU::DELAY_A, std::round(delay_a + delay_offset));
+            set_tcu_param(TCU::DELAY_B, std::round(delay_b + delay_offset));
 
             break;
         }
         case EST_DOV: {
-            int gw = std::round(val / dist_ns), gw_corrected_a = gw + pref->gate_width_offset, gw_corrected_b = gw + gate_width_n + pref->gate_width_offset;
+            int gw = std::round(val / dist_ns), gw_corrected_a = gw + gate_width_offset, gw_corrected_b = gw + gate_width_n + gate_width_offset;
             if (gw_corrected_a < 0 || gw_corrected_b < 0) return -1;
             if (gw_corrected_a < 100) gw_corrected_a = gw_lut[gw_corrected_a];
             if (gw_corrected_b < 100) gw_corrected_b = gw_lut[gw_corrected_b];
@@ -277,6 +322,11 @@ int TCU::set_user_param(TCU::USER_PARAMS cmd, float val)
     return 0;
 }
 
+TCUDataGroup TCU::get_tcu_params()
+{
+    return TCUDataGroup{rep_freq, laser_width, delay_a, gate_width_a, delay_b, gate_width_b, ccd_freq, duty, mcp};
+}
+
 int TCU::set_tcu_param(TCU::USER_PARAMS param, float val)
 {
     uint integer_part = std::round(val);
@@ -294,7 +344,8 @@ int TCU::set_tcu_param(TCU::USER_PARAMS param, float val)
         out[3] = integer_part & 0xFF; integer_part >>= 8;
         out[2] = integer_part & 0xFF;
 
-        communicate_display(out, 7, 1, false);
+//        communicate_display(out, 7, 1, false);
+        q.push(PortData{out, 7, 1, false, false});
         return false;
     }
     case 1:
@@ -323,7 +374,8 @@ int TCU::set_tcu_param(TCU::USER_PARAMS param, float val)
         out[3] = integer_part & 0xFF; integer_part >>= 8;
         out[2] = integer_part & 0xFF;
 
-        communicate_display(out, 8, 1, false);
+//        communicate_display(out, 8, 1, false);
+        q.push(PortData{out, 8, 1, false, false});
         return false;
     }
     default: return false;
@@ -336,40 +388,43 @@ void TCU::try_communicate()
     if (!connected_to_serial && !connected_to_tcp) return;
 
     static QByteArray write = generate_ba(new uchar[7]{0x88, 0x15, 0x00, 0x00, 0x00, 0x00, 0x99}, 7);
-    QByteArray read = communicate_display(write, 7, 1, true, false);
-    if (read != QByteArray(1, 0x15)) successive_count++;
-    else                             successive_count = 0;
+    q.push(PortData{write, 7, 1, true, true});
+//    QByteArray read = communicate_display(write, 7, 1, true, false);
+//    if (read != QByteArray(1, 0x15)) successive_count++;
+//    else                             successive_count = 0;
 }
 
-Lens::Lens(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Preferences *pref, QObject *parent, int init_speed) : ControlPort(label, edit, index, status_icon, pref, parent)
+Lens::Lens(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent, int init_speed) :
+    ControlPort(label, edit, index, status_icon, parent)
 {
     zoom = focus = laser = 0;
     speed = init_speed;
 }
 
 void Lens::try_communicate()
-{
+{return;
     // TODO: disable self-check system
     if (!connected_to_serial && !connected_to_tcp) return;
 
     static QByteArray write1 = generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7);
     static QByteArray write2 = generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7);
     static QByteArray write3 = generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x57, 0x00, 0x00, 0x58}, 7);
-    QByteArray read = communicate_display(write1, 7, 1, true, false);
+    QByteArray read = communicate_display(write1, 7, 7, true, false);
     if (read != QByteArray(1, 0x15)) successive_count++;
     else                             successive_count = 0;
-    read = communicate_display(write2, 7, 1, true, false);
+    read = communicate_display(write2, 7, 7, true, false);
     if (read != QByteArray(1, 0x15)) successive_count++;
     else                             successive_count = 0;
-    read = communicate_display(write3, 7, 1, true, false);
+    read = communicate_display(write3, 7, 7, true, false);
     if (read != QByteArray(1, 0x15)) successive_count++;
     else                             successive_count = 0;
 }
 
-Laser::Laser(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Preferences *pref, QObject *parent) : ControlPort(label, edit, index, status_icon, pref, parent) {}
+Laser::Laser(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent) :
+    ControlPort(label, edit, index, status_icon, parent) {}
 
 void Laser::try_communicate()
-{
+{return;
     // TODO: disable self-check system
     if (!connected_to_serial && !connected_to_tcp) return;
 
@@ -379,14 +434,15 @@ void Laser::try_communicate()
     else                             successive_count = 0;
 }
 
-PTZ::PTZ(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Preferences *pref, QObject *parent, int init_speed) : ControlPort(label, edit, index, status_icon, pref, parent)
+PTZ::PTZ(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent, int init_speed) :
+    ControlPort(label, edit, index, status_icon, parent)
 {
     angle_h = angle_v = 0;
     ptz_speed = init_speed;
 }
 
 void PTZ::try_communicate()
-{
+{return;
     // TODO: disable self-check system
     if (!connected_to_serial && !connected_to_tcp) return;
 

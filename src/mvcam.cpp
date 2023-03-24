@@ -42,6 +42,7 @@ int Cam::start(int idx) {
     MV_CC_SetEnumValue(dev_handle, "BinningHorizontal", 1);
     MV_CC_SetEnumValue(dev_handle, "BinningVertical", 1);
 
+    qDebug() << "start cam:" << hex << (uint)ret;
     return ret;
 }
 
@@ -201,7 +202,9 @@ int Cam::ip_address(bool read, int *ip, int *gateway, int *nic_address)
         return 0;
     }
     else {
-        return MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
+        int ret = MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
+        qDebug() << "modify ip: " << hex << ret;
+        return ret;
     }
 }
 
@@ -259,6 +262,7 @@ void Cam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *
         break;
     }
 
-    ((std::queue<cv::Mat>*)user_data)->push(img.clone());
+    struct main_ui_info *ptr = (struct main_ui_info*)user_data;
+    ptr->frame_info_q->push(frame_info->nLostPacket);
+    ptr->img_q->push(img.clone());
 }
-

@@ -5,6 +5,7 @@
 #include "threadpool.h"
 #include "imageproc.h"
 #include "controlport.h"
+#include "aliasing.h"
 
 #include "preferences.h"
 #include "scanconfig.h"
@@ -19,13 +20,14 @@ QT_END_NAMESPACE
 class GrabThread : public QThread {
     Q_OBJECT
 public:
-    GrabThread(void *info);
+    GrabThread(void *info, int idx);
 
 protected:
     void run();
 
 private:
     void *p_info;
+    int  display_idx;
 
 signals:
     void stop_image_writing();
@@ -49,7 +51,7 @@ public:
     UserPanel(QWidget *parent = nullptr);
     ~UserPanel();
 
-    int grab_thread_process();
+    int grab_thread_process(int display_idx);
     bool is_maximized();
 
     // rename vid file in new thread
@@ -85,12 +87,13 @@ public slots:
     void update_laser_offset(float laser_offset);
     void setup_laser(int laser_on);
     void set_baudrate(int idx, int baudrate);
+    void set_tcp_status_on_port(int idx, bool use_tcp);
     void set_tcu_as_shared_port(bool share);
     void com_write_data(int com_idx, QByteArray data);
-    void display_baudrate(int idx);
+    void display_port_info(int idx);
     void update_dev_ip();
     void set_dev_ip(int ip, int gateway);
-    void change_pixel_format(int pixel_format);
+    void change_pixel_format(int pixel_format, int display_idx = 0);
     void update_lower_3d_thresh();
     void reset_custom_3d_params();
     void save_current_video();
@@ -104,6 +107,9 @@ public slots:
     // signaled by ControlPort
     void append_data(QString str);
     void update_port_status(int connected_status);
+
+    // signaled by Aliasing
+    void set_distance_set(int id);
 
 private slots:
     // on clicking enum btn: enumerate devices
@@ -329,8 +335,9 @@ private:
     void update_laser_width();
     void update_gate_width();
 
-    // filter mat by brightness
+    // configure scan
     void filter_scan();
+    void auto_scan_for_target();
 
     // change current in laser
     void update_current();
@@ -350,12 +357,13 @@ private:
     void send_ctrl_cmd(uchar dir);
 
     // static image display (drag & drop)
-    void start_static_display(int width, int height, bool is_color, int pixel_depth = 8, int device_type = -1);
+    void start_static_display(int width, int height, bool is_color, int display_idx = 0, int pixel_depth = 8, int device_type = -1);
     bool load_image_file(QString filename, bool init);
-    int load_video_file(QString filename, bool format_gray = false, void (*process_frame)(cv::Mat &frame, void *ptr) = NULL, void *ptr = NULL, bool display = true);
+    int load_video_file(QString filename, bool format_gray = false, void (*process_frame)(cv::Mat &frame, void *ptr) = NULL,
+                        void *ptr = NULL, int display_idx = 0, bool display = true);
 
     // status display
-    void update_pixel_depth(int depth);
+    void update_pixel_depth(int depth, int display_idx = 0);
 
     // tcu_type
     void update_tcu_param_pos(QLabel *u_unit, QLineEdit *n_input, QLabel *n_unit, QLineEdit *p_input);
@@ -374,20 +382,23 @@ private:
     Preferences*            pref;
     ScanConfig*             scan_config;
     LaserSettings*          laser_settings;
+    Distance3DView*         view_3d;
+    Aliasing*               aliasing;
+    FloatingWindow*         fw[2];
 
     int                     calc_avg_option;            // a: 4 frames; b: 8 frames
     bool                    trigger_by_software;        // whether the device gets trigger signal from sw
 
-    QMutex                  image_mutex;                // img handle lock
+    QMutex                  image_mutex[3];             // img handle lock
     QMutex                  port_mutex;                 // port handle lock
-    QMutex                  display_mutex;              // display handle lock
+    QMutex                  display_mutex[3];           // display handle lock
     Cam*                    curr_cam;                   // current camera
     float                   time_exposure_edit;
     float                   gain_analog_edit;
     float                   frame_rate_edit;
     QString                 save_location;              // where to save the image
     QString                 TEMP_SAVE_LOCATION;         // temp location to save the image
-    cv::VideoWriter         vid_out[3];                 // video writer for ORI/RES
+    cv::VideoWriter         vid_out[3];                 // video writer for ORI/RES/export
     QString                 current_video_filename;     // name of the imported video file (if not a stream)
     QString                 output_filename;            // target output name when exporting video
     QString                 temp_output_filename;       // temp save location of target output file
@@ -410,9 +421,12 @@ private:
     uint                    zoom;
     uint                    focus;
     int                     distance;                   // dist read from rangefinder
+    float                   rep_freq;
     float                   laser_width;
     float                   delay_dist;                 // estimated distance calculated from delay
     float                   depth_of_view;              // depth of view from gate width
+    bool                    aliasing_mode;
+    int                     aliasing_level;
     int                     focus_direction;
     int                     clarity[3];
     char                    curr_laser_idx;
@@ -420,53 +434,55 @@ private:
     int                     display_option;             // data display option: 1: com data; 2: histogram
     QButtonGroup*           display_grp;
 
-    std::queue<cv::Mat>     q_img;                      // image queue in grab_thread
-    bool                    updated;                    // whether the program get a new image from stream
+    std::queue<cv::Mat>     q_img[3];                   // image queue in grab_thread
+    std::queue<int>         q_frame_info;
+    bool                    updated[3];                 // whether the program get a new image from stream
     // TODO add other scan features
-    std::deque<float>       q_scan;                     // objects' distance found while scanning
+    std::vector<TCUDataGroup> q_scan;                   // targets' tcu param found while scanning
 
     int                     device_type;                // 1: hik gige
     bool                    device_on;                  // whether curr device is on
     bool                    trigger_mode_on;            // whether img grabbing is on trigger mode
     bool                    start_grabbing;             // whether the device is rdy to grab imgs
-    bool                    record_original;            // whether recording original stream
-    bool                    record_modified;            // whether recording modified stream
-    bool                    save_original;              // saving original bmp
-    bool                    save_modified;              // saving modified bmp
-    bool                    save_scan;
-    bool                    image_3d;                   // whether to build a 3d image
+    bool                    record_original[3];         // whether recording original stream
+    bool                    record_modified[3];         // whether recording modified stream
+    bool                    save_original[3];           // saving original bmp
+    bool                    save_modified[3];           // saving modified bmp
+    bool                    image_3d[3];                // whether to build a 3d image
     int                     trigger_source;             // where the device gets the trigger signal
-    bool                    is_color;                   // display in mono8 or rgb8
+    bool                    is_color[3];                // display in mono8 or rgb8
 
-    int                     w;                          // image width
-    int                     h;                          // image height
-    int                     pixel_format;               // for hik cam, use mono 8 for others
-    int                     pixel_depth;                // pixel depth
+    int                     w[3];                       // image width
+    int                     h[3];                       // image height
+    int                     pixel_format[3];            // for hik cam, use mono 8 for others
+    int                     pixel_depth[3];             // pixel depth
 
-    bool                    grab_image;                 // whether thread should continue grabbing image
-    GrabThread*             h_grab_thread;              // img-grab thread handle
-    bool                    grab_thread_state;          // whether grabbing thread is on
+    Display*                displays[3];                // 3 set of display widgets
+    bool                    grab_image[3];              // whether thread should continue grabbing image
+    GrabThread*             h_grab_thread[3];           // img-grab thread handle
+    bool                    grab_thread_state[3];       // whether grabbing thread is on
     bool                    video_thread_state;         // whether video reading thread is on
     JoystickThread*         h_joystick_thread;          // process joystick input
 
-    cv::Mat                 img_mem;                    // right-side img display source (stream)
-    cv::Mat                 modified_result;            // right-side img display modified (stream)
-    cv::Mat                 img_display;                // right-side img display cropped (stream)
-    cv::Mat                 prev_img;                   // previous original image
-    cv::Mat                 prev_3d;                    // previous 3d image
-    cv::Mat                 seq[8];                     // for frame average
-    cv::Mat                 seq_sum;
-    cv::Mat                 frame_a_sum;
-    cv::Mat                 frame_b_sum;
-    uint                    hist[256];                  // display histogram
-    cv::Mat                 hist_mat;
-    int                     seq_idx;                    // frame-average current index
-    cv::Mat                 dist_mat;
-    cv::Mat                 user_mask;
+    cv::Mat                 img_mem[3];                 // right-side img display source (stream)
+    cv::Mat                 modified_result[3];         // right-side img display modified (stream)
+    cv::Mat                 img_display[3];             // right-side img display cropped (stream)
+    cv::Mat                 prev_img[3];                // previous original image
+    cv::Mat                 prev_3d[3];                 // previous 3d image
+    cv::Mat                 seq[3][8];                  // for frame average
+    cv::Mat                 seq_sum[3];
+    cv::Mat                 frame_a_sum[3];
+    cv::Mat                 frame_b_sum[3];
+    uint                    hist[3][256];               // display histogram
+    cv::Mat                 hist_mat[3];
+    int                     seq_idx[3];                 // frame-average current index
+    cv::Mat                 dist_mat[3];
+    cv::Mat                 user_mask[3];
 
     QLabel*                 com_label[5];               // for com communication
     QLineEdit*              com_edit[5];
 
+    bool                    auto_scan_mode;             // search for target
     bool                    scan;                       // auto-scan for object detection
     float                   scan_distance;              // curr distance of scanning
     float                   scan_step;                  // stepping size when scanning

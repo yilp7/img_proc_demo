@@ -54,4 +54,9 @@ public:
     static void __stdcall frame_cb(unsigned char* data, MV_FRAME_OUT_INFO_EX *frame_info, void* user_data);
 };
 
+struct main_ui_info {
+    std::queue<int> *frame_info_q;
+    std::queue<cv::Mat> *img_q;
+};
+
 #endif // MVCAM_H

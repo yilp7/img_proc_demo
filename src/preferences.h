@@ -50,13 +50,15 @@ signals:
     void change_pixel_format(int format);
 
     // serial comm.
-    void get_baudrate(int com_idx);
+    void get_port_info(int com_idx);
     void change_baudrate(int idx, int baudrate);
+    void set_tcp_status(int idx, bool use_tcp);
     void share_tcu_port(bool share);
     void com_write(int idx, QByteArray data);
 
     // tcu config
     void tcu_type_changed(int idx);
+    void set_auto_rep_freq(bool _auto);
     void rep_freq_unit_changed(int idx);
     void base_unit_changed(int idx);
     void max_dist_changed(float dist);

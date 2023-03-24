@@ -133,11 +133,12 @@ Preferences::Preferences(QWidget *parent) :
     ui->BAUDRATE_LIST->installEventFilter(this);
 
     connect(ui->COM_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
-            [this](int index){ emit get_baudrate(index); });
+            [this](int index){ emit get_port_info(index); });
     connect(ui->BAUDRATE_LIST, static_cast<void (QComboBox::*)(const QString &arg1)>(&QComboBox::activated), this,
             [this](const QString &arg1){ emit change_baudrate(ui->COM_LIST->currentIndex(), arg1.toInt()); });
+    connect(ui->TCP_SERVER_CHK, &QCheckBox::stateChanged, this,
+            [this](int arg1){ emit set_tcp_status(ui->COM_LIST->currentIndex(), arg1); });
     connect(ui->SHARE_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ share_port = arg1; emit share_tcu_port(arg1); });
-    connect(ui->TCP_SERVER_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ use_tcp = arg1; });
 
 //    QFont temp = QFont(consolas);
 //    temp.setPixelSize(11);
@@ -166,7 +167,7 @@ Preferences::Preferences(QWidget *parent) :
 
     connect(ui->TCU_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
             [this](int index){ emit tcu_type_changed(index); });
-    connect(ui->AUTO_REP_FREQ_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ auto_rep_freq = arg1; });
+    connect(ui->AUTO_REP_FREQ_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit set_auto_rep_freq(auto_rep_freq = arg1); });
     connect(ui->AUTO_MCP_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ auto_mcp = arg1; });
     connect(ui->HZ_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
             [this](int index){ emit rep_freq_unit_changed(hz_unit = index); });
@@ -246,11 +247,11 @@ Preferences::Preferences(QWidget *parent) :
         int delay_offset_int, gate_width_offset_int, laser_offset_int;
         fseek(f, 9, SEEK_SET);
         fread(&delay_offset_int, 4, 1, f);
-        delay_offset = delay_offset_int * dist_ns;
+        emit delay_offset_changed(delay_offset = delay_offset_int * dist_ns);
         fread(&gate_width_offset_int, 4, 1, f);
-        gate_width_offset = gate_width_offset_int * dist_ns;
+        emit gate_width_offset_changed(gate_width_offset = gate_width_offset_int * dist_ns);
         fread(&laser_offset_int, 4, 1, f);
-        laser_width_offset = laser_offset_int;
+        emit laser_offset_changed(laser_width_offset = laser_offset_int);
         fclose(f);
     }
 

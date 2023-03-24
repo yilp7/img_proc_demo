@@ -14,7 +14,7 @@
    <bool>true</bool>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Scan Configuration</string>
   </property>
   <widget class="QLabel" name="UNIT_US_2">
    <property name="geometry">

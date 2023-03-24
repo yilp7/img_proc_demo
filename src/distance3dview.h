@@ -2,7 +2,6 @@
 #define DISTANCE3DVIEW_H
 
 #include "utils.h"
-#include <QtDataVisualization>
 
 namespace Ui {
 class Distance3DView;

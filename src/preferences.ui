@@ -14,7 +14,7 @@
    <bool>true</bool>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Preferences</string>
   </property>
   <widget class="QTabWidget" name="PREFERENCE_TAB">
    <property name="geometry">
@@ -790,7 +790,7 @@
       <property name="geometry">
        <rect>
         <x>40</x>
-        <y>100</y>
+        <y>130</y>
         <width>161</width>
         <height>22</height>
        </rect>
@@ -855,7 +855,7 @@
       <property name="geometry">
        <rect>
         <x>40</x>
-        <y>130</y>
+        <y>100</y>
         <width>121</width>
         <height>22</height>
        </rect>
@@ -904,7 +904,7 @@
       <property name="geometry">
        <rect>
         <x>160</x>
-        <y>130</y>
+        <y>100</y>
         <width>111</width>
         <height>21</height>
        </rect>

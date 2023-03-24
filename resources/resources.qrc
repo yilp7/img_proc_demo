@@ -35,6 +35,7 @@
         <file alias="file_hover">tools/dark/file_hover.png</file>
         <file alias="url">tools/dark/url.png</file>
         <file alias="url_hover">tools/dark/url_hover.png</file>
+        <file alias="switch">tools/dark/switch.png</file>
     </qresource>
     <qresource prefix="/cursor/dark">
         <file alias="cursor">cursor/dark/cursor.png</file>
@@ -93,6 +94,7 @@
         <file alias="file_hover">tools/light/file_hover.png</file>
         <file alias="url">tools/light/url.png</file>
         <file alias="url_hover">tools/light/url_hover.png</file>
+        <file alias="switch">tools/light/switch.png</file>
     </qresource>
     <qresource prefix="/cursor/light">
         <file alias="cursor">cursor/light/cursor.png</file>

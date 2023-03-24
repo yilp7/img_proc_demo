@@ -34,7 +34,7 @@ public:
                            int colormap = cv::COLORMAP_PARULA, double lower_thresh = 0, double upper_thresh = 0.981,
                            bool trim = false, cv::Mat *dist_mat = nullptr, double *d_min = nullptr, double *d_max = nullptr);
     // TODO rewrite 3d painting function
-    static void paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double min, double max);
+    static void paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double min, double max, int colormap = cv::COLORMAP_PARULA);
 
     // split image 1x(2x2) -> 4x(1x1)
     static void split_img(cv::Mat &src, cv::Mat &res);

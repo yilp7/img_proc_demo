@@ -12,6 +12,7 @@ Display::Display(QWidget *parent) :
     scale{ 1.0f, 2.0f / 3, 1.0f / 2, 1.0f / 4, 1.0f / 8},
     pressed(false)
 {
+    connect(this, SIGNAL(set_pixmap(const QPixmap&)), this, SLOT(setPixmap(const QPixmap&)));
     setContextMenuPolicy(Qt::ActionsContextMenu);
     QAction *add_to_roi = new QAction("add selection to roi", this);
     this->addAction(add_to_roi);
@@ -19,6 +20,7 @@ Display::Display(QWidget *parent) :
     QAction *clear_all_rois = new QAction("clear all rois", this);
     this->addAction(clear_all_rois);
     connect(clear_all_rois, &QAction::triggered, this, [this](){ emit clear_roi(); });
+    update_roi(center);
 }
 
 void Display::update_roi(QPoint center)
@@ -287,8 +289,9 @@ void TitleBar::setup(QObject *ptr)
     connect(preferences, SIGNAL(query_dev_ip()),                   signal_receiver, SLOT(update_dev_ip()));
     connect(preferences, SIGNAL(set_dev_ip(int, int)),             signal_receiver, SLOT(set_dev_ip(int, int)));
     connect(preferences, SIGNAL(change_pixel_format(int)),         signal_receiver, SLOT(change_pixel_format(int)));
-    connect(preferences, SIGNAL(get_baudrate(int)),                signal_receiver, SLOT(display_baudrate(int)));
+    connect(preferences, SIGNAL(get_port_info(int)),               signal_receiver, SLOT(display_port_info(int)));
     connect(preferences, SIGNAL(change_baudrate(int, int)),        signal_receiver, SLOT(set_baudrate(int, int)));
+    connect(preferences, SIGNAL(set_tcp_status(int, bool)),        signal_receiver, SLOT(set_tcp_status_on_port(int, bool)));
     connect(preferences, SIGNAL(share_tcu_port(bool)),             signal_receiver, SLOT(set_tcu_as_shared_port(bool)));
     // TODO use_tcp_chk updated
     connect(preferences, SIGNAL(com_write(int, QByteArray)),       signal_receiver, SLOT(com_write_data(int, QByteArray)));
@@ -303,10 +306,10 @@ void TitleBar::setup(QObject *ptr)
     connect(preferences, SIGNAL(lower_3d_thresh_updated()),        signal_receiver, SLOT(update_lower_3d_thresh()));
     connect(preferences, SIGNAL(query_tcu_param()),                signal_receiver, SLOT(reset_custom_3d_params()));
 
-    settings_menu->addAction(">> export pref.", signal_receiver, SLOT(export_config()), QKeySequence(Qt::ALT + Qt::Key_E));
-    settings_menu->addAction("<< load pref.",   signal_receiver, SLOT(prompt_for_config_file()), QKeySequence(Qt::ALT + Qt::Key_R));
+    settings_menu->addAction(">> export pref.", signal_receiver, SLOT(export_config())/*, QKeySequence(Qt::ALT + Qt::Key_E)*/);
+    settings_menu->addAction("<< load pref.",   signal_receiver, SLOT(prompt_for_config_file())/*, QKeySequence(Qt::ALT + Qt::Key_R)*/);
     // TODO congigure serial number should be exclusive to ICMOS only
-    settings_menu->addAction("## config s.n.",  signal_receiver, SLOT(prompt_for_serial_file()), QKeySequence(Qt::ALT + Qt::Key_C));
+    settings_menu->addAction("## config s.n.",  signal_receiver, SLOT(prompt_for_serial_file())/*, QKeySequence(Qt::ALT + Qt::Key_C)*/);
     settings_menu->addAction("=> export video", signal_receiver, SLOT(save_current_video()), QKeySequence(Qt::ALT + Qt::SHIFT + Qt::Key_S));
     settings->setMenu(settings_menu);
 
@@ -535,20 +538,115 @@ StatusBar::StatusBar(QWidget *parent) : QFrame(parent)
     ptz_status->setObjectName("PTZ_STATUS");
     ptz_status->setup(QPixmap(":/status/dark/ptz"));
 
-    img_pixel_format = new StatusIcon(this);
-    img_pixel_format->setGeometry(280, 0, 48, 32);
-    img_pixel_format->setObjectName("IMG_PIXEL_FORMAT");
-    img_pixel_format->setup("MONO8");
     img_pixel_depth = new StatusIcon(this);
-    img_pixel_depth->setGeometry(332, 0, 48, 32);
+    img_pixel_depth->setGeometry(280, 0, 48, 32);
     img_pixel_depth->setObjectName("IMG_PIXEL_DEPTH");
     img_pixel_depth->setup("8-bit");
     img_resolution = new StatusIcon(this);
-    img_resolution->setGeometry(384, 0, 48, 32);
+    img_resolution->setGeometry(332, 0, 120, 32);
     img_resolution->setObjectName("IMG_RESOLUTION");
-    img_resolution->setup("");
+    img_resolution->setup("0 x 0");
+    packet_lost = new StatusIcon(this);
+    packet_lost->setGeometry(456, 0, 132, 32);
+    packet_lost->setObjectName("PACKET_LOST");
+    packet_lost->setup("packets lost: 0");
     result_cam_fps = new StatusIcon(this);
-    result_cam_fps->setGeometry(436, 0, 48, 32);
+    result_cam_fps->setGeometry(592, 0, 48, 32);
     result_cam_fps->setObjectName("RESULT_CAM_FPS");
     result_cam_fps->setup("");
+}
+
+FloatingWindow::FloatingWindow() :
+    QWidget(),
+    pressed(false),
+    disp(NULL),
+    frame(NULL)
+{
+    setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint | Qt::WindowStaysOnTopHint);
+    setMouseTracking(true);
+    this->setMinimumSize(240, 135);
+    this->resize(480, 270);
+
+    frame = new QFrame(this);
+//    frame->setObjectName("FRAME");
+    frame->resize(this->size());
+    QGridLayout *layout = new QGridLayout(frame);
+    layout->setContentsMargins(0, 0, 0, 0);
+
+    layout->addWidget(new QSizeGrip(frame), 1, 1, Qt::AlignBottom | Qt::AlignRight);
+//    layout->addWidget(new QSizeGrip(this), 0, 0, Qt::AlignTop    | Qt::AlignRight);
+//    layout->addWidget(new QSizeGrip(this), 0, 0, Qt::AlignBottom | Qt::AlignLeft);
+//    layout->addWidget(new QSizeGrip(this), 0, 0, Qt::AlignTop    | Qt::AlignLeft);
+
+    QPushButton *exit = new QPushButton(QIcon(":/tools/exit"), "", frame);
+    connect(exit, &QPushButton::clicked, this, [this](){ hide(); });
+    exit->setFixedSize(20, 20);
+    exit->setIconSize(QSize(16, 16));
+    exit->setStyleSheet("background-color: transparent; border: none;");
+    layout->addWidget(exit, 0, 1, Qt::AlignTop | Qt::AlignRight);
+
+    disp = new Display(this);
+//    disp->setObjectName("DISP");
+    this->resize(this->size());
+    disp->setMouseTracking(true);
+    disp->lower();
+
+    QTimer::singleShot(5000, [this](){ frame->hide(); });
+}
+
+Display *FloatingWindow::get_display_widget()
+{
+    return disp;
+}
+
+void FloatingWindow::resize_display()
+{
+    QResizeEvent e(this->size(), this->size());
+    resizeEvent(&e);
+}
+
+void FloatingWindow::mousePressEvent(QMouseEvent *event)
+{
+    if(event->button() != Qt::LeftButton) return;
+    pressed = true;
+    prev_pos = event->globalPos();
+    timer_mouse.restart();
+
+    QWidget::mousePressEvent(event);
+}
+
+void FloatingWindow::mouseMoveEvent(QMouseEvent *event)
+{
+    if (pressed) {
+        // use globalPos instead of pos to prevent window shaking
+        window()->move(window()->pos() + event->globalPos() - prev_pos);
+        prev_pos = event->globalPos();
+    }
+    else {
+        setCursor(cursor_curr_pointer);
+    }
+    QWidget::mouseMoveEvent(event);
+}
+
+void FloatingWindow::mouseReleaseEvent(QMouseEvent *event)
+{
+    if(event->button() != Qt::LeftButton) return;
+    pressed = false;
+    if (timer_mouse.elapsed() < 500) {
+        frame->show();
+        QTimer::singleShot(5000, [this](){ frame->hide(); });
+    }
+
+    QWidget::mouseReleaseEvent(event);
+}
+
+void FloatingWindow::resizeEvent(QResizeEvent *event)
+{
+    resize(this->width(), this->width() / 1920.0 * 1080);
+    QPoint center = disp->center;
+    center = center * this->width() / disp->width();
+    disp->update_roi(center);
+
+    disp->resize(this->size());
+    frame->resize(this->size());
 }

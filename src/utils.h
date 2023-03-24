@@ -5,6 +5,8 @@
 #include <QtWidgets>
 #include <QtSerialPort>
 #include <QtNetwork>
+#include <QtDataVisualization>
+#include <QtConcurrent>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>

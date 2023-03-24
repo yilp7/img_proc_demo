@@ -174,7 +174,7 @@ void Distance3DView::load_data()
         }
     }
     scatter_graph->axisX()->setRange(0, result_dist_mat.rows);
-    scatter_graph->axisY()->setRange(dist_min * 0.8, dist_max * 1.2);
+    scatter_graph->axisY()->setRange(dist_min * 0.95, dist_max * 1.05);
     scatter_graph->axisZ()->setRange(0, result_dist_mat.cols);
     mat_mutex.unlock();
 

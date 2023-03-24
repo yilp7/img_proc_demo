@@ -179,6 +179,8 @@ void ScanConfig::update_scan()
         if (!frame_count) frame_count = 1;
         step_size_delay = 1.0 * (ending_delay - starting_delay) / frame_count;
         step_size_gw = 1.0 * (ending_gw - starting_gw) / frame_count;
+        if (!step_size_delay) step_size_delay = 1;
+        if (!step_size_gw) step_size_gw = 1;
     }
 
     ui->FRAME_COUNT_EDIT->setText(QString::number(frame_count));

@@ -36,7 +36,7 @@ link_directories(${SDK_DIR}/VLD/lib)
 # They need to be set before the find_package(Qt5 ...) call.
 
 find_package(QT NAMES Qt5 REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort Network DataVisualization REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort Network DataVisualization Concurrent REQUIRED)
 
 if (WIN32)
     include_directories(${Hik_SDK_DIR}/include/win)
@@ -127,6 +127,8 @@ set(SOURCE_FILES
     src/distance3dview.h
     src/distance3dview.cpp
     src/distance3dview.ui
+    src/aliasing.h
+    src/aliasing.cpp
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss
@@ -144,6 +146,8 @@ set(PROJECT_LIBS
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::SerialPort
     Qt${QT_VERSION_MAJOR}::Network
+    Qt${QT_VERSION_MAJOR}::DataVisualization
+    Qt${QT_VERSION_MAJOR}::Concurrent
     # mvs
     MvCameraControl
     # Euresys
@@ -259,15 +263,15 @@ endif()
 
 add_executable(GLI_params WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(GLI_params PRIVATE PARAM=1)
-qt5_use_modules(GLI_params Widgets SerialPort Network DataVisualization)
+qt5_use_modules(GLI_params Widgets SerialPort Network DataVisualization Concurrent)
 target_link_libraries(GLI_params ${PROJECT_LIBS})
 
 add_executable(ICMOS WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(ICMOS PRIVATE ICMOS=1)
-qt5_use_modules(ICMOS Widgets SerialPort Network DataVisualization)
+qt5_use_modules(ICMOS Widgets SerialPort Network DataVisualization Concurrent)
 target_link_libraries(ICMOS ${PROJECT_LIBS})
 
 add_executable(LvTong WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(LvTong PRIVATE LVTONG=1)
-qt5_use_modules(LvTong Widgets SerialPort Network DataVisualization)
+qt5_use_modules(LvTong Widgets SerialPort Network DataVisualization Concurrent)
 target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn454)

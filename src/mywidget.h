@@ -26,6 +26,7 @@ protected:
     void wheelEvent(QWheelEvent *event);
 
 signals:
+    void set_pixmap(const QPixmap& pm);
     // idx: 0: curr_pos, 1: start_pos, 2: shape_size, 3: ptz_target
     void updated_pos(int idx, QPoint pos);
     void curr_pos(QPoint pos);
@@ -242,10 +243,38 @@ public:
     StatusIcon* lens_status;
     StatusIcon* laser_status;
     StatusIcon* ptz_status;
-    StatusIcon* img_pixel_format;
     StatusIcon* img_pixel_depth;
     StatusIcon* img_resolution;
+    StatusIcon* packet_lost;
     StatusIcon* result_cam_fps;
+};
+
+class FloatingWindow : public QWidget
+{
+    Q_OBJECT
+public:
+    explicit FloatingWindow();
+
+    Display* get_display_widget();
+    void resize_display();
+
+protected:
+    void mousePressEvent(QMouseEvent *event);
+    void mouseMoveEvent(QMouseEvent *event);
+    void mouseReleaseEvent(QMouseEvent *event);
+    void resizeEvent(QResizeEvent *event);
+
+public:
+    // ui-control
+    bool            pressed;
+    QPoint          prev_pos;
+    QElapsedTimer   timer_mouse;
+
+private:
+    Display* disp;
+    QFrame*  frame;
+
+    int      w, h;
 };
 
 #endif // MYWIDGET_H
