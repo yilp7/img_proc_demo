@@ -58,7 +58,7 @@ protected:
     QLabel*      lbl;
     QLineEdit*   edt;
     StatusIcon*  status_icon;
-    int          idx; // 0: TCU, 1: lens, 2: laser, 3: ptz
+    int          idx; // 0: TCU, 1: lens, 2: laser, 3: ptz, 4: inclinometer
     bool         connected_to_serial;
     bool         connected_to_tcp;
     bool         use_tcp;
@@ -73,6 +73,7 @@ protected:
 
     QTimer*      timer;
     int          time_interval;
+    int          write_idx;
     bool         write_succeeded;
     int          count_threshold;
     int          successive_count;
@@ -238,6 +239,33 @@ private:
     float angle_h;
     float angle_v;
     int   ptz_speed;
+};
+
+class Inclin : public ControlPort {
+    Q_OBJECT
+public:
+    Inclin(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr);
+
+public slots:
+    void try_communicate() override;
+
+private:
+    // unlock: 0XFF 0XAA 0X69 0X88 0XB5
+    // set output frequency: 0xFF 0xAA 0x03 0x03 0x00 (1Hz)
+    // set output content: 0xFF 0xAA 0x02 0x0F 0x00 (TIME, ACC, GYRO, ANGLE)
+    // save config: 0XFF 0XAA 0X00 0X00 0X00
+    float acceleration_x;
+    float acceleration_y;
+    float acceleration_z;
+    float temperature;
+
+    float angular_x;
+    float angular_y;
+    float angular_z;
+
+    float roll;
+    float pitch;
+    float yaw;
 };
 
 #endif // CONTROLPORT_H

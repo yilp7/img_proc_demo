@@ -49,6 +49,7 @@ Preferences::Preferences(QWidget *parent) :
     custom_3d_param(false),
     custom_3d_delay(0),
     custom_3d_gate_width(0),
+    model_idx(0),
     fishnet_recog(false),
     fishnet_thresh(0.99)
 {
@@ -298,6 +299,11 @@ Preferences::Preferences(QWidget *parent) :
                 emit query_tcu_param();
             });
 #ifdef LVTONG
+    ui->MODEL_LIST->addItem("01");
+    ui->MODEL_LIST->addItem("02");
+    ui->MODEL_LIST->setCurrentIndex(model_idx = 1);
+    connect(ui->MODEL_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
+            [this](int index){ model_idx = index; });
     connect(ui->FISHNET_RECOG_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ fishnet_recog = arg1; });
     connect(ui->FISHNET_THRESH_EDIT, &QLineEdit::editingFinished, this,
             [this](){
@@ -306,6 +312,7 @@ Preferences::Preferences(QWidget *parent) :
             });
 #else
     ui->FISHNET->hide();
+    ui->MODEL_LIST->hide();
     ui->FISHNET_RECOG_CHK->hide();
     ui->FISHNET_THRESH->hide();
     ui->FISHNET_THRESH_EDIT->hide();

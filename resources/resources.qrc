@@ -47,6 +47,7 @@
     <qresource prefix="/fonts">
         <file alias="consolas">fonts/consola.ttf</file>
         <file alias="monaco">fonts/monaco.ttf</file>
+        <file alias="smileysans">fonts/smileysans.ttf</file>
     </qresource>
     <qresource prefix="/qt">
         <file>etc/qt.conf</file>

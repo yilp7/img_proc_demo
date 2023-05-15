@@ -57,7 +57,6 @@ UserPanel::UserPanel(QWidget *parent) :
     focus_direction(0),
     curr_laser_idx(-1),
     display_option(1),
-    updated{false},
     device_type(0),
     device_on(false),
     start_grabbing(false),
@@ -76,7 +75,6 @@ UserPanel::UserPanel(QWidget *parent) :
     grab_thread_state{false},
     video_thread_state(false),
     h_joystick_thread(NULL),
-    seq_idx{0},
     auto_scan_mode(true),
     scan(false),
     scan_distance(200),
@@ -402,16 +400,23 @@ UserPanel::UserPanel(QWidget *parent) :
     connect(laser_settings, SIGNAL(com_write(int, QByteArray)), this, SLOT(com_write_data(int, QByteArray)));
 
     // setup serial port with tcp socket
-    ptr_tcu   = new TCU  (ui->TCU_COM,   ui->TCU_COM_EDIT,   0, ui->STATUS->tcu_status,   scan_config, this);
-    ptr_lens  = new Lens (ui->LENS_COM,  ui->LENS_COM_EDIT,  1, ui->STATUS->lens_status,  this);
-    ptr_laser = new Laser(ui->LASER_COM, ui->LASER_COM_EDIT, 2, ui->STATUS->laser_status, this);
-    ptr_ptz   = new PTZ  (ui->PTZ_COM,   ui->PTZ_COM_EDIT,   3, ui->STATUS->ptz_status,   this);
+    ptr_tcu   = new TCU   (ui->TCU_COM,   ui->TCU_COM_EDIT,   0, ui->STATUS->tcu_status,   scan_config, this);
+    ptr_inc   = new Inclin(ui->RANGE_COM, ui->RANGE_COM_EDIT, 4, nullptr,                  this);
+    ptr_lens  = new Lens  (ui->LENS_COM,  ui->LENS_COM_EDIT,  1, ui->STATUS->lens_status,  this);
+    ptr_laser = new Laser (ui->LASER_COM, ui->LASER_COM_EDIT, 2, ui->STATUS->laser_status, this);
+    ptr_ptz   = new PTZ   (ui->PTZ_COM,   ui->PTZ_COM_EDIT,   3, ui->STATUS->ptz_status,   this);
 //    qDebug() << QThread::currentThread();
     connect(ptr_tcu,   &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
+    connect(ptr_inc,   &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
     connect(ptr_lens,  &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
     connect(ptr_laser, &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
     connect(ptr_ptz,   &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
     ptr_tcu->start();
+    ptr_inc->start();
+    ptr_lens->start();
+    ptr_laser->start();
+    ptr_ptz->start();
+    qDebug() << "main" << QThread::currentThread();
 
     connect(pref, &Preferences::set_auto_rep_freq, ptr_tcu, [this](bool arg1){ ptr_tcu->auto_rep_freq = arg1;});
 
@@ -539,6 +544,10 @@ UserPanel::~UserPanel()
     for (FloatingWindow* &w : fw) delete w;
 
     ptr_tcu->quit_thread();
+    ptr_inc->quit_thread();
+    ptr_lens->quit_thread();
+    ptr_laser->quit_thread();
+    ptr_ptz->quit_thread();
 
     delete ui;
 }
@@ -640,19 +649,33 @@ void UserPanel::data_exchange(bool read){
 int UserPanel::grab_thread_process(int display_idx) {
     grab_thread_state[display_idx] = true;
     Display *disp = displays[display_idx];
+    int _w = w[display_idx], _h = h[display_idx], _pixel_depth = pixel_depth[display_idx];
+    bool updated;
+    cv::Mat img_display, prev_img, prev_3d;
+    cv::Mat seq[8], seq_sum, frame_a_sum, frame_b_sum;
+    int seq_idx;
+    uint hist[256];
+    cv::Mat hist_mat, dist_mat;
 //    ProgSettings *settings = ui->TITLE->prog_settings;
     QImage stream;
     cv::Mat sobel;
     int ww, hh, scan_img_count = -1;
-    float weight = h[display_idx] / 1024.0; // font scale & thickness
-    prev_3d[display_idx] = cv::Mat(h[display_idx], w[display_idx], CV_8UC3);
-    prev_img[display_idx] = cv::Mat(h[display_idx], w[display_idx], CV_MAKETYPE(pixel_depth[display_idx] == 8 ? CV_8U : CV_16U, is_color[display_idx] ? 3 : 1));
-    user_mask[display_idx] = cv::Mat::zeros(h[display_idx], w[display_idx], CV_8UC1);
+    float weight = _h / 1024.0; // font scale & thickness
+    prev_3d = cv::Mat(_h, _w, CV_8UC3);
+    prev_img = cv::Mat(_h, _w, CV_MAKETYPE(_pixel_depth == 8 ? CV_8U : CV_16U, is_color[display_idx] ? 3 : 1));
+    user_mask[display_idx] = cv::Mat::zeros(_h, _w, CV_8UC1);
     static int packets_lost = 0;
 //    double *range = (double*)calloc(w * h, sizeof(double));
 #ifdef LVTONG
     cv::Mat fishnet_res;
-    cv::dnn::Net net = cv::dnn::readNet("model/resnet18.onnx");
+    QString model_name;
+    switch (pref->model_idx) {
+    case 0: model_name = "models/resnet18.onnx"; break;
+    case 1: model_name = "models/fishnet_pix2pix_maxpool.onnx"; break;
+    default: break;
+    }
+
+    cv::dnn::Net net = cv::dnn::readNet(model_name.toLatin1().constData());
 #endif
     while (grab_image[display_idx]) {
         while (q_img[display_idx].size() > 5) {
@@ -666,8 +689,8 @@ int UserPanel::grab_thread_process(int display_idx) {
             continue;
 #else
 //            if (device_type == -2) continue;
-            img_mem[display_idx] = prev_img[display_idx].clone();
-            updated[display_idx] = false;
+            img_mem[display_idx] = prev_img.clone();
+            updated = false;
 #endif
         }
         else {
@@ -684,17 +707,17 @@ int UserPanel::grab_thread_process(int display_idx) {
 //                }
 //            }
             if (device_type == 1) q_frame_info.pop();
-            updated[display_idx] = true;
+            updated = true;
             if (device_type == -1) q_img[display_idx].push(img_mem[display_idx].clone());
         }
 
         image_mutex[display_idx].lock();
 //        qDebug () << QDateTime::currentDateTime().toString() << updated << img_mem.data;
 
-        if (updated[display_idx]) {
+        if (updated) {
             // calc histogram (grayscale)
-            memset(hist[display_idx], 0, 256 * sizeof(uint));
-            if (!is_color[display_idx]) for (int i = 0; i < h[display_idx]; i++) for (int j = 0; j < w[display_idx]; j++) hist[display_idx][(img_mem[display_idx].data + i * img_mem[display_idx].cols)[j]]++;
+            memset(hist, 0, 256 * sizeof(uint));
+            if (!is_color[display_idx]) for (int i = 0; i < _h; i++) for (int j = 0; j < _w; j++) hist[(img_mem[display_idx].data + i * img_mem[display_idx].cols)[j]]++;
 
             // if the image needs flipping
             if (pref->symmetry) cv::flip(img_mem[display_idx], img_mem[display_idx], pref->symmetry - 2);
@@ -702,7 +725,7 @@ int UserPanel::grab_thread_process(int display_idx) {
             // mcp self-adaptive
             if (pref->auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
                 int thresh_num = img_mem[display_idx].total() / 200, thresh = 1 << pixel_depth[display_idx];
-                while (thresh && thresh_num > 0) thresh_num -= hist[display_idx][thresh--];
+                while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
                 if (thresh > (1 << pixel_depth[display_idx]) * 0.94) emit update_mcp_in_thread(ptr_tcu->mcp - sqrt(thresh - (1 << pixel_depth[display_idx]) * 0.94));
 //                qDebug() << "high" << thresh;
 //                thresh_num = img_mem.total() / 100, thresh = 255;
@@ -726,98 +749,131 @@ int UserPanel::grab_thread_process(int display_idx) {
         }
 */
 #ifdef LVTONG
-        double is_net;
+        double is_net = 0;
+        static double min, max;
         if (pref->fishnet_recog) {
-            cv::cvtColor(img_mem[display_idx], fishnet_res, cv::COLOR_GRAY2RGB);
-            fishnet_res.convertTo(fishnet_res, CV_32FC3, 1.0 / 255);
-            cv::resize(fishnet_res, fishnet_res, cv::Size(224, 224));
+            switch (pref->model_idx) {
+            case 0: {
+                cv::cvtColor(img_mem[display_idx], fishnet_res, cv::COLOR_GRAY2RGB);
+                fishnet_res.convertTo(fishnet_res, CV_32FC3, 1.0 / 255);
+                cv::resize(fishnet_res, fishnet_res, cv::Size(224, 224));
 
-            cv::Mat blob = cv::dnn::blobFromImage(fishnet_res, 1.0, cv::Size(224, 224));
-            net.setInput(blob);
-            cv::Mat prob = net.forward("195");
-//            std::cout << cv::format(prob, cv::Formatter::FMT_C) << std::endl;
+                cv::Mat blob = cv::dnn::blobFromImage(fishnet_res, 1.0, cv::Size(224, 224));
+                net.setInput(blob);
+                cv::Mat prob = net.forward("195");
+                //            std::cout << cv::format(prob, cv::Formatter::FMT_C) << std::endl;
 
-            static double min, max;
-            cv::minMaxLoc(prob, &min, &max);
+                cv::minMaxLoc(prob, &min, &max);
 
-            prob -= max;
-            is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
-//            is_net = exp(prob.at<float>(1)) / exp(prob.at<float>(0) + prob.at<float>(1));
+                prob -= max;
+                is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
+//                is_net = exp(prob.at<float>(1)) / exp(prob.at<float>(0) + prob.at<float>(1));
 
-            emit update_fishnet_result(is_net > pref->fishnet_thresh);
+                emit update_fishnet_result(is_net > pref->fishnet_thresh);
+
+                break;
+            }
+            case 1: {
+                img_mem[display_idx].convertTo(fishnet_res, CV_32FC3, 1.0 / 255);
+                cv::resize(fishnet_res, fishnet_res, cv::Size(256, 256));
+
+                cv::Mat blob = cv::dnn::blobFromImage(fishnet_res, 1.0, cv::Size(256, 256));
+                net.setInput(blob);
+                cv::Mat prob = net.forward();
+//                std::cout << cv::format(prob, cv::Formatter::FMT_C) << std::endl;
+
+                cv::minMaxLoc(prob, &min, &max);
+
+//                prob -= max;
+//                is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
+
+                emit update_fishnet_result(prob.at<float>(1) > prob.at<float>(0));
+
+                break;
+            }
+            default: break;
+            }
+
         }
         else emit update_fishnet_result(-1);
 #endif
 
         // process frame average
-        if (seq_sum[display_idx].empty()) seq_sum[display_idx] = cv::Mat::zeros(h[display_idx], w[display_idx], CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
-        if (frame_a_sum[display_idx].empty()) frame_a_sum[display_idx] = cv::Mat::zeros(h[display_idx], w[display_idx], CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
-        if (frame_b_sum[display_idx].empty()) frame_b_sum[display_idx] = cv::Mat::zeros(h[display_idx], w[display_idx], CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
+        if (seq_sum.empty()) seq_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
+        if (frame_a_sum.empty()) frame_a_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
+        if (frame_b_sum.empty()) frame_b_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
         if (ui->FRAME_AVG_CHECK->isChecked()) {
-            if (updated[display_idx]) {
+            if (updated) {
                 calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
-                if (seq[display_idx][7].empty()) for (auto& m: seq[display_idx]) m = cv::Mat::zeros(h[display_idx], w[display_idx], CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
+                if (seq[7].empty()) for (auto& m: seq) m = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
 
-                seq_sum[display_idx] -= seq[display_idx][(seq_idx[display_idx] + 4) & 7];
+                seq_sum -= seq[(seq_idx + 4) & 7];
 //                seq_sum -= seq[seq_idx];
-                if (frame_a_3d) frame_a_sum[display_idx] -= seq[display_idx][seq_idx[display_idx]];
-                else            frame_b_sum[display_idx] -= seq[display_idx][seq_idx[display_idx]];
-                img_mem[display_idx].convertTo(seq[display_idx][seq_idx[display_idx]], CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
-                seq_sum[display_idx] += seq[display_idx][seq_idx[display_idx]];
-                if (frame_a_3d) frame_a_sum[display_idx] += seq[display_idx][seq_idx[display_idx]];
-                else            frame_b_sum[display_idx] += seq[display_idx][seq_idx[display_idx]];
+                if (frame_a_3d) frame_a_sum -= seq[seq_idx];
+                else            frame_b_sum -= seq[seq_idx];
+                img_mem[display_idx].convertTo(seq[seq_idx], CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
+                seq_sum += seq[seq_idx];
+                if (frame_a_3d) frame_a_sum += seq[seq_idx];
+                else            frame_b_sum += seq[seq_idx];
 //                for(int i = 0; i < calc_avg_option; i++) seq_sum += seq[i];
 
 //                seq_idx = (seq_idx + 1) % calc_avg_option;
-                seq_idx[display_idx] = (seq_idx[display_idx] + 1) & 7;
+                seq_idx = (seq_idx + 1) & 7;
             }
 //            seq_sum.convertTo(modified_result, CV_8U, 1. / (calc_avg_option * (1 << (pixel_depth - 8))));
-            seq_sum[display_idx].convertTo(modified_result[display_idx], CV_MAKETYPE(CV_8U, is_color[display_idx] ? 3 : 1), 1. / (4 * (1 << (pixel_depth[display_idx] - 8))));
+            seq_sum.convertTo(modified_result[display_idx], CV_MAKETYPE(CV_8U, is_color[display_idx] ? 3 : 1), 1. / (4 * (1 << (_pixel_depth - 8))));
         }
         else {
-            img_mem[display_idx].convertTo(modified_result[display_idx], CV_MAKETYPE(CV_8U, is_color[display_idx] ? 3 : 1), 1. / (1 << (pixel_depth[display_idx] - 8)));
+            if (!seq_sum.empty()) {
+                seq_sum.release();
+                for (auto& m: seq) m.release();
+                frame_a_sum.release();
+                frame_b_sum.release();
+                seq_idx = 0;
+            }
+            img_mem[display_idx].convertTo(modified_result[display_idx], CV_MAKETYPE(CV_8U, is_color[display_idx] ? 3 : 1), 1. / (1 << (_pixel_depth - 8)));
         }
 
         if (pref->split) ImageProc::split_img(modified_result[display_idx], modified_result[display_idx]);
 
         // process 3d image construction from ABN frames
         if (ui->IMG_3D_CHECK->isChecked()) {
-            ww = w[display_idx] + 104;
-            hh = h[display_idx];
+            ww = _w + 104;
+            hh = _h;
             double dist_min = 0, dist_max = 0;
 //            modified_result = frame_a_3d ? prev_3d : ImageProc::gated3D(prev_img, img_mem, delay_dist / dist_ns, depth_of_view / dist_ns, range_threshold);
 //            if (prev_3d.empty()) cv::cvtColor(img_mem, prev_3d, cv::COLOR_GRAY2RGB);
-            if (updated[display_idx]) {
+            if (updated) {
                 // TODO try to reduce if statements
                 if (ui->FRAME_AVG_CHECK->isChecked()) {
                     static cv::Mat frame_a_avg, frame_b_avg;
-                    frame_a_sum[display_idx].convertTo(frame_a_avg, pixel_depth[display_idx] > 8 ? CV_16U : CV_8U, 0.25);
-                    frame_b_sum[display_idx].convertTo(frame_b_avg, pixel_depth[display_idx] > 8 ? CV_16U : CV_8U, 0.25);
+                    frame_a_sum.convertTo(frame_a_avg, _pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
+                    frame_b_sum.convertTo(frame_b_avg, _pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
                     ImageProc::gated3D_v2(frame_b_avg, frame_a_avg, modified_result[display_idx],
                                           pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - ptr_tcu->delay_offset * dist_ns) / dist_ns,
                                           pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - ptr_tcu->gate_width_offset * dist_ns) / dist_ns,
-                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &dist_mat[display_idx], &dist_min, &dist_max);
+                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &dist_mat, &dist_min, &dist_max);
                 }
                 else {
-                    ImageProc::gated3D_v2(frame_a_3d ? prev_img[display_idx] : img_mem[display_idx], frame_a_3d ? img_mem[display_idx] : prev_img[display_idx], modified_result[display_idx],
+                    ImageProc::gated3D_v2(frame_a_3d ? prev_img : img_mem[display_idx], frame_a_3d ? img_mem[display_idx] : prev_img, modified_result[display_idx],
                                           pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - ptr_tcu->delay_offset * dist_ns) / dist_ns,
                                           pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - ptr_tcu->gate_width_offset * dist_ns) / dist_ns,
-                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &dist_mat[display_idx], &dist_min, &dist_max);
+                                          pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &dist_mat, &dist_min, &dist_max);
                 }
                 frame_a_3d ^= 1;
-                prev_3d[display_idx] = modified_result[display_idx].clone();
+                prev_3d = modified_result[display_idx].clone();
             }
-            else modified_result[display_idx] = prev_3d[display_idx];
+            else modified_result[display_idx] = prev_3d;
             cv::Mat masked_dist;
-            if (list_roi.size()) dist_mat[display_idx].copyTo(masked_dist, user_mask[display_idx]), emit update_dist_mat(masked_dist, dist_min, dist_max);
-            else emit update_dist_mat(dist_mat[display_idx], dist_min, dist_max);
+            if (list_roi.size()) dist_mat.copyTo(masked_dist, user_mask[display_idx]), emit update_dist_mat(masked_dist, dist_min, dist_max);
+            else emit update_dist_mat(dist_mat, dist_min, dist_max);
 
-            cv::resize(modified_result[display_idx], img_display[display_idx], cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
+            cv::resize(modified_result[display_idx], img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
         }
         // process ordinary image enhance
         else {
-            ww = w[display_idx];
-            hh = h[display_idx];
+            ww = _w;
+            hh = _h;
             if (ui->IMG_ENHANCE_CHECK->isChecked()) {
                 switch (ui->ENHANCE_OPTIONS->currentIndex()) {
                 // histogram
@@ -957,21 +1013,21 @@ int UserPanel::grab_thread_process(int display_idx) {
             if (modified_result[display_idx].channels() == 1) {
                 uchar *img = modified_result[display_idx].data;
                 int step = modified_result[display_idx].step;
-                memset(hist[display_idx], 0, 256 * sizeof(uint));
-                for (int i = 0; i < hh; i++) for (int j = 0; j < ww; j++) hist[display_idx][(img + i * step)[j]]++;
+                memset(hist, 0, 256 * sizeof(uint));
+                for (int i = 0; i < hh; i++) for (int j = 0; j < ww; j++) hist[(img + i * step)[j]]++;
                 uint max = 0;
                 for (int i = 1; i < 256; i++) {
                     // discard abnormal value
                     //                    if (hist[i] > 50000) hist[i] = 0;
-                    if (hist[display_idx][i] > max) max = hist[display_idx][i];
+                    if (hist[i] > max) max = hist[i];
                 }
-                hist_mat[display_idx] = cv::Mat(225, 256, CV_8UC3, cv::Scalar(56, 64, 72));
+                hist_mat = cv::Mat(225, 256, CV_8UC3, cv::Scalar(56, 64, 72));
                 for (int i = 1; i < 256; i++) {
-                    cv::rectangle(hist_mat[display_idx], cv::Point(i, 225), cv::Point(i + 1, 225 - hist[display_idx][i] * 225.0 / max), cv::Scalar(202, 225, 255));
+                    cv::rectangle(hist_mat, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
                 }
             }
             // TODO change to signal/slots
-            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_mat[display_idx].data, hist_mat[display_idx].cols, hist_mat[display_idx].rows, hist_mat[display_idx].step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         }
         // FIXME possible crash when move scaled image to bottom-right corner
         // crop the region to display
@@ -1005,24 +1061,24 @@ int UserPanel::grab_thread_process(int display_idx) {
         }
 
         // resize to display size
-        cv::resize(modified_result[display_idx], img_display[display_idx], cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
+        cv::resize(modified_result[display_idx], img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
         // draw the center cross
-        if (!image_3d[0] && ui->CENTER_CHECK->isChecked()) {
-            for (int i = img_display[display_idx].cols / 2 - 9; i < img_display[display_idx].cols / 2 + 10; i++) img_display[display_idx].at<uchar>(img_display[display_idx].rows / 2, i) = img_display[display_idx].at<uchar>(img_display[display_idx].rows / 2, i) > 127 ? 0 : 255;
-            for (int i = img_display[display_idx].rows / 2 - 9; i < img_display[display_idx].rows / 2 + 10; i++) img_display[display_idx].at<uchar>(i, img_display[display_idx].cols / 2) = img_display[display_idx].at<uchar>(i, img_display[display_idx].cols / 2) > 127 ? 0 : 255;
+        if (!image_3d[display_idx] && ui->CENTER_CHECK->isChecked()) {
+            for (int i = img_display.cols / 2 - 9; i < img_display.cols / 2 + 10; i++) img_display.at<uchar>(img_display.rows / 2, i) = img_display.at<uchar>(img_display.rows / 2, i) > 127 ? 0 : 255;
+            for (int i = img_display.rows / 2 - 9; i < img_display.rows / 2 + 10; i++) img_display.at<uchar>(i, img_display.cols / 2) = img_display.at<uchar>(i, img_display.cols / 2) > 127 ? 0 : 255;
         }
-        if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(img_display[display_idx], disp->selection_v1, disp->selection_v2, cv::Scalar(255));
+        if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(img_display, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
 
         // image display
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
-        stream = QImage(img_display[display_idx].data, img_display[display_idx].cols, img_display[display_idx].rows, img_display[display_idx].step, image_3d[display_idx] || is_color[display_idx] ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+        stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, image_3d[display_idx] || is_color[display_idx] ? QImage::Format_RGB888 : QImage::Format_Indexed8);
 //        ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         // use signal->slot instead of directly call
         disp->emit set_pixmap(QPixmap::fromImage(stream.scaled(disp->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 //        qDebug() << QDateTime::currentDateTime().toString("ss.zzz");
 
         // process scan
-        if (scan && updated[display_idx]) {
+        if (scan && updated) {
             static cv::Mat temp;
             if (scan_img_count < 0) scan_img_count = ui->FRAME_AVG_CHECK->isChecked() ? 5 : 1;
             scan_img_count -= 1;
@@ -1032,27 +1088,32 @@ int UserPanel::grab_thread_process(int display_idx) {
                 delay_dist += scan_step;
                 scan_img_count = ui->FRAME_AVG_CHECK->isChecked() ? 5 : 1;
                 filter_scan();
-
-                img_mem[display_idx].convertTo(temp, CV_64F);
-                cv::threshold(temp, temp, 20, 255, cv::THRESH_TOZERO);
-                scan_3d += temp * (++scan_idx);
-                scan_sum += temp;
-
+                if (!auto_scan_mode) {
+                    img_mem[display_idx].convertTo(temp, CV_64F);
+                    cv::threshold(temp, temp, 20, 255, cv::THRESH_TOZERO);
+                    scan_3d += temp * (++scan_idx);
+                    scan_sum += temp;
+                }
+                else if (fabs(delay_dist - 4000) < 1e-4) {
+                    ptr_tcu->set_user_param(TCU::REPEATED_FREQ, rep_freq = 17);
+                    ptr_tcu->set_user_param(TCU::LASER_USR, laser_width = 2500);
+                    ptr_tcu->set_user_param(TCU::EST_DOV, depth_of_view = 375);
+                }
                 emit update_delay_in_thread();
             }
         }
         if (scan && std::round(delay_dist / dist_ns) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
 
         // image write / video record
-        if (updated[display_idx] && save_original[display_idx]) {
+        if (updated && save_original[display_idx]) {
             save_to_file(false);
             if (device_type == -1) save_original[display_idx] = 0;
         }
-        if (updated[display_idx] && save_modified[display_idx]) {
+        if (updated && save_modified[display_idx]) {
             save_to_file(true);
             if (device_type == -1) save_modified[display_idx] = 0;
         }
-        if (updated[display_idx] && record_original[display_idx]) {
+        if (updated && record_original[display_idx]) {
             cv::Mat temp = img_mem[display_idx].clone();
             if (pref->save_info) {
                 cv::putText(temp, info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
@@ -1061,7 +1122,7 @@ int UserPanel::grab_thread_process(int display_idx) {
             if (is_color[display_idx]) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
             vid_out[0].write(temp);
         }
-        if (updated[display_idx] && record_modified[display_idx]) {
+        if (updated && record_modified[display_idx]) {
             cv::Mat temp = modified_result[display_idx].clone();
             if (!image_3d[display_idx] && !ui->INFO_CHECK->isChecked()) {
                 if (pref->save_info) {
@@ -1080,7 +1141,7 @@ int UserPanel::grab_thread_process(int display_idx) {
             vid_out[1].write(temp);
         }
 
-        if (updated[display_idx]) prev_img[display_idx] = img_mem[display_idx].clone();
+        if (updated) prev_img = img_mem[display_idx].clone();
         image_mutex[display_idx].unlock();
     }
 //    free(range);
@@ -1840,7 +1901,8 @@ void UserPanel::on_SOFTWARE_TRIGGER_BUTTON_clicked()
 
 void UserPanel::on_START_GRABBING_BUTTON_clicked()
 {
-    if (!device_on || start_grabbing || curr_cam == NULL) return;
+//    if (!device_on || start_grabbing || curr_cam == NULL) return;
+    if (!device_on || curr_cam == NULL) return;
 
     gain_analog_edit = ui->GAIN_EDIT->text().toFloat();
     ptr_tcu->duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
@@ -1936,7 +1998,7 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         image_mutex[0].lock();
         res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi");
-        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(image_3d ? w[0] + 104 : w[0], h[0]), is_color[0] || image_3d[0]);
+        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || image_3d[0]);
         image_mutex[0].unlock();
     }
     record_modified[0] ^= 1;
@@ -2004,13 +2066,13 @@ void UserPanel::clean()
     std::queue<cv::Mat>().swap(q_img[0]);
     img_mem[0].release();
     modified_result[0].release();
-    img_display[0].release();
-    prev_img[0].release();
-    prev_3d[0].release();
-    for (cv::Mat &m: seq[0]) m.release();
-    seq_sum[0].release();
-    frame_a_sum[0].release();
-    frame_b_sum[0].release();
+//    img_display[0].release();
+//    prev_img[0].release();
+//    prev_3d[0].release();
+//    for (cv::Mat &m: seq[0]) m.release();
+//    seq_sum[0].release();
+//    frame_a_sum[0].release();
+//    frame_b_sum[0].release();
 }
 
 void UserPanel::setup_hz(int hz_unit)
@@ -2670,7 +2732,7 @@ void UserPanel::filter_scan()
     static cv::Mat filter = img_mem[0].clone();
     filter = img_mem[0] / 64;
 //    qDebug("ratio %f\n", cv::countNonZero(filter) / (float)filter.total());
-    if (cv::countNonZero(filter) / (float)filter.total() > 0.3) /*scan = !scan, */emit update_scan(true);
+    if (cv::countNonZero(filter) / (float)filter.total() > 0.3) /*scan = !scan, *//*emit update_scan(true);*/q_scan.push_back(ptr_tcu->get_tcu_params());
 }
 
 void UserPanel::auto_scan_for_target()
@@ -2928,7 +2990,7 @@ void UserPanel::on_IMG_3D_CHECK_stateChanged(int arg1)
 
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
-    if (!arg1) frame_a_3d = 0, prev_3d[0] = cv::Mat(w[0], h[0], CV_8UC3);
+    if (!arg1) frame_a_3d = 0/*, prev_3d[0] = cv::Mat(w[0], h[0], CV_8UC3)*/;
 }
 
 void UserPanel::on_ZOOM_IN_BTN_pressed()
@@ -4066,10 +4128,10 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
         return;
     }
     h_grab_thread[display_idx]->start();
-//    start_grabbing = true;
+    start_grabbing = true;
     displays[display_idx]->is_grabbing = true;
     if (display_idx == 0) {
-//        enable_controls(true);
+        enable_controls(true);
         ui->ENUM_BUTTON->setEnabled(false);
         ui->START_BUTTON->setEnabled(false);
         ui->STOP_GRABBING_BUTTON->setEnabled(true);
@@ -4102,7 +4164,7 @@ void UserPanel::on_SAVE_AVI_BUTTON_clicked()
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         image_mutex[0].lock();
         raw_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw.avi");
-        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w[0], h[0]), is_color[0] || image_3d[0]);
+        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w[0], h[0]), is_color[0]);
         image_mutex[0].unlock();
     }
     record_original[0] ^= 1;
@@ -4157,12 +4219,12 @@ void UserPanel::on_SCAN_BUTTON_clicked()
 
 //        for (uint i = scan_q.size(); i; i--) qDebug("dist %f", scan_q.front()), scan_q.pop_front();
 
-        scan_3d = scan_3d.mul(1 / scan_sum);
-        scan_3d *= 2.25;
-        cv::Mat scan_result_3d;
-        ImageProc::paint_3d(scan_3d, scan_result_3d, 0, scan_config->starting_delay * dist_ns, scan_config->ending_delay * dist_ns);
-        cv::imwrite((TEMP_SAVE_LOCATION + "/" + scan_name + "_result.bmp").toLatin1().constData(), scan_result_3d);
-        QFile::rename(TEMP_SAVE_LOCATION + "/" + scan_name + "_result.bmp", save_location + "/" + scan_name + "/result.bmp");
+//        scan_3d = scan_3d.mul(1 / scan_sum);
+//        scan_3d *= 2.25;
+//        cv::Mat scan_result_3d;
+//        ImageProc::paint_3d(scan_3d, scan_result_3d, 0, scan_config->starting_delay * dist_ns, scan_config->ending_delay * dist_ns);
+//        cv::imwrite((TEMP_SAVE_LOCATION + "/" + scan_name + "_result.bmp").toLatin1().constData(), scan_result_3d);
+//        QFile::rename(TEMP_SAVE_LOCATION + "/" + scan_name + "_result.bmp", save_location + "/" + scan_name + "/result.bmp");
     }
 
     ui->SCAN_BUTTON->setText(start_scan ? tr("Stop") : tr("Scan"));
@@ -4217,15 +4279,15 @@ void UserPanel::enable_scan_options(bool show)
 
 void UserPanel::on_FRAME_AVG_CHECK_stateChanged(int arg1)
 {
-    if (arg1) {
-        for (int i = 0; i < 3; i++) {
-            seq_sum[i].release();
-            frame_a_sum[i].release();
-            frame_b_sum[i].release();
-            for (cv::Mat &m: seq[i]) m.release();
-            seq_idx[i] = 0;
-        }
-    }
+//    if (arg1) {
+//        for (int i = 0; i < 3; i++) {
+//            seq_sum[i].release();
+//            frame_a_sum[i].release();
+//            frame_b_sum[i].release();
+//            for (cv::Mat &m: seq[i]) m.release();
+//            seq_idx[i] = 0;
+//        }
+//    }
     calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
 }
 
@@ -4235,7 +4297,7 @@ void UserPanel::on_SAVE_RESULT_BUTTON_clicked()
     if (device_type == -1) save_modified[0] = 1;
     else{
         save_modified[0] ^= 1;
-        ui->SAVE_RESULT_BUTTON->setText(save_modified ? tr("Stop") : tr("RES"));
+        ui->SAVE_RESULT_BUTTON->setText(save_modified[0] ? tr("Stop") : tr("RES"));
     }
 }
 
@@ -4619,8 +4681,8 @@ void UserPanel::on_DUAL_LIGHT_BTN_clicked()
 void UserPanel::on_RESET_3D_BTN_clicked()
 {
     frame_a_3d ^= 1;
-    for (cv::Mat &m: frame_a_sum) m = 0;
-    for (cv::Mat &m: frame_b_sum) m = 0;
+//    for (cv::Mat &m: frame_a_sum) m = 0;
+//    for (cv::Mat &m: frame_b_sum) m = 0;
 }
 
 void UserPanel::display_fishnet_result(int result)

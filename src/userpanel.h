@@ -404,6 +404,7 @@ private:
     QString                 temp_output_filename;       // temp save location of target output file
 
     TCU*                    ptr_tcu;
+    Inclin*                 ptr_inc;
     Lens*                   ptr_lens;
     Laser*                  ptr_laser;
     PTZ*                    ptr_ptz;
@@ -436,7 +437,7 @@ private:
 
     std::queue<cv::Mat>     q_img[3];                   // image queue in grab_thread
     std::queue<int>         q_frame_info;
-    bool                    updated[3];                 // whether the program get a new image from stream
+//    bool                    updated[3];                 // whether the program get a new image from stream
     // TODO add other scan features
     std::vector<TCUDataGroup> q_scan;                   // targets' tcu param found while scanning
 
@@ -466,17 +467,17 @@ private:
 
     cv::Mat                 img_mem[3];                 // right-side img display source (stream)
     cv::Mat                 modified_result[3];         // right-side img display modified (stream)
-    cv::Mat                 img_display[3];             // right-side img display cropped (stream)
-    cv::Mat                 prev_img[3];                // previous original image
-    cv::Mat                 prev_3d[3];                 // previous 3d image
-    cv::Mat                 seq[3][8];                  // for frame average
-    cv::Mat                 seq_sum[3];
-    cv::Mat                 frame_a_sum[3];
-    cv::Mat                 frame_b_sum[3];
-    uint                    hist[3][256];               // display histogram
-    cv::Mat                 hist_mat[3];
-    int                     seq_idx[3];                 // frame-average current index
-    cv::Mat                 dist_mat[3];
+//    cv::Mat                 img_display[3];             // right-side img display cropped (stream)
+//    cv::Mat                 prev_img[3];                // previous original image
+//    cv::Mat                 prev_3d[3];                 // previous 3d image
+//    cv::Mat                 seq[3][8];                  // for frame average
+//    cv::Mat                 seq_sum[3];
+//    cv::Mat                 frame_a_sum[3];
+//    cv::Mat                 frame_b_sum[3];
+//    uint                    hist[3][256];               // display histogram
+//    cv::Mat                 hist_mat[3];
+//    int                     seq_idx[3];                 // frame-average current index
+//    cv::Mat                 dist_mat[3];
     cv::Mat                 user_mask[3];
 
     QLabel*                 com_label[5];               // for com communication

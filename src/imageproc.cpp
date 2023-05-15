@@ -659,6 +659,7 @@ void ImageProc::guided_image_filter(cv::Mat &img, cv::Mat &guidance, int r, floa
     cv::resize(p_f, p_f, img.size());
     p_f.convertTo(img, img.type());
 }
+
 std::vector<uchar> ImageProc::estimate_atmospheric_light_avg(cv::Mat &src, cv::Mat &dark)
 {
     uchar *ptr = dark.data;

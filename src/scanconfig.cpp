@@ -12,8 +12,8 @@ ScanConfig::ScanConfig(QWidget *parent) :
     ending_delay(0),
     starting_gw(0),
     ending_gw(0),
-    step_size_delay(0),
-    step_size_gw(0),
+    step_size_delay(1),
+    step_size_gw(1),
     frame_count(1),
     rep_freq(10),
     capture_scan_ori(true),
@@ -162,25 +162,27 @@ void ScanConfig::update_scan()
     QLineEdit *source = qobject_cast<QLineEdit*>(sender());
     if (source == ui->STEP_SIZE_DELAY_EDIT) {
         step_size_delay = ui->STEP_SIZE_DELAY_EDIT->text().toFloat();
-        if (!step_size_delay) step_size_delay = 1;
+        if (fabs(step_size_delay) < 1e-4) step_size_delay = 1;
         frame_count = 1.0 * (ending_delay - starting_delay) / step_size_delay;
         if (!frame_count) frame_count = 1;
         step_size_gw = 1.0 * (ending_gw - starting_gw) / frame_count;
+        if (fabs(step_size_gw) < 1e-4) step_size_gw = 1;
     }
     else if (source == ui->STEP_SIZE_GW_EDIT) {
         step_size_gw = ui->STEP_SIZE_GW_EDIT->text().toFloat();
-        if (!step_size_gw) step_size_gw = 1;
+        if (fabs(step_size_gw) < 1e-4) step_size_gw = 1;
         frame_count = 1.0 * (ending_delay - starting_delay) / step_size_delay;
         if (!frame_count) frame_count = 1;
         step_size_delay = 1.0 * (ending_delay - starting_delay) / frame_count;
+        if (fabs(step_size_delay) < 1e-4) step_size_delay = 1;
     }
     else {
         frame_count = ui->FRAME_COUNT_EDIT->text().toInt();
         if (!frame_count) frame_count = 1;
         step_size_delay = 1.0 * (ending_delay - starting_delay) / frame_count;
         step_size_gw = 1.0 * (ending_gw - starting_gw) / frame_count;
-        if (!step_size_delay) step_size_delay = 1;
-        if (!step_size_gw) step_size_gw = 1;
+        if (fabs(step_size_delay) < 1e-4) step_size_delay = 1;
+        if (fabs(step_size_gw) < 1e-4) step_size_gw = 1;
     }
 
     ui->FRAME_COUNT_EDIT->setText(QString::number(frame_count));

@@ -510,7 +510,7 @@
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>-235</y>
+      <y>-1282</y>
       <width>324</width>
       <height>1620</height>
      </rect>
@@ -1758,8 +1758,8 @@
      <widget class="QCheckBox" name="FISHNET_RECOG_CHK">
       <property name="geometry">
        <rect>
-        <x>128</x>
-        <y>460</y>
+        <x>130</x>
+        <y>450</y>
         <width>77</width>
         <height>22</height>
        </rect>
@@ -1863,6 +1863,16 @@
       </property>
       <property name="text">
        <string>ns</string>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="MODEL_LIST">
+      <property name="geometry">
+       <rect>
+        <x>130</x>
+        <y>480</y>
+        <width>48</width>
+        <height>21</height>
+       </rect>
       </property>
      </widget>
     </widget>

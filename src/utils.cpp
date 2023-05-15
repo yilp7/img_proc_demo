@@ -1,6 +1,6 @@
 #include "utils.h"
 
-QFont monaco, consolas;
+QFont monaco, consolas, yozai;
 
 QTextCodec *locale_codec = QTextCodec::codecForLocale();
 

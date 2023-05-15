@@ -34,7 +34,7 @@ extern "C" {
 #include <libavutil/time.h>
 }
 
-extern QFont monaco, consolas;
+extern QFont monaco, consolas, yozai;
 
 extern QTextCodec *locale_codec;
 

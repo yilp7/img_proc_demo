@@ -129,6 +129,7 @@ public:
     bool             custom_3d_param;
     float            custom_3d_delay;
     float            custom_3d_gate_width;
+    int              model_idx;
     bool             fishnet_recog;
     float            fishnet_thresh;
 

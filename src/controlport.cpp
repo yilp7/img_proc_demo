@@ -11,6 +11,7 @@ ControlPort::ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *
     shared_from(-1),
     shared_port(NULL),
     time_interval(1000),
+    write_idx(0),
     write_succeeded(false),
     count_threshold(5),
     successive_count(0)
@@ -35,9 +36,10 @@ ControlPort::ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *
             if (!connected_to_serial && !connected_to_tcp) last_status = StatusIcon::STATUS::NOT_CONNECTED;
             if (successive_count > 5) successive_count = 5, last_status = write_succeeded ? StatusIcon::STATUS::RECONNECTING : StatusIcon::DISCONNECTED;
 //            emit port_connected(last_status);
-            this->status_icon->update_status(last_status);
+            if (this->status_icon) this->status_icon->update_status(last_status);
         });
     timer->start(time_interval);
+    if (idx == 4) qDebug() << "init" << QThread::currentThread();
     //![1]
 
     //[2] setup serialport / tcpsocket for communication
@@ -76,6 +78,12 @@ void ControlPort::setup_serial_port()
 
         // send initial data
         switch (idx) {
+        case 4:
+            q.push(PortData{generate_ba(new uchar[5]{0XFF, 0XAA, 0X69, 0X88, 0XB5}, 5), 5, 1, true, true});
+            q.push(PortData{generate_ba(new uchar[5]{0xFF, 0xAA, 0x03, 0x03, 0x00}, 5), 5, 1, true, true});
+            q.push(PortData{generate_ba(new uchar[5]{0xFF, 0xAA, 0x02, 0x0F, 0x00}, 5), 5, 1, true, true});
+            q.push(PortData{generate_ba(new uchar[5]{0XFF, 0XAA, 0X00, 0X00, 0X00}, 5), 5, 1, true, true});
+            break;
         default:
             break;
         }
@@ -190,11 +198,27 @@ void ControlPort::quit_thread()
 
 void ControlPort::run()
 {
+    if (idx == 4) qDebug() << "run" << QThread::currentThread();
     while (!thread_interrupt) {
         if (q.empty()) { QThread::msleep(10); continue; }
         PortData temp = q.front();
         q.pop();
-        QByteArray read = communicate_display(temp.write, temp.write_size, temp.read_size, temp.fb, temp.heartbeat);
+        QByteArray read, read_byte(2, 0x00);
+        if (temp.write.isEmpty()) {
+            QIODevice *port = use_tcp ? (QIODevice*)tcp_port : (QIODevice*)serial_port;
+            if (!port->isOpen()) continue;
+//            static QByteArray head = generate_ba(new uchar[2]{0x55, 0x50}, 2);
+//            do {
+//                read_byte[0] = read_byte[1];
+//                read_byte.append(port->read(1));
+//            } while (read_byte != head);
+//            read = read_byte + port->read(42);
+            read = port->read(44);
+//            qDebug() << read.toHex(',');
+            QThread::msleep(1);
+        }
+        else read = communicate_display(temp.write, temp.write_size, temp.read_size, temp.fb, temp.heartbeat);
+//        qDebug() << read.toHex(',');
         if (temp.heartbeat) {
             switch (idx) {
             case 0:
@@ -204,7 +228,32 @@ void ControlPort::run()
             case 1:
             case 2:
             case 3:
-            case 4:
+                break;
+            case 4: {
+                static float g = 9.8f;
+                (uchar)read[0] == 0x55;
+                (uchar)read[1] == 0x50;
+                read[2], read[10];
+                (uchar)read[11] == 0x55;
+                (uchar)read[12] == 0x51;
+                float acceleration_x = 16 * g * (uint(read[14] << 8) + read[13]) / 32768.;
+                float acceleration_y = 16 * g * (uint(read[16] << 8) + read[15]) / 32768.;
+                float acceleration_z = 16 * g * (uint(read[18] << 8) + read[17]) / 32768.;
+                read[19], read[21];
+                (uchar)read[22] == 0x55;
+                (uchar)read[23] == 0x52;
+                float angular_x = 2000 * (uint(read[25] << 8) + read[24]) / 32768.;
+                float angular_y = 2000 * (uint(read[27] << 8) + read[26]) / 32768.;
+                float angular_z = 2000 * (uint(read[29] << 8) + read[28]) / 32768.;
+                read[30], read[32];
+                (uchar)read[33] == 0x55;
+                (uchar)read[34] == 0x53;
+                float roll  = 180 * (uint(read[36] << 8) + read[35]) / 32768.;
+                float pitch = 180 * (uint(read[38] << 8) + read[37]) / 32768.;
+                float yaw   = 180 * (uint(read[40] << 8) + read[39]) / 32768.;
+                read[41], read[43];
+                qDebug() << roll << pitch << yaw;
+            }
             default: break;
             }
         }
@@ -387,8 +436,8 @@ void TCU::try_communicate()
     // TODO: disable self-check system
     if (!connected_to_serial && !connected_to_tcp) return;
 
-    static QByteArray write = generate_ba(new uchar[7]{0x88, 0x15, 0x00, 0x00, 0x00, 0x00, 0x99}, 7);
-    q.push(PortData{write, 7, 1, true, true});
+    static QByteArray write[1] = {generate_ba(new uchar[7]{0x88, 0x15, 0x00, 0x00, 0x00, 0x00, 0x99}, 7)};
+    q.push(PortData{write[write_idx], 7, 1, true, true});
 //    QByteArray read = communicate_display(write, 7, 1, true, false);
 //    if (read != QByteArray(1, 0x15)) successive_count++;
 //    else                             successive_count = 0;
@@ -406,18 +455,22 @@ void Lens::try_communicate()
     // TODO: disable self-check system
     if (!connected_to_serial && !connected_to_tcp) return;
 
-    static QByteArray write1 = generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7);
-    static QByteArray write2 = generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7);
-    static QByteArray write3 = generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x57, 0x00, 0x00, 0x58}, 7);
-    QByteArray read = communicate_display(write1, 7, 7, true, false);
-    if (read != QByteArray(1, 0x15)) successive_count++;
-    else                             successive_count = 0;
-    read = communicate_display(write2, 7, 7, true, false);
-    if (read != QByteArray(1, 0x15)) successive_count++;
-    else                             successive_count = 0;
-    read = communicate_display(write3, 7, 7, true, false);
-    if (read != QByteArray(1, 0x15)) successive_count++;
-    else                             successive_count = 0;
+    static QByteArray write[3] = {generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7),
+                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7),
+                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x57, 0x00, 0x00, 0x58}, 7)};
+
+    q.push(PortData{write[write_idx], 7, 1, true, true});
+    write_idx = (write_idx + 1) & 3;
+
+//    QByteArray read = communicate_display(write[write_idx], 7, 7, true, false);
+//    if (read != QByteArray(1, 0x15)) successive_count++;
+//    else                             successive_count = 0;
+//    read = communicate_display(write[write_idx], 7, 7, true, false);
+//    if (read != QByteArray(1, 0x15)) successive_count++;
+//    else                             successive_count = 0;
+//    read = communicate_display(write[write_idx], 7, 7, true, false);
+//    if (read != QByteArray(1, 0x15)) successive_count++;
+//    else                             successive_count = 0;
 }
 
 Laser::Laser(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent) :
@@ -442,16 +495,41 @@ PTZ::PTZ(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QOb
 }
 
 void PTZ::try_communicate()
-{return;
+{
     // TODO: disable self-check system
     if (!connected_to_serial && !connected_to_tcp) return;
 
-    static QByteArray write1 = generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x51, 0x00, 0x00, 0x52}, 7);
-    static QByteArray write2 = generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x53, 0x00, 0x00, 0x54}, 7);
-    QByteArray read = communicate_display(write1, 7, 1, true, false);
-    if (read != QByteArray(1, 0x15)) successive_count++;
-    else                             successive_count = 0;
-    read = communicate_display(write2, 7, 1, true, false);
-    if (read != QByteArray(1, 0x15)) successive_count++;
-    else                             successive_count = 0;
+    static QByteArray write[2] = {generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x51, 0x00, 0x00, 0x52}, 7),
+                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x53, 0x00, 0x00, 0x54}, 7)};
+
+    q.push(PortData{write[write_idx], 7, 1, true, true});
+    write_idx = (write_idx + 1) % 2;
+
+//    QByteArray read = communicate_display(write[write_idx], 7, 1, true, false);
+//    if (read != QByteArray(1, 0x15)) successive_count++;
+//    else                             successive_count = 0;
+//    read = communicate_display(write[write_idx], 7, 1, true, false);
+//    if (read != QByteArray(1, 0x15)) successive_count++;
+//    else                             successive_count = 0;
+}
+
+Inclin::Inclin(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent) :
+    ControlPort(label, edit, index, status_icon, parent)
+{
+//    time_interval = 990;
+}
+
+void Inclin::try_communicate()
+{
+    // TODO: disable self-check system
+    if (!connected_to_serial && !connected_to_tcp) return;
+
+    q.push(PortData{QByteArray(), 7, 44, true, true});
+
+//    QByteArray read = communicate_display(write[write_idx], 7, 1, true, false);
+//    if (read != QByteArray(1, 0x15)) successive_count++;
+//    else                             successive_count = 0;
+//    read = communicate_display(write[write_idx], 7, 1, true, false);
+//    if (read != QByteArray(1, 0x15)) successive_count++;
+//    else                             successive_count = 0;
 }
