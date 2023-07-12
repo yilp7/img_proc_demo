@@ -129,6 +129,8 @@ set(SOURCE_FILES
     src/distance3dview.ui
     src/aliasing.h
     src/aliasing.cpp
+    src/imageio.h
+    src/imageio.cpp
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss

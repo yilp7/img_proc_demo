@@ -192,6 +192,19 @@ void Cam::binning(bool read, int *val)
     }
 }
 
+int Cam::ip_config(bool read, int *val)
+{
+    int ret = 0;
+    if (read) {
+        if (curr_idx >= gige_dev_list.nDeviceNum) return 0;
+        *val = gige_dev_list.pDeviceInfo[curr_idx]->SpecialInfo.stGigEInfo.nIpCfgCurrent;
+    }
+    else {
+        int ret = MV_GIGE_SetIpConfig(dev_handle, MV_IP_CFG_STATIC);
+        return ret;
+    }
+}
+
 int Cam::ip_address(bool read, int *ip, int *gateway, int *nic_address)
 {
     if (read) {
@@ -203,7 +216,7 @@ int Cam::ip_address(bool read, int *ip, int *gateway, int *nic_address)
     }
     else {
         int ret = MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
-        qDebug() << "modify ip: " << hex << ret;
+//        qDebug() << "modify ip: " << hex << ret;
         return ret;
     }
 }
@@ -261,6 +274,8 @@ void Cam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *
         img = 0;
         break;
     }
+
+//    ImageIO::save_image_bmp(img, "imgs/" + QDateTime::currentDateTime().toString("hhMMss.zzz") + ".bmp");
 
     struct main_ui_info *ptr = (struct main_ui_info*)user_data;
     ptr->frame_info_q->push(frame_info->nLostPacket);

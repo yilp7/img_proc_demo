@@ -8,6 +8,8 @@
 #include <QtDataVisualization>
 #include <QtConcurrent>
 
+#include <queue>
+
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
@@ -18,10 +20,12 @@
 
 #include "PixelType.h"
 
+/*
 //#include "cam.h"
 #include "mvcam.h"
 //#include "hqvscam.h"
 //#include "euresyscam.h"
+*/
 
 extern "C" {
 #include <libavcodec/avcodec.h>

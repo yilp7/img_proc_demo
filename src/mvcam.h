@@ -4,6 +4,7 @@
 #include "MvCameraControl.h"
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
+#include "imageio.h"
 #include <queue>
 #include <QtCore>
 
@@ -47,6 +48,7 @@ public:
     void trigger_mode(bool read, bool *val);
     void trigger_source(bool read, bool *val);
     void binning(bool read, int *val);
+    int ip_config(bool read, int *val);
     int ip_address(bool read, int *ip, int *gateway, int *nic_address = NULL);
     int pixel_type(bool read, int *val);
     void trigger_once();

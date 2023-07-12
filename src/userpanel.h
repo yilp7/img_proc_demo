@@ -7,6 +7,11 @@
 #include "controlport.h"
 #include "aliasing.h"
 
+//#include "cam.h"
+#include "mvcam.h"
+//#include "hqvscam.h"
+//#include "euresyscam.h"
+
 #include "preferences.h"
 #include "scanconfig.h"
 #include "lasersettings.h"
@@ -21,13 +26,16 @@ class GrabThread : public QThread {
     Q_OBJECT
 public:
     GrabThread(void *info, int idx);
+    ~GrabThread();
+
+    void display_idx(bool read, int &idx);
 
 protected:
     void run();
 
 private:
     void *p_info;
-    int  display_idx;
+    int  _display_idx;
 
 signals:
     void stop_image_writing();
@@ -51,13 +59,14 @@ public:
     UserPanel(QWidget *parent = nullptr);
     ~UserPanel();
 
-    int grab_thread_process(int display_idx);
+    int grab_thread_process(int *display_idx);
+    void swap_grab_thread_display(int display_idx1, int display_idx2);
     bool is_maximized();
 
     // rename vid file in new thread
     static void move_to_dest(QString src, QString dst);
 
-    // TODO movw image io to a new class
+    // TODO move image io to a new class
     // image i/o
     static void save_image_bmp(cv::Mat img, QString filename);
     static void save_image_tif(cv::Mat img, QString filename);
@@ -205,8 +214,8 @@ private slots:
 
     // change misc. display
     void on_COM_DATA_RADIO_clicked();
-    void on_ANALYSIS_RADIO_clicked();
     void on_PTZ_RADIO_clicked();
+    void on_PLUGIN_RADIO_clicked();
 
     // choose how mouse works in DISPLAY
     // TODO add a new exclusive button group
@@ -459,6 +468,7 @@ private:
     int                     pixel_depth[3];             // pixel depth
 
     Display*                displays[3];                // 3 set of display widgets
+    int                     display_thread_idx[3];      // idx of the thread displaying in display_i
     bool                    grab_image[3];              // whether thread should continue grabbing image
     GrabThread*             h_grab_thread[3];           // img-grab thread handle
     bool                    grab_thread_state[3];       // whether grabbing thread is on

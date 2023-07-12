@@ -39,7 +39,7 @@ ControlPort::ControlPort(QLabel *label, QLineEdit *edit, int index, StatusIcon *
             if (this->status_icon) this->status_icon->update_status(last_status);
         });
     timer->start(time_interval);
-    if (idx == 4) qDebug() << "init" << QThread::currentThread();
+//    if (idx == 4) qDebug() << "init" << QThread::currentThread();
     //![1]
 
     //[2] setup serialport / tcpsocket for communication
@@ -109,7 +109,7 @@ bool ControlPort::setup_tcp_port(QString ip, int port, bool connect)
         return use_tcp = connected_to_tcp = tcp_port->waitForConnected(1000);
     }
         tcp_port->disconnectFromHost();
-        return use_tcp = false;
+        return use_tcp = connected_to_tcp = false;
 }
 
 inline QByteArray ControlPort::generate_ba(uchar *data, int len)
@@ -157,10 +157,10 @@ QByteArray ControlPort::communicate_display(QByteArray write, int write_size, in
         return QByteArray();
     }
     port->readAll();
-    port->write(write, write_size);
-    write_succeeded = port->waitForBytesWritten(10);
+    port->write(write.constData(), write_size);
+    write_succeeded = port->waitForBytesWritten(5);
 
-    if (fb) port->waitForReadyRead(20);
+    if (fb) port->waitForReadyRead(40);
 
     read = read_size ? port->read(read_size) : port->readAll();
 //    read = port->readAll();
@@ -168,8 +168,57 @@ QByteArray ControlPort::communicate_display(QByteArray write, int write_size, in
     if (!heartbeat) emit port_io(str_r);
 
 //    port_mutex.unlock();
-    QThread().msleep(1);
+    QThread().msleep(5);
     return read;
+}
+
+void ControlPort::communicate_display(PortData port_data)
+{
+    QByteArray read = communicate_display(port_data.write, port_data.write_size, port_data.read_size, port_data.fb, port_data.heartbeat);
+    if (port_data.heartbeat) {
+        switch (idx) {
+        case 0:
+            qDebug() << "TCU heartbeat" << read.toHex(' ').toUpper();
+            if (read != QByteArray(1, 0x15)) successive_count++;
+            else                             successive_count = 0;
+            break;
+        case 1:
+            qDebug() << "lens heartbeat" << read.toHex(' ').toUpper();
+            break;
+        case 2:
+            qDebug() << "laser heartbeat" << read.toHex(' ').toUpper();
+            break;
+        case 3:
+            qDebug() << "PTZ heartbeat" << read.toHex(' ').toUpper();
+            break;
+        case 4: {
+            static float g = 9.8f;
+            (uchar)read[0] == 0x55;
+            (uchar)read[1] == 0x50;
+            read[2], read[10];
+            (uchar)read[11] == 0x55;
+            (uchar)read[12] == 0x51;
+            float acceleration_x = 16 * g * (uint(read[14] << 8) + read[13]) / 32768.;
+            float acceleration_y = 16 * g * (uint(read[16] << 8) + read[15]) / 32768.;
+            float acceleration_z = 16 * g * (uint(read[18] << 8) + read[17]) / 32768.;
+            read[19], read[21];
+            (uchar)read[22] == 0x55;
+            (uchar)read[23] == 0x52;
+            float angular_x = 2000 * (uint(read[25] << 8) + read[24]) / 32768.;
+            float angular_y = 2000 * (uint(read[27] << 8) + read[26]) / 32768.;
+            float angular_z = 2000 * (uint(read[29] << 8) + read[28]) / 32768.;
+            read[30], read[32];
+            (uchar)read[33] == 0x55;
+            (uchar)read[34] == 0x53;
+            float roll  = 180 * (uint(read[36] << 8) + read[35]) / 32768.;
+            float pitch = 180 * (uint(read[38] << 8) + read[37]) / 32768.;
+            float yaw   = 180 * (uint(read[40] << 8) + read[39]) / 32768.;
+            read[41], read[43];
+            qDebug() << roll << pitch << yaw;
+        }
+        default: break;
+        }
+    }
 }
 
 void ControlPort::share_port_from(ControlPort *port)
@@ -198,7 +247,8 @@ void ControlPort::quit_thread()
 
 void ControlPort::run()
 {
-    if (idx == 4) qDebug() << "run" << QThread::currentThread();
+    qRegisterMetaType<PortData>("PortData");
+    connect(this, SIGNAL(send_port_data(PortData)), this, SLOT(communicate_display(PortData)));
     while (!thread_interrupt) {
         if (q.empty()) { QThread::msleep(10); continue; }
         PortData temp = q.front();
@@ -217,46 +267,9 @@ void ControlPort::run()
 //            qDebug() << read.toHex(',');
             QThread::msleep(1);
         }
-        else read = communicate_display(temp.write, temp.write_size, temp.read_size, temp.fb, temp.heartbeat);
+//        else read = communicate_display(temp.write, temp.write_size, temp.read_size, temp.fb, temp.heartbeat);
+        else emit send_port_data(temp);
 //        qDebug() << read.toHex(',');
-        if (temp.heartbeat) {
-            switch (idx) {
-            case 0:
-                if (read != QByteArray(1, 0x15)) successive_count++;
-                else                             successive_count = 0;
-                break;
-            case 1:
-            case 2:
-            case 3:
-                break;
-            case 4: {
-                static float g = 9.8f;
-                (uchar)read[0] == 0x55;
-                (uchar)read[1] == 0x50;
-                read[2], read[10];
-                (uchar)read[11] == 0x55;
-                (uchar)read[12] == 0x51;
-                float acceleration_x = 16 * g * (uint(read[14] << 8) + read[13]) / 32768.;
-                float acceleration_y = 16 * g * (uint(read[16] << 8) + read[15]) / 32768.;
-                float acceleration_z = 16 * g * (uint(read[18] << 8) + read[17]) / 32768.;
-                read[19], read[21];
-                (uchar)read[22] == 0x55;
-                (uchar)read[23] == 0x52;
-                float angular_x = 2000 * (uint(read[25] << 8) + read[24]) / 32768.;
-                float angular_y = 2000 * (uint(read[27] << 8) + read[26]) / 32768.;
-                float angular_z = 2000 * (uint(read[29] << 8) + read[28]) / 32768.;
-                read[30], read[32];
-                (uchar)read[33] == 0x55;
-                (uchar)read[34] == 0x53;
-                float roll  = 180 * (uint(read[36] << 8) + read[35]) / 32768.;
-                float pitch = 180 * (uint(read[38] << 8) + read[37]) / 32768.;
-                float yaw   = 180 * (uint(read[40] << 8) + read[39]) / 32768.;
-                read[41], read[43];
-                qDebug() << roll << pitch << yaw;
-            }
-            default: break;
-            }
-        }
     }
 }
 
@@ -451,7 +464,7 @@ Lens::Lens(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, Q
 }
 
 void Lens::try_communicate()
-{return;
+{
     // TODO: disable self-check system
     if (!connected_to_serial && !connected_to_tcp) return;
 
@@ -459,8 +472,8 @@ void Lens::try_communicate()
                                   generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7),
                                   generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x57, 0x00, 0x00, 0x58}, 7)};
 
-    q.push(PortData{write[write_idx], 7, 1, true, true});
-    write_idx = (write_idx + 1) & 3;
+    q.push(PortData{write[write_idx], 7, 7, true, true});
+    write_idx = (write_idx + 1) % 3;
 
 //    QByteArray read = communicate_display(write[write_idx], 7, 7, true, false);
 //    if (read != QByteArray(1, 0x15)) successive_count++;
@@ -482,7 +495,7 @@ void Laser::try_communicate()
     if (!connected_to_serial && !connected_to_tcp) return;
 
     static QByteArray write = generate_ba(new uchar[7]{0x88, 0x15, 0x00, 0x00, 0x00, 0x00, 0x99}, 7);
-    QByteArray read = communicate_display(write, 7, 1, true, false);
+    QByteArray read = communicate_display(write, 7, 7, true, false);
     if (read != QByteArray(1, 0x15)) successive_count++;
     else                             successive_count = 0;
 }
@@ -502,7 +515,7 @@ void PTZ::try_communicate()
     static QByteArray write[2] = {generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x51, 0x00, 0x00, 0x52}, 7),
                                   generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x53, 0x00, 0x00, 0x54}, 7)};
 
-    q.push(PortData{write[write_idx], 7, 1, true, true});
+    q.push(PortData{write[write_idx], 7, 7, true, true});
     write_idx = (write_idx + 1) % 2;
 
 //    QByteArray read = communicate_display(write[write_idx], 7, 1, true, false);

@@ -5,12 +5,24 @@
 GrabThread::GrabThread(void *info, int idx)
 {
     p_info = info;
-    display_idx = idx;
+    _display_idx = idx;
+}
+
+GrabThread::~GrabThread()
+{
+    quit();
+    wait();
+}
+
+void GrabThread::display_idx(bool read, int &idx)
+{
+    if (read) idx = this->_display_idx;
+    else      this->_display_idx = idx;
 }
 
 void GrabThread::run()
 {
-    ((UserPanel*)p_info)->grab_thread_process(display_idx);
+    ((UserPanel*)p_info)->grab_thread_process(&_display_idx);
 }
 
 UserPanel* wnd;
@@ -70,6 +82,7 @@ UserPanel::UserPanel(QWidget *parent) :
     h{400, 270, 270},
     pixel_format{PixelType_Gvsp_Mono8},
     pixel_depth{8, 8, 8},
+    display_thread_idx{-1, -1, -1},
     grab_image{false},
     h_grab_thread{NULL},
     grab_thread_state{false},
@@ -278,12 +291,14 @@ UserPanel::UserPanel(QWidget *parent) :
 
     ui->RULER_V->vertical = true;
     ui->ZOOM_TOOL->click();
-    ui->CURR_COORD->setup("current");
+//    ui->CURR_COORD->setup("current");
 //    connect(ui->SOURCE_DISPLAY, SIGNAL(curr_pos(QPoint)), ui->CURR_COORD, SLOT(display_pos(QPoint)));
     ui->START_COORD->setup("start");
 //    connect(ui->SOURCE_DISPLAY, SIGNAL(start_pos(QPoint)), ui->START_COORD, SLOT(display_pos(QPoint)));
     ui->SHAPE_INFO->setup("size");
 //    connect(ui->SOURCE_DISPLAY, SIGNAL(shape_size(QPoint)), ui->SHAPE_INFO, SLOT(display_pos(QPoint)));
+    ui->SHIFT_INFO->setup("shift");
+    ui->SHIFT_INFO->hide();
     connect(ui->SOURCE_DISPLAY, &Display::updated_pos, this,
         [this](int idx, QPoint pos) {
             static QPoint converted_pos(0, 0);
@@ -293,10 +308,15 @@ UserPanel::UserPanel(QWidget *parent) :
 //            converted_pos /= 4;
 //            converted_pos *= 4;
             switch (idx) {
-            case 0: ui->CURR_COORD->display_pos(converted_pos); break;
+//            case 0: ui->CURR_COORD->display_pos(converted_pos); break;
             case 1: ui->START_COORD->display_pos(converted_pos); break;
             case 2: ui->SHAPE_INFO->display_pos(converted_pos); break;
             case 3: point_ptz_to_target(pos); break;
+            case 4:
+                if (ui->SHAPE_INFO->pair.isNull()) ui->SHIFT_INFO->hide();
+                else ui->SHIFT_INFO->show();
+                ui->SHIFT_INFO->display_pos(converted_pos);
+                break;
             default: break;
             }
         });
@@ -348,7 +368,7 @@ UserPanel::UserPanel(QWidget *parent) :
 
     display_grp = new QButtonGroup(this);
     display_grp->addButton(ui->COM_DATA_RADIO);
-    display_grp->addButton(ui->ANALYSIS_RADIO);
+    display_grp->addButton(ui->PLUGIN_RADIO);
     display_grp->addButton(ui->PTZ_RADIO);
     display_grp->setExclusive(true);
     // TODO change continuous/trigger exclusive
@@ -400,11 +420,11 @@ UserPanel::UserPanel(QWidget *parent) :
     connect(laser_settings, SIGNAL(com_write(int, QByteArray)), this, SLOT(com_write_data(int, QByteArray)));
 
     // setup serial port with tcp socket
-    ptr_tcu   = new TCU   (ui->TCU_COM,   ui->TCU_COM_EDIT,   0, ui->STATUS->tcu_status,   scan_config, this);
-    ptr_inc   = new Inclin(ui->RANGE_COM, ui->RANGE_COM_EDIT, 4, nullptr,                  this);
-    ptr_lens  = new Lens  (ui->LENS_COM,  ui->LENS_COM_EDIT,  1, ui->STATUS->lens_status,  this);
-    ptr_laser = new Laser (ui->LASER_COM, ui->LASER_COM_EDIT, 2, ui->STATUS->laser_status, this);
-    ptr_ptz   = new PTZ   (ui->PTZ_COM,   ui->PTZ_COM_EDIT,   3, ui->STATUS->ptz_status,   this);
+    ptr_tcu   = new TCU   (ui->TCU_COM,   ui->TCU_COM_EDIT,   0, ui->STATUS->tcu_status,   scan_config, NULL);
+    ptr_inc   = new Inclin(ui->RANGE_COM, ui->RANGE_COM_EDIT, 4, nullptr,                               NULL);
+    ptr_lens  = new Lens  (ui->LENS_COM,  ui->LENS_COM_EDIT,  1, ui->STATUS->lens_status,               NULL);
+    ptr_laser = new Laser (ui->LASER_COM, ui->LASER_COM_EDIT, 2, ui->STATUS->laser_status,              NULL);
+    ptr_ptz   = new PTZ   (ui->PTZ_COM,   ui->PTZ_COM_EDIT,   3, ui->STATUS->ptz_status,                NULL);
 //    qDebug() << QThread::currentThread();
     connect(ptr_tcu,   &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
     connect(ptr_inc,   &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
@@ -495,7 +515,7 @@ UserPanel::UserPanel(QWidget *parent) :
     QSize temp = ui->DATA_EXCHANGE->size();
     temp.setWidth(ui->ALT_DISPLAY->width());
     ui->DATA_EXCHANGE->resize(temp);
-    ui->HIST_DISPLAY->resize(temp);
+//    ui->HIST_DISPLAY->resize(temp);
     ui->LENS_STATIC->hide();
     ui->IMG_SAVE_STATIC->move(10, 265);
     ui->IMG_PROC_STATIC->hide();
@@ -521,6 +541,8 @@ UserPanel::UserPanel(QWidget *parent) :
     ui->DUAL_LIGHT_BTN->hide();
 #else
     ui->LOGO->hide();
+//    ui->ANALYSIS_RADIO->hide();
+//    ui->PLUGIN_DISPLAY_1->hide();
 #endif
 }
 
@@ -646,10 +668,11 @@ void UserPanel::data_exchange(bool read){
     }
 }
 
-int UserPanel::grab_thread_process(int display_idx) {
-    grab_thread_state[display_idx] = true;
-    Display *disp = displays[display_idx];
-    int _w = w[display_idx], _h = h[display_idx], _pixel_depth = pixel_depth[display_idx];
+int UserPanel::grab_thread_process(int *idx) {
+    int thread_idx = *idx;
+    grab_thread_state[thread_idx] = true;
+    Display *disp;
+    int _w = w[thread_idx], _h = h[thread_idx], _pixel_depth = pixel_depth[thread_idx];
     bool updated;
     cv::Mat img_display, prev_img, prev_3d;
     cv::Mat seq[8], seq_sum, frame_a_sum, frame_b_sum;
@@ -662,40 +685,45 @@ int UserPanel::grab_thread_process(int display_idx) {
     int ww, hh, scan_img_count = -1;
     float weight = _h / 1024.0; // font scale & thickness
     prev_3d = cv::Mat(_h, _w, CV_8UC3);
-    prev_img = cv::Mat(_h, _w, CV_MAKETYPE(_pixel_depth == 8 ? CV_8U : CV_16U, is_color[display_idx] ? 3 : 1));
-    user_mask[display_idx] = cv::Mat::zeros(_h, _w, CV_8UC1);
+    prev_img = cv::Mat(_h, _w, CV_MAKETYPE(_pixel_depth == 8 ? CV_8U : CV_16U, is_color[thread_idx] ? 3 : 1));
+    user_mask[thread_idx] = cv::Mat::zeros(_h, _w, CV_8UC1);
     static int packets_lost = 0;
 //    double *range = (double*)calloc(w * h, sizeof(double));
 #ifdef LVTONG
+    pref->ui->MODEL_LIST->setEnabled(false);
     cv::Mat fishnet_res;
     QString model_name;
     switch (pref->model_idx) {
-    case 0: model_name = "models/resnet18.onnx"; break;
+    case 0: model_name = "models/fishnet_lvtong_legacy.onnx"; break;
     case 1: model_name = "models/fishnet_pix2pix_maxpool.onnx"; break;
+    case 2: model_name = "models/fishnet_maskguided.onnx"; break;
+    case 3: model_name = "models/fishnet_semantic_static_sim.onnx"; break;
     default: break;
     }
 
     cv::dnn::Net net = cv::dnn::readNet(model_name.toLatin1().constData());
 #endif
-    while (grab_image[display_idx]) {
-        while (q_img[display_idx].size() > 5) {
-            q_img[display_idx].pop();
+    while (grab_image[thread_idx]) {
+        disp = displays[*idx];
+
+        while (q_img[thread_idx].size() > 5) {
+            q_img[thread_idx].pop();
             if (device_type == 1) q_frame_info.pop();
         }
 
-        if (q_img[display_idx].empty()) {
+        if (q_img[thread_idx].empty()) {
 #ifdef LVTONG
             QThread::msleep(10);
             continue;
 #else
 //            if (device_type == -2) continue;
-            img_mem[display_idx] = prev_img.clone();
+            img_mem[thread_idx] = prev_img.clone();
             updated = false;
 #endif
         }
         else {
-            img_mem[display_idx] = q_img[display_idx].front();
-            q_img[display_idx].pop();
+            img_mem[thread_idx] = q_img[thread_idx].front();
+            q_img[thread_idx].pop();
             int packets_lost_frame = device_type == 1 ? q_frame_info.front() : 0;
             packets_lost += packets_lost_frame;
             if (packets_lost_frame) ui->STATUS->packet_lost->set_text("packets lost: " + QString::number(packets_lost));
@@ -708,29 +736,29 @@ int UserPanel::grab_thread_process(int display_idx) {
 //            }
             if (device_type == 1) q_frame_info.pop();
             updated = true;
-            if (device_type == -1) q_img[display_idx].push(img_mem[display_idx].clone());
+            if (device_type == -1) q_img[thread_idx].push(img_mem[thread_idx].clone());
         }
 
-        image_mutex[display_idx].lock();
+        image_mutex[thread_idx].lock();
 //        qDebug () << QDateTime::currentDateTime().toString() << updated << img_mem.data;
 
         if (updated) {
             // calc histogram (grayscale)
             memset(hist, 0, 256 * sizeof(uint));
-            if (!is_color[display_idx]) for (int i = 0; i < _h; i++) for (int j = 0; j < _w; j++) hist[(img_mem[display_idx].data + i * img_mem[display_idx].cols)[j]]++;
+            if (!is_color[thread_idx]) for (int i = 0; i < _h; i++) for (int j = 0; j < _w; j++) hist[(img_mem[thread_idx].data + i * img_mem[thread_idx].cols)[j]]++;
 
             // if the image needs flipping
-            if (pref->symmetry) cv::flip(img_mem[display_idx], img_mem[display_idx], pref->symmetry - 2);
+            if (pref->symmetry) cv::flip(img_mem[thread_idx], img_mem[thread_idx], pref->symmetry - 2);
 
             // mcp self-adaptive
             if (pref->auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
-                int thresh_num = img_mem[display_idx].total() / 200, thresh = 1 << pixel_depth[display_idx];
+                int thresh_num = img_mem[thread_idx].total() / 200, thresh = 1 << pixel_depth[thread_idx];
                 while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-                if (thresh > (1 << pixel_depth[display_idx]) * 0.94) emit update_mcp_in_thread(ptr_tcu->mcp - sqrt(thresh - (1 << pixel_depth[display_idx]) * 0.94));
+                if (thresh > (1 << pixel_depth[thread_idx]) * 0.94) emit update_mcp_in_thread(ptr_tcu->mcp - sqrt(thresh - (1 << pixel_depth[thread_idx]) * 0.94));
 //                qDebug() << "high" << thresh;
 //                thresh_num = img_mem.total() / 100, thresh = 255;
 //                while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
-                if (thresh < (1 << pixel_depth[display_idx]) * 0.39) emit update_mcp_in_thread(ptr_tcu->mcp + sqrt((1 << pixel_depth[display_idx]) * 0.39 - thresh));
+                if (thresh < (1 << pixel_depth[thread_idx]) * 0.39) emit update_mcp_in_thread(ptr_tcu->mcp + sqrt((1 << pixel_depth[thread_idx]) * 0.39 - thresh));
 //                qDebug() << "low" << thresh;
             }
         }
@@ -753,8 +781,9 @@ int UserPanel::grab_thread_process(int display_idx) {
         static double min, max;
         if (pref->fishnet_recog) {
             switch (pref->model_idx) {
-            case 0: {
-                cv::cvtColor(img_mem[display_idx], fishnet_res, cv::COLOR_GRAY2RGB);
+            case 0:
+            {
+                cv::cvtColor(img_mem[thread_idx], fishnet_res, cv::COLOR_GRAY2RGB);
                 fishnet_res.convertTo(fishnet_res, CV_32FC3, 1.0 / 255);
                 cv::resize(fishnet_res, fishnet_res, cv::Size(224, 224));
 
@@ -773,8 +802,10 @@ int UserPanel::grab_thread_process(int display_idx) {
 
                 break;
             }
-            case 1: {
-                img_mem[display_idx].convertTo(fishnet_res, CV_32FC3, 1.0 / 255);
+            case 1:
+            case 2:
+            {
+                img_mem[thread_idx].convertTo(fishnet_res, CV_32FC1, 1.0 / 255);
                 cv::resize(fishnet_res, fishnet_res, cv::Size(256, 256));
 
                 cv::Mat blob = cv::dnn::blobFromImage(fishnet_res, 1.0, cv::Size(256, 256));
@@ -791,6 +822,25 @@ int UserPanel::grab_thread_process(int display_idx) {
 
                 break;
             }
+            case 3:
+            {
+                img_mem[thread_idx].convertTo(fishnet_res, CV_32FC1, 1.0 / 255);
+                cv::resize(fishnet_res, fishnet_res, cv::Size(224, 224));
+
+                cv::Mat blob = cv::dnn::blobFromImage(fishnet_res, 1.0, cv::Size(224, 224), cv::Scalar(0.5));
+                net.setInput(blob);
+                cv::Mat prob = net.forward();
+                //                std::cout << cv::format(prob, cv::Formatter::FMT_C) << std::endl;
+
+                cv::minMaxLoc(prob, &min, &max);
+
+                //                prob -= max;
+                //                is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
+
+                emit update_fishnet_result(prob.at<float>(1) > prob.at<float>(0));
+
+                break;
+            }
             default: break;
             }
 
@@ -799,19 +849,19 @@ int UserPanel::grab_thread_process(int display_idx) {
 #endif
 
         // process frame average
-        if (seq_sum.empty()) seq_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
-        if (frame_a_sum.empty()) frame_a_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
-        if (frame_b_sum.empty()) frame_b_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
+        if (seq_sum.empty()) seq_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
+        if (frame_a_sum.empty()) frame_a_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
+        if (frame_b_sum.empty()) frame_b_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
         if (ui->FRAME_AVG_CHECK->isChecked()) {
             if (updated) {
                 calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
-                if (seq[7].empty()) for (auto& m: seq) m = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
+                if (seq[7].empty()) for (auto& m: seq) m = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
 
                 seq_sum -= seq[(seq_idx + 4) & 7];
 //                seq_sum -= seq[seq_idx];
                 if (frame_a_3d) frame_a_sum -= seq[seq_idx];
                 else            frame_b_sum -= seq[seq_idx];
-                img_mem[display_idx].convertTo(seq[seq_idx], CV_MAKETYPE(CV_16U, is_color[display_idx] ? 3 : 1));
+                img_mem[thread_idx].convertTo(seq[seq_idx], CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
                 seq_sum += seq[seq_idx];
                 if (frame_a_3d) frame_a_sum += seq[seq_idx];
                 else            frame_b_sum += seq[seq_idx];
@@ -821,7 +871,7 @@ int UserPanel::grab_thread_process(int display_idx) {
                 seq_idx = (seq_idx + 1) & 7;
             }
 //            seq_sum.convertTo(modified_result, CV_8U, 1. / (calc_avg_option * (1 << (pixel_depth - 8))));
-            seq_sum.convertTo(modified_result[display_idx], CV_MAKETYPE(CV_8U, is_color[display_idx] ? 3 : 1), 1. / (4 * (1 << (_pixel_depth - 8))));
+            seq_sum.convertTo(modified_result[thread_idx], CV_MAKETYPE(CV_8U, is_color[thread_idx] ? 3 : 1), 1. / (4 * (1 << (_pixel_depth - 8))));
         }
         else {
             if (!seq_sum.empty()) {
@@ -831,10 +881,10 @@ int UserPanel::grab_thread_process(int display_idx) {
                 frame_b_sum.release();
                 seq_idx = 0;
             }
-            img_mem[display_idx].convertTo(modified_result[display_idx], CV_MAKETYPE(CV_8U, is_color[display_idx] ? 3 : 1), 1. / (1 << (_pixel_depth - 8)));
+            img_mem[thread_idx].convertTo(modified_result[thread_idx], CV_MAKETYPE(CV_8U, is_color[thread_idx] ? 3 : 1), 1. / (1 << (_pixel_depth - 8)));
         }
 
-        if (pref->split) ImageProc::split_img(modified_result[display_idx], modified_result[display_idx]);
+        if (pref->split) ImageProc::split_img(modified_result[thread_idx], modified_result[thread_idx]);
 
         // process 3d image construction from ABN frames
         if (ui->IMG_3D_CHECK->isChecked()) {
@@ -849,26 +899,26 @@ int UserPanel::grab_thread_process(int display_idx) {
                     static cv::Mat frame_a_avg, frame_b_avg;
                     frame_a_sum.convertTo(frame_a_avg, _pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
                     frame_b_sum.convertTo(frame_b_avg, _pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
-                    ImageProc::gated3D_v2(frame_b_avg, frame_a_avg, modified_result[display_idx],
+                    ImageProc::gated3D_v2(frame_b_avg, frame_a_avg, modified_result[thread_idx],
                                           pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - ptr_tcu->delay_offset * dist_ns) / dist_ns,
                                           pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - ptr_tcu->gate_width_offset * dist_ns) / dist_ns,
                                           pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &dist_mat, &dist_min, &dist_max);
                 }
                 else {
-                    ImageProc::gated3D_v2(frame_a_3d ? prev_img : img_mem[display_idx], frame_a_3d ? img_mem[display_idx] : prev_img, modified_result[display_idx],
+                    ImageProc::gated3D_v2(frame_a_3d ? prev_img : img_mem[thread_idx], frame_a_3d ? img_mem[thread_idx] : prev_img, modified_result[thread_idx],
                                           pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - ptr_tcu->delay_offset * dist_ns) / dist_ns,
                                           pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - ptr_tcu->gate_width_offset * dist_ns) / dist_ns,
                                           pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &dist_mat, &dist_min, &dist_max);
                 }
                 frame_a_3d ^= 1;
-                prev_3d = modified_result[display_idx].clone();
+                prev_3d = modified_result[thread_idx].clone();
             }
-            else modified_result[display_idx] = prev_3d;
+            else modified_result[thread_idx] = prev_3d;
             cv::Mat masked_dist;
-            if (list_roi.size()) dist_mat.copyTo(masked_dist, user_mask[display_idx]), emit update_dist_mat(masked_dist, dist_min, dist_max);
+            if (list_roi.size()) dist_mat.copyTo(masked_dist, user_mask[thread_idx]), emit update_dist_mat(masked_dist, dist_min, dist_max);
             else emit update_dist_mat(dist_mat, dist_min, dist_max);
 
-            cv::resize(modified_result[display_idx], img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
+            cv::resize(modified_result[thread_idx], img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
         }
         // process ordinary image enhance
         else {
@@ -879,13 +929,13 @@ int UserPanel::grab_thread_process(int display_idx) {
                 // histogram
                 case 1: {
 //                    cv::equalizeHist(modified_result, modified_result);
-                    ImageProc::hist_equalization(modified_result[display_idx], modified_result[display_idx]);
+                    ImageProc::hist_equalization(modified_result[thread_idx], modified_result[thread_idx]);
                     break;
                 }
                 // laplace
                 case 2: {
                     cv::Mat kernel = (cv::Mat_<float>(3, 3) << 0, -1, 0, 0, 5, 0, 0, -1, 0);
-                    cv::filter2D(modified_result[display_idx], modified_result[display_idx], CV_8U, kernel);
+                    cv::filter2D(modified_result[thread_idx], modified_result[thread_idx], CV_8U, kernel);
                     break;
                 }
 //                // log
@@ -901,7 +951,7 @@ int UserPanel::grab_thread_process(int display_idx) {
 //                }
                 // SP
                 case 3: {
-                    ImageProc::plateau_equl_hist(modified_result[display_idx], modified_result[display_idx], 4);
+                    ImageProc::plateau_equl_hist(modified_result[thread_idx], modified_result[thread_idx], 4);
                     break;
                 }
                 // accumulative
@@ -924,13 +974,13 @@ int UserPanel::grab_thread_process(int display_idx) {
 //                            else if (p < 256) {img[i * modified_result.step + j] = cv::saturate_cast<uchar>(p * settings->accu_base * 1);}
 //                        }
 //                    }
-                    ImageProc::accumulative_enhance(modified_result[display_idx], modified_result[display_idx], pref->accu_base);
+                    ImageProc::accumulative_enhance(modified_result[thread_idx], modified_result[thread_idx], pref->accu_base);
                     break;
                 }
                 // TODO rewrite sigmoid enchance
                 // sigmoid (nonlinear) (mergw log w/ 1/(1+exp))
                 case 5: {
-                    ImageProc::guided_image_filter(modified_result[display_idx], modified_result[display_idx], 60, 0.01, 1);
+                    ImageProc::guided_image_filter(modified_result[thread_idx], modified_result[thread_idx], 60, 0.01, 1);
 //                    uchar *img = modified_result.data;
 //                    cv::Mat img_log, img_nonLT = cv::Mat(h, w, CV_8U);
 //                    modified_result.convertTo(img_log, CV_32F);
@@ -971,19 +1021,19 @@ int UserPanel::grab_thread_process(int display_idx) {
     //                temp = temp * err_out + bottom;
     //                cv::normalize(temp, temp, 0, 255, cv::NORM_MINMAX);
     //                cv::convertScaleAbs(temp, modified_result);
-                    ImageProc::adaptive_enhance(modified_result[display_idx], modified_result[display_idx], pref->low_in, pref->high_in, pref->low_out, pref->high_out, pref->gamma);
+                    ImageProc::adaptive_enhance(modified_result[thread_idx], modified_result[thread_idx], pref->low_in, pref->high_in, pref->low_out, pref->high_out, pref->gamma);
                     break;
                 }
                 // enhance_dehaze
                 case 7: {
-                    modified_result[display_idx] = ~modified_result[display_idx];
-                    ImageProc::haze_removal(modified_result[display_idx], modified_result[display_idx], 7, pref->dehaze_pct, 0.1, 60, 0.01);
-                    modified_result[display_idx] = ~modified_result[display_idx];
+                    modified_result[thread_idx] = ~modified_result[thread_idx];
+                    ImageProc::haze_removal(modified_result[thread_idx], modified_result[thread_idx], 7, pref->dehaze_pct, 0.1, 60, 0.01);
+                    modified_result[thread_idx] = ~modified_result[thread_idx];
                     break;
                 }
                 // dcp
                 case 8: {
-                    ImageProc::haze_removal(modified_result[display_idx], modified_result[display_idx], 7, pref->dehaze_pct, 0.1, 60, 0.01);
+                    ImageProc::haze_removal(modified_result[thread_idx], modified_result[thread_idx], 7, pref->dehaze_pct, 0.1, 60, 0.01);
                 }
                 // none
                 default:
@@ -1004,10 +1054,11 @@ int UserPanel::grab_thread_process(int display_idx) {
 //            for (int i = 0; i < hh; i++) for (int j = 0; j < ww; j++) {
 //                if (modified_result.data[i * ww + j] == val) modified_result.data[i * ww + j] = 0;
 //            }
-            ImageProc::brightness_and_contrast(modified_result[display_idx], modified_result[display_idx], std::exp(ui->CONTRAST_SLIDER->value() / 10.), ui->BRIGHTNESS_SLIDER->value() * 12.8);
+            ImageProc::brightness_and_contrast(modified_result[thread_idx], modified_result[thread_idx], std::exp(ui->CONTRAST_SLIDER->value() / 10.), ui->BRIGHTNESS_SLIDER->value() * 12.8);
             // map [0, 20] to [0, +inf) using tan
-            ImageProc::brightness_and_contrast(modified_result[display_idx], modified_result[display_idx], tan((20 - ui->GAMMA_SLIDER->value()) / 40. * M_PI));
+            ImageProc::brightness_and_contrast(modified_result[thread_idx], modified_result[thread_idx], tan((20 - ui->GAMMA_SLIDER->value()) / 40. * M_PI));
         }
+#if 0
         // display the gray-value histogram of the current grayscale image, or the distance histogram of the current 3D image
         if (ui->ANALYSIS_RADIO->isChecked()) {
             if (modified_result[display_idx].channels() == 1) {
@@ -1027,20 +1078,21 @@ int UserPanel::grab_thread_process(int display_idx) {
                 }
             }
             // TODO change to signal/slots
-            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+            ui->PLUGIN_DISPLAY_1->setPixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(ui->PLUGIN_DISPLAY_1->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         }
+#endif
         // FIXME possible crash when move scaled image to bottom-right corner
         // crop the region to display
 //        cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? ww + 104 : ww) / disp->width(), disp->display_region.br() * (image_3d ? ww + 104 : ww) / disp->width());
         cv::Rect region = cv::Rect(disp->display_region.tl() * ww / disp->width(), disp->display_region.br() * ww / disp->width());
 //        qDebug() << disp->display_region.tl().x << disp->display_region.tl().y << disp->display_region.width << disp->display_region.height;
 //        qDebug() << disp->size();
-        if (region.height + region.x > modified_result[display_idx].rows) region.height = modified_result[display_idx].rows - region.x;
-        if (region.width + region.y > modified_result[display_idx].cols) region.width = modified_result[display_idx].cols - region.y;
+        if (region.height + region.x > modified_result[thread_idx].rows) region.height = modified_result[thread_idx].rows - region.x;
+        if (region.width + region.y > modified_result[thread_idx].cols) region.width = modified_result[thread_idx].cols - region.y;
 //        qDebug("region x: %d, y: %d, w: %d, h: %d", region.x, region.y, region.width, region.height);
 //        qDebug("image  w: %d, h: %d", modified_result.cols, modified_result.rows);
-        modified_result[display_idx] = modified_result[display_idx](region);
-        cv::resize(modified_result[display_idx], modified_result[display_idx], cv::Size(ww, hh));
+        modified_result[thread_idx] = modified_result[thread_idx](region);
+        cv::resize(modified_result[thread_idx], modified_result[thread_idx], cv::Size(ww, hh));
 
         // put info (dist, dov, time) as text on image
         QString info_tcu = pref->custom_topleft_info ?
@@ -1049,29 +1101,40 @@ int UserPanel::grab_thread_process(int display_idx) {
                                      QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns));
         QString info_time = QDateTime::currentDateTime().toString("hh:mm:ss:zzz");
         if (ui->INFO_CHECK->isChecked()) {
-            cv::putText(modified_result[display_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            cv::putText(modified_result[display_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            cv::putText(modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
 #ifdef LVTONG
             static int baseline = 0;
             if (pref->fishnet_recog) {
 //                cv::putText(modified_result[display_idx], "FISHNET", cv::Point(ww - 40 - cv::getTextSize("FISHNET", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                cv::putText(modified_result[display_idx], is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                cv::putText(modified_result[thread_idx], is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
 #endif
         }
 
         // resize to display size
-        cv::resize(modified_result[display_idx], img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
+        cv::resize(modified_result[thread_idx], img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
+        bool use_mask = modified_result[thread_idx].channels() == 1;
+        cv::Mat info_mask(cv::Size(disp->width(), disp->height()), CV_8U, cv::Scalar(0)), thresh_result;
+        if (use_mask) cv::threshold(img_display, thresh_result, 128, 255, cv::THRESH_BINARY);
         // draw the center cross
-        if (!image_3d[display_idx] && ui->CENTER_CHECK->isChecked()) {
-            for (int i = img_display.cols / 2 - 9; i < img_display.cols / 2 + 10; i++) img_display.at<uchar>(img_display.rows / 2, i) = img_display.at<uchar>(img_display.rows / 2, i) > 127 ? 0 : 255;
-            for (int i = img_display.rows / 2 - 9; i < img_display.rows / 2 + 10; i++) img_display.at<uchar>(i, img_display.cols / 2) = img_display.at<uchar>(i, img_display.cols / 2) > 127 ? 0 : 255;
+        if (!image_3d[thread_idx] && ui->CENTER_CHECK->isChecked()) {
+//            for (int i = img_display.cols / 2 - 9; i < img_display.cols / 2 + 10; i++) img_display.at<uchar>(img_display.rows / 2, i) = img_display.at<uchar>(img_display.rows / 2, i) > 127 ? 0 : 255;
+//            for (int i = img_display.rows / 2 - 9; i < img_display.rows / 2 + 10; i++) img_display.at<uchar>(i, img_display.cols / 2) = img_display.at<uchar>(i, img_display.cols / 2) > 127 ? 0 : 255;
+            cv::line(use_mask ? info_mask : img_display, cv::Point(info_mask.cols / 2 - 9, info_mask.rows / 2), cv::Point(info_mask.cols / 2 + 10, info_mask.rows / 2), cv::Scalar(255), 1);
+            cv::line(use_mask ? info_mask : img_display, cv::Point(info_mask.cols / 2, info_mask.rows / 2 - 9), cv::Point(info_mask.cols / 2, info_mask.rows / 2 + 10), cv::Scalar(255), 1);
         }
-        if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) cv::rectangle(img_display, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
+        if (ui->SELECT_TOOL->isChecked() && disp->selection_v1 != disp->selection_v2) {
+            cv::rectangle(use_mask ? info_mask : img_display, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
+            cv::circle(use_mask ? info_mask : img_display, (disp->selection_v1 + disp->selection_v2) / 2, 1, cv::Scalar(255), -1);
+        }
+        if (use_mask) img_display = (img_display & (~info_mask)) + ((~thresh_result) & info_mask);
+//        img_display &= ~info_mask;
+//        img_display += ~thresh_result & info_mask;
 
         // image display
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
-        stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, image_3d[display_idx] || is_color[display_idx] ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+        stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, image_3d[thread_idx] || is_color[thread_idx] ? QImage::Format_RGB888 : QImage::Format_Indexed8);
 //        ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         // use signal->slot instead of directly call
         disp->emit set_pixmap(QPixmap::fromImage(stream.scaled(disp->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
@@ -1089,7 +1152,7 @@ int UserPanel::grab_thread_process(int display_idx) {
                 scan_img_count = ui->FRAME_AVG_CHECK->isChecked() ? 5 : 1;
                 filter_scan();
                 if (!auto_scan_mode) {
-                    img_mem[display_idx].convertTo(temp, CV_64F);
+                    img_mem[thread_idx].convertTo(temp, CV_64F);
                     cv::threshold(temp, temp, 20, 255, cv::THRESH_TOZERO);
                     scan_3d += temp * (++scan_idx);
                     scan_sum += temp;
@@ -1105,48 +1168,91 @@ int UserPanel::grab_thread_process(int display_idx) {
         if (scan && std::round(delay_dist / dist_ns) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
 
         // image write / video record
-        if (updated && save_original[display_idx]) {
+        if (updated && save_original[thread_idx]) {
             save_to_file(false);
-            if (device_type == -1) save_original[display_idx] = 0;
+            if (device_type == -1) save_original[thread_idx] = 0;
         }
-        if (updated && save_modified[display_idx]) {
+        if (updated && save_modified[thread_idx]) {
             save_to_file(true);
-            if (device_type == -1) save_modified[display_idx] = 0;
+            if (device_type == -1) save_modified[thread_idx] = 0;
         }
-        if (updated && record_original[display_idx]) {
-            cv::Mat temp = img_mem[display_idx].clone();
+        if (updated && record_original[thread_idx]) {
+            cv::Mat temp = img_mem[thread_idx].clone();
             if (pref->save_info) {
                 cv::putText(temp, info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(temp, info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
-            if (is_color[display_idx]) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
+            if (is_color[thread_idx]) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
             vid_out[0].write(temp);
         }
-        if (updated && record_modified[display_idx]) {
-            cv::Mat temp = modified_result[display_idx].clone();
-            if (!image_3d[display_idx] && !ui->INFO_CHECK->isChecked()) {
+        if (updated && record_modified[thread_idx]) {
+            cv::Mat temp = modified_result[thread_idx].clone();
+            if (!image_3d[thread_idx] && !ui->INFO_CHECK->isChecked()) {
                 if (pref->save_info) {
-                    cv::putText(modified_result[display_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                    cv::putText(modified_result[display_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    cv::putText(modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
 #ifdef LVTONG
                     static int baseline = 0;
                     if (pref->fishnet_recog) {
 //                        cv::putText(modified_result[display_idx], "FISHNET", cv::Point(ww - 40 - cv::getTextSize("FISHNET", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                        cv::putText(modified_result[display_idx], is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                        cv::putText(modified_result[thread_idx], is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                     }
 #endif
                 }
             }
-            if (is_color[display_idx] || image_3d[display_idx]) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
+            if (is_color[thread_idx] || image_3d[thread_idx]) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
             vid_out[1].write(temp);
         }
 
-        if (updated) prev_img = img_mem[display_idx].clone();
-        image_mutex[display_idx].unlock();
+        if (updated) prev_img = img_mem[thread_idx].clone();
+        image_mutex[thread_idx].unlock();
     }
 //    free(range);
-    grab_thread_state[display_idx] = false;
+#ifdef LVTONG
+    pref->ui->MODEL_LIST->setEnabled(true);
+#endif
+    grab_thread_state[thread_idx] = false;
     return 0;
+}
+
+void UserPanel::swap_grab_thread_display(int display_idx1, int display_idx2)
+{
+    int thread_idx1 = display_thread_idx[display_idx1],
+        thread_idx2 = display_thread_idx[display_idx2];
+    qDebug() << "swap thread" << thread_idx1 << thread_idx2;
+
+    if (thread_idx1 != -1 && thread_idx1 != -1) {
+        image_mutex[thread_idx1].lock();
+        image_mutex[thread_idx2].lock();
+
+        h_grab_thread[thread_idx1]->display_idx(false, display_idx2);
+        h_grab_thread[thread_idx2]->display_idx(false, display_idx1);
+        display_thread_idx[display_idx1] = thread_idx2;
+        display_thread_idx[display_idx2] = thread_idx1;
+
+        image_mutex[thread_idx1].unlock();
+        image_mutex[thread_idx2].unlock();
+    }
+    else if (thread_idx1 != -1) {
+        image_mutex[thread_idx1].lock();
+
+        h_grab_thread[thread_idx1]->display_idx(false, display_idx2);
+        display_thread_idx[display_idx1] = thread_idx2;
+        display_thread_idx[display_idx2] = thread_idx1;
+
+        image_mutex[thread_idx1].unlock();
+        displays[display_idx1]->clear();
+    }
+    else if (thread_idx2 != -1) {
+        image_mutex[thread_idx2].lock();
+
+        h_grab_thread[thread_idx2]->display_idx(false, display_idx1);
+        display_thread_idx[display_idx1] = thread_idx2;
+        display_thread_idx[display_idx2] = thread_idx1;
+
+        image_mutex[thread_idx2].unlock();
+        displays[display_idx2]->clear();
+    }
 }
 
 inline bool UserPanel::is_maximized()
@@ -1908,15 +2014,20 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
     ptr_tcu->duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
     ptr_tcu->ccd_freq = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
 
-    if (grab_image[0] || h_grab_thread[0]) {
-        grab_image[0] = false;
-        h_grab_thread[0]->quit();
-        h_grab_thread[0]->wait();
-        delete h_grab_thread[0];
-        h_grab_thread[0] = NULL;
+    int main_thread_idx = display_thread_idx[0];
+    if (display_thread_idx[0] != -1) main_thread_idx = 0;
+
+    if (grab_image[main_thread_idx] || h_grab_thread[main_thread_idx]) {
+        grab_image[main_thread_idx] = false;
+        h_grab_thread[main_thread_idx]->quit();
+        h_grab_thread[main_thread_idx]->wait();
+        delete h_grab_thread[main_thread_idx];
+        h_grab_thread[main_thread_idx] = NULL;
+        display_thread_idx[0] = -1;
     }
 
     grab_image[0] = true;
+
     h_grab_thread[0] = new GrabThread((void*)this, 0);
     if (h_grab_thread[0] == NULL) {
         grab_image[0] = false;
@@ -1936,6 +2047,7 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
     start_grabbing = true;
     ui->SOURCE_DISPLAY->is_grabbing = true;
     enable_controls(true);
+    display_thread_idx[0] = 0;
 
 #ifdef ICMOS
     ui->HIDE_BTN->click();
@@ -1949,14 +2061,17 @@ void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
     if (record_original[0]) on_SAVE_AVI_BUTTON_clicked();
     if (record_modified[0]) on_SAVE_FINAL_BUTTON_clicked();
 
-    if (!q_img[0].empty()) std::queue<cv::Mat>().swap(q_img[0]);
+    int main_thread_idx = display_thread_idx[0];
+//    if (display_thread_idx[0] != -1) main_thread_idx = 0;
 
-    grab_image[0] = false;
-    if (h_grab_thread[0]) {
-        h_grab_thread[0]->quit();
-        h_grab_thread[0]->wait();
-        delete h_grab_thread[0];
-        h_grab_thread[0] = NULL;
+    if (!q_img[main_thread_idx].empty()) std::queue<cv::Mat>().swap(q_img[main_thread_idx]);
+
+    grab_image[main_thread_idx] = false;
+    if (h_grab_thread[main_thread_idx]) {
+        h_grab_thread[main_thread_idx]->quit();
+        h_grab_thread[main_thread_idx]->wait();
+        delete h_grab_thread[main_thread_idx];
+        h_grab_thread[main_thread_idx] = NULL;
     }
 
     start_grabbing = false;
@@ -1968,6 +2083,7 @@ void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
     if (device_type == -2) ui->ENUM_BUTTON->click();
 
     curr_cam->stop_grabbing();
+    display_thread_idx[0] = -1;
 }
 
 void UserPanel::on_SAVE_BMP_BUTTON_clicked()
@@ -2216,6 +2332,8 @@ void UserPanel::update_dev_ip()
 
 void UserPanel::set_dev_ip(int ip, int gateway)
 {
+    int static_ip = MV_IP_CFG_STATIC;
+    curr_cam->ip_config(false, &static_ip);
     curr_cam->ip_address(false, &ip, &gateway);
     ui->ENUM_BUTTON->click();
 }
@@ -2537,8 +2655,8 @@ void UserPanel::prompt_for_input_file()
 
     QComboBox *file_path_x = new QComboBox(&input_file_dialog);
     static QStringList file_paths = (QStringList() << "rtsp://192.168.2.xxx/mainstream"
-                                     << "rtsp://admin:abcd1234@102.168.1.xxx:554/h264/ch1/main/av_stream"
-                                     << "rtsp://admin:abcd1234@102.168.1.xxx:554"
+                                     << "rtsp://admin:abcd1234@192.168.1.xxx:554/h264/ch1/main/av_stream"
+                                     << "rtsp://admin:abcd1234@192.168.1.xxx:554"
                                      << "https://mst3k-localnow.amagi.tv/playlist.m3u8");
     file_path_x->addItems(file_paths);
     file_path_x->setEditable(true);
@@ -2895,9 +3013,10 @@ void UserPanel::connect_to_serial_server_tcp()
     connected |= ptr_lens-> setup_tcp_port(pref->ui->TCP_SERVER_IP_EDIT->text(), 10002, true);
 //    connected |= ptr_laser->setup_tcp_port(ip, 10000, true);
 //    connected |= ptr_ptz->  setup_tcp_port(ip, 10000, true);
-    ptr_ptz->share_port_from(ptr_lens);
+//    ptr_ptz->share_port_from(ptr_lens);
     pref->ui->TCP_SERVER_CHK->setEnabled(connected);
     pref->ui->TCP_SERVER_CHK->setChecked(connected);
+//    qDebug() << ptr_tcu->get_port_status() << ptr_lens->get_port_status() << ptr_laser->get_port_status() << ptr_ptz->get_port_status();
     if (connected) QMessageBox::information(this, "serial port server", "connected to server");
     else           QMessageBox::information(this, "serial port server", "cannot connect to server");
 }
@@ -2909,10 +3028,11 @@ void UserPanel::disconnect_from_serial_server_tcp()
     ptr_lens-> setup_tcp_port("", 0, false);
 //    ptr_laser->setup_tcp_port("", 0, false);
 //    ptr_ptz->  setup_tcp_port("", 0, false);
-    ptr_ptz->share_port_from(nullptr);
+//    ptr_ptz->share_port_from(nullptr);
     pref->ui->TCP_SERVER_CHK->setEnabled(false);
     pref->ui->TCP_SERVER_CHK->setChecked(false);
     QMessageBox::information(this, "serial port server", "disconnected from server");
+//    qDebug() << ptr_tcu->get_port_status() << ptr_lens->get_port_status() << ptr_laser->get_port_status() << ptr_ptz->get_port_status();
 //    for (int i = 0; i < 5; i++) use_tcp[i] = false;
 }
 
@@ -3522,7 +3642,10 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             break;
         case Qt::Key_Q:
 //            std::accumulate(use_tcp, use_tcp + 5, 0) ? disconnect_from_serial_server_tcp() : connect_to_serial_server_tcp();
-            ptr_tcu->get_port_status() & 0x10 || ptr_lens->get_port_status() & 0x10 || ptr_laser->get_port_status() & 0x10 || ptr_ptz->get_port_status() & 0x10 ?
+            (ptr_tcu->get_port_status() & ControlPort::PortStatus::TCP_CONNECTED) ||
+            (ptr_lens->get_port_status() & ControlPort::PortStatus::TCP_CONNECTED) ||
+            (ptr_laser->get_port_status() & ControlPort::PortStatus::TCP_CONNECTED) ||
+            (ptr_ptz->get_port_status() & ControlPort::PortStatus::TCP_CONNECTED) ?
                 disconnect_from_serial_server_tcp() : connect_to_serial_server_tcp();
             break;
         case Qt::Key_L:
@@ -3598,9 +3721,11 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     ui->ZOOM_TOOL->move(region.x(), 15);
     ui->SELECT_TOOL->move(region.x() + 25, 15);
     ui->PTZ_TOOL->move(region.x() + 50, 15);
-    ui->CURR_COORD->move(region.x() + 80, 5);
-    ui->START_COORD->move(ui->CURR_COORD->geometry().right() + 20, 5);
+//    ui->CURR_COORD->move(region.x() + 80, 5);
+    ui->START_COORD->move(region.x() + 80, 5);
     ui->SHAPE_INFO->move(ui->START_COORD->geometry().right() + 20, 5);
+    ui->SHIFT_INFO->move(ui->SHAPE_INFO->geometry().right() + 20, 5);
+
     ui->INFO_CHECK->move(region.right() - 60, 0);
     ui->CENTER_CHECK->move(region.right() - 60, 20);
     ui->HIDE_BTN->move(ui->MID->geometry().left() - 8, this->geometry().height() / 2 - 10);
@@ -4002,7 +4127,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                     else {
                         if (display && frame->pts != AV_NOPTS_VALUE) {
                             if (last_pts != AV_NOPTS_VALUE) {
-                                delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1000;
+                                delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1e6;
 //                                qDebug() << av_rescale_q(frame->pts - last_pts, time_base, time_base_q) << elapsed_timer.nsecsElapsed() / 1000;
                                 if (delay > 0 && delay < 1000000) av_usleep(delay);
                                 elapsed_timer.restart();
@@ -4091,17 +4216,21 @@ inline uint UserPanel::get_width_in_ps(float val)
 
 void UserPanel::start_static_display(int width, int height, bool is_color, int display_idx, int pixel_depth, int device_type)
 {
-    if (grab_image[display_idx] || h_grab_thread[display_idx]) {
-        grab_image[display_idx] = false;
-        if (h_grab_thread[display_idx]) {
-            h_grab_thread[display_idx]->quit();
-            h_grab_thread[display_idx]->wait();
-            delete h_grab_thread[display_idx];
-            h_grab_thread[display_idx] = NULL;
+    int select_display_thread = display_thread_idx[display_idx];
+
+    if (select_display_thread != -1) {
+        if (grab_image[select_display_thread] || h_grab_thread[select_display_thread]) {
+            grab_image[select_display_thread] = false;
+            if (h_grab_thread[select_display_thread]) {
+                h_grab_thread[select_display_thread]->quit();
+                h_grab_thread[select_display_thread]->wait();
+                delete h_grab_thread[select_display_thread];
+                h_grab_thread[select_display_thread] = NULL;
+            }
         }
+        while (grab_thread_state[select_display_thread]) ;
+        std::queue<cv::Mat>().swap(q_img[select_display_thread]);
     }
-    while (grab_thread_state[display_idx]) ;
-    std::queue<cv::Mat>().swap(q_img[display_idx]);
 
     image_mutex[display_idx].lock();
     w[display_idx] = width;
@@ -4136,6 +4265,7 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
         ui->START_BUTTON->setEnabled(false);
         ui->STOP_GRABBING_BUTTON->setEnabled(true);
     }
+    display_thread_idx[display_idx] = display_idx;
 }
 
 void UserPanel::showEvent(QShowEvent *event)
@@ -4414,15 +4544,7 @@ void UserPanel::on_COM_DATA_RADIO_clicked()
 {
     display_option = 0;
     ui->DATA_EXCHANGE->show();
-    ui->HIST_DISPLAY->hide();
-    ui->PTZ_GRP->hide();
-}
-
-void UserPanel::on_ANALYSIS_RADIO_clicked()
-{
-    display_option = 1;
-    ui->DATA_EXCHANGE->hide();
-    ui->HIST_DISPLAY->show();
+    ui->PLUGIN_DISPLAY_1->hide();
     ui->PTZ_GRP->hide();
 }
 
@@ -4430,8 +4552,16 @@ void UserPanel::on_PTZ_RADIO_clicked()
 {
     display_option = 2;
     ui->DATA_EXCHANGE->hide();
-    ui->HIST_DISPLAY->hide();
+    ui->PLUGIN_DISPLAY_1->hide();
     ui->PTZ_GRP->show();
+}
+
+void UserPanel::on_PLUGIN_RADIO_clicked()
+{
+    display_option = 3;
+    ui->DATA_EXCHANGE->hide();
+    ui->PLUGIN_DISPLAY_1->show();
+    ui->PTZ_GRP->hide();
 }
 
 void UserPanel::screenshot()
@@ -4667,14 +4797,17 @@ void UserPanel::point_ptz_to_target(QPoint target)
 
 void UserPanel::on_DUAL_LIGHT_BTN_clicked()
 {
-    QPluginLoader pluginLoader("plugins/ir_visible_light/plugin_ir_visible_light.dll");
+    QPluginLoader pluginLoader("plugins/hik_control/plugin_hik_control.dll");
     QObject *plugin = pluginLoader.instance();
     qDebug() << plugin;
     if (plugin) {
         pluginInterface = qobject_cast<PluginInterface *>(plugin);
 //        pluginInterface = (PluginInterface *)plugin;
         qDebug() << pluginInterface;
-        if (pluginInterface) pluginInterface->start();
+        if (pluginInterface) {
+            pluginInterface->create(ui->PLUGIN_DISPLAY_1);
+            pluginInterface->start();
+        }
     }
 }
 

@@ -299,11 +299,21 @@ Preferences::Preferences(QWidget *parent) :
                 emit query_tcu_param();
             });
 #ifdef LVTONG
-    ui->MODEL_LIST->addItem("01");
-    ui->MODEL_LIST->addItem("02");
-    ui->MODEL_LIST->setCurrentIndex(model_idx = 1);
+    QStringList model_list;
+    model_list << "01 legacy" << "02 pix2pix" << "03 maskguided" /*<< "04 semantic"*/;
+    QStandardItemModel *model = new QStandardItemModel();//添加提示tootip
+    for(int i = 0; i < model_list.size(); i++){
+        QStandardItem *item = new QStandardItem(model_list[i]);
+        item->setToolTip(model_list[i]);
+        model->appendRow(item);
+    }
+    ui->MODEL_LIST->setModel(model);
+    ui->MODEL_LIST->setCurrentIndex(model_idx = 0);
     connect(ui->MODEL_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
-            [this](int index){ model_idx = index; });
+            [this](int index){
+                model_idx = index;
+                ui->FISHNET_THRESH_EDIT->setEnabled(!model_idx);
+            });
     connect(ui->FISHNET_RECOG_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ fishnet_recog = arg1; });
     connect(ui->FISHNET_THRESH_EDIT, &QLineEdit::editingFinished, this,
             [this](){

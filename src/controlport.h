@@ -28,6 +28,7 @@ public:
 signals:
     void port_connected(int connected_status);
     void port_io(QString data);
+    void send_port_data(PortData port_data);
 
 public slots:
     virtual void try_communicate() = 0;
@@ -36,6 +37,7 @@ public slots:
     bool setup_tcp_port(QString ip, int port, bool connect);
 
     QByteArray communicate_display(QByteArray write, int write_size, int read_size, bool fb = false, bool heartbeat = false);
+    void communicate_display(PortData port_data);
 
 public:
     QByteArray generate_ba(uchar *data, int len);

@@ -834,7 +834,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>60</width>
+        <width>55</width>
         <height>20</height>
        </rect>
       </property>
@@ -842,36 +842,17 @@
        <string>DATA</string>
       </property>
      </widget>
-     <widget class="QRadioButton" name="ANALYSIS_RADIO">
+     <widget class="QRadioButton" name="PLUGIN_RADIO">
       <property name="geometry">
        <rect>
-        <x>70</x>
+        <x>120</x>
         <y>0</y>
-        <width>60</width>
+        <width>65</width>
         <height>20</height>
        </rect>
       </property>
       <property name="text">
-       <string>ANLYS</string>
-      </property>
-     </widget>
-     <widget class="QLabel" name="HIST_DISPLAY">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>20</y>
-        <width>191</width>
-        <height>161</height>
-       </rect>
-      </property>
-      <property name="frameShape">
-       <enum>QFrame::NoFrame</enum>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
+       <string>PLUGIN</string>
       </property>
      </widget>
      <widget class="QTextEdit" name="DATA_EXCHANGE">
@@ -899,9 +880,9 @@
      <widget class="QRadioButton" name="PTZ_RADIO">
       <property name="geometry">
        <rect>
-        <x>140</x>
+        <x>65</x>
         <y>0</y>
-        <width>60</width>
+        <width>50</width>
         <height>20</height>
        </rect>
       </property>
@@ -1271,12 +1252,22 @@
        </property>
       </widget>
      </widget>
+     <widget class="QWidget" name="PLUGIN_DISPLAY_1" native="true">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>20</y>
+        <width>191</width>
+        <height>161</height>
+       </rect>
+      </property>
+     </widget>
      <zorder>PTZ_GRP</zorder>
      <zorder>COM_DATA_RADIO</zorder>
-     <zorder>ANALYSIS_RADIO</zorder>
-     <zorder>HIST_DISPLAY</zorder>
+     <zorder>PLUGIN_RADIO</zorder>
      <zorder>DATA_EXCHANGE</zorder>
      <zorder>PTZ_RADIO</zorder>
+     <zorder>PLUGIN_DISPLAY_1</zorder>
     </widget>
     <widget class="QLabel" name="LOGO">
      <property name="geometry">
@@ -1436,10 +1427,10 @@
       <string/>
      </property>
     </widget>
-    <widget class="Coordinate" name="CURR_COORD">
+    <widget class="Coordinate" name="SHIFT_INFO">
      <property name="geometry">
       <rect>
-       <x>90</x>
+       <x>310</x>
        <y>5</y>
        <width>90</width>
        <height>30</height>
@@ -1455,7 +1446,7 @@
     <widget class="Coordinate" name="START_COORD">
      <property name="geometry">
       <rect>
-       <x>200</x>
+       <x>90</x>
        <y>5</y>
        <width>90</width>
        <height>30</height>
@@ -1471,7 +1462,7 @@
     <widget class="Coordinate" name="SHAPE_INFO">
      <property name="geometry">
       <rect>
-       <x>310</x>
+       <x>200</x>
        <y>5</y>
        <width>90</width>
        <height>30</height>

@@ -113,6 +113,7 @@ void Display::mouseMoveEvent(QMouseEvent *event)
         selection_v2.y /*= selection_v1.y */= curr_pos.y();
 //        emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
         emit updated_pos(2, curr_pos - QPoint(selection_v1.x, selection_v1.y));
+        emit updated_pos(4, (event->pos() + QPoint(selection_v1.x, selection_v1.y) - QPoint(this->width(), this->height())) / 2);
     }
 }
 
@@ -129,6 +130,7 @@ void Display::mouseReleaseEvent(QMouseEvent *event)
         selection_v2.y = event->pos().y();
 //        emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
         emit updated_pos(2, event->pos() - QPoint(selection_v1.x, selection_v1.y));
+        emit updated_pos(4, (event->pos() + QPoint(selection_v1.x, selection_v1.y) - QPoint(this->width(), this->height())) / 2);
     }
     else if (mode == 2) {
 //        emit ptz_target(event->pos());
@@ -444,8 +446,8 @@ void Coordinate::display_pos(QPoint p)
 {
     pair.setX(p.x());
     pair.setY(p.y());
-    coord_x->setText(QString::asprintf("X: %04d", abs(p.x())));
-    coord_y->setText(QString::asprintf("Y: %04d", abs(p.y())));
+    coord_x->setText(QString::asprintf("X:% 05d", p.x()));
+    coord_y->setText(QString::asprintf("Y:% 05d", p.y()));
 }
 
 IndexLabel::IndexLabel(QWidget *parent) : QLabel(parent) {}
@@ -577,6 +579,13 @@ FloatingWindow::FloatingWindow() :
 //    layout->addWidget(new QSizeGrip(this), 0, 0, Qt::AlignTop    | Qt::AlignRight);
 //    layout->addWidget(new QSizeGrip(this), 0, 0, Qt::AlignBottom | Qt::AlignLeft);
 //    layout->addWidget(new QSizeGrip(this), 0, 0, Qt::AlignTop    | Qt::AlignLeft);
+
+//    QPushButton *capture = new QPushButton(QIcon(":/tools/dark/capture"), "", frame);
+//    connect(capture, &QPushButton::clicked, this, [this](){ hide(); });
+//    capture->setFixedSize(20, 20);
+//    capture->setIconSize(QSize(16, 16));
+//    capture->setStyleSheet("background-color: transparent; border: none;");
+//    layout->addWidget(capture, 0, 7, Qt::AlignTop | Qt::AlignRight);
 
     QPushButton *exit = new QPushButton(QIcon(":/tools/exit"), "", frame);
     connect(exit, &QPushButton::clicked, this, [this](){ hide(); });
