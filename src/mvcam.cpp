@@ -42,7 +42,7 @@ int Cam::start(int idx) {
     MV_CC_SetEnumValue(dev_handle, "BinningHorizontal", 1);
     MV_CC_SetEnumValue(dev_handle, "BinningVertical", 1);
 
-    qDebug() << "start cam:" << hex << (uint)ret;
+    // qDebug() << "start cam:" << hex << (uint)ret;
     return ret;
 }
 
@@ -99,12 +99,29 @@ void Cam::frame_size(bool read, int *w, int *h, int *inc_w, int *inc_h)
         MV_CC_GetIntValue(dev_handle, "Height", &int_value);
         *h = int_value.nCurValue;
         if (inc_h) *inc_h = int_value.nInc;
-        img = cv::Mat(*h, *w, CV_8UC1);
     }
     else {
         MV_CC_SetIntValue(dev_handle, "Width", *w);
         MV_CC_SetIntValue(dev_handle, "Height", *h);
+    }
+    MVCC_ENUMVALUE temp = {0};
+    MV_CC_GetPixelFormat(dev_handle, &temp);
+    switch (temp.nCurValue) {
+    case PixelType_Gvsp_RGB8_Packed:
+        img = cv::Mat(*h, *w, CV_8UC3);
+        break;
+    case PixelType_Gvsp_Mono8:
         img = cv::Mat(*h, *w, CV_8UC1);
+        break;
+    case PixelType_Gvsp_Mono10:
+    case PixelType_Gvsp_Mono12:
+    case PixelType_Gvsp_Mono10_Packed:
+    case PixelType_Gvsp_Mono12_Packed:
+        img = cv::Mat(*h, *w, CV_16UC1);
+        break;
+    default:
+        img = 0;
+        break;
     }
 }
 

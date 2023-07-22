@@ -33,6 +33,9 @@ Preferences::Preferences(QWidget *parent) :
     laser_width_offset(0),
     laser_grp(NULL),
     laser_on(0),
+    save_info(true),
+    custom_topleft_info(false),
+    continuous_capture(true),
     accu_base(1),
     gamma(1.2),
     low_in(0),
@@ -274,6 +277,8 @@ Preferences::Preferences(QWidget *parent) :
     ui->CUSTOM_INFO_EDT->setFont(temp_f);
     connect(ui->CUSTOM_INFO_CHK, &QCheckBox::stateChanged, this,
             [this](int arg1){ custom_topleft_info = arg1; ui->CUSTOM_INFO_EDT->setEnabled(arg1); });
+    connect(ui->CONTINUOUS_CAPTURE_CHK, &QCheckBox::stateChanged, this,
+            [this](int arg1){ continuous_capture = arg1; });
 //![4]
 
 //[5] set up ui for image proc

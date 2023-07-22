@@ -111,6 +111,7 @@ public:
     // 4 save options
     bool             save_info;
     bool             custom_topleft_info;
+    bool             continuous_capture;
 
     // 5 img proc
     float            accu_base;

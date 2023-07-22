@@ -76,7 +76,9 @@ void ImageIO::save_image_bmp(cv::Mat img, QString filename)
                 fwrite(&empty, 1, 1, f); // null
             }
         }
-        for(int i = img.rows - 1; i >= 0; i--) fwrite(img.data + i * img.step, 1, img.step, f);
+        static uint padding = 0;
+        int padding_size = (4 - img.step % 4) % 4;
+        for(int i = img.rows - 1; i >= 0; i--) fwrite(img.data + i * img.step, 1, img.step, f), fwrite(&padding, 1, padding_size, f);
         fclose(f);
     }
 }

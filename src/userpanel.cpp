@@ -37,7 +37,8 @@ UserPanel::UserPanel(QWidget *parent) :
     laser_settings(NULL),
     view_3d(NULL),
     aliasing(NULL),
-    fw{NULL},
+    fw_display{NULL},
+    secondary_display(NULL),
     calc_avg_option(5),
     trigger_by_software(false),
     curr_cam(NULL),
@@ -68,7 +69,7 @@ UserPanel::UserPanel(QWidget *parent) :
     aliasing_level(0),
     focus_direction(0),
     curr_laser_idx(-1),
-    display_option(1),
+    alt_display_option(0),
     device_type(0),
     device_on(false),
     start_grabbing(false),
@@ -114,7 +115,10 @@ UserPanel::UserPanel(QWidget *parent) :
     lang(0),
     tp(40),
     ptz_grp(NULL),
-    ptz_speed(16)
+    ptz_speed(16),
+    angle_h(0),
+    angle_v(0),
+    alt_ctrl_grp(NULL)
 {
     ui->setupUi(this);
     wnd = this;
@@ -129,11 +133,12 @@ UserPanel::UserPanel(QWidget *parent) :
 //    bg_painter.setRenderHint(QPainter::HighQualityAntialiasing);
 //    bg_painter.drawRoundRect(bg.rect(), 1, 2);
 //    setMask(bg);
-    fw[0] = new FloatingWindow();
-    fw[1] = new FloatingWindow();
+    fw_display[0] = new FloatingWindow();
+    fw_display[1] = new FloatingWindow();
     displays[0] = ui->SOURCE_DISPLAY;
-    displays[1] = fw[0]->get_display_widget();
-    displays[2] = fw[1]->get_display_widget();
+    displays[1] = fw_display[0]->get_display_widget();
+    displays[2] = fw_display[1]->get_display_widget();
+    secondary_display = new FloatingWindow();
 
     trans.load("zh_cn.qm");
 
@@ -358,19 +363,42 @@ UserPanel::UserPanel(QWidget *parent) :
 //    q_scan.push_back(-1);
 //    setup_stepping(0);
 
+    // TODO integrate main display capture/record here
+    alt_ctrl_grp = new QButtonGroup(this);
+    alt_ctrl_grp->addButton(ui->STOP_ALT1_BTN, 0);
+    alt_ctrl_grp->addButton(ui->STOP_ALT2_BTN, 1);
+    alt_ctrl_grp->addButton(ui->CAPTURE_ALT1_BTN, 2);
+    alt_ctrl_grp->addButton(ui->CAPTURE_ALT2_BTN, 3);
+    alt_ctrl_grp->addButton(ui->RECORD_ALT1_BTN, 4);
+    alt_ctrl_grp->addButton(ui->RECORD_ALT2_BTN, 5);
+    connect(alt_ctrl_grp, SIGNAL(buttonClicked(int)), this, SLOT(alt_display_control(int)));
+
     // set up display info (left bottom corner)
+    QStringList alt_options_str;
+    alt_options_str << "DATA" << "HIST" << "PTZ" << "ALT" << "ADDON";
+    ui->MISC_OPTION_1->addItems(alt_options_str);
+    ui->MISC_OPTION_2->addItems(alt_options_str);
+    ui->MISC_OPTION_1->setCurrentIndex(0);
+    ui->MISC_OPTION_2->setCurrentIndex(2);
+    connect(ui->MISC_OPTION_1, SIGNAL(selected()), ui->MISC_RADIO_1, SLOT(click()));
+    connect(ui->MISC_OPTION_2, SIGNAL(selected()), ui->MISC_RADIO_2, SLOT(click()));
+
     ui->DATA_EXCHANGE->document()->setMaximumBlockCount(200);
-    ui->COM_DATA_RADIO->click();
+//    ui->COM_DATA_RADIO->click();
     QFont temp_f(consolas);
     temp_f.setPixelSize(11);
     ui->DATA_EXCHANGE->setFont(temp_f);
     ui->FILE_PATH_EDIT->setFont(consolas);
 
     display_grp = new QButtonGroup(this);
-    display_grp->addButton(ui->COM_DATA_RADIO);
-    display_grp->addButton(ui->PLUGIN_RADIO);
-    display_grp->addButton(ui->PTZ_RADIO);
+//    display_grp->addButton(ui->COM_DATA_RADIO);
+//    display_grp->addButton(ui->PLUGIN_RADIO);
+//    display_grp->addButton(ui->PTZ_RADIO);
+    display_grp->addButton(ui->MISC_RADIO_1);
+    display_grp->addButton(ui->MISC_RADIO_2);
     display_grp->setExclusive(true);
+    ui->MISC_RADIO_1->setChecked(true);
+    ui->MISC_DISPLAY->setCurrentIndex(1);
     // TODO change continuous/trigger exclusive
 
     // connect status bar to the main window
@@ -408,7 +436,7 @@ UserPanel::UserPanel(QWidget *parent) :
     // process post-video stuff
     connect(this, &UserPanel::video_stopped, this,
             [this](){
-                vid_out[2].release();
+                vid_out_proc.release();
                 if (!temp_output_filename.isEmpty() && !output_filename.isEmpty()) {
                     std::thread t(UserPanel::move_to_dest, temp_output_filename.trimmed(), output_filename.trimmed());
                     t.detach();
@@ -496,7 +524,7 @@ UserPanel::UserPanel(QWidget *parent) :
     ui->RANGE_COM_EDIT->setEnabled(false);
     ui->LASER_COM_EDIT->setEnabled(false);
 
-    ui->PTZ_RADIO->hide();
+//    ui->PTZ_RADIO->hide();
 
     ui->ESTIMATED->hide();
     ui->EST_DIST->hide();
@@ -510,10 +538,10 @@ UserPanel::UserPanel(QWidget *parent) :
     ui->PARAMS_STATIC->move(10, ui->PARAMS_STATIC->y() + 60);
 
     ui->LASER_STATIC->hide();
-    ui->ALT_DISPLAY->setParent(ui->RIGHT);
-    ui->ALT_DISPLAY->setGeometry(10, 365, ui->IMG_PROC_STATIC->width(), ui->ALT_DISPLAY->height());
+    ui->MISC_DISPLAY_GRP->setParent(ui->RIGHT);
+    ui->MISC_DISPLAY_GRP->setGeometry(10, 365, ui->IMG_PROC_STATIC->width(), ui->MISC_DISPLAY_GRP->height());
     QSize temp = ui->DATA_EXCHANGE->size();
-    temp.setWidth(ui->ALT_DISPLAY->width());
+    temp.setWidth(ui->MISC_DISPLAY_GRP->width());
     ui->DATA_EXCHANGE->resize(temp);
 //    ui->HIST_DISPLAY->resize(temp);
     ui->LENS_STATIC->hide();
@@ -563,7 +591,7 @@ UserPanel::~UserPanel()
     delete view_3d;
     delete aliasing;
 
-    for (FloatingWindow* &w : fw) delete w;
+    for (FloatingWindow* &w: fw_display) delete w;
 
     ptr_tcu->quit_thread();
     ptr_inc->quit_thread();
@@ -737,6 +765,7 @@ int UserPanel::grab_thread_process(int *idx) {
             if (device_type == 1) q_frame_info.pop();
             updated = true;
             if (device_type == -1) q_img[thread_idx].push(img_mem[thread_idx].clone());
+//            cv::imwrite("../a.bmp", img_mem[thread_idx]);
         }
 
         image_mutex[thread_idx].lock();
@@ -1058,12 +1087,12 @@ int UserPanel::grab_thread_process(int *idx) {
             // map [0, 20] to [0, +inf) using tan
             ImageProc::brightness_and_contrast(modified_result[thread_idx], modified_result[thread_idx], tan((20 - ui->GAMMA_SLIDER->value()) / 40. * M_PI));
         }
-#if 0
+
         // display the gray-value histogram of the current grayscale image, or the distance histogram of the current 3D image
-        if (ui->ANALYSIS_RADIO->isChecked()) {
-            if (modified_result[display_idx].channels() == 1) {
-                uchar *img = modified_result[display_idx].data;
-                int step = modified_result[display_idx].step;
+        if (alt_display_option == 1) {
+            if (modified_result[thread_idx].channels() == 1) {
+                uchar *img = modified_result[thread_idx].data;
+                int step = modified_result[thread_idx].step;
                 memset(hist, 0, 256 * sizeof(uint));
                 for (int i = 0; i < hh; i++) for (int j = 0; j < ww; j++) hist[(img + i * step)[j]]++;
                 uint max = 0;
@@ -1078,9 +1107,9 @@ int UserPanel::grab_thread_process(int *idx) {
                 }
             }
             // TODO change to signal/slots
-            ui->PLUGIN_DISPLAY_1->setPixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(ui->PLUGIN_DISPLAY_1->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(ui->PLUGIN_DISPLAY_1->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         }
-#endif
+
         // FIXME possible crash when move scaled image to bottom-right corner
         // crop the region to display
 //        cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? ww + 104 : ww) / disp->width(), disp->display_region.br() * (image_3d ? ww + 104 : ww) / disp->width());
@@ -1138,6 +1167,14 @@ int UserPanel::grab_thread_process(int *idx) {
 //        ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         // use signal->slot instead of directly call
         disp->emit set_pixmap(QPixmap::fromImage(stream.scaled(disp->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+
+        if (*idx == 0 && ui->DUAL_DISPLAY_CHK->isChecked()) {
+            cv::Mat ori_img_display;
+            Display *ori_display = secondary_display->get_display_widget();
+            cv::resize(img_mem[thread_idx], ori_img_display, cv::Size(ori_display->width(), ori_display->height()), 0, 0, cv::INTER_AREA);
+            stream = QImage(ori_img_display.data, ori_img_display.cols, ori_img_display.rows, ori_img_display.step, is_color[thread_idx] ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+            ori_display->emit set_pixmap(QPixmap::fromImage(stream).scaled(ori_display->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        }
 //        qDebug() << QDateTime::currentDateTime().toString("ss.zzz");
 
         // process scan
@@ -1169,12 +1206,12 @@ int UserPanel::grab_thread_process(int *idx) {
 
         // image write / video record
         if (updated && save_original[thread_idx]) {
-            save_to_file(false);
-            if (device_type == -1) save_original[thread_idx] = 0;
+            save_to_file(false, thread_idx);
+            if (device_type == -1 || !pref->continuous_capture || *idx) save_original[thread_idx] = 0;
         }
         if (updated && save_modified[thread_idx]) {
-            save_to_file(true);
-            if (device_type == -1) save_modified[thread_idx] = 0;
+            save_to_file(true, thread_idx);
+            if (device_type == -1 || !pref->continuous_capture || *idx) save_modified[thread_idx] = 0;
         }
         if (updated && record_original[thread_idx]) {
             cv::Mat temp = img_mem[thread_idx].clone();
@@ -1183,7 +1220,9 @@ int UserPanel::grab_thread_process(int *idx) {
                 cv::putText(temp, info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
             if (is_color[thread_idx]) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
-            vid_out[0].write(temp);
+            // inc by 1 because main display uses two videowriter
+            if (*idx) vid_out[thread_idx + 1].write(temp);
+            else      vid_out[0].write(temp);
         }
         if (updated && record_modified[thread_idx]) {
             cv::Mat temp = modified_result[thread_idx].clone();
@@ -1201,7 +1240,9 @@ int UserPanel::grab_thread_process(int *idx) {
                 }
             }
             if (is_color[thread_idx] || image_3d[thread_idx]) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
-            vid_out[1].write(temp);
+            // inc by 1 because main display uses two videowriter
+            if (*idx) vid_out[thread_idx + 1].write(temp);
+            else      vid_out[1].write(temp);
         }
 
         if (updated) prev_img = img_mem[thread_idx].clone();
@@ -1265,346 +1306,6 @@ void UserPanel::move_to_dest(QString src, QString dst)
 {
     qDebug() << src << "->" << dst;
     QFile::rename(src, dst);
-}
-
-void UserPanel::save_image_bmp(cv::Mat img, QString filename)
-{
-//    QPixmap::fromImage(QImage(img.data, img.cols, img.rows, img.step, img.channels() == 3 ? QImage::Format_RGB888 : QImage::Format_Indexed8)).save(filename + "_qt", "BMP", 100);
-
-    if (img.channels() == 3) cv::cvtColor(img, img, cv::COLOR_BGRA2RGB);
-/*
-    // using qt file io
-    QFile f(filename);
-    f.open(QIODevice::WriteOnly);
-    if (f.isOpen()) {
-//        qDebug() << filename;
-        QDataStream out(&f);
-        out.setByteOrder(QDataStream::LittleEndian);
-        quint32_le offset((img.channels() == 1 ? 4 * (1 << img.channels() * 8) : 0) + 54);
-        // bmp file header
-        out << (quint16_le)'MB' << (quint32_le)(img.total() * img.channels() + offset) << (quint16_le)0 << (quint16_le)0 << offset;
-        //  windows signature,  total file size,                                       reserved1,       reserved2,       offset to data
-        // DIB header
-        out << (quint32_le)40 << (quint32_le)img.cols << (quint32_le)img.rows << (quint16_le)1 << (quint16_le)(img.channels() * 8) << (quint32_le)0 << (quint32_le)(img.total() * img.channels()) << (quint32_le)0 << (quint32_le)0 << (quint32_le)0 << (quint32_le)0;
-        //  dib header size,  width,                  height,                 planes,          bit per pixel,                      compression,     image size,                                   x pixels in meter, y,             color important, color used
-        // color table
-        if (img.channels() == 1) {
-            for (int i = 0; i < 1 << img.channels() * 8; i++) out << (quint8)i << (quint8)i << (quint8)i << (quint8)0;
-        //                                                        rgb blue,    rgb green,   rgb red,     reserved
-        }
-        for(int i = img.rows - 1; i >= 0; i--) f.write((char*)img.data + i * img.step, img.step);
-        f.close();
-    }
-*/
-    // using std file io
-    FILE *f = fopen(filename.toLocal8Bit().constData(), "wb");
-    if (f) {
-        static ushort signature = 'MB';
-        fwrite(&signature, 2, 1, f);
-        uint offset = (img.channels() == 1 ? 4 * (1 << img.channels() * 8) : 0) + 54;
-        uint file_size = img.total() * img.channels() + offset;
-        fwrite(&file_size, 4, 1, f);
-        static ushort reserved1 = 0, reserved2 = 0;
-        fwrite(&reserved1, 2, 1, f);
-        fwrite(&reserved2, 2, 1, f);
-        fwrite(&offset, 4, 1, f);
-        static uint dib_size = 40;
-        fwrite(&dib_size, 4, 1, f);
-        uint w = img.cols, h = img.rows;
-        fwrite(&w, 4, 1, f);
-        fwrite(&h, 4, 1, f);
-        static ushort planes = 1;
-        fwrite(&planes, 2, 1, f);
-        ushort bit_per_pixel = 8 * img.channels();
-        fwrite(&bit_per_pixel, 2, 1, f);
-        static uint compression = 0;
-        fwrite(&compression, 4, 1, f);
-        uint img_size = img.total() * img.channels();
-        fwrite(&img_size, 4, 1, f);
-        static uint pixels_in_meter_x = 0, pixels_in_meter_y = 0;
-        fwrite(&pixels_in_meter_x, 4, 1, f);
-        fwrite(&pixels_in_meter_y, 4, 1, f);
-        static uint colors_important = 0, colors_used = 0;
-        fwrite(&colors_important, 4, 1, f);
-        fwrite(&colors_used, 4, 1, f);
-
-        // color table
-        static uchar empty = 0;
-        if (img.channels() == 1) {
-            for (int i = 0; i < 1 << img.channels() * 8; i++) {
-                fwrite(&i, 1, 1, f);     // r
-                fwrite(&i, 1, 1, f);     // g
-                fwrite(&i, 1, 1, f);     // b
-                fwrite(&empty, 1, 1, f); // null
-            }
-        }
-        for(int i = img.rows - 1; i >= 0; i--) fwrite(img.data + i * img.step, 1, img.step, f);
-        fclose(f);
-    }
-}
-
-void UserPanel::save_image_tif(cv::Mat img, QString filename)
-{
-    uint32_t w = img.cols, h = img.rows, channel = img.channels();
-    uint32_t depth = 8 * (img.depth() / 2 + 1);
-    FILE *f = fopen(filename.toLocal8Bit().constData(), "wb");
-    static uint16_t type_short = 3, type_long = 4, type_fraction = 5;
-    static uint32_t count_1 = 1, count_3 = 3;
-    static uint32_t TWO = 2;
-    static uint32_t next_ifd_offset = 0;
-    uint64_t block_size = w * channel, sum = h * block_size * depth / 8;
-    uint i;
-
-    // Offset=w*h*d + 8(eg:Img[1000][1000][3] --> 3000008)
-    // RGB  Color:W H BitsPerSample Compression Photometric StripOffset Orientation SamplePerPixle RowsPerStrip StripByteCounts PlanarConfiguration
-    // Gray Color:W H BitsPerSample Compression Photometric StripOffset Orientation SamplePerPixle RowsPerStrip StripByteCounts XResolution YResoulution PlanarConfiguration ResolutionUnit
-    // DE_N ID:   0 1 2             3           4           5           6           7              8            9               10          11           12                  13
-
-    fseek(f, 0, SEEK_SET);
-    static uint16_t endian = 'II';
-    fwrite(&endian, 2, 1, f);
-    static uint16_t tiff_magic_number = 42;
-    fwrite(&tiff_magic_number, 2, 1, f);
-    uint32_t ifd_offset = sum + 8; // 8 (IFH size)
-    fwrite(&ifd_offset, 4, 1, f);
-
-    // Insert the image data
-    fwrite(img.data, 2, h * block_size, f);
-
-//    fseek(f, ifd_offset, SEEK_SET);
-    static uint16_t num_de = 14;
-    fwrite(&num_de, 2, 1, f);
-    // 256 image width
-    static uint16_t tag_w = 256;
-    fwrite(&tag_w, 2, 1, f);
-    fwrite(&type_short, 2, 1, f);
-    fwrite(&count_1, 4, 1, f);
-    fwrite(&w, 4, 1, f);
-
-    // 257 image height
-    static uint16_t tag_h = 257;
-    fwrite(&tag_h, 2, 1, f);
-    fwrite(&type_short, 2, 1, f);
-    fwrite(&count_1, 4, 1, f);
-    fwrite(&h, 4, 1, f);
-
-    // 258 bits per sample
-    static uint16_t tag_bits_per_sample = 258;
-    fwrite(&tag_bits_per_sample, 2, 1, f);
-    fwrite(&type_short, 2, 1, f);
-    switch (channel) {
-    case 1: {
-        fwrite(&count_1, 4, 1, f);
-        fwrite(&depth, 4, 1, f);
-        break;
-    }
-    case 3: {
-        fwrite(&count_3, 4, 1, f);
-        // 8 (IFH size) + (2 + 14 * 12 + 4) (0th IFD size: 2->size of the num of DE = 14, 12->size of one DE, 4->size of offset of next IFD) = 182
-        uint32_t tag_bits_per_sample_offset = sum + 182;
-        fwrite(&tag_bits_per_sample_offset, 4, 1, f);
-        break;
-    }
-    default: break;
-    }
-
-    // 259 compression
-    static uint16_t tag_compression = 259;
-    fwrite(&tag_compression, 2, 1, f);
-    fwrite(&type_short, 2, 1, f);
-    fwrite(&count_1, 4, 1, f);
-    fwrite(&count_1, 4, 1, f); // use 1 for uncompressed
-
-    // 262 photometric interpretation
-    static uint16_t tag_photometric_interpretation = 262;
-    fwrite(&tag_photometric_interpretation, 2, 1, f);
-    fwrite(&type_short, 2, 1, f);
-    fwrite(&count_1, 4, 1, f);
-    fwrite(channel == 1 ? &count_1 : &TWO, 4, 1, f); // use 1 for black is zero, use 2 for RGB
-
-    // 273 strip offsets
-    static uint16_t tag_strip_offsets = 273;
-    fwrite(&tag_strip_offsets, 2, 1, f);
-    fwrite(&type_long, 2, 1, f);
-/*  treat every row as a single strip
-    fwrite(&h, 4, 1, f);
-    // 1 channel
-    // 8 (IFH size) + (2 + 14 * 12 + 4) (0th IFD size: 2->size of the num of DE = 14, 12->size of one DE, 4->size of offset of next IFD) = 182
-    // 3 channels
-    // 182 (bits per sample offsets) + 3 * 2 (3 channels * 2 bytes) = 188
-    uint tag_strip_offsets_offset = channel == 1 ? sum + 182 : sum + 188;
-    fwrite(&tag_strip_offsets_offset, 4, 1, f);
-*/
-    fwrite(&count_1, 4, 1, f);
-    static uint32_t strip_offset = 8;
-    fwrite(&strip_offset, 4, 1, f);
-
-    // 274 orientation
-    static uint16_t tag_orientation = 274;
-    fwrite(&tag_orientation, 2, 1, f);
-    fwrite(&type_short, 2, 1, f);
-    fwrite(&count_1, 4, 1, f);
-    fwrite(&count_1, 4, 1, f); // 1 = The 0th row represents the visual top of the image, and the 0th column represents the visual left-hand side.
-
-    // 277 samples per pixel
-    static uint16_t tag_samples_per_pixel = 277;
-    fwrite(&tag_samples_per_pixel, 2, 1, f);
-    fwrite(&type_short, 2, 1, f);
-    fwrite(&count_1, 4, 1, f);
-    fwrite(channel == 1 ? &count_1 : &count_3, 4, 1, f); // use 1 for grayscale image, use 3 for 3-channel RGB image
-
-    // 278 rows per strip
-    static uint16_t tag_rows_per_strip = 278;
-    fwrite(&tag_rows_per_strip, 2, 1, f);
-    fwrite(&type_short, 2, 1, f);
-    fwrite(&count_1, 4, 1, f);
-    fwrite(&h, 4, 1, f); // all rows in one strip
-
-    // 279 strip byte counts
-    static uint16_t tag_strip_byte_counts = 279;
-    fwrite(&tag_strip_byte_counts, 2, 1, f);
-    fwrite(&type_long, 2, 1, f);
-/*  treat every row as a single strip
-    fwrite(&h, 4, 1, f);
-    // 1 channel
-    // 182 (offset of strip offsets), 4 * h (length of tag 273, strip_offsets)
-    // 3 channels
-    // 188 (offset of strip offsets), 4 * h (length of tag 273, strip_offsets)
-    uint tag_strip_byte_counts_offset = channel == 1 ? sum + 182 + 4 * h : sum + 188 + 4 * h;
-    fwrite(&tag_strip_byte_counts_offset, 4, 1, f);
-*/
-    fwrite(&count_1, 4, 1, f);
-    fwrite(&sum, 4, 1, f);
-
-    // 282 X resolution
-    static uint16_t tag_x_resolution = 282;
-    fwrite(&tag_x_resolution, 2, 1, f);
-    fwrite(&type_fraction, 2, 1, f);
-    fwrite(&count_1, 4, 1, f);
-/*  treat every row as a single strip
-    uint tag_x_resolution_offset = channel == 1 ? sum + 182 + 8 * h : sum + 188 + 8 * h;
-    fwrite(&tag_x_resolution_offset, 4, 1, f);
-*/
-    uint32_t tag_x_resolution_offset = channel == 1 ? sum + 182 : sum + 188;
-    fwrite(&tag_x_resolution_offset, 4, 1, f);
-
-    // 283 Y resolution
-    static uint16_t tag_y_resolution = 283;
-    fwrite(&tag_y_resolution, 2, 1, f);
-    fwrite(&type_fraction, 2, 1, f);
-    fwrite(&count_1, 4, 1, f);
-/*  treat every row as a single strip
-    uint tag_y_resolution_offset = channel == 1 ? sum + 190 + 8 * h : sum + 196 + 8 * h;
-    fwrite(&tag_y_resolution_offset, 4, 1, f);
-*/
-    uint32_t tag_y_resolution_offset = channel == 1 ? sum + 190 : sum + 196;
-    fwrite(&tag_y_resolution_offset, 4, 1, f);
-
-    // 284 planar configuration
-    static uint16_t tag_planar_configuration = 284;
-    fwrite(&tag_planar_configuration, 2, 1, f);
-    fwrite(&type_short, 2, 1, f);
-    fwrite(&count_1, 4, 1, f);
-    fwrite(&count_1, 4, 1, f); // use 1 for chunky format
-
-    // 296 resolution unit
-    static uint16_t tag_resolution_unit = 296;
-    fwrite(&tag_resolution_unit, 2, 1, f);
-    fwrite(&type_short, 2, 1, f);
-    fwrite(&count_1, 4, 1, f);
-    fwrite(&TWO, 4, 1, f); // use 2 for inch
-
-    fwrite(&next_ifd_offset, 4, 1, f);
-
-    // (rgb only) value for tag 258, offset: sum + 182
-    if (channel == 3) for(i = 0; i < 3; i++) fwrite(&depth, 2, 1, f);
-
-/*  treat every row as a single strip
-    // value for tag 273, offset: sum + 182 (gray), sum + 188 (rgb)
-    uint strip_offset = 8;
-    for(i = 0; i < h; i++, strip_offset += block_size) fwrite(&strip_offset, 4, 1, f);
-
-    // value for tag 279, offset: sum + 182 + 4 * h (gray), sum + 188 + 4 * h (rgb)
-    for(i = 0; i < h; i++) fwrite(&block_size, 4, 1, f);
-*/
-
-    // value for tag 282, offset: sum + 182 + 8 * h (gray), sum + 188 + 8 * h (rgb)
-    static uint32_t res_physical = 1, res_pixel = 72;
-    fwrite(&res_pixel, 4, 1, f); // fraction w-pixel
-    fwrite(&res_physical, 4, 1, f); // denominator PhyWidth-inch
-
-    // value for tag 283, offset: sum + 190 + 8 * h (gray), sum + 196 + 8 * h (rgb)
-    fwrite(&res_pixel, 4, 1, f); // fraction h-pixel
-    fwrite(&res_physical,4, 1, f); // denominator PhyHeight-inch
-
-    fclose(f);
-}
-
-bool UserPanel::load_image_tif(cv::Mat &img, QString filename)
-{
-    // TODO test motorola tiff read function
-    static uint16_t byte_order;
-    static bool is_big_endian;
-    static uint32_t ifd_offset;
-    static uint16_t num_de;
-    static uint16_t tag_number, tag_data_type;
-    static uint32_t tag_data_num, tag_data;
-    static int width, height, depth;
-    FILE *f = fopen(filename.toLocal8Bit().constData(), "rb");
-
-    // tiff header
-    fseek(f, 0, SEEK_SET);
-    fread(&byte_order, 2, 1, f);
-    is_big_endian = byte_order == 'MM';
-    fread(&ifd_offset, 2, 1, f); // magic number 42
-    fread(&ifd_offset, 4, 1, f);
-    if (is_big_endian) ifd_offset = qFromBigEndian(ifd_offset);
-
-    // skip image data before fetching image info
-    fseek(f, ifd_offset, SEEK_SET);
-//    qDebug() << "ifd_offset " << ifd_offset;
-
-    // IFH data
-    fread(&num_de, 2, 1, f);
-    if (is_big_endian) num_de = qFromBigEndian(num_de);
-    for (uint16_t c = 0; c < num_de; c++) {
-        // get tag #
-        fread(&tag_number, 2, 1, f);
-        if (is_big_endian) tag_number = qFromBigEndian(tag_number);
-        // get tag type
-        fread(&tag_data_type, 2, 1, f);
-        if (is_big_endian) tag_data_type = qFromBigEndian(tag_data_type);
-        // get tag data num
-        fread(&tag_data_num, 4, 1, f);
-        if (is_big_endian) tag_data_num = qFromBigEndian(tag_data_num);
-        // get tag data (or ptr offset)
-        fread(&tag_data, 4, 1, f);
-        if (is_big_endian) tag_data = qFromBigEndian(tag_data) / (tag_data_type == 3 ? 1 << 16 : 1);
-
-//        qDebug() << tag_number << tag_data_type << tag_data_num << hex << tag_data;
-        switch (tag_number) {
-        case 256: width = tag_data; break;
-        case 257: height = tag_data; break;
-        case 258:
-            if (tag_data_num != 1) return -1;
-            depth = tag_data;
-            break;
-        case 259:
-            if (tag_data != 1) return -1;
-            break;
-        case 279:
-            if (width * height * depth / 8 != tag_data) return -1;
-            break;
-        default: break;
-        }
-    }
-
-    img = cv::Mat(height, width, depth == 8 ? CV_8U : CV_16U);
-    fseek(f, 8, SEEK_SET);
-    fread(img.data, 2, height * width, f);
-    if (is_big_endian) img = (img & 0xFF00) / (1 << 8) + (img & 0x00FF) * (1 << 8);
-
-    return 0;
 }
 
 void UserPanel::set_theme()
@@ -1699,7 +1400,8 @@ void UserPanel::closeEvent(QCloseEvent *event)
     pref->reject();
     laser_settings->reject();
     scan_config->reject();
-    for (FloatingWindow* &w: fw) w->close();
+    for (FloatingWindow* &w: fw_display) w->close();
+    secondary_display->close();
     if (QFile::exists("HQVSDK.xml")) QFile::remove("HQVSDK.xml");
 }
 
@@ -1767,13 +1469,13 @@ void UserPanel::enable_controls(bool cam_rdy) {
     ui->CENTER_CHECK->setEnabled(start_grabbing);
 }
 
-void UserPanel::save_to_file(bool save_result) {
+void UserPanel::save_to_file(bool save_result, int idx) {
 //    QString temp = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"),
 //            dest = QString(save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), save_result ? modified_result : img_mem);
 //    QFile::rename(temp, dest);
 
-    cv::Mat *temp = save_result ? &modified_result[0] : &img_mem[0];
+    cv::Mat *temp = save_result ? &modified_result[idx] : &img_mem[idx];
 //    QPixmap::fromImage(QImage(temp->data, temp->cols, temp->rows, temp->step, temp->channels() == 3 ? QImage::Format_RGB888 : QImage::Format_Indexed8)).save(save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", "BMP", 100);
 
 //    std::thread t_save(UserPanel::save_image_bmp, *temp, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
@@ -1789,20 +1491,20 @@ void UserPanel::save_to_file(bool save_result) {
         QString dt = QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz");
         cv::Mat temp_clone = temp->clone();
         if (pref->split) {
-            if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp_clone(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp"))) emit task_queue_full();
-            if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp_clone(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp"))) emit task_queue_full();
-            if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp_clone(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp"))) emit task_queue_full();
-            if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp_clone(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp"))) emit task_queue_full();
+            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, temp_clone(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp"))) emit task_queue_full();
+            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, temp_clone(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp"))) emit task_queue_full();
+            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, temp_clone(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp"))) emit task_queue_full();
+            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, temp_clone(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp"))) emit task_queue_full();
         }
-        if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp_clone, save_location + "/res_bmp/" + dt + ".bmp"))) emit task_queue_full();
+        if (!tp.append_task(std::bind(ImageIO::save_image_bmp, temp_clone, save_location + "/res_bmp/" + dt + ".bmp"))) emit task_queue_full();
     } else {
         switch (pixel_depth[0]) {
         case  8:
-            if (!tp.append_task(std::bind(UserPanel::save_image_bmp, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
+            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, temp->clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
         case 10:
         case 12:
         case 16:
-            if (!tp.append_task(std::bind(UserPanel::save_image_tif, temp->clone() * (1 << (16 - pixel_depth[0])), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
+            if (!tp.append_task(std::bind(ImageIO::save_image_tif, temp->clone() * (1 << (16 - pixel_depth[0])), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
         default: break;
         }
     }
@@ -1817,7 +1519,7 @@ void UserPanel::save_scan_img() {
     if (scan_config->capture_scan_ori) {
 //        std::thread t_ori(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
 //        t_ori.detach();
-        tp.append_task(std::bind(save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
+        tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
     }
 //    dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), modified_result);
@@ -1826,7 +1528,7 @@ void UserPanel::save_scan_img() {
     if (scan_config->capture_scan_res) {
 //        std::thread t_res(save_image_bmp, modified_result, save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
 //        t_res.detach();
-        tp.append_task(std::bind(save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
+        tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
     }
 }
 
@@ -1907,10 +1609,6 @@ void UserPanel::on_START_BUTTON_clicked()
     device_on = true;
     enable_controls(true);
 
-    static struct main_ui_info cam_union;
-    cam_union = {&q_frame_info, q_img};
-    curr_cam->set_frame_callback(&cam_union);
-
     on_SET_PARAMS_BUTTON_clicked();
     ui->GAIN_SLIDER->setMinimum(0);
     ui->GAIN_SLIDER->setMaximum(curr_cam->device_type == 1 ? 23 : 480);
@@ -1929,29 +1627,6 @@ void UserPanel::on_START_BUTTON_clicked()
     ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
     ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
 
-    // TODO complete BayerGB process & display
-    curr_cam->pixel_type(true, &pixel_format[0]);
-    switch (pixel_format[0]) {
-    case PixelType_Gvsp_Mono8:       is_color[0] = false; update_pixel_depth( 8); break;
-    case PixelType_Gvsp_Mono10:      is_color[0] = false; update_pixel_depth(10); break;
-    case PixelType_Gvsp_Mono12:      is_color[0] = false; update_pixel_depth(12); break;
-    case PixelType_Gvsp_BayerGB8:    is_color[0] =  true; update_pixel_depth( 8); break;
-    case PixelType_Gvsp_RGB8_Packed: is_color[0] =  true; update_pixel_depth( 8); break;
-    default:                         is_color[0] = false; update_pixel_depth( 8); break;
-    }
-
-    // adjust display size according to frame size
-    curr_cam->frame_size(true, &w[0], &h[0]);
-    status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
-    qInfo("frame w: %d, h: %d", w[0], h[0]);
-//    QRect region = ui->SOURCE_DISPLAY->geometry();
-//    region.setHeight(ui->SOURCE_DISPLAY->width() * h / w);
-//    ui->SOURCE_DISPLAY->setGeometry(region);
-//    qDebug("display region x: %d, y: %d, w: %d, h: %d\n", region.x(), region.y(), region.width(), region.height());
-//    ui->SOURCE_DISPLAY->update_roi(QPoint());
-    QResizeEvent e(this->size(), this->size());
-    resizeEvent(&e);
-
 //    ui->TITLE->prog_settings->set_pixel_format(0);
     pref->set_pixel_format(0);
     emit device_connection_status_changed(0, QStringList());
@@ -1965,7 +1640,7 @@ void UserPanel::on_SHUTDOWN_BUTTON_clicked()
     ui->FRAME_AVG_CHECK->setChecked(false);
     ui->IMG_3D_CHECK->setChecked(false);
     on_ENUM_BUTTON_clicked();
-    QTimer::singleShot(10, this, SLOT(clean()));
+    QTimer::singleShot(100, this, SLOT(clean()));
     emit device_connection_status_changed(0, QStringList());
 }
 
@@ -2010,12 +1685,26 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
 //    if (!device_on || start_grabbing || curr_cam == NULL) return;
     if (!device_on || curr_cam == NULL) return;
 
+    static struct main_ui_info cam_union = {&q_frame_info, q_img + 0};
+    curr_cam->set_frame_callback(&cam_union);
+
+    // TODO complete BayerGB process & display
+    curr_cam->pixel_type(true, &pixel_format[0]);
+    switch (pixel_format[0]) {
+    case PixelType_Gvsp_Mono8:       is_color[0] = false; update_pixel_depth( 8); break;
+    case PixelType_Gvsp_Mono10:      is_color[0] = false; update_pixel_depth(10); break;
+    case PixelType_Gvsp_Mono12:      is_color[0] = false; update_pixel_depth(12); break;
+    case PixelType_Gvsp_BayerGB8:    is_color[0] =  true; update_pixel_depth( 8); break;
+    case PixelType_Gvsp_RGB8_Packed: is_color[0] =  true; update_pixel_depth( 8); break;
+    default:                         is_color[0] = false; update_pixel_depth( 8); break;
+    }
+
     gain_analog_edit = ui->GAIN_EDIT->text().toFloat();
     ptr_tcu->duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
     ptr_tcu->ccd_freq = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
 
     int main_thread_idx = display_thread_idx[0];
-    if (display_thread_idx[0] != -1) main_thread_idx = 0;
+    if (display_thread_idx[0] == -1) main_thread_idx = 0;
 
     if (grab_image[main_thread_idx] || h_grab_thread[main_thread_idx]) {
         grab_image[main_thread_idx] = false;
@@ -2025,6 +1714,19 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
         h_grab_thread[main_thread_idx] = NULL;
         display_thread_idx[0] = -1;
     }
+
+    // adjust display size according to frame size
+    curr_cam->frame_size(true, &w[0], &h[0]);
+    status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
+    qInfo("frame w: %d, h: %d", w[0], h[0]);
+    //    QRect region = ui->SOURCE_DISPLAY->geometry();
+    //    region.setHeight(ui->SOURCE_DISPLAY->width() * h / w);
+    //    ui->SOURCE_DISPLAY->setGeometry(region);
+    //    qDebug("display region x: %d, y: %d, w: %d, h: %d\n", region.x(), region.y(), region.width(), region.height());
+    //    ui->SOURCE_DISPLAY->update_roi(QPoint());
+    QResizeEvent e(this->size(), this->size());
+    resizeEvent(&e);
+    secondary_display->resize_display(w[0], h[0]);
 
     grab_image[0] = true;
 
@@ -2076,7 +1778,7 @@ void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
 
     start_grabbing = false;
     ui->SOURCE_DISPLAY->is_grabbing = false;
-    QTimer::singleShot(10, this, SLOT(clean()));
+    QTimer::singleShot(100, this, SLOT(clean()));
     enable_controls(device_type);
     if (device_type == -1) ui->ENUM_BUTTON->click();
 //    if (device_type == -2) ui->ENUM_BUTTON->click(), video_input->stop(), video_surface->stop();
@@ -2089,10 +1791,11 @@ void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
 void UserPanel::on_SAVE_BMP_BUTTON_clicked()
 {
     if (!QDir(save_location + "/ori_bmp").exists()) QDir().mkdir(save_location + "/ori_bmp");
-    if (device_type == -1) save_original[0] = 1;
+    if (device_type == -1 || !pref->continuous_capture) save_original[0] = 1;
     else{
         save_original[0] ^= 1;
         ui->SAVE_BMP_BUTTON->setText(save_original[0] ? tr("Stop") : tr("ORI"));
+        pref->ui->CONTINUOUS_CAPTURE_CHK->setEnabled(!save_original[0]);
     }
 }
 
@@ -2100,7 +1803,7 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
 {
     static QString res_avi;
 //    cv::imwrite(QString(save_location + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".jpg").toLatin1().data(), modified_result);
-    if (record_modified) {
+    if (record_modified[0]) {
 //        curr_cam->stop_recording(0);
         image_mutex[0].lock();
         vid_out[1].release();
@@ -2368,8 +2071,13 @@ void UserPanel::reset_custom_3d_params()
     pref->ui->CUSTOM_3D_GW_EDT->setText(QString::number((int)std::round(ptr_tcu->gate_width_a)));
 }
 
+struct frame_process_parameters {
+    cv::VideoWriter *out;
+    int enhance_option;
+};
+
 // TODO implement function to prompt for output filename and video conversion
-void UserPanel::save_current_video()
+void UserPanel::export_current_video()
 {
     if (device_type != -2 || current_video_filename.isEmpty()) return;
     output_filename = QFileDialog::getSaveFileName(this, tr("Name the Output Video"), save_location,
@@ -2380,13 +2088,40 @@ void UserPanel::save_current_video()
 
     srand(time(NULL));
     temp_output_filename = TEMP_SAVE_LOCATION + "/" + QString::number(rand(), 16) + ".mp4";
-    vid_out[2].open(temp_output_filename.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit, cv::Size(w[0], h[0]), true);
+    vid_out_proc.open(temp_output_filename.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit, cv::Size(w[0], h[0]), true);
+    // TODO update enhance function parameters; add support for frame average
+    int enhance_option = 0;
+    if (ui->IMG_ENHANCE_CHECK->isChecked()) enhance_option = ui->ENHANCE_OPTIONS->currentIndex();
+    struct frame_process_parameters *params = new struct frame_process_parameters;
+    params->out = &vid_out_proc;
+    params->enhance_option = enhance_option;
     load_video_file(current_video_filename, false,
                     [](cv::Mat &frame, void *ptr){
+                        cv::Mat temp = frame.clone();
+                        switch (((struct frame_process_parameters*)ptr)->enhance_option) {
+                        case 1: ImageProc::hist_equalization(temp, temp); break;
+                        case 2: {
+                            cv::Mat kernel = (cv::Mat_<float>(3, 3) << 0, -1, 0, 0, 5, 0, 0, -1, 0);
+                            cv::filter2D(temp, temp, CV_8U, kernel);
+                            break;
+                        }
+                        case 3: ImageProc::plateau_equl_hist(temp, temp, 4); break;
+                        case 4: ImageProc::accumulative_enhance(temp, temp, 1); break;
+                        case 5: break;
+                        case 6:
+                            ImageProc::adaptive_enhance(temp, temp, 0, 0.05, 0, 1, 1.2); break;
+                        case 7:
+                            temp = ~temp;
+                            ImageProc::haze_removal(temp, temp, 7, 0.95, 0.1, 60, 0.01);
+                            temp = ~temp;
+                            break;
+                        case 8: ImageProc::haze_removal(temp, temp, 7, 0.95, 0.1, 60, 0.01); break;
+                        default: break;
+                        }
                         cv::Mat frame_swapped;
-                        cv::cvtColor(frame, frame_swapped, cv::COLOR_RGB2BGR);
-                        (*(cv::VideoWriter*)ptr).write(frame_swapped);
-    }, vid_out + 2, false);
+                        cv::cvtColor(temp, frame_swapped, cv::COLOR_RGB2BGR);
+                        ((struct frame_process_parameters*)ptr)->out->write(frame_swapped);
+                    }, params, 0, false);
 }
 
 void UserPanel::set_tcu_type(int idx)
@@ -3626,10 +3361,12 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
         break;
     case Qt::AltModifier:
         switch (event->key()) {
+        case Qt::Key_0:
+            secondary_display->show(); break;
         case Qt::Key_1:
-            fw[0]->show(); break;
+            fw_display[0]->show(); break;
         case Qt::Key_2:
-            fw[1]->show(); break;
+            fw_display[1]->show(); break;
         case Qt::Key_3:
         case Qt::Key_4:
 //            goto_laser_preset(1 << (event->key() - Qt::Key_1));
@@ -3928,7 +3665,7 @@ bool UserPanel::load_image_file(QString filename, bool init)
     if (filename.endsWith(".tif") || filename.endsWith(".tiff")) tiff = true;
 
     if (tiff) {
-        if (UserPanel::load_image_tif(mat_temp, filename)) return false;
+        if (ImageIO::load_image_tif(mat_temp, filename)) return false;
     }
     else {
         if (!qimage_temp.load(filename)) return false;
@@ -4097,6 +3834,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
         long long delay;
         QElapsedTimer elapsed_timer;
         int result;
+        uint frame_count = 0;
         while (grab_image[display_idx]) {
             start_time = time(NULL);
             if ((result = av_read_frame(format_context, &packet)) < 0) {
@@ -4141,6 +3879,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                     cv_frame.data = (format_gray ? frame_filter : frame_result)->data[0];
 
                     if (process_frame) (*process_frame)(cv_frame, ptr);
+//                    qInfo() << filename << frame_count++;
 //                    img_q.push(cv_frame.clone());
 
                     av_frame_unref(frame);
@@ -4243,7 +3982,7 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
     image_mutex[display_idx].unlock();
 
 
-    if (display_idx) fw[display_idx - 1]->resize_display();
+    if (display_idx) fw_display[display_idx]->resize_display(width, height);
     else {
         QResizeEvent e(this->size(), this->size());
         resizeEvent(&e);
@@ -4424,10 +4163,11 @@ void UserPanel::on_FRAME_AVG_CHECK_stateChanged(int arg1)
 void UserPanel::on_SAVE_RESULT_BUTTON_clicked()
 {
     if (!QDir(save_location + "/res_bmp").exists()) QDir().mkdir(save_location + "/res_bmp");
-    if (device_type == -1) save_modified[0] = 1;
+    if (device_type == -1 || !pref->continuous_capture) save_modified[0] = 1;
     else{
         save_modified[0] ^= 1;
         ui->SAVE_RESULT_BUTTON->setText(save_modified[0] ? tr("Stop") : tr("RES"));
+        pref->ui->CONTINUOUS_CAPTURE_CHK->setEnabled(!save_modified[0]);
     }
 }
 
@@ -4540,6 +4280,32 @@ void UserPanel::on_HIDE_BTN_clicked()
     resizeEvent(&e);
 }
 
+void UserPanel::on_MISC_RADIO_1_clicked()
+{
+    alt_display_option = ui->MISC_OPTION_1->currentIndex() + 1;
+    ui->MISC_DISPLAY->setCurrentIndex(alt_display_option);
+}
+
+void UserPanel::on_MISC_RADIO_2_clicked()
+{
+    alt_display_option = ui->MISC_OPTION_2->currentIndex() + 1;
+    ui->MISC_DISPLAY->setCurrentIndex(alt_display_option);
+}
+
+void UserPanel::on_MISC_OPTION_1_currentIndexChanged(int index)
+{
+    alt_display_option = index + 1;
+    ui->MISC_DISPLAY->setCurrentIndex(alt_display_option);
+    ui->MISC_RADIO_1->setChecked(true);
+}
+
+void UserPanel::on_MISC_OPTION_2_currentIndexChanged(int index)
+{
+    alt_display_option = index + 1;
+    ui->MISC_DISPLAY->setCurrentIndex(alt_display_option);
+    ui->MISC_RADIO_2->setChecked(true);
+}
+#if 0
 void UserPanel::on_COM_DATA_RADIO_clicked()
 {
     display_option = 0;
@@ -4563,7 +4329,7 @@ void UserPanel::on_PLUGIN_RADIO_clicked()
     ui->PLUGIN_DISPLAY_1->show();
     ui->PTZ_GRP->hide();
 }
-
+#endif
 void UserPanel::screenshot()
 {
 //    image_mutex[0].lock();
@@ -4793,6 +4559,52 @@ void UserPanel::point_ptz_to_target(QPoint target)
     angle_v += target.y() * tot_v / display_height - tot_v / 2;
 
     set_ptz_angle();
+}
+
+void UserPanel::alt_display_control(int cmd)
+{
+    int display_idx = (cmd & 1) + 1;
+    if (!grab_thread_state[display_idx]) return;
+    switch (cmd / 2) {
+    case 0: {
+//        if (record_original[display_idx]) on_SAVE_AVI_BUTTON_clicked();
+//        if (record_modified[display_idx]) on_SAVE_FINAL_BUTTON_clicked();
+
+        grab_image[display_idx] = false;
+        if (h_grab_thread[display_idx]) {
+            h_grab_thread[display_idx]->quit();
+            h_grab_thread[display_idx]->wait();
+            delete h_grab_thread[display_idx];
+            h_grab_thread[display_idx] = NULL;
+        }
+        QTimer::singleShot(100, displays[display_idx], SLOT(clear));
+
+        break;
+    }
+    case 1: save_modified[display_idx] = 1; break;
+    case 2: {
+        static QString raw_avi[2];
+        if (record_modified[display_idx]) {
+            image_mutex[display_idx].lock();
+            vid_out[display_idx + 1].release();
+            image_mutex[display_idx].unlock();
+            QString dest = save_location + "/" + raw_avi[display_idx - 1].section('/', -1, -1);
+            std::thread t(UserPanel::move_to_dest, QString(raw_avi[display_idx - 1]), QString(dest));
+            t.detach();
+        }
+        else {
+            image_mutex[display_idx].lock();
+            raw_avi[display_idx - 1] = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw_alt" + QString::number(display_idx) + ".avi");
+            vid_out[display_idx + 1].open(raw_avi[display_idx - 1].toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w[display_idx], h[display_idx]), is_color[display_idx]);
+            image_mutex[display_idx].unlock();
+        }
+        record_modified[display_idx] ^= 1;
+
+        alt_ctrl_grp->button(cmd)->setText(record_modified[display_idx] ? "STOP" : "REC");
+        break;
+    }
+    default: break;
+    }
 }
 
 void UserPanel::on_DUAL_LIGHT_BTN_clicked()

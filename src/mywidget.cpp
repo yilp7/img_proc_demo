@@ -312,7 +312,7 @@ void TitleBar::setup(QObject *ptr)
     settings_menu->addAction("<< load pref.",   signal_receiver, SLOT(prompt_for_config_file())/*, QKeySequence(Qt::ALT + Qt::Key_R)*/);
     // TODO congigure serial number should be exclusive to ICMOS only
     settings_menu->addAction("## config s.n.",  signal_receiver, SLOT(prompt_for_serial_file())/*, QKeySequence(Qt::ALT + Qt::Key_C)*/);
-    settings_menu->addAction("=> export video", signal_receiver, SLOT(save_current_video()), QKeySequence(Qt::ALT + Qt::SHIFT + Qt::Key_S));
+    settings_menu->addAction("=> export video", signal_receiver, SLOT(export_current_video()), QKeySequence(Qt::ALT + Qt::SHIFT + Qt::Key_S));
     settings->setMenu(settings_menu);
 
     capture = new TitleButton("", this);
@@ -562,7 +562,9 @@ FloatingWindow::FloatingWindow() :
     QWidget(),
     pressed(false),
     disp(NULL),
-    frame(NULL)
+    frame(NULL),
+    w(1920),
+    h(1080)
 {
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint | Qt::WindowStaysOnTopHint);
     setMouseTracking(true);
@@ -597,6 +599,7 @@ FloatingWindow::FloatingWindow() :
     disp = new Display(this);
 //    disp->setObjectName("DISP");
     this->resize(this->size());
+    disp->resize(this->size());
     disp->setMouseTracking(true);
     disp->lower();
 
@@ -608,8 +611,10 @@ Display *FloatingWindow::get_display_widget()
     return disp;
 }
 
-void FloatingWindow::resize_display()
+void FloatingWindow::resize_display(int width, int height)
 {
+    w = width, h = height;
+    this->resize(w * this->height() / h, h);
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
 }
@@ -651,11 +656,33 @@ void FloatingWindow::mouseReleaseEvent(QMouseEvent *event)
 
 void FloatingWindow::resizeEvent(QResizeEvent *event)
 {
-    resize(this->width(), this->width() / 1920.0 * 1080);
+    this->resize(this->width(), this->width() * h / w);
     QPoint center = disp->center;
     center = center * this->width() / disp->width();
     disp->update_roi(center);
 
     disp->resize(this->size());
     frame->resize(this->size());
+}
+
+MiscSelection::MiscSelection(QWidget *parent) : QComboBox(parent) {}
+
+void MiscSelection::mousePressEvent(QMouseEvent *event)
+{
+    clearFocus();
+}
+
+void MiscSelection::mouseReleaseEvent(QMouseEvent *event)
+{
+    switch (event->button()) {
+    case Qt::LeftButton: emit selected(); break;
+    case Qt::RightButton: showPopup(); break;
+    default: break;
+    }
+    clearFocus();
+}
+
+void MiscSelection::wheelEvent(QWheelEvent *event)
+{
+    clearFocus();
 }

@@ -66,12 +66,6 @@ public:
     // rename vid file in new thread
     static void move_to_dest(QString src, QString dst);
 
-    // TODO move image io to a new class
-    // image i/o
-    static void save_image_bmp(cv::Mat img, QString filename);
-    static void save_image_tif(cv::Mat img, QString filename);
-    static bool load_image_tif(cv::Mat &img, QString filename);
-
     // generate 3d image through scan result
     static void paint_3d();
 
@@ -105,7 +99,7 @@ public slots:
     void change_pixel_format(int pixel_format, int display_idx = 0);
     void update_lower_3d_thresh();
     void reset_custom_3d_params();
-    void save_current_video();
+    void export_current_video();
     void set_tcu_type(int idx);
 
     // signaled by joystick input
@@ -211,11 +205,17 @@ private slots:
 
     // hide left parameter bar
     void on_HIDE_BTN_clicked();
-
+#if 0
     // change misc. display
     void on_COM_DATA_RADIO_clicked();
     void on_PTZ_RADIO_clicked();
     void on_PLUGIN_RADIO_clicked();
+#endif
+    // change alt display content
+    void on_MISC_RADIO_1_clicked();
+    void on_MISC_RADIO_2_clicked();
+    void on_MISC_OPTION_1_currentIndexChanged(int index);
+    void on_MISC_OPTION_2_currentIndexChanged(int index);
 
     // choose how mouse works in DISPLAY
     // TODO add a new exclusive button group
@@ -243,6 +243,8 @@ private slots:
     void set_ptz_angle();
     void on_STOP_BTN_clicked();
     void point_ptz_to_target(QPoint target);
+
+    void alt_display_control(int cmd);
 
     void on_DUAL_LIGHT_BTN_clicked();
 
@@ -330,7 +332,7 @@ private:
     void goto_laser_preset(char target);
 
     // save img in buffer to file; or save imgs while scanning
-    void save_to_file(bool save_result);
+    void save_to_file(bool save_result, int idx);
     void save_scan_img();
 
     // convert data to be sent to HEX buffer
@@ -393,7 +395,8 @@ private:
     LaserSettings*          laser_settings;
     Distance3DView*         view_3d;
     Aliasing*               aliasing;
-    FloatingWindow*         fw[2];
+    FloatingWindow*         fw_display[2];
+    FloatingWindow*         secondary_display;
 
     int                     calc_avg_option;            // a: 4 frames; b: 8 frames
     bool                    trigger_by_software;        // whether the device gets trigger signal from sw
@@ -407,7 +410,8 @@ private:
     float                   frame_rate_edit;
     QString                 save_location;              // where to save the image
     QString                 TEMP_SAVE_LOCATION;         // temp location to save the image
-    cv::VideoWriter         vid_out[3];                 // video writer for ORI/RES/export
+    cv::VideoWriter         vid_out[4];                 // video writer for ORI/RES/alt-display1/2
+    cv::VideoWriter         vid_out_proc;               // video writer for export
     QString                 current_video_filename;     // name of the imported video file (if not a stream)
     QString                 output_filename;            // target output name when exporting video
     QString                 temp_output_filename;       // temp save location of target output file
@@ -430,7 +434,7 @@ private:
     int                     laser_on;
     uint                    zoom;
     uint                    focus;
-    int                     distance;                   // dist read from rangefinder
+    int                     distance;                   // dist read from rangefinder (or manually set)
     float                   rep_freq;
     float                   laser_width;
     float                   delay_dist;                 // estimated distance calculated from delay
@@ -441,7 +445,7 @@ private:
     int                     clarity[3];
     char                    curr_laser_idx;
 
-    int                     display_option;             // data display option: 1: com data; 2: histogram
+    int                     alt_display_option;         // data display option: 1: com data; 2: histogram; 3: PTZ; 4: addons
     QButtonGroup*           display_grp;
 
     std::queue<cv::Mat>     q_img[3];                   // image queue in grab_thread
@@ -533,6 +537,8 @@ private:
     int                     ptz_speed;
     float                   angle_h;
     float                   angle_v;
+
+    QButtonGroup*           alt_ctrl_grp;               // alt display control button group
 
 //    QMediaPlayer*           video_input;
 //    VideoSurface*           video_surface;

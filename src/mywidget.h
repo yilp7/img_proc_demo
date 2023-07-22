@@ -190,6 +190,7 @@ public:
     void setup(int idx, int pos_y);
 
 protected:
+    //@override
     void mouseReleaseEvent(QMouseEvent *event);
 
 signals:
@@ -256,9 +257,10 @@ public:
     explicit FloatingWindow();
 
     Display* get_display_widget();
-    void resize_display();
+    void resize_display(int width, int height);
 
 protected:
+    //@override
     void mousePressEvent(QMouseEvent *event);
     void mouseMoveEvent(QMouseEvent *event);
     void mouseReleaseEvent(QMouseEvent *event);
@@ -275,6 +277,22 @@ private:
     QFrame*  frame;
 
     int      w, h;
+};
+
+class MiscSelection : public QComboBox
+{
+    Q_OBJECT
+public:
+    explicit MiscSelection(QWidget *parent);
+
+protected:
+    //@override
+    void mousePressEvent(QMouseEvent *event);
+    void mouseReleaseEvent(QMouseEvent *event);
+    void wheelEvent(QWheelEvent *event);
+
+signals:
+    void selected();
 };
 
 #endif // MYWIDGET_H

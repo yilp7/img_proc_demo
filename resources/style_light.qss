@@ -100,7 +100,7 @@ QMenuBar::item:selected, QMenu::selected {
 }
 
 /* edit box */
-QLineEdit, QTextEdit, QComboBox, QDialog {
+QLineEdit, QTextEdit, .QComboBox, QDialog {
 	border: 2px solid #CBB9A5;
 	background-color: #F0E6DB;
 	color: #180D1C;
@@ -109,17 +109,17 @@ QLineEdit, QTextEdit, QComboBox, QDialog {
 	border-radius: 3px;
 }
 
-QLineEdit::disabled, QComboBox::disabled {
+QLineEdit::disabled, .QComboBox::disabled {
 	background-color: #C9C0BB;
 	color: #433D37;
 }
 
-QLineEdit::focus, QComboBox::focus {
+QLineEdit::focus, .QComboBox::focus {
 	border: 2px solid #877B6E;
 }
 
 /* combo selection */
-QComboBox::drop-down {
+.QComboBox::drop-down {
 	image: url(:/tools/light/triangle);
 	width: 12px;
 	height: 12px;
@@ -129,19 +129,15 @@ QComboBox::drop-down {
 	border-radius: 3px;
 }
 
-QComboBox::on {
+.QComboBox::on {
 	border: 2px solid #877B6E;
 }
 
-QComboBox::drop-down:disabled {
+.QComboBox::drop-down:disabled, .QComboBox::drop-down:hover {
 	background-color: #C9C0BB;
 }
 
-QComboBox::drop-down:hover {
-	background-color: #C9C0BB;
-}
-
-QComboBox::drop-down:on {
+.QComboBox::drop-down:on {
 	background-color: #A0A0A0;
 }
 
@@ -151,6 +147,26 @@ QComboBox QAbstractItemView {
 	color: #433D37;
 	selection-color: #180D1C;
 	border: 1px solid #101010;
+	border-radius: 3px;
+}
+
+MiscSelection {
+	border: none;
+	background-color: #F4F4EA;
+	color: #433D37;
+	width: 60px;
+}
+
+MiscSelection::drop-down {
+	width: 0px;
+	height: 0px;
+}
+
+MiscSelection QAbstractItemView {
+	background-color: #F0E6DB;
+	selection-background-color: #F4F4EA;
+	color: #433D37;
+	selection-color: #180D1C;
 	border-radius: 3px;
 }
 
