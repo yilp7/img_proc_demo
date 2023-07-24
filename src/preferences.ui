@@ -510,7 +510,7 @@
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>-803</y>
+      <y>-73</y>
       <width>324</width>
       <height>1620</height>
      </rect>
@@ -601,7 +601,7 @@
        <string>Split</string>
       </property>
      </widget>
-     <widget class="QCheckBox" name="CAMERALINK_CHK">
+     <widget class="QCheckBox" name="EBUS_CHK">
       <property name="geometry">
        <rect>
         <x>40</x>
@@ -611,7 +611,7 @@
        </rect>
       </property>
       <property name="text">
-       <string>Cameralink</string>
+       <string>eBUS</string>
       </property>
      </widget>
      <widget class="QLabel" name="FILP">

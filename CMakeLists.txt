@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(GLI_user_panel LANGUAGES CXX VERSION 0.5.4.1)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.6.1.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -27,6 +27,7 @@ set(HQV_DIR "${SDK_DIR}/HQV")
 set(EURESYS_DIR "${SDK_DIR}/euresys")
 set(OpenCV_DIR "${SDK_DIR}/opencv")
 set(FFMPEG_DIR "${SDK_DIR}/ffmpeg")
+set(eBUS_DIR "${SDK_DIR}/eBUS")
 
 include_directories(${SDK_DIR}/VLD/include)
 link_directories(${SDK_DIR}/VLD/lib)
@@ -44,6 +45,7 @@ if (WIN32)
     include_directories(${EURESYS_DIR}/include)
     include_directories(${OpenCV_DIR}/include)
     include_directories(${FFMPEG_DIR}/include)
+    include_directories(${eBUS_DIR}/include)
 
     if (CMAKE_SIZEOF_VOID_P EQUAL 8)
         link_directories(${Hik_SDK_DIR}/lib/x64)
@@ -55,11 +57,13 @@ if (WIN32)
         else()
             link_directories(${OpenCV_DIR}/lib/x64)
         endif()
+        link_directories(${eBUS_DIR}/lib)
     else()
         link_directories(${Hik_SDK_DIR}/lib/x86)
         link_directories(${HQV_DIR}/lib)
         link_directories(${EURESYS_DIR}/lib)
         link_directories(${OpenCV_DIR}/lib/x86)
+        link_directories(${eBUS_DIR}/lib)
     endif()
 elseif (APPLE)
 
@@ -104,10 +108,12 @@ set(SOURCE_FILES
     src/laser_settings.ui
     src/imageproc.h
     src/imageproc.cpp
-#    src/cam.h
+    src/cam.h
 #    src/cam.cpp
     src/mvcam.h
     src/mvcam.cpp
+    src/ebuscam.h
+    src/ebuscam.cpp
 #    src/hqvcam.h
 #    src/hqvcam.cpp
 #    src/euresyscam.h

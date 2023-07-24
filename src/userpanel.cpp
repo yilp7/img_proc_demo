@@ -1586,17 +1586,12 @@ void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, 
 void UserPanel::on_ENUM_BUTTON_clicked()
 {
     if (curr_cam) delete curr_cam;
-    curr_cam = new Cam;
+    if (pref->ebus_cam) curr_cam = new EbusCam;
+    else                curr_cam = new MvCam;
 //    if (ui->TITLE->prog_settings->cameralink) curr_cam->cameralink = true;
-    curr_cam->cameralink = pref->cameralink;
-    enable_controls(device_type = curr_cam->search_for_devices());
+    enable_controls(device_type = (curr_cam->search_for_devices() ?  (pref->ebus_cam ? 2 : 1) : 0));
     update_dev_ip();
-    QStringList sl;
-    for (int i = 0; i < curr_cam->gige_dev_list.nDeviceNum; i++)
-        sl << QString::asprintf("%s %s", curr_cam->gige_dev_list.pDeviceInfo[i]->SpecialInfo.stGigEInfo.chModelName, curr_cam->gige_dev_list.pDeviceInfo[i]->SpecialInfo.stGigEInfo.chManufacturerName);
-    for (int i = 0; i < curr_cam->usb3_dev_list.nDeviceNum; i++)
-        sl << QString::asprintf("%s %s", curr_cam->usb3_dev_list.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chModelName, curr_cam->usb3_dev_list.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chManufacturerName);
-    emit update_device_list(1, sl);
+    emit update_device_list(1, curr_cam->get_device_list());
 }
 
 void UserPanel::on_START_BUTTON_clicked()
@@ -1687,7 +1682,7 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
     if (!device_on || curr_cam == NULL) return;
 
     static struct main_ui_info cam_union = {&q_frame_info, q_img + 0};
-    curr_cam->set_frame_callback(&cam_union);
+    curr_cam->set_user_pointer(&cam_union);
 
     // TODO complete BayerGB process & display
     curr_cam->pixel_type(true, &pixel_format[0]);
@@ -2025,8 +2020,8 @@ void UserPanel::display_port_info(int idx)
 void UserPanel::update_dev_ip()
 {
 //    ui->TITLE->prog_settings->enable_ip_editing(device_type == 1);
-    pref->enable_ip_editing(device_type == 1 && pref->device_idx < curr_cam->gige_dev_list.nDeviceNum);
-    if (device_type) {
+    pref->enable_ip_editing(device_type > 0 && pref->device_idx < curr_cam->gige_device_num());
+    if (device_type > 0) {
         int ip, gateway, nic_address;
         curr_cam->ip_address(true, &ip, &gateway, &nic_address);
 //        ui->TITLE->prog_settings->config_ip(true, ip, gateway);
@@ -2423,7 +2418,12 @@ void UserPanel::prompt_for_input_file()
     if (input_file_dialog.exec() == QDialog::Accepted)
         load_video_file(file_path_x->currentText(), use_gray_format->isChecked(),
                         [](cv::Mat &frame, void* ptr){ (*(std::queue<cv::Mat>*)ptr).push(frame.clone()); },
-                        &(this->q_img[display_list->currentIndex()]), display_list->currentIndex());
+            &(this->q_img[display_list->currentIndex()]), display_list->currentIndex());
+}
+
+void UserPanel::search_for_devices()
+{
+    ui->ENUM_BUTTON->click();
 }
 
 // convert data to be sent to TCU-COM to hex buffer
@@ -4376,9 +4376,11 @@ void UserPanel::on_FILE_PATH_EDIT_editingFinished()
 
 void UserPanel::on_BINNING_CHECK_stateChanged(int arg1)
 {
+    MvCam *temp_mvcam = dynamic_cast<MvCam*>(curr_cam);
+    if (!temp_mvcam) return;
     int binning = arg1 ? 2 : 1;
-    curr_cam->binning(false, &binning);
-    curr_cam->frame_size(true, &w[0], &h[0]);
+    temp_mvcam->binning(false, &binning);
+    temp_mvcam->frame_size(true, &w[0], &h[0]);
     qInfo("frame w: %d, h: %d", w[0], h[0]);
     status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
     QResizeEvent e(this->size(), this->size());

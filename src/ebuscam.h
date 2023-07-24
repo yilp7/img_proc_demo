@@ -1,25 +1,47 @@
-#ifndef MVCAM_H
-#define MVCAM_H
+#ifndef EBUSCAM_H
+#define EBUSCAM_H
 
 #include "cam.h"
 
-#include "MvCameraControl.h"
+#include <PvInterface.h>
+#include <PvDevice.h>
+#include <PvTypes.h>
+#include <PvDevice.h>
+#include <PvSystem.h>
+#include <PvDeviceGEV.h>
+#include <PvStream.h>
+#include <PvStreamGEV.h>
+#include <PvBuffer.h>
+#include <PvGenParameter.h>
+#include <PvDeviceSerialPort.h>
+#include <PvDeviceAdapter.h>
 
 #include <QtCore>
 
-class MvCam : public Cam {
+class EbusCam : public Cam {
 private:
-    void* dev_handle;
+    PvDevice           *dev_handle;
+    PvStream           *stream_handle;
+    PvDeviceAdapter    *dev_adapter;
+    PvDeviceSerialPort *dev_serial_port;
+
+    uchar buffer_out[7];
+    uchar buffer_in[7];
+
+    std::list<PvBuffer*> buffer_list;
+    void*                ptr_user;
+    bool                 is_streaming;
+    bool                 streaming_thread_state;
 
 public:
-    int                    device_type;
-    int                    curr_idx;
-    MV_CC_DEVICE_INFO_LIST gige_dev_list;
-    MV_CC_DEVICE_INFO_LIST usb3_dev_list;
+    int device_type;
+    int curr_idx;
+    std::vector<PvDeviceInfoGEV*> gige_dev_list;
+    std::vector<PvDeviceInfoU3V*> usb3_dev_list;
 
 public:
-    MvCam();
-    ~MvCam();
+    EbusCam();
+    ~EbusCam();
 
     int search_for_devices();
 
@@ -48,11 +70,6 @@ public:
     int gige_device_num();
     int usb3_device_num();
 
-//    int get_img_buffer(MV_FRAME_OUT* frame, int msec);
-//    int free_img_buffer(MV_FRAME_OUT* frame);
-    void binning(bool read, int *val);
-
-    static void __stdcall frame_cb(unsigned char* data, MV_FRAME_OUT_INFO_EX *frame_info, void* user_data);
 };
 
-#endif // MVCAM_H
+#endif // EBUSCAM_H

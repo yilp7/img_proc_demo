@@ -45,6 +45,7 @@ private slots:
 
 signals:
     // device
+    void search_for_devices();
     void query_dev_ip();
     void set_dev_ip(int ip, int gateway);
     void change_pixel_format(int format);
@@ -84,7 +85,7 @@ public:
     int              device_idx;
     int              symmetry;
     int              pixel_type;
-    bool             cameralink;
+    bool             ebus_cam;
     bool             split;
 
     // 2 serial comm.

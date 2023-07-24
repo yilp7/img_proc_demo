@@ -288,6 +288,7 @@ void TitleBar::setup(QObject *ptr)
 */
     connect(pref, SIGNAL(triggered()), preferences, SLOT(show()));
     connect(pref, SIGNAL(triggered()), preferences, SLOT(raise()));
+    connect(preferences, SIGNAL(search_for_devices()),             signal_receiver, SLOT(search_for_devices()));
     connect(preferences, SIGNAL(query_dev_ip()),                   signal_receiver, SLOT(update_dev_ip()));
     connect(preferences, SIGNAL(set_dev_ip(int, int)),             signal_receiver, SLOT(set_dev_ip(int, int)));
     connect(preferences, SIGNAL(change_pixel_format(int)),         signal_receiver, SLOT(change_pixel_format(int)));
@@ -295,7 +296,6 @@ void TitleBar::setup(QObject *ptr)
     connect(preferences, SIGNAL(change_baudrate(int, int)),        signal_receiver, SLOT(set_baudrate(int, int)));
     connect(preferences, SIGNAL(set_tcp_status(int, bool)),        signal_receiver, SLOT(set_tcp_status_on_port(int, bool)));
     connect(preferences, SIGNAL(share_tcu_port(bool)),             signal_receiver, SLOT(set_tcu_as_shared_port(bool)));
-    // TODO use_tcp_chk updated
     connect(preferences, SIGNAL(com_write(int, QByteArray)),       signal_receiver, SLOT(com_write_data(int, QByteArray)));
     connect(preferences, SIGNAL(tcu_type_changed(int)),            signal_receiver, SLOT(set_tcu_type(int)));
     connect(preferences, SIGNAL(rep_freq_unit_changed(int)),       signal_receiver, SLOT(setup_hz(int)));

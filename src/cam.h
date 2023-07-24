@@ -1,52 +1,52 @@
 #ifndef CAM_H
 #define CAM_H
 
-#include "MvCameraControl.h"
-#include "HQV_API.h"
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
+#include <stddef.h>
 #include <queue>
+#include <opencv2/opencv.hpp>
 #include <QtCore>
 
-class Cam
-{
-private:
-    void* dev_handle;
-    MV_CC_DEVICE_INFO* mv_dev;
-
+class Cam {
 public:
-    // 0: no device; 1: MvCam; 2: HqvCam
     int device_type;
-    bool cameralink; // true if using cameralink -> ethernet converter
+    int curr_idx;
 
 public:
-    Cam();
-    ~Cam();
+    Cam() {};
+    ~Cam() {};
 
-    int search_for_devices();
+    virtual int search_for_devices() = 0;
 
-    int start();
-    int shut_down();
+    virtual int start(int idx = 0) = 0;
+    virtual int shut_down() = 0;
 
-    int set_frame_callback(void *user);
+    virtual int set_user_pointer(void *user) = 0;
 
-    int start_grabbing();
-    int stop_grabbing();
+    virtual int start_grabbing() = 0;
+    virtual int stop_grabbing() = 0;
 
-    void get_frame_size(int &w, int &h);
-    void time_exposure(bool read, float *val);
-    void frame_rate(bool read, float *val);
-    void gain_analog(bool read, float *val);
-    void trigger_mode(bool read, bool *val);
-    void trigger_source(bool read, bool *val);
-    void binning(bool read, int *val);
-    int ip_address(bool read, int *ip, int *gateway);
-    int pixel_type(bool read, int *val);
-    void trigger_once();
+    virtual void get_max_frame_size(int *w, int *h) = 0;
+    virtual void frame_size(bool read, int *w, int *h, int *inc_w = NULL, int *inc_h = NULL) = 0;
+    virtual void frame_offset(bool read, int *x, int *y, int *inc_x = NULL, int *inc_y = NULL) = 0;
+    virtual void time_exposure(bool read, float *val) = 0;
+    virtual void frame_rate(bool read, float *val) = 0;
+    virtual void gain_analog(bool read, float *val) = 0;
+    virtual void trigger_mode(bool read, bool *val) = 0;
+    virtual void trigger_source(bool read, bool *val) = 0;
+    virtual int ip_config(bool read, int *val) = 0;
+    virtual int ip_address(bool read, int *ip, int *gateway, int *nic_address = NULL) = 0;
+    virtual int pixel_type(bool read, int *val) = 0;
+    virtual void trigger_once() = 0;
 
-    static void __stdcall frame_cb(unsigned char* data, MV_FRAME_OUT_INFO_EX *frame_info, void* user_data);
-    static DWORD WINAPI frame_cb(HANDLE dev, HQV_FRAMEINFO frame_info, void* user_data);
-    static DWORD WINAPI frame_cb_cl(HANDLE dev, HQV_FRAMEINFO frame_info, void* user_data);
+    virtual QStringList get_device_list() = 0;
+    virtual int gige_device_num() = 0;
+    virtual int usb3_device_num() = 0;
+
 };
-
+#if 1
+struct main_ui_info {
+    std::queue<int> *frame_info_q;
+    std::queue<cv::Mat> *img_q;
+};
+#endif
 #endif // CAM_H

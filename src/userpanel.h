@@ -7,11 +7,13 @@
 #include "controlport.h"
 #include "aliasing.h"
 
-//#include "cam.h"
+#include "cam.h"
 #include "mvcam.h"
+#include "ebuscam.h"
 //#include "hqvscam.h"
 //#include "euresyscam.h"
 
+#include "imageio.h"
 #include "preferences.h"
 #include "scanconfig.h"
 #include "lasersettings.h"
@@ -81,7 +83,8 @@ public slots:
     void prompt_for_serial_file();
     void prompt_for_input_file();
 
-    // signaled in settings ui
+    // signaled in preferences ui
+    void search_for_devices();
     void setup_hz(int hz_unit);
     void setup_stepping(int base_unit);
     void setup_max_dist(float max_dist);
