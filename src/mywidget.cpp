@@ -665,7 +665,10 @@ void FloatingWindow::resizeEvent(QResizeEvent *event)
     frame->resize(this->size());
 }
 
-MiscSelection::MiscSelection(QWidget *parent) : QComboBox(parent) {}
+MiscSelection::MiscSelection(QWidget *parent) : QComboBox(parent)
+{
+    this->view()->window()->setWindowFlags(Qt::Popup | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
+}
 
 void MiscSelection::mousePressEvent(QMouseEvent *event)
 {
@@ -686,3 +689,12 @@ void MiscSelection::wheelEvent(QWheelEvent *event)
 {
     clearFocus();
 }
+
+//void MiscSelection::showPopup()
+//{
+//    QComboBox::showPopup();
+
+//    QWidget *popup = this->findChild<QFrame*>();
+//    if (!popup) return;
+//    popup->move(popup->x(), popup->y() - this->height() - popup->height());
+//}

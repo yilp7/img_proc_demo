@@ -141,7 +141,7 @@ QLineEdit::focus, .QComboBox::focus {
 	background-color: #A0A0A0;
 }
 
-QComboBox QAbstractItemView {
+.QComboBox QAbstractItemView {
 	background-color: #F0E6DB;
 	selection-background-color: #F4F4EA;
 	color: #433D37;

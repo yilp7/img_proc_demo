@@ -291,6 +291,9 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event);
     void wheelEvent(QWheelEvent *event);
 
+    // TODO make this popup grow upwards with no animation
+//    void showPopup();
+
 signals:
     void selected();
 };

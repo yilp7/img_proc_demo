@@ -376,6 +376,7 @@ UserPanel::UserPanel(QWidget *parent) :
     // set up display info (left bottom corner)
     QStringList alt_options_str;
     alt_options_str << "DATA" << "HIST" << "PTZ" << "ALT" << "ADDON";
+//    alt_options_str << "ADDON" << "ALT" << "PTZ" << "HIST" << "DATA";
     ui->MISC_OPTION_1->addItems(alt_options_str);
     ui->MISC_OPTION_2->addItems(alt_options_str);
     ui->MISC_OPTION_1->setCurrentIndex(0);
@@ -3754,6 +3755,8 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
             if (!display_mutex[display_idx].tryLock(1e3)) return -1;
         }
 
+        bool is_rtsp_stream = !filename.contains("rtsp://");
+
         AVFormatContext *format_context = avformat_alloc_context();
         std::shared_ptr<AVFormatContext*> closer_format_context(&format_context, avformat_close_input);
         AVCodecParameters *codec_param = NULL;
@@ -3863,7 +3866,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
                     }
                     else {
-                        if (display && frame->pts != AV_NOPTS_VALUE) {
+                        if (is_rtsp_stream && display && frame->pts != AV_NOPTS_VALUE) {
                             if (last_pts != AV_NOPTS_VALUE) {
                                 delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1e6;
 //                                qDebug() << av_rescale_q(frame->pts - last_pts, time_base, time_base_q) << elapsed_timer.nsecsElapsed() / 1000;
@@ -4577,7 +4580,7 @@ void UserPanel::alt_display_control(int cmd)
             delete h_grab_thread[display_idx];
             h_grab_thread[display_idx] = NULL;
         }
-        QTimer::singleShot(100, displays[display_idx], SLOT(clear));
+        QTimer::singleShot(100, displays[display_idx], SLOT(clear()));
 
         break;
     }
