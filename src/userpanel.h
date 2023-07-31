@@ -261,6 +261,8 @@ private slots:
 
     void on_SWITCH_TCU_UI_BTN_clicked();
 
+    void on_AVG_NUM_EDT_editingFinished();
+
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);

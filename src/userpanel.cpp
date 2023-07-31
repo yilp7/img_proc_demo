@@ -888,7 +888,7 @@ int UserPanel::grab_thread_process(int *idx) {
                 if (seq[99].empty()) for (auto& m: seq) m = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
 
 //                seq_sum -= seq[(seq_idx + 4) & 7];
-                seq_sum -= seq[(seq_idx + calc_avg_option) % 100];
+                seq_sum -= seq[(seq_idx - calc_avg_option + 100) % 100];
                 if (frame_a_3d) frame_a_sum -= seq[seq_idx];
                 else            frame_b_sum -= seq[seq_idx];
                 img_mem[thread_idx].convertTo(seq[seq_idx], CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
@@ -902,7 +902,7 @@ int UserPanel::grab_thread_process(int *idx) {
             }
 //            seq_sum.convertTo(modified_result, CV_8U, 1. / (calc_avg_option * (1 << (pixel_depth - 8))));
 //            seq_sum.convertTo(modified_result[thread_idx], CV_MAKETYPE(CV_8U, is_color[thread_idx] ? 3 : 1), 1. / (4 * (1 << (_pixel_depth - 8))));
-            seq_sum.convertTo(modified_result[thread_idx], CV_MAKETYPE(CV_8U, is_color[thread_idx] ? 3 : 1), 1. / (100 * (1 << (_pixel_depth - 8))));
+            seq_sum.convertTo(modified_result[thread_idx], CV_MAKETYPE(CV_8U, is_color[thread_idx] ? 3 : 1), 1. / (calc_avg_option * (1 << (_pixel_depth - 8))));
         }
         else {
             if (!seq_sum.empty()) {
@@ -4163,6 +4163,7 @@ void UserPanel::on_FRAME_AVG_CHECK_stateChanged(int arg1)
 //        }
 //    }
 //    calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
+    ui->AVG_NUM_EDT->setEnabled(!arg1);
 }
 
 void UserPanel::on_SAVE_RESULT_BUTTON_clicked()
