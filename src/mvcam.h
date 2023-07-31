@@ -12,8 +12,6 @@ private:
     void* dev_handle;
 
 public:
-    int                    device_type;
-    int                    curr_idx;
     MV_CC_DEVICE_INFO_LIST gige_dev_list;
     MV_CC_DEVICE_INFO_LIST usb3_dev_list;
 

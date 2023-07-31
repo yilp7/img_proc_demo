@@ -39,7 +39,7 @@ UserPanel::UserPanel(QWidget *parent) :
     aliasing(NULL),
     fw_display{NULL},
     secondary_display(NULL),
-    calc_avg_option(5),
+    calc_avg_option(100),
     trigger_by_software(false),
     curr_cam(NULL),
     time_exposure_edit(5000),
@@ -194,7 +194,7 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // - image operations
     QComboBox *enhance_options = ui->ENHANCE_OPTIONS;
-    QComboBox *calc_avg_options = ui->FRAME_AVG_OPTIONS;
+//    QComboBox *calc_avg_options = ui->FRAME_AVG_OPTIONS;
     enhance_options->addItem(tr("None"));
     enhance_options->addItem(tr("Histogram"));
     enhance_options->addItem(tr("Laplace"));
@@ -205,9 +205,9 @@ UserPanel::UserPanel(QWidget *parent) :
     enhance_options->addItem(tr("Dehaze_enh"));
     enhance_options->addItem(tr("DCP"));
     enhance_options->setCurrentIndex(0);
-    calc_avg_options->addItem("a");
-    calc_avg_options->addItem("b");
-    calc_avg_options->setCurrentIndex(0);
+//    calc_avg_options->addItem("a");
+//    calc_avg_options->addItem("b");
+//    calc_avg_options->setCurrentIndex(0);
 
     // - set-up COMs
 //    foreach (const QSerialPortInfo & info, QSerialPortInfo::availablePorts()) qDebug("%s\n", qPrintable(info.portName()));
@@ -606,7 +606,7 @@ UserPanel::~UserPanel()
 void UserPanel::data_exchange(bool read){
     if (read) {
 //        device_idx = ui->DEVICE_SELECTION->currentIndex();
-        calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
+//        calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
 
         trigger_by_software = ui->SOFTWARE_CHECK->isChecked();
         image_3d[0] = ui->IMG_3D_CHECK->isChecked();
@@ -653,7 +653,7 @@ void UserPanel::data_exchange(bool read){
     }
     else {
 //        ui->DEVICE_SELECTION->setCurrentIndex(device_idx);
-        ui->FRAME_AVG_OPTIONS->setCurrentIndex(calc_avg_option / 4 - 1);
+//        ui->FRAME_AVG_OPTIONS->setCurrentIndex(calc_avg_option / 4 - 1);
 
         ui->SOFTWARE_CHECK->setChecked(trigger_by_software);
         ui->IMG_3D_CHECK->setChecked(image_3d[0]);
@@ -704,7 +704,7 @@ int UserPanel::grab_thread_process(int *idx) {
     int _w = w[thread_idx], _h = h[thread_idx], _pixel_depth = pixel_depth[thread_idx];
     bool updated;
     cv::Mat img_display, prev_img, prev_3d;
-    cv::Mat seq[8], seq_sum, frame_a_sum, frame_b_sum;
+    cv::Mat seq[100], seq_sum, frame_a_sum, frame_b_sum;
     int seq_idx;
     uint hist[256];
     cv::Mat hist_mat, dist_mat;
@@ -884,11 +884,11 @@ int UserPanel::grab_thread_process(int *idx) {
         if (frame_b_sum.empty()) frame_b_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
         if (ui->FRAME_AVG_CHECK->isChecked()) {
             if (updated) {
-                calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
-                if (seq[7].empty()) for (auto& m: seq) m = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
+//                calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
+                if (seq[99].empty()) for (auto& m: seq) m = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
 
-                seq_sum -= seq[(seq_idx + 4) & 7];
-//                seq_sum -= seq[seq_idx];
+//                seq_sum -= seq[(seq_idx + 4) & 7];
+                seq_sum -= seq[(seq_idx + calc_avg_option) % 100];
                 if (frame_a_3d) frame_a_sum -= seq[seq_idx];
                 else            frame_b_sum -= seq[seq_idx];
                 img_mem[thread_idx].convertTo(seq[seq_idx], CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
@@ -898,10 +898,11 @@ int UserPanel::grab_thread_process(int *idx) {
 //                for(int i = 0; i < calc_avg_option; i++) seq_sum += seq[i];
 
 //                seq_idx = (seq_idx + 1) % calc_avg_option;
-                seq_idx = (seq_idx + 1) & 7;
+                seq_idx = (seq_idx + 1) % 100;
             }
 //            seq_sum.convertTo(modified_result, CV_8U, 1. / (calc_avg_option * (1 << (pixel_depth - 8))));
-            seq_sum.convertTo(modified_result[thread_idx], CV_MAKETYPE(CV_8U, is_color[thread_idx] ? 3 : 1), 1. / (4 * (1 << (_pixel_depth - 8))));
+//            seq_sum.convertTo(modified_result[thread_idx], CV_MAKETYPE(CV_8U, is_color[thread_idx] ? 3 : 1), 1. / (4 * (1 << (_pixel_depth - 8))));
+            seq_sum.convertTo(modified_result[thread_idx], CV_MAKETYPE(CV_8U, is_color[thread_idx] ? 3 : 1), 1. / (100 * (1 << (_pixel_depth - 8))));
         }
         else {
             if (!seq_sum.empty()) {
@@ -1457,7 +1458,8 @@ void UserPanel::enable_controls(bool cam_rdy) {
     ui->IMG_ENHANCE_CHECK->setEnabled(start_grabbing);
     ui->FRAME_AVG_CHECK->setEnabled(start_grabbing);
     ui->ENHANCE_OPTIONS->setEnabled(start_grabbing);
-    ui->FRAME_AVG_OPTIONS->setEnabled(start_grabbing);
+//    ui->FRAME_AVG_OPTIONS->setEnabled(start_grabbing);
+    ui->AVG_NUM_EDT->setEnabled(start_grabbing);
     ui->RANGE_THRESH_EDIT->setEnabled(start_grabbing);
 //    ui->BRIGHTNESS_LABEL->setEnabled(start_grabbing);
     ui->BRIGHTNESS_SLIDER->setEnabled(start_grabbing);
@@ -4160,7 +4162,7 @@ void UserPanel::on_FRAME_AVG_CHECK_stateChanged(int arg1)
 //            seq_idx[i] = 0;
 //        }
 //    }
-    calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
+//    calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
 }
 
 void UserPanel::on_SAVE_RESULT_BUTTON_clicked()
@@ -4817,4 +4819,12 @@ void UserPanel::on_SWITCH_TCU_UI_BTN_clicked()
         ui->GATE_WIDTH_DIFF_GRP->hide();
     }
     show_diff ^= 1;
+}
+
+void UserPanel::on_AVG_NUM_EDT_editingFinished()
+{
+    calc_avg_option = ui->AVG_NUM_EDT->text().toInt();
+    if (calc_avg_option <   1) calc_avg_option =   1;
+    if (calc_avg_option > 100) calc_avg_option = 100;
+    ui->AVG_NUM_EDT->setText(QString::number(calc_avg_option));
 }

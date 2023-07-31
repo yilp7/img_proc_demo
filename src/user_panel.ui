@@ -3069,19 +3069,6 @@
        <string>Avg</string>
       </property>
      </widget>
-     <widget class="QComboBox" name="FRAME_AVG_OPTIONS">
-      <property name="geometry">
-       <rect>
-        <x>52</x>
-        <y>64</y>
-        <width>51</width>
-        <height>20</height>
-       </rect>
-      </property>
-      <property name="mouseTracking">
-       <bool>false</bool>
-      </property>
-     </widget>
      <widget class="QCheckBox" name="IMG_3D_CHECK">
       <property name="geometry">
        <rect>
@@ -3266,6 +3253,22 @@
       </property>
       <property name="text">
        <string/>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="AVG_NUM_EDT">
+      <property name="geometry">
+       <rect>
+        <x>62</x>
+        <y>65</y>
+        <width>31</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>100</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
       </property>
      </widget>
     </widget>
@@ -3633,7 +3636,6 @@
   <tabstop>FOCUS_EDIT</tabstop>
   <tabstop>FOCUS_SPEED_EDIT</tabstop>
   <tabstop>FRAME_AVG_CHECK</tabstop>
-  <tabstop>FRAME_AVG_OPTIONS</tabstop>
   <tabstop>IMG_3D_CHECK</tabstop>
   <tabstop>RANGE_THRESH_EDIT</tabstop>
   <tabstop>CONTRAST_SLIDER</tabstop>
