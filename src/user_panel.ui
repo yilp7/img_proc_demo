@@ -885,7 +885,7 @@
        </rect>
       </property>
       <property name="currentIndex">
-       <number>4</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="NULL_PAGE"/>
       <widget class="QWidget" name="DATA_PAGE">
@@ -3027,7 +3027,7 @@
      <widget class="QCheckBox" name="IMG_ENHANCE_CHECK">
       <property name="geometry">
        <rect>
-        <x>11</x>
+        <x>10</x>
         <y>15</y>
         <width>74</width>
         <height>20</height>
@@ -3056,7 +3056,7 @@
      <widget class="QCheckBox" name="FRAME_AVG_CHECK">
       <property name="geometry">
        <rect>
-        <x>11</x>
+        <x>10</x>
         <y>65</y>
         <width>46</width>
         <height>20</height>
@@ -3072,7 +3072,7 @@
      <widget class="QCheckBox" name="IMG_3D_CHECK">
       <property name="geometry">
        <rect>
-        <x>11</x>
+        <x>10</x>
         <y>90</y>
         <width>39</width>
         <height>20</height>

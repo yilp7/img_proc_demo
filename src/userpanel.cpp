@@ -375,12 +375,20 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // set up display info (left bottom corner)
     QStringList alt_options_str;
+#ifndef ICMOS
     alt_options_str << "DATA" << "HIST" << "PTZ" << "ALT" << "ADDON";
 //    alt_options_str << "ADDON" << "ALT" << "PTZ" << "HIST" << "DATA";
+#else
+    alt_options_str << "DATA" << "HIST" << "ALT";
+#endif
     ui->MISC_OPTION_1->addItems(alt_options_str);
     ui->MISC_OPTION_2->addItems(alt_options_str);
     ui->MISC_OPTION_1->setCurrentIndex(0);
+#ifndef ICMOS
     ui->MISC_OPTION_2->setCurrentIndex(2);
+#else
+    ui->MISC_OPTION_2->setCurrentIndex(1);
+#endif
     connect(ui->MISC_OPTION_1, SIGNAL(selected()), ui->MISC_RADIO_1, SLOT(click()));
     connect(ui->MISC_OPTION_2, SIGNAL(selected()), ui->MISC_RADIO_2, SLOT(click()));
 
@@ -540,17 +548,22 @@ UserPanel::UserPanel(QWidget *parent) :
 
     ui->LASER_STATIC->hide();
     ui->MISC_DISPLAY_GRP->setParent(ui->RIGHT);
-    ui->MISC_DISPLAY_GRP->setGeometry(10, 365, ui->IMG_PROC_STATIC->width(), ui->MISC_DISPLAY_GRP->height());
-    QSize temp = ui->DATA_EXCHANGE->size();
-    temp.setWidth(ui->MISC_DISPLAY_GRP->width());
-    ui->DATA_EXCHANGE->resize(temp);
-//    ui->HIST_DISPLAY->resize(temp);
+//    ui->MISC_DISPLAY_GRP->setGeometry(10, 365, ui->IMG_PROC_STATIC->width(), ui->MISC_DISPLAY_GRP->height());
+    ui->MISC_DISPLAY_GRP->move(25, 365);
+    ui->FRAME_AVG_CHECK->setParent(ui->HIST_PAGE);
+    ui->AVG_NUM_EDT->setParent(ui->HIST_PAGE);
+    ui->FRAME_AVG_CHECK->move(10, 5);
+    ui->AVG_NUM_EDT->move(62, 5);
     ui->LENS_STATIC->hide();
     ui->IMG_SAVE_STATIC->move(10, 265);
     ui->IMG_PROC_STATIC->hide();
     ui->SCAN_GRP->move(10, 560);
     ui->IMG_3D_CHECK->hide();
     ui->RANGE_THRESH_EDIT->hide();
+
+    temp_f.setPixelSize(11);
+    ui->DATA_EXCHANGE->setFont(temp_f);
+    ui->HIST_DISPLAY->setAlignment(Qt::AlignHCenter | Qt::AlignBottom);
 
 //    ui->DELAY_N->hide();
 //    ui->DELAY_N_EDIT_N->hide();
@@ -1091,7 +1104,7 @@ int UserPanel::grab_thread_process(int *idx) {
         }
 
         // display the gray-value histogram of the current grayscale image, or the distance histogram of the current 3D image
-        if (alt_display_option == 1) {
+        if (alt_display_option == 2) {
             if (modified_result[thread_idx].channels() == 1) {
                 uchar *img = modified_result[thread_idx].data;
                 int step = modified_result[thread_idx].step;
@@ -1103,13 +1116,13 @@ int UserPanel::grab_thread_process(int *idx) {
                     //                    if (hist[i] > 50000) hist[i] = 0;
                     if (hist[i] > max) max = hist[i];
                 }
-                hist_mat = cv::Mat(225, 256, CV_8UC3, cv::Scalar(56, 64, 72));
+                hist_mat = cv::Mat(176, 256, CV_8UC3, cv::Scalar(56, 64, 72));
                 for (int i = 1; i < 256; i++) {
                     cv::rectangle(hist_mat, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
                 }
             }
             // TODO change to signal/slots
-            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(ui->PLUGIN_DISPLAY_1->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         }
 
         // FIXME possible crash when move scaled image to bottom-right corner
