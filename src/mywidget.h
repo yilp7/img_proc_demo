@@ -290,6 +290,7 @@ protected:
     void mousePressEvent(QMouseEvent *event);
     void mouseReleaseEvent(QMouseEvent *event);
     void wheelEvent(QWheelEvent *event);
+    void paintEvent(QPaintEvent *event);
 
     // TODO make this popup grow upwards with no animation
 //    void showPopup();

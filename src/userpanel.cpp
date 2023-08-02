@@ -155,6 +155,9 @@ UserPanel::UserPanel(QWidget *parent) :
 
     dist_ns = c * 1e-9 / 2;
 
+    QFont temp_f(consolas);
+    temp_f.setPixelSize(11);
+
     // connect title bar to the main window (UserPanel*)
     ui->TITLE->setup(this);
     pref = ui->TITLE->preferences;
@@ -204,6 +207,7 @@ UserPanel::UserPanel(QWidget *parent) :
     enhance_options->addItem(tr("Adaptive"));
     enhance_options->addItem(tr("Dehaze_enh"));
     enhance_options->addItem(tr("DCP"));
+    enhance_options->addItem(tr("AINDANE"));
     enhance_options->setCurrentIndex(0);
     calc_avg_options->addItem("a");
     calc_avg_options->addItem("b");
@@ -375,19 +379,31 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // set up display info (left bottom corner)
     QStringList alt_options_str;
+#ifndef ICMOS
     alt_options_str << "DATA" << "HIST" << "PTZ" << "ALT" << "ADDON";
 //    alt_options_str << "ADDON" << "ALT" << "PTZ" << "HIST" << "DATA";
+#else
+    alt_options_str << "DATA" << "HIST" << "ALT";
+#endif
     ui->MISC_OPTION_1->addItems(alt_options_str);
     ui->MISC_OPTION_2->addItems(alt_options_str);
+    ui->MISC_OPTION_3->addItems(alt_options_str);
     ui->MISC_OPTION_1->setCurrentIndex(0);
+#ifndef ICMOS
     ui->MISC_OPTION_2->setCurrentIndex(2);
+    ui->MISC_OPTION_3->setCurrentIndex(3);
+#else
+    ui->MISC_OPTION_2->setCurrentIndex(1);
+    ui->MISC_RADIO_3->hide();
+    ui->MISC_OPTION_3->hide();
+#endif
     connect(ui->MISC_OPTION_1, SIGNAL(selected()), ui->MISC_RADIO_1, SLOT(click()));
     connect(ui->MISC_OPTION_2, SIGNAL(selected()), ui->MISC_RADIO_2, SLOT(click()));
+    connect(ui->MISC_OPTION_3, SIGNAL(selected()), ui->MISC_RADIO_3, SLOT(click()));
+    ui->MISC_OPTION_1->view()->setFont(temp_f);
 
     ui->DATA_EXCHANGE->document()->setMaximumBlockCount(200);
 //    ui->COM_DATA_RADIO->click();
-    QFont temp_f(consolas);
-    temp_f.setPixelSize(11);
     ui->DATA_EXCHANGE->setFont(temp_f);
     ui->FILE_PATH_EDIT->setFont(consolas);
 
@@ -397,6 +413,7 @@ UserPanel::UserPanel(QWidget *parent) :
 //    display_grp->addButton(ui->PTZ_RADIO);
     display_grp->addButton(ui->MISC_RADIO_1);
     display_grp->addButton(ui->MISC_RADIO_2);
+    display_grp->addButton(ui->MISC_RADIO_3);
     display_grp->setExclusive(true);
     ui->MISC_RADIO_1->setChecked(true);
     ui->MISC_DISPLAY->setCurrentIndex(1);
@@ -540,17 +557,18 @@ UserPanel::UserPanel(QWidget *parent) :
 
     ui->LASER_STATIC->hide();
     ui->MISC_DISPLAY_GRP->setParent(ui->RIGHT);
-    ui->MISC_DISPLAY_GRP->setGeometry(10, 365, ui->IMG_PROC_STATIC->width(), ui->MISC_DISPLAY_GRP->height());
-    QSize temp = ui->DATA_EXCHANGE->size();
-    temp.setWidth(ui->MISC_DISPLAY_GRP->width());
-    ui->DATA_EXCHANGE->resize(temp);
-//    ui->HIST_DISPLAY->resize(temp);
+//    ui->MISC_DISPLAY_GRP->setGeometry(10, 365, ui->IMG_PROC_STATIC->width(), ui->MISC_DISPLAY_GRP->height());
+    ui->MISC_DISPLAY_GRP->move(25, 365);
     ui->LENS_STATIC->hide();
     ui->IMG_SAVE_STATIC->move(10, 265);
     ui->IMG_PROC_STATIC->hide();
     ui->SCAN_GRP->move(10, 560);
     ui->IMG_3D_CHECK->hide();
     ui->RANGE_THRESH_EDIT->hide();
+
+    temp_f.setPixelSize(11);
+    ui->DATA_EXCHANGE->setFont(temp_f);
+    ui->HIST_DISPLAY->setAlignment(Qt::AlignHCenter | Qt::AlignBottom);
 
 //    ui->DELAY_N->hide();
 //    ui->DELAY_N_EDIT_N->hide();
@@ -1064,6 +1082,12 @@ int UserPanel::grab_thread_process(int *idx) {
                 // dcp
                 case 8: {
                     ImageProc::haze_removal(modified_result[thread_idx], modified_result[thread_idx], 7, pref->dehaze_pct, 0.1, 60, 0.01);
+                    break;
+                }
+                // aindane
+                case 9: {
+                    ImageProc::aindane(modified_result[thread_idx], modified_result[thread_idx]);
+                    break;
                 }
                 // none
                 default:
@@ -1090,7 +1114,7 @@ int UserPanel::grab_thread_process(int *idx) {
         }
 
         // display the gray-value histogram of the current grayscale image, or the distance histogram of the current 3D image
-        if (alt_display_option == 1) {
+        if (alt_display_option == 2) {
             if (modified_result[thread_idx].channels() == 1) {
                 uchar *img = modified_result[thread_idx].data;
                 int step = modified_result[thread_idx].step;
@@ -1108,7 +1132,7 @@ int UserPanel::grab_thread_process(int *idx) {
                 }
             }
             // TODO change to signal/slots
-            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(ui->PLUGIN_DISPLAY_1->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         }
 
         // FIXME possible crash when move scaled image to bottom-right corner
@@ -4295,6 +4319,12 @@ void UserPanel::on_MISC_RADIO_2_clicked()
     ui->MISC_DISPLAY->setCurrentIndex(alt_display_option);
 }
 
+void UserPanel::on_MISC_RADIO_3_clicked()
+{
+    alt_display_option = ui->MISC_OPTION_3->currentIndex() + 1;
+    ui->MISC_DISPLAY->setCurrentIndex(alt_display_option);
+}
+
 void UserPanel::on_MISC_OPTION_1_currentIndexChanged(int index)
 {
     alt_display_option = index + 1;
@@ -4307,6 +4337,13 @@ void UserPanel::on_MISC_OPTION_2_currentIndexChanged(int index)
     alt_display_option = index + 1;
     ui->MISC_DISPLAY->setCurrentIndex(alt_display_option);
     ui->MISC_RADIO_2->setChecked(true);
+}
+
+void UserPanel::on_MISC_OPTION_3_currentIndexChanged(int index)
+{
+    alt_display_option = index + 1;
+    ui->MISC_DISPLAY->setCurrentIndex(alt_display_option);
+    ui->MISC_RADIO_3->setChecked(true);
 }
 #if 0
 void UserPanel::on_COM_DATA_RADIO_clicked()

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(GLI_user_panel LANGUAGES CXX VERSION 0.6.1.0)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.6.2.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -268,6 +268,9 @@ if (MSVC AND BUILD_STATIC)
         string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
     endforeach()
 endif()
+
+add_library(ImgProc STATIC src/imageproc.h src/imageproc.cpp)
+target_link_libraries(ImgProc opencv_core454 opencv_imgcodecs454 opencv_imgproc454)
 
 add_executable(GLI_params WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(GLI_params PRIVATE PARAM=1)

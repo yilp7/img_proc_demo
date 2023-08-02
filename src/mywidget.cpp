@@ -690,6 +690,20 @@ void MiscSelection::wheelEvent(QWheelEvent *event)
     clearFocus();
 }
 
+void MiscSelection::paintEvent(QPaintEvent *event)
+{
+    QStylePainter painter(this);
+    QStyleOptionComboBox opt;
+    initStyleOption(&opt);
+    opt.currentText = "";
+    opt.subControls &= ~QStyle::SC_ComboBoxArrow;
+    painter.drawComplexControl(QStyle::CC_ComboBox, opt);
+    painter.drawControl(QStyle::CE_ComboBoxLabel, opt);
+    QRect rect1 = style()->subControlRect(QStyle::CC_ComboBox, &opt, QStyle::SC_ComboBoxEditField, this);
+    QRect rect2 = style()->subControlRect(QStyle::CC_ComboBox, &opt, QStyle::SC_ComboBoxArrow, this);
+    painter.drawText(rect1.adjusted(0, 0, rect2.right() - rect1.right(), 0), Qt::AlignLeft | Qt::AlignVCenter, currentText());
+}
+
 //void MiscSelection::showPopup()
 //{
 //    QComboBox::showPopup();

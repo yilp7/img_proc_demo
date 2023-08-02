@@ -34,8 +34,6 @@ private:
     bool                 streaming_thread_state;
 
 public:
-    int device_type;
-    int curr_idx;
     std::vector<PvDeviceInfoGEV*> gige_dev_list;
     std::vector<PvDeviceInfoU3V*> usb3_dev_list;
 

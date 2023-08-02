@@ -157,11 +157,6 @@ MiscSelection {
 	width: 60px;
 }
 
-MiscSelection::drop-down {
-	width: 0px;
-	height: 0px;
-}
-
 MiscSelection QAbstractItemView {
 	background-color: #F0E6DB;
 	selection-background-color: #F4F4EA;

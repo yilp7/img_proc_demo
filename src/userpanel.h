@@ -217,8 +217,10 @@ private slots:
     // change alt display content
     void on_MISC_RADIO_1_clicked();
     void on_MISC_RADIO_2_clicked();
+    void on_MISC_RADIO_3_clicked();
     void on_MISC_OPTION_1_currentIndexChanged(int index);
     void on_MISC_OPTION_2_currentIndexChanged(int index);
+    void on_MISC_OPTION_3_currentIndexChanged(int index);
 
     // choose how mouse works in DISPLAY
     // TODO add a new exclusive button group

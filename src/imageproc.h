@@ -19,8 +19,8 @@ public:
     static void plateau_equl_hist(cv::Mat &src, cv::Mat &res, int method);
     static void accumulative_enhance(cv::Mat &src, cv::Mat &res, float accu_base);
     static void adaptive_enhance(cv::Mat &src, cv::Mat &res, double low_in, double high_in, double low_out, double high_out, double gamma);
-
     static void haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega, float t0, int guided_radius = 60, float eps = 0.01);
+    static void aindane(cv::Mat &src, cv::Mat &res, std::vector<int> sigma = {60});
     static void brightness_and_contrast(cv::Mat & src, cv::Mat &res, float alpha, float beta);
     // TODO: check float implementation
     static void brightness_and_contrast(cv::Mat & src, cv::Mat &res, float gamma);
@@ -36,7 +36,7 @@ public:
     // TODO rewrite 3d painting function
     static void paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double min, double max, int colormap = cv::COLORMAP_PARULA);
 
-    // split image 1x(2x2) -> 4x(1x1)
+    // split image 2x2 -> (1x1) x4
     static void split_img(cv::Mat &src, cv::Mat &res);
 
 private:

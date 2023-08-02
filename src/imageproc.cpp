@@ -1,8 +1,4 @@
 #include "imageproc.h"
-#include "opencv2/highgui.hpp"
-#include <QDebug>
-//#define NOMINMAX
-//#include <windows.h>
 
 ImageProc::ImageProc() {}
 
@@ -528,8 +524,8 @@ void ImageProc::paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double
     cv::hconcat(mask, gray_bar, mask);
     cv::applyColorMap(img_3d_gray, img_3d, colormap);
     img_3d.copyTo(res, mask);
-    qDebug() << cv::countNonZero(mask);
-    cv::imwrite("../mask.bmp", mask);
+//    qDebug() << cv::countNonZero(mask);
+//    cv::imwrite("../mask.bmp", mask);
 
 //    min = 150, max = 300;
     char text[32] = {0};
@@ -608,6 +604,63 @@ void ImageProc::haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega
 
 //    QueryPerformanceCounter(&t2);
     //    printf("- reconstruct: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
+}
+
+void ImageProc::aindane(cv::Mat &src, cv::Mat &res, std::vector<int> sigma)
+{
+    int size = sigma.size();
+    int w = src.cols, h = src.rows;
+    static cv::Mat I;
+    if (src.channels() != 1) cv::cvtColor(src, I, cv::COLOR_RGB2GRAY); // Eq. 1
+    else I = src.clone();
+#if 1
+    static uint hist[256];
+    memset(hist, 0, 256 * sizeof(uint));
+    for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(src.data + i * src.step)[j]]++;
+    uint count = 0, limit = src.total() * 0.1, L = 0;
+    for (; L < 256 && count <= limit; L++) count += hist[L];
+    float z = L >= 150 ? 1 : (L <= 50 ? 0 : (L - 50) / 100.);
+#endif
+#if 0
+    static int histsize = 256;
+    static float range[] = { 0, 256 };
+    const float* histRanges = { range };
+    cv::Mat hist;
+    cv::calcHist(&I, 1, 0, cv::Mat(), hist, 1, &histsize, &histRanges, true, false);
+    uint count = 0, limit = src.total() * 0.1, L = 0;
+    for (; L < 256 && count <= limit; L++) count += hist.at<int>(L);
+    float z = L >= 150 ? 1 : (L <= 50 ? 0 : (L - 50) / 100.);
+#endif
+    cv::Mat mean, stddev;
+    cv::meanStdDev(I, mean, stddev);
+    float sig = stddev.at<double>(0, 0);
+    float P = sig >= 10 ? 1 : (sig <= 3 ? 0 : (27 - 2 * sig) / 7.);
+
+    static uchar lut[256][256];
+    for (int i = 0; i < 256; i++) {      // I_conv
+        for (int j = 0; j < 256; j++) {  // I
+            float in = j / 255.;
+            float _in = (std::pow(in, 0.75 * z + 0.25) + (1 - in) * 0.4 * (1 - z) + std::pow(in, 2 - z)) / 2.; // Eq. 3
+            lut[i][j] = cv::saturate_cast<uchar>(255 * std::pow(_in, std::pow((i + 1.) / (j + 1.), P)) + 0.5); // Eq. 7 & 8
+        }
+    }
+
+    std::vector<cv::Mat> I_conv(size);
+    for (int i = 0; i < size; i++) cv::GaussianBlur(I, I_conv[i], cv::Size(), sigma[i], sigma[i], cv::BORDER_CONSTANT); // Eq. 6
+
+    uchar *ptr_src = src.data, *ptr_res = res.data;
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            uchar I_ch = I.data[i * I.step + j];
+            float S = 0;
+            for (int c = 0; c < size; c++) S += lut[I_conv[c].data[i * I.step + j]][I_ch] / float(size); // Eq. 13
+            for (int k = 0; k < src.channels(); k++) {
+                int idx = i * src.step + j * src.channels() + k;
+                float coef = std::min(S / I_ch, 4.f);
+                ptr_res[idx] = cv::saturate_cast<uchar>(ptr_src[idx] * coef); // Eq. 14
+            }
+        }
+    }
 }
 
 void ImageProc::brightness_and_contrast(cv::Mat &src, cv::Mat &res, float alpha, float beta)
