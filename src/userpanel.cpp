@@ -930,6 +930,28 @@ int UserPanel::grab_thread_process(int *idx) {
 
         if (pref->split) ImageProc::split_img(modified_result[thread_idx], modified_result[thread_idx]);
 
+        // display the gray-value histogram of the current grayscale image, or the distance histogram of the current 3D image
+        if (alt_display_option == 2) {
+            if (modified_result[thread_idx].channels() == 1) {
+                uchar *img = modified_result[thread_idx].data;
+                int step = modified_result[thread_idx].step;
+                memset(hist, 0, 256 * sizeof(uint));
+                for (int i = 0; i < hh; i++) for (int j = 0; j < ww; j++) hist[(img + i * step)[j]]++;
+                uint max = 0;
+                for (int i = 1; i < 256; i++) {
+                    // discard abnormal value
+                    //                    if (hist[i] > 50000) hist[i] = 0;
+                    if (hist[i] > max) max = hist[i];
+                }
+                hist_mat = cv::Mat(176, 256, CV_8UC3, cv::Scalar(56, 64, 72));
+                for (int i = 1; i < 256; i++) {
+                    cv::rectangle(hist_mat, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
+                }
+            }
+            // TODO change to signal/slots
+            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+        }
+
         // process 3d image construction from ABN frames
         if (ui->IMG_3D_CHECK->isChecked()) {
             ww = _w + 104;
@@ -963,6 +985,12 @@ int UserPanel::grab_thread_process(int *idx) {
             else emit update_dist_mat(dist_mat, dist_min, dist_max);
 
             cv::resize(modified_result[thread_idx], img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
+        }
+        // process pseudo-color
+        else if (ui->COLORMAP_CHK->isChecked()) {
+            ww = _w + 104;
+            hh = _h;
+            ImageProc::paint_3d(modified_result[thread_idx], modified_result[thread_idx], pref->lower_3d_thresh * 255, pref->upper_3d_thresh * 255, pref->colormap);
         }
         // process ordinary image enhance
         else {
@@ -1103,28 +1131,6 @@ int UserPanel::grab_thread_process(int *idx) {
             ImageProc::brightness_and_contrast(modified_result[thread_idx], modified_result[thread_idx], tan((20 - ui->GAMMA_SLIDER->value()) / 40. * M_PI));
         }
 
-        // display the gray-value histogram of the current grayscale image, or the distance histogram of the current 3D image
-        if (alt_display_option == 2) {
-            if (modified_result[thread_idx].channels() == 1) {
-                uchar *img = modified_result[thread_idx].data;
-                int step = modified_result[thread_idx].step;
-                memset(hist, 0, 256 * sizeof(uint));
-                for (int i = 0; i < hh; i++) for (int j = 0; j < ww; j++) hist[(img + i * step)[j]]++;
-                uint max = 0;
-                for (int i = 1; i < 256; i++) {
-                    // discard abnormal value
-                    //                    if (hist[i] > 50000) hist[i] = 0;
-                    if (hist[i] > max) max = hist[i];
-                }
-                hist_mat = cv::Mat(176, 256, CV_8UC3, cv::Scalar(56, 64, 72));
-                for (int i = 1; i < 256; i++) {
-                    cv::rectangle(hist_mat, cv::Point(i, 225), cv::Point(i + 1, 225 - hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
-                }
-            }
-            // TODO change to signal/slots
-            ui->HIST_DISPLAY->setPixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(ui->HIST_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
-        }
-
         // FIXME possible crash when move scaled image to bottom-right corner
         // crop the region to display
 //        cv::Rect region = cv::Rect(disp->display_region.tl() * (image_3d ? ww + 104 : ww) / disp->width(), disp->display_region.br() * (image_3d ? ww + 104 : ww) / disp->width());
@@ -1178,7 +1184,7 @@ int UserPanel::grab_thread_process(int *idx) {
 
         // image display
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
-        stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, image_3d[thread_idx] || is_color[thread_idx] ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+        stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, ui->COLORMAP_CHK->isChecked() || image_3d[thread_idx] || is_color[thread_idx] ? QImage::Format_RGB888 : QImage::Format_Indexed8);
 //        ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         // use signal->slot instead of directly call
         disp->emit set_pixmap(QPixmap::fromImage(stream.scaled(disp->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
@@ -1483,6 +1489,7 @@ void UserPanel::enable_controls(bool cam_rdy) {
 //    ui->SCAN_BUTTON->setEnabled(start_grabbing || device_type > 0);
     ui->INFO_CHECK->setEnabled(start_grabbing);
     ui->CENTER_CHECK->setEnabled(start_grabbing);
+    ui->COLORMAP_CHK->setEnabled(start_grabbing);
 }
 
 void UserPanel::save_to_file(bool save_result, int idx) {
@@ -3443,7 +3450,7 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
 
 void UserPanel::resizeEvent(QResizeEvent *event)
 {
-    int ww = ui->IMG_3D_CHECK->isChecked() ? w[0] + 104 : w[0];
+    int ww = ui->IMG_3D_CHECK->isChecked() || ui->COLORMAP_CHK->isChecked() ? w[0] + 104 : w[0];
     QRect window = this->geometry();
 //    qDebug() << window;
     int grp_width = ui->RIGHT->width();
@@ -3481,6 +3488,7 @@ void UserPanel::resizeEvent(QResizeEvent *event)
 
     ui->INFO_CHECK->move(region.right() - 60, 0);
     ui->CENTER_CHECK->move(region.right() - 60, 20);
+    ui->COLORMAP_CHK->move(region.right() - 150, 20);
     ui->HIDE_BTN->move(ui->MID->geometry().left() - 8, this->geometry().height() / 2 - 10);
 //    ui->HIDE_BTN->move(ui->LEFT->geometry().right() - 10 + (ui->SOURCE_DISPLAY->geometry().left() + ui->MID->geometry().left() - ui->LEFT->geometry().right() + 10) / 2 + 2, this->geometry().height() / 2 - 10);
     ui->RULER_H->setGeometry(region.left(), region.bottom() - 10, region.width(), 32);
@@ -3770,7 +3778,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
             if (!display_mutex[display_idx].tryLock(1e3)) return -1;
         }
 
-        bool is_rtsp_stream = !filename.contains("rtsp://");
+        bool rtsp_stream = filename.contains("rtsp://");
 
         AVFormatContext *format_context = avformat_alloc_context();
         std::shared_ptr<AVFormatContext*> closer_format_context(&format_context, avformat_close_input);
@@ -3881,7 +3889,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
                     }
                     else {
-                        if (is_rtsp_stream && display && frame->pts != AV_NOPTS_VALUE) {
+                        if (!rtsp_stream && display && frame->pts != AV_NOPTS_VALUE) {
                             if (last_pts != AV_NOPTS_VALUE) {
                                 delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1e6;
 //                                qDebug() << av_rescale_q(frame->pts - last_pts, time_base, time_base_q) << elapsed_timer.nsecsElapsed() / 1000;
@@ -4841,4 +4849,14 @@ void UserPanel::on_AVG_NUM_EDT_editingFinished()
     if (calc_avg_option <   1) calc_avg_option =   1;
     if (calc_avg_option > 100) calc_avg_option = 100;
     ui->AVG_NUM_EDT->setText(QString::number(calc_avg_option));
+}
+
+void UserPanel::on_COLORMAP_CHK_stateChanged(int arg1)
+{
+//    image_mutex[0].lock();
+//    is_color[0] = arg1;
+//    image_mutex[0].unlock();
+
+    QResizeEvent e(this->size(), this->size());
+    resizeEvent(&e);
 }

@@ -1697,6 +1697,19 @@
       <string/>
      </property>
     </widget>
+    <widget class="QCheckBox" name="COLORMAP_CHK">
+     <property name="geometry">
+      <rect>
+       <x>500</x>
+       <y>20</y>
+       <width>91</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>colormap</string>
+     </property>
+    </widget>
    </widget>
    <widget class="QFrame" name="RIGHT">
     <property name="geometry">

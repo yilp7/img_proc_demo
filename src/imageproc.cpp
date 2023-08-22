@@ -492,25 +492,22 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
     *d_max = max;
 }
 
-void ImageProc::paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double start_pos, double end_pos, int colormap)
+void ImageProc::paint_3d(cv::Mat &src, cv::Mat &res, double lower_thresh, double upper_thresh, int colormap)
 {
     const int BARWIDTH = 104, BARHEIGHT = src.rows;
     const int IMAGEWIDTH = src.cols, IMAGEHEIGHT = src.rows;
     cv::Mat gray_bar(BARHEIGHT, BARWIDTH, CV_8UC1);
     uchar *uc_ptr = gray_bar.data;
-    cv::Mat img_3d;
 
     double max = 0, min = 65535;
     int i, j, step_gray = gray_bar.step;
 
-    cv::minMaxLoc(src, &min, &max);
-    max *= 0.98;
-    min *= 1.02;
-    cv::Mat img_3d_gray, mask;
-    cv::threshold(src, mask, 0.05, 255, cv::THRESH_BINARY);
-    mask.convertTo(mask, CV_8UC1);
-
-    cv::normalize(src, img_3d_gray, 0, 255, cv::NORM_MINMAX, CV_8UC1, mask);
+    static cv::Mat temp, mask, img_3d_gray, img_3d;
+    cv::threshold(src,  temp, lower_thresh, 0, cv::THRESH_TOZERO);
+    cv::threshold(temp, temp, upper_thresh, 0, cv::THRESH_TOZERO_INV);
+    temp.convertTo(mask, CV_8UC1);
+    cv::minMaxLoc(temp, &min, &max, NULL, NULL, mask);
+    cv::normalize(temp, img_3d_gray, 0, 255, cv::NORM_MINMAX, CV_8UC1, mask);
 
     int bar_gray = 255;
     int color_step = BARHEIGHT / 254;
@@ -527,20 +524,20 @@ void ImageProc::paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double
     cv::hconcat(img_3d_gray, gray_bar, img_3d_gray);
     cv::hconcat(mask, gray_bar, mask);
     cv::applyColorMap(img_3d_gray, img_3d, colormap);
-    img_3d.copyTo(res, mask);
-    qDebug() << cv::countNonZero(mask);
-    cv::imwrite("../mask.bmp", mask);
+//    img_3d.copyTo(res, mask);
+//    qDebug() << cv::countNonZero(mask);
+//    cv::imwrite("../mask.bmp", mask);
 
 //    min = 150, max = 300;
     char text[32] = {0};
-    sprintf(text, "%.2f", end_pos);
+    sprintf(text, "%03d", int(max));
     cv::putText(img_3d, text, cv::Point(IMAGEWIDTH, 20), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
-    sprintf(text, "%.2f", (end_pos + start_pos) / 2);
+    sprintf(text, "%03d", int((max + min) / 2));
     cv::putText(img_3d, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT / 2 - 15), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
-    sprintf(text, "%.2f", start_pos);
+    sprintf(text, "%03d", int(min));
     cv::putText(img_3d, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT - 10), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
 
-    res = img_3d.clone();
+    img_3d.copyTo(res, mask);
 }
 
 void ImageProc::split_img(cv::Mat &src, cv::Mat &res)

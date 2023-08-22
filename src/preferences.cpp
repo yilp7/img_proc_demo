@@ -46,7 +46,7 @@ Preferences::Preferences(QWidget *parent) :
     sky_tolerance(40),
     fast_gf(1),
     colormap(cv::COLORMAP_PARULA),
-    lower_3d_thresh(0),
+    lower_3d_thresh(0.019),
     upper_3d_thresh(0.981),
     truncate_3d(false),
     custom_3d_param(false),
@@ -334,6 +334,27 @@ Preferences::Preferences(QWidget *parent) :
 #endif
     //![5]
     data_exchange(false);
+
+    ui->PIXEL_FORMAT_LIST->setEnabled(false);
+    ui->EBUS_CHK->setEnabled(false);
+    ui->IMAGE_3D->setParent(ui->TEMP_IMG_PROC_GRP);
+    ui->LOWER_3D_THRESH->setParent(ui->TEMP_IMG_PROC_GRP);
+    ui->UPPER_3D_THRESH_EDT->setParent(ui->TEMP_IMG_PROC_GRP);
+    ui->UPPER_3D_THRESH->setParent(ui->TEMP_IMG_PROC_GRP);
+    ui->LOWER_3D_THRESH_EDT->setParent(ui->TEMP_IMG_PROC_GRP);
+    ui->COLORMAP_3D_LIST->setParent(ui->TEMP_IMG_PROC_GRP);
+    ui->TRUNCATE_3D_CHK->setParent(ui->TEMP_IMG_PROC_GRP);
+    ui->IMG_PROC_GRP->hide();
+
+    ui->IMAGE_3D->move(ui->IMAGE_3D->x(), ui->IMAGE_3D->y() - 310);
+    ui->LOWER_3D_THRESH->move(ui->LOWER_3D_THRESH->x(), ui->LOWER_3D_THRESH->y() - 310);
+    ui->UPPER_3D_THRESH_EDT->move(ui->UPPER_3D_THRESH_EDT->x(), ui->UPPER_3D_THRESH_EDT->y() - 310);
+    ui->UPPER_3D_THRESH->move(ui->UPPER_3D_THRESH->x(), ui->UPPER_3D_THRESH->y() - 310);
+    ui->LOWER_3D_THRESH_EDT->move(ui->LOWER_3D_THRESH_EDT->x(), ui->LOWER_3D_THRESH_EDT->y() - 310);
+    ui->COLORMAP_3D_LIST->move(ui->COLORMAP_3D_LIST->x(), ui->COLORMAP_3D_LIST->y() - 310);
+    ui->TRUNCATE_3D_CHK->move(ui->TRUNCATE_3D_CHK->x(), ui->TRUNCATE_3D_CHK->y() - 310);
+
+    ui->CONTENT->setMinimumHeight(1220);
 }
 
 Preferences::~Preferences()

@@ -510,7 +510,7 @@
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>-73</y>
+      <y>-928</y>
       <width>324</width>
       <height>1620</height>
      </rect>
@@ -1531,7 +1531,7 @@
        </rect>
       </property>
       <property name="text">
-       <string>3D</string>
+       <string>colormap</string>
       </property>
      </widget>
      <widget class="QCheckBox" name="TRUNCATE_3D_CHK">
@@ -2001,6 +2001,23 @@
       </property>
      </widget>
     </widget>
+    <widget class="QFrame" name="TEMP_IMG_PROC_GRP">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>1100</y>
+       <width>291</width>
+       <height>91</height>
+      </rect>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+    </widget>
+    <zorder>TEMP_IMG_PROC_GRP</zorder>
     <zorder>IMG_PROC_GRP</zorder>
     <zorder>SERIAL_PORTS_GRP</zorder>
     <zorder>TCU_GRP</zorder>

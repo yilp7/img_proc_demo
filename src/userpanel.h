@@ -263,6 +263,8 @@ private slots:
 
     void on_AVG_NUM_EDT_editingFinished();
 
+    void on_COLORMAP_CHK_stateChanged(int arg1);
+
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
     void append_text(QString text);
