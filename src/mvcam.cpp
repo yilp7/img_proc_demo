@@ -303,4 +303,5 @@ void MvCam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void
     struct main_ui_info *ptr = (struct main_ui_info*)user_data;
     ptr->frame_info_q->push(frame_info->nLostPacket);
     ptr->img_q->push(mv_img.clone());
+//    cv::imwrite("../mv.bmp", mv_img);
 }

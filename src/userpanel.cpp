@@ -1229,6 +1229,9 @@ int UserPanel::grab_thread_process(int *idx) {
         }
         if (scan && std::round(delay_dist / dist_ns) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
 
+//        cv::imwrite("../a.bmp", img_mem[thread_idx]);
+//        cv::imwrite("../b.bmp", modified_result[thread_idx]);
+
         // image write / video record
         if (updated && save_original[thread_idx]) {
             save_to_file(false, thread_idx);
