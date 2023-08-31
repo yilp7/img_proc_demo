@@ -39,6 +39,8 @@ public:
     // split image 1x(2x2) -> 4x(1x1)
     static void split_img(cv::Mat &src, cv::Mat &res);
 
+    static void saturation_alert(cv::Mat &src, cv::Mat &res);
+
 private:
     static int get_median(uint *arr, int len);
     static void get_threshold(uint *nonzero_hist, int nonzero_size, uint &up, uint &down);

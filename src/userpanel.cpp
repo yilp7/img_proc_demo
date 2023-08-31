@@ -1144,6 +1144,8 @@ int UserPanel::grab_thread_process(int *idx) {
         modified_result[thread_idx] = modified_result[thread_idx](region);
         cv::resize(modified_result[thread_idx], modified_result[thread_idx], cv::Size(ww, hh));
 
+        if (ui->SAT_ALERT_CHK->isChecked()) ImageProc::saturation_alert(modified_result[thread_idx], modified_result[thread_idx]);
+
         // put info (dist, dov, time) as text on image
         QString info_tcu = pref->custom_topleft_info ?
                     pref->ui->CUSTOM_INFO_EDT->text() :
@@ -1151,8 +1153,8 @@ int UserPanel::grab_thread_process(int *idx) {
                                      QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns));
         QString info_time = QDateTime::currentDateTime().toString("hh:mm:ss:zzz");
         if (ui->INFO_CHECK->isChecked()) {
-            cv::putText(modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            cv::putText(modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255, 255, 255), weight * 2);
+            cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255, 255, 255), weight * 2);
 #ifdef LVTONG
             static int baseline = 0;
             if (pref->fishnet_recog) {
@@ -1184,7 +1186,7 @@ int UserPanel::grab_thread_process(int *idx) {
 
         // image display
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
-        stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, ui->COLORMAP_CHK->isChecked() || image_3d[thread_idx] || is_color[thread_idx] ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+        stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, ui->SAT_ALERT_CHK->isChecked() || ui->COLORMAP_CHK->isChecked() || image_3d[thread_idx] || is_color[thread_idx] ? QImage::Format_RGB888 : QImage::Format_Indexed8);
 //        ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         // use signal->slot instead of directly call
         disp->emit set_pixmap(QPixmap::fromImage(stream.scaled(disp->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
@@ -1490,6 +1492,7 @@ void UserPanel::enable_controls(bool cam_rdy) {
     ui->INFO_CHECK->setEnabled(start_grabbing);
     ui->CENTER_CHECK->setEnabled(start_grabbing);
     ui->COLORMAP_CHK->setEnabled(start_grabbing);
+    ui->SAT_ALERT_CHK->setEnabled(start_grabbing);
 }
 
 void UserPanel::save_to_file(bool save_result, int idx) {
@@ -3489,6 +3492,7 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     ui->INFO_CHECK->move(region.right() - 60, 0);
     ui->CENTER_CHECK->move(region.right() - 60, 20);
     ui->COLORMAP_CHK->move(region.right() - 150, 20);
+    ui->SAT_ALERT_CHK->move(region.right() - 150, 0);
     ui->HIDE_BTN->move(ui->MID->geometry().left() - 8, this->geometry().height() / 2 - 10);
 //    ui->HIDE_BTN->move(ui->LEFT->geometry().right() - 10 + (ui->SOURCE_DISPLAY->geometry().left() + ui->MID->geometry().left() - ui->LEFT->geometry().right() + 10) / 2 + 2, this->geometry().height() / 2 - 10);
     ui->RULER_H->setGeometry(region.left(), region.bottom() - 10, region.width(), 32);

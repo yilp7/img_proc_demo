@@ -554,6 +554,40 @@ void ImageProc::split_img(cv::Mat &src, cv::Mat &res)
     }
 }
 
+void ImageProc::saturation_alert(cv::Mat &src, cv::Mat &res)
+{
+    if (src.channels() != 1) return;
+    cv::Mat inter;
+    src.convertTo(inter, CV_8U);
+    cv::cvtColor(inter, res, cv::COLOR_GRAY2RGB);
+    int h = src.rows, w = src.cols;
+    uchar *ptr_src = inter.data, *ptr_res = res.data;
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            switch (ptr_src[i * w + j]) {
+            case 251:
+            case 252:
+                ptr_res[i * w * 3 + j * 3    ] = 253;
+                ptr_res[i * w * 3 + j * 3 + 1] = 245;
+                ptr_res[i * w * 3 + j * 3 + 2] =  20;
+                break;
+            case 253:
+            case 254:
+                ptr_res[i * w * 3 + j * 3    ] = 255;
+                ptr_res[i * w * 3 + j * 3 + 1] = 143;
+                ptr_res[i * w * 3 + j * 3 + 2] =   0;
+                break;
+            case 255:
+                ptr_res[i * w * 3 + j * 3    ] = 243;
+                ptr_res[i * w * 3 + j * 3 + 1] =  34;
+                ptr_res[i * w * 3 + j * 3 + 2] =  46;
+                break;
+            default: break;
+            }
+        }
+    }
+}
+
 void ImageProc::haze_removal(cv::Mat &src, cv::Mat &res, int radius, float omega, float t0, int guided_radius, float eps)
 {
 //    LARGE_INTEGER t1, t2, tc;
