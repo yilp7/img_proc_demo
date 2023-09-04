@@ -4501,7 +4501,13 @@ void UserPanel::ptz_button_pressed(int id) {
     case 1: send_ctrl_cmd(0x08);                      break;
     case 2: send_ctrl_cmd(0x08); send_ctrl_cmd(0x02); break;
     case 3: send_ctrl_cmd(0x04);                      break;
-//    case 4: send_ctrl_cmd(0x00); break;
+    case 4: {
+        if (QMessageBox::warning(this, "PTZ", "Initialize?", QMessageBox::StandardButton::Ok | QMessageBox::StandardButton::Cancel) == QMessageBox::StandardButton::Ok) {
+            uchar buffer_out[7] = {0xFF, 0x01, 0x00, 0x07, 0x00, 0x77, 0x7F};
+            ptr_ptz->communicate_display(QByteArray((char*)buffer_out, 7), 7, 1, false);
+        }
+        break;
+    }
     case 5: send_ctrl_cmd(0x02);                      break;
     case 6: send_ctrl_cmd(0x10); send_ctrl_cmd(0x04); break;
     case 7: send_ctrl_cmd(0x10);                      break;
