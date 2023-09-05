@@ -16,7 +16,7 @@ set(BUILD_STATIC 0)
 add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
-if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(SDK_DIR "${PROJECT_SOURCE_DIR}/../SDK/sdk64")
 else()
     set(SDK_DIR "${PROJECT_SOURCE_DIR}/../SDK/sdk32")
@@ -25,12 +25,35 @@ endif()
 set(Hik_SDK_DIR "${SDK_DIR}/mvs")
 set(HQV_DIR "${SDK_DIR}/HQV")
 set(EURESYS_DIR "${SDK_DIR}/euresys")
-set(OpenCV_DIR "${SDK_DIR}/opencv")
-set(FFMPEG_DIR "${SDK_DIR}/ffmpeg")
-set(eBUS_DIR "${SDK_DIR}/eBUS")
+if(WIN32)
+    set(eBUS_DIR "${SDK_DIR}/eBUS")
+    set(OpenCV_DIR "${SDK_DIR}/opencv")
+    set(FFmpeg_DIR "${SDK_DIR}/ffmpeg")
+else()
+    set(OpenCV_DIR "/opt/OpenCV4.8.0")
+    set(FFmpeg_DIR "/opt/FFmpeg5.1.3")
 
-include_directories(${SDK_DIR}/VLD/include)
-link_directories(${SDK_DIR}/VLD/lib)
+    find_package(Eigen3)
+    find_package(OpenCV REQUIRED)
+
+    find_package(PkgConfig REQUIRED)
+    set(ENV{PKG_CONFIG_PATH} "${FFmpeg_DIR}/lib/pkgconfig")
+    pkg_check_modules(LIBFFMPEG REQUIRED IMPORTED_TARGET
+        libavdevice
+        libavfilter
+        libavformat
+        libavcodec
+        libswresample
+        libswscale
+        libavutil
+    )
+    set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+endif()
+
+if(WIN32)
+    include_directories(${SDK_DIR}/VLD/include)
+    link_directories(${SDK_DIR}/VLD/lib)
+endif()
 
 # QtCreator supports the following variables for Android, which are identical to qmake Android variables.
 # Check http://doc.qt.io/qt-5/deployment-android.html for more information.
@@ -39,20 +62,23 @@ link_directories(${SDK_DIR}/VLD/lib)
 find_package(QT NAMES Qt5 REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort Network DataVisualization Concurrent REQUIRED)
 
-if (WIN32)
+
+#message(${CMAKE_HOST_SYSTEM_PROCESSOR})
+
+if(WIN32)
     include_directories(${Hik_SDK_DIR}/include/win)
     include_directories(${HQV_DIR}/include)
     include_directories(${EURESYS_DIR}/include)
     include_directories(${OpenCV_DIR}/include)
-    include_directories(${FFMPEG_DIR}/include)
+    include_directories(${FFmpeg_DIR}/include)
     include_directories(${eBUS_DIR}/include)
 
-    if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         link_directories(${Hik_SDK_DIR}/lib/x64)
         link_directories(${HQV_DIR}/lib)
         link_directories(${EURESYS_DIR}/lib)
-        link_directories(${FFMPEG_DIR}/lib/x64)
-        if (BUILD_STATIC)
+        link_directories(${FFmpeg_DIR}/lib/x64)
+        if(BUILD_STATIC)
             link_directories(${OpenCV_DIR}/lib/x64_static)
         else()
             link_directories(${OpenCV_DIR}/lib/x64)
@@ -65,24 +91,31 @@ if (WIN32)
         link_directories(${OpenCV_DIR}/lib/x86)
         link_directories(${eBUS_DIR}/lib)
     endif()
-elseif (APPLE)
+elseif(APPLE)
 
-# for aarch64 only
-elseif (UNIX)
+elseif(UNIX)
     include_directories(${PROJECT_SOURCE_DIR}/src)
 
     include_directories(${Hik_SDK_DIR}/include/linux)
     include_directories(${HQV_DIR}/include)
     include_directories(${EURESYS_DIR}/include)
     include_directories(${OpenCV_DIR}/include)
+    include_directories(${FFmpeg_DIR}/include/linux)
 
-    link_directories(${Hik_SDK_DIR}/lib/aarch64)
     link_directories(${HQV_DIR}/lib)
     link_directories(${EURESYS_DIR}/lib)
-    link_directories(${OpenCV_DIR}/lib/aarch64)
+    if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "aarch64")
+        link_directories(${Hik_SDK_DIR}/lib/aarch64)
+        link_directories(${OpenCV_DIR}/lib/aarch64)
+        link_directories(${FFmpeg_DIR}/lib/aarch64)
+    elseif(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "x86_64")
+        link_directories(${Hik_SDK_DIR}/lib/x64)
+        link_directories(${OpenCV_DIR}/lib/x64)
+        link_directories(${FFmpeg_DIR}/lib/x64)
+    endif()
 endif()
 
-if (MSVC)
+if(MSVC)
     set(VER_PRELEASE 1)
     configure_file("${CMAKE_SOURCE_DIR}/src/gist.rc.in" "${CMAKE_SOURCE_DIR}/resources/gist.rc" NEWLINE_STYLE WIN32)
     configure_file("${CMAKE_SOURCE_DIR}/src/version.h.in" "${CMAKE_SOURCE_DIR}/src/version.h" NEWLINE_STYLE WIN32)
@@ -112,8 +145,6 @@ set(SOURCE_FILES
 #    src/cam.cpp
     src/mvcam.h
     src/mvcam.cpp
-    src/ebuscam.h
-    src/ebuscam.cpp
 #    src/hqvcam.h
 #    src/hqvcam.cpp
 #    src/euresyscam.h
@@ -142,9 +173,11 @@ set(SOURCE_FILES
     resources/style_light.qss
 )
 
-if (WIN32)
+if(WIN32)
     set(SOURCE_FILES
         ${SOURCE_FILES}
+        src/ebuscam.h
+        src/ebuscam.cpp
         resources/gist.rc
     )
 endif()
@@ -181,7 +214,7 @@ set(PROJECT_LIBS
 #    )
 #endif()
 
-if (WIN32)
+if(WIN32)
     set(PROJECT_LIBS
         ${PROJECT_LIBS}
         # joystick
@@ -207,7 +240,7 @@ if (WIN32)
         Secur32
         Bcrypt
     )
-    if (BUILD_STATIC)
+    if(BUILD_STATIC)
         string(LENGTH ${QT_DIR} LEN_QT_DIR)
         math(EXPR LEN_QT_DIR ${LEN_QT_DIR}-14)
         string(SUBSTRING ${QT_DIR} 0 ${LEN_QT_DIR} QT_ROOT_DIR)
@@ -237,12 +270,21 @@ if (WIN32)
             qwindows      #platform plugin
         )
     endif()
-elseif (APPLE)
+elseif(APPLE)
 
 # for aarch64 only
-elseif (UNIX)
+elseif(UNIX)
     set(PROJECT_LIBS
         ${PROJECT_LIBS}
+        # ffmpeg
+        PkgConfig::LIBFFMPEG
+#        avcodec
+#        avformat
+#        avutil
+#        avfilter
+#        swscale
+#        swresample
+#        postproc
         # opencv
         opencv_core
         opencv_imgcodecs
@@ -253,7 +295,7 @@ elseif (UNIX)
     )
 endif()
 
-if (MSVC AND BUILD_STATIC)
+if(MSVC AND BUILD_STATIC)
     set(CompilerFlags
         CMAKE_C_FLAGS
         CMAKE_C_FLAGS_DEBUG
@@ -270,7 +312,11 @@ if (MSVC AND BUILD_STATIC)
 endif()
 
 add_library(ImgProc STATIC src/imageproc.h src/imageproc.cpp)
-target_link_libraries(ImgProc opencv_core454 opencv_imgcodecs454 opencv_imgproc454)
+if(WIN32)
+    target_link_libraries(ImgProc opencv_core454 opencv_imgcodecs454 opencv_imgproc454)
+else()
+    target_link_libraries(ImgProc opencv_core opencv_imgcodecs opencv_imgproc)
+endif()
 
 add_executable(GLI_params WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(GLI_params PRIVATE PARAM=1)
@@ -285,4 +331,8 @@ target_link_libraries(ICMOS ${PROJECT_LIBS})
 add_executable(LvTong WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(LvTong PRIVATE LVTONG=1)
 qt5_use_modules(LvTong Widgets SerialPort Network DataVisualization Concurrent)
-target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn454)
+if(WIN32)
+    target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn454)
+else()
+    target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn)
+endif()

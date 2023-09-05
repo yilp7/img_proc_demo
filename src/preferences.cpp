@@ -96,6 +96,9 @@ Preferences::Preferences(QWidget *parent) :
                 static int pixel_format[4] = {PixelType_Gvsp_Mono8, PixelType_Gvsp_Mono10, PixelType_Gvsp_Mono12, PixelType_Gvsp_RGB8_Packed};
                 emit change_pixel_format(pixel_format[index]);
             });
+#ifndef WIN32
+    ui->EBUS_CHK->setCheckable(false);
+#endif
     connect(ui->EBUS_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ ebus_cam = arg1; emit search_for_devices(); });
     connect(ui->SPLIT_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ split = arg1; });
 //![1]

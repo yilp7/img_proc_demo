@@ -1613,8 +1613,12 @@ void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, 
 void UserPanel::on_ENUM_BUTTON_clicked()
 {
     if (curr_cam) delete curr_cam;
+#ifdef WIN32
     if (pref->ebus_cam) curr_cam = new EbusCam;
     else                curr_cam = new MvCam;
+#else
+    curr_cam = new MvCam;
+#endif
 //    if (ui->TITLE->prog_settings->cameralink) curr_cam->cameralink = true;
     enable_controls(device_type = (curr_cam->search_for_devices() ?  (pref->ebus_cam ? 2 : 1) : 0));
     update_dev_ip();

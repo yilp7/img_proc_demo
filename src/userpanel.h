@@ -7,9 +7,11 @@
 #include "controlport.h"
 #include "aliasing.h"
 
-#include "cam.h"
+//#include "cam.h"
 #include "mvcam.h"
+#ifdef WIN32
 #include "ebuscam.h"
+#endif
 //#include "hqvscam.h"
 //#include "euresyscam.h"
 
