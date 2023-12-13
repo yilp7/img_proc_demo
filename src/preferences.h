@@ -69,6 +69,7 @@ signals:
     void gate_width_offset_changed(float dov);
     void laser_offset_changed(float laser_width);
     void laser_toggled(int config);
+    void ps_config_updated(bool read, int idx, int val);
 
     // image process
     void lower_3d_thresh_updated();
@@ -105,6 +106,7 @@ public:
     float            gate_width_offset; // depth offset (from hardware)
     float            max_laser_width;
     float            laser_width_offset; // laser width offset (from hardware)
+    int              ps_step[4]; // ps-stepping in ps-TCU
     bool             laser_enable;
     QButtonGroup*    laser_grp;
     int              laser_on; // does not rely on laser_enable

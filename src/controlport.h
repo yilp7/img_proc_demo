@@ -112,6 +112,10 @@ public:
         LASER4        = 0x1D,
         DIST          = 0x1E,
         TOGGLE_LASER  = 0x1F,
+        GW_A_PS       = 0x28,
+        DELAY_A_PS    = 0x29,
+        GW_B_PS       = 0x2A,
+        DELAY_B_PS    = 0x2B,
 
         DELAY_N       = 0x0100,
         GATE_WIDTH_N  = 0x0101,
@@ -119,6 +123,8 @@ public:
         EST_DIST      = 0x0103,
         EST_DOV       = 0x0104,
         LASER_ON      = 0x0105,
+
+        NO_PARAM      = 0xFF,
     };
 
     TCU(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, ScanConfig* sc = nullptr, QObject *parent = nullptr, uint init_width = 100);
@@ -158,10 +164,13 @@ public:
 
     // configuration
     bool  auto_rep_freq;
+    bool  ab_lock;
     float laser_offset;
     float delay_offset;
     float gate_width_offset;
+    int   ps_step[4];
 
+    bool  use_gw_lut;
     int   gw_lut[100];                // lookup table for gatewidth config by serial
 
 private:

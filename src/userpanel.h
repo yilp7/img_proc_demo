@@ -45,6 +45,29 @@ signals:
     void stop_image_writing();
 };
 
+class TimedQueue : public QThread {
+    Q_OBJECT
+public:
+    TimedQueue(double expiration_time);
+    ~TimedQueue();
+
+    void set_display_label(StatusIcon *lbl);
+    void add_to_q();
+    void empty_q();
+    int count();
+    void stop();
+
+protected:
+    void run();
+
+private:
+    QMutex mtx;
+    bool _quit;
+    double expiration_time;
+    std::queue<struct timespec> q;
+    StatusIcon* fps_status;
+};
+
 class UserPanel : public QMainWindow
 {
     Q_OBJECT
@@ -106,6 +129,7 @@ public slots:
     void reset_custom_3d_params();
     void export_current_video();
     void set_tcu_type(int idx);
+    void update_ps_config(bool read, int idx, int val);
 
     // signaled by joystick input
     void joystick_button_pressed(int btn);
@@ -270,7 +294,8 @@ signals:
     void append_text(QString text);
 
     // tell SOURCE_DISPLAY to display an image
-    void set_pixmap(QPixmap pm);
+    void set_src_pixmap(QPixmap pm);
+    void set_hist_pixmap(QPixmap pm);
 
     // pause / continue scan
     void update_scan(bool show);
@@ -385,106 +410,105 @@ private:
 
     // tcu_type
     void update_tcu_param_pos(QLabel *u_unit, QLineEdit *n_input, QLabel *n_unit, QLineEdit *p_input);
-    uint get_width_in_us(float val);
-    uint get_width_in_ns(float val);
-    uint get_width_in_ps(float val);
+    void split_value_by_unit(float val, uint &us, uint &ns, uint &ps, int idx = -1);
+//    uint get_width_in_us(float val);
+//    uint get_width_in_ns(float val);
+//    uint get_width_in_ps(float val, int idx = -1);
 
 public:
-    bool                    mouse_pressed;
-    std::vector<cv::Rect>   list_roi;                   // user-selected roi
+    bool                  mouse_pressed;
+    std::vector<cv::Rect> list_roi;                   // user-selected roi
 
 private:
-    Ui::UserPanel*          ui;
+    Ui::UserPanel*  ui;
+    StatusBar*      status_bar;
+    Preferences*    pref;
+    ScanConfig*     scan_config;
+    LaserSettings*  laser_settings;
+    Distance3DView* view_3d;
+    Aliasing*       aliasing;
+    FloatingWindow* fw_display[2];
+    FloatingWindow* secondary_display;
 
-    StatusBar*              status_bar;
-    Preferences*            pref;
-    ScanConfig*             scan_config;
-    LaserSettings*          laser_settings;
-    Distance3DView*         view_3d;
-    Aliasing*               aliasing;
-    FloatingWindow*         fw_display[2];
-    FloatingWindow*         secondary_display;
+    int             calc_avg_option;            // a: 4 frames; b: 8 frames
+    bool            trigger_by_software;        // whether the device gets trigger signal from sw
+    QMutex          image_mutex[3];             // img handle lock
+    QMutex          port_mutex;                 // port handle lock
+    QMutex          display_mutex[3];           // display handle lock
+    Cam*            curr_cam;                   // current camera
+    float           time_exposure_edit;
+    float           gain_analog_edit;
+    float           frame_rate_edit;
+    QString         save_location;              // where to save the image
+    QString         TEMP_SAVE_LOCATION;         // temp location to save the image
+    cv::VideoWriter vid_out[4];                 // video writer for ORI/RES/alt-display1/2
+    cv::VideoWriter vid_out_proc;               // video writer for export
+    QString         current_video_filename;     // name of the imported video file (if not a stream)
+    QString         output_filename;            // target output name when exporting video
+    QString         temp_output_filename;       // temp save location of target output file
 
-    int                     calc_avg_option;            // a: 4 frames; b: 8 frames
-    bool                    trigger_by_software;        // whether the device gets trigger signal from sw
-
-    QMutex                  image_mutex[3];             // img handle lock
-    QMutex                  port_mutex;                 // port handle lock
-    QMutex                  display_mutex[3];           // display handle lock
-    Cam*                    curr_cam;                   // current camera
-    float                   time_exposure_edit;
-    float                   gain_analog_edit;
-    float                   frame_rate_edit;
-    QString                 save_location;              // where to save the image
-    QString                 TEMP_SAVE_LOCATION;         // temp location to save the image
-    cv::VideoWriter         vid_out[4];                 // video writer for ORI/RES/alt-display1/2
-    cv::VideoWriter         vid_out_proc;               // video writer for export
-    QString                 current_video_filename;     // name of the imported video file (if not a stream)
-    QString                 output_filename;            // target output name when exporting video
-    QString                 temp_output_filename;       // temp save location of target output file
-
-    TCU*                    ptr_tcu;
-    Inclin*                 ptr_inc;
-    Lens*                   ptr_lens;
-    Laser*                  ptr_laser;
-    PTZ*                    ptr_ptz;
+    TCU*    ptr_tcu;
+    Inclin* ptr_inc;
+    Lens*   ptr_lens;
+    Laser*  ptr_laser;
+    PTZ*    ptr_ptz;
 
     // WARNING port communication mostly moved to new class ControlPort
-    QSerialPort*            serial_port[5];             // 0: tcu, 1: rangefinder, 2: lens, 3: laser, 4: PTZ
-    bool                    serial_port_connected[5];
-    QTcpSocket*             tcp_port[5];                // 0-1: 232, 2-4: 485
-    bool                    use_tcp[5];
-    bool                    share_serial_port;          // whether using a single comm for serial communication
-    float                   stepping;
-    int                     hz_unit;
-    int                     base_unit;
-    int                     laser_on;
-    uint                    zoom;
-    uint                    focus;
-    int                     distance;                   // dist read from rangefinder (or manually set)
-    float                   rep_freq;
-    float                   laser_width;
-    float                   delay_dist;                 // estimated distance calculated from delay
-    float                   depth_of_view;              // depth of view from gate width
-    bool                    aliasing_mode;
-    int                     aliasing_level;
-    int                     focus_direction;
-    int                     clarity[3];
-    char                    curr_laser_idx;
+    QSerialPort*  serial_port[5];           // 0: tcu, 1: rangefinder, 2: lens, 3: laser, 4: PTZ
+    bool          serial_port_connected[5];
+    QTcpSocket*   tcp_port[5];              // 0-1: 232, 2-4: 485
+    bool          use_tcp[5];
+    bool          share_serial_port;        // whether using a single comm for serial communication
+    float         stepping;
+    int           hz_unit;
+    int           base_unit;
+    int           laser_on;
+    uint          zoom;
+    uint          focus;
+    int           distance;                 // dist read from rangefinder (or manually set)
+    float         rep_freq;
+    float         laser_width;
+    float         delay_dist;               // estimated distance calculated from delay
+    float         depth_of_view;            // depth of view from gate width
+    int           mcp_max;
+    bool          aliasing_mode;
+    int           aliasing_level;
+    int           focus_direction;
+    int           clarity[3];
+    char          curr_laser_idx;
+    int           alt_display_option;         // data display option: 1: com data; 2: histogram; 3: PTZ; 4: addons
+    QButtonGroup* display_grp;
 
-    int                     alt_display_option;         // data display option: 1: com data; 2: histogram; 3: PTZ; 4: addons
-    QButtonGroup*           display_grp;
-
-    std::queue<cv::Mat>     q_img[3];                   // image queue in grab_thread
-    std::queue<int>         q_frame_info;
+    std::queue<cv::Mat>        q_img[3];                   // image queue in grab_thread
+    std::queue<int>            q_frame_info;
+    TimedQueue                 q_fps_calc;
 //    bool                    updated[3];                 // whether the program get a new image from stream
     // TODO add other scan features
-    std::vector<TCUDataGroup> q_scan;                   // targets' tcu param found while scanning
+    std::vector<TCUDataGroup>  q_scan;                   // targets' tcu param found while scanning
 
-    int                     device_type;                // 1: hik gige
-    bool                    device_on;                  // whether curr device is on
-    bool                    trigger_mode_on;            // whether img grabbing is on trigger mode
-    bool                    start_grabbing;             // whether the device is rdy to grab imgs
-    bool                    record_original[3];         // whether recording original stream
-    bool                    record_modified[3];         // whether recording modified stream
-    bool                    save_original[3];           // saving original bmp
-    bool                    save_modified[3];           // saving modified bmp
-    bool                    image_3d[3];                // whether to build a 3d image
-    int                     trigger_source;             // where the device gets the trigger signal
-    bool                    is_color[3];                // display in mono8 or rgb8
+    int  device_type;        // 1: hik gige
+    bool device_on;          // whether curr device is on
+    bool trigger_mode_on;    // whether img grabbing is on trigger mode
+    bool start_grabbing;     // whether the device is rdy to grab imgs
+    bool record_original[3]; // whether recording original stream
+    bool record_modified[3]; // whether recording modified stream
+    bool save_original[3];   // saving original bmp
+    bool save_modified[3];   // saving modified bmp
+    bool image_3d[3];        // whether to build a 3d image
+    int  trigger_source;     // where the device gets the trigger signal
+    bool is_color[3];        // display in mono8 or rgb8
+    int  w[3];               // image width
+    int  h[3];               // image height
+    int  pixel_format[3];    // for hik cam, use mono 8 for others
+    int  pixel_depth[3];     // pixel depth
 
-    int                     w[3];                       // image width
-    int                     h[3];                       // image height
-    int                     pixel_format[3];            // for hik cam, use mono 8 for others
-    int                     pixel_depth[3];             // pixel depth
-
-    Display*                displays[3];                // 3 set of display widgets
-    int                     display_thread_idx[3];      // idx of the thread displaying in display_i
-    bool                    grab_image[3];              // whether thread should continue grabbing image
-    GrabThread*             h_grab_thread[3];           // img-grab thread handle
-    bool                    grab_thread_state[3];       // whether grabbing thread is on
-    bool                    video_thread_state;         // whether video reading thread is on
-    JoystickThread*         h_joystick_thread;          // process joystick input
+    Display*        displays[3];                // 3 set of display widgets
+    int             display_thread_idx[3];      // idx of the thread displaying in display_i
+    bool            grab_image[3];              // whether thread should continue grabbing image
+    GrabThread*     h_grab_thread[3];           // img-grab thread handle
+    bool            grab_thread_state[3];       // whether grabbing thread is on
+    bool            video_thread_state;         // whether video reading thread is on
+    JoystickThread* h_joystick_thread;          // process joystick input
 
     cv::Mat                 img_mem[3];                 // right-side img display source (stream)
     cv::Mat                 modified_result[3];         // right-side img display modified (stream)

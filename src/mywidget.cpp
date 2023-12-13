@@ -12,7 +12,7 @@ Display::Display(QWidget *parent) :
     scale{ 1.0f, 2.0f / 3, 1.0f / 2, 1.0f / 4, 1.0f / 8},
     pressed(false)
 {
-    connect(this, SIGNAL(set_pixmap(const QPixmap&)), this, SLOT(setPixmap(const QPixmap&)));
+//    connect(this, SIGNAL(set_pixmap(const QPixmap&)), this, SLOT(setPixmap(const QPixmap&)));
     setContextMenuPolicy(Qt::ActionsContextMenu);
     QAction *add_to_roi = new QAction("add selection to roi", this);
     this->addAction(add_to_roi);
@@ -288,25 +288,26 @@ void TitleBar::setup(QObject *ptr)
 */
     connect(pref, SIGNAL(triggered()), preferences, SLOT(show()));
     connect(pref, SIGNAL(triggered()), preferences, SLOT(raise()));
-    connect(preferences, SIGNAL(search_for_devices()),             signal_receiver, SLOT(search_for_devices()));
-    connect(preferences, SIGNAL(query_dev_ip()),                   signal_receiver, SLOT(update_dev_ip()));
-    connect(preferences, SIGNAL(set_dev_ip(int, int)),             signal_receiver, SLOT(set_dev_ip(int, int)));
-    connect(preferences, SIGNAL(change_pixel_format(int)),         signal_receiver, SLOT(change_pixel_format(int)));
-    connect(preferences, SIGNAL(get_port_info(int)),               signal_receiver, SLOT(display_port_info(int)));
-    connect(preferences, SIGNAL(change_baudrate(int, int)),        signal_receiver, SLOT(set_baudrate(int, int)));
-    connect(preferences, SIGNAL(set_tcp_status(int, bool)),        signal_receiver, SLOT(set_tcp_status_on_port(int, bool)));
-    connect(preferences, SIGNAL(share_tcu_port(bool)),             signal_receiver, SLOT(set_tcu_as_shared_port(bool)));
-    connect(preferences, SIGNAL(com_write(int, QByteArray)),       signal_receiver, SLOT(com_write_data(int, QByteArray)));
-    connect(preferences, SIGNAL(tcu_type_changed(int)),            signal_receiver, SLOT(set_tcu_type(int)));
-    connect(preferences, SIGNAL(rep_freq_unit_changed(int)),       signal_receiver, SLOT(setup_hz(int)));
-    connect(preferences, SIGNAL(base_unit_changed(int)),           signal_receiver, SLOT(setup_stepping(int)));
-    connect(preferences, SIGNAL(max_dist_changed(float)),          signal_receiver, SLOT(setup_max_dist(float)));
-    connect(preferences, SIGNAL(delay_offset_changed(float)),      signal_receiver, SLOT(update_delay_offset(float)));
-    connect(preferences, SIGNAL(gate_width_offset_changed(float)), signal_receiver, SLOT(update_gate_width_offset(float)));
-    connect(preferences, SIGNAL(laser_offset_changed(float)),      signal_receiver, SLOT(update_laser_offset(float)));
-    connect(preferences, SIGNAL(laser_toggled(int)),               signal_receiver, SLOT(setup_laser(int)));
-    connect(preferences, SIGNAL(lower_3d_thresh_updated()),        signal_receiver, SLOT(update_lower_3d_thresh()));
-    connect(preferences, SIGNAL(query_tcu_param()),                signal_receiver, SLOT(reset_custom_3d_params()));
+    connect(preferences, SIGNAL(search_for_devices()),              signal_receiver, SLOT(search_for_devices()));
+    connect(preferences, SIGNAL(query_dev_ip()),                    signal_receiver, SLOT(update_dev_ip()));
+    connect(preferences, SIGNAL(set_dev_ip(int, int)),              signal_receiver, SLOT(set_dev_ip(int, int)));
+    connect(preferences, SIGNAL(change_pixel_format(int)),          signal_receiver, SLOT(change_pixel_format(int)));
+    connect(preferences, SIGNAL(get_port_info(int)),                signal_receiver, SLOT(display_port_info(int)));
+    connect(preferences, SIGNAL(change_baudrate(int, int)),         signal_receiver, SLOT(set_baudrate(int, int)));
+    connect(preferences, SIGNAL(set_tcp_status(int, bool)),         signal_receiver, SLOT(set_tcp_status_on_port(int, bool)));
+    connect(preferences, SIGNAL(share_tcu_port(bool)),              signal_receiver, SLOT(set_tcu_as_shared_port(bool)));
+    connect(preferences, SIGNAL(com_write(int, QByteArray)),        signal_receiver, SLOT(com_write_data(int, QByteArray)));
+    connect(preferences, SIGNAL(tcu_type_changed(int)),             signal_receiver, SLOT(set_tcu_type(int)));
+    connect(preferences, SIGNAL(rep_freq_unit_changed(int)),        signal_receiver, SLOT(setup_hz(int)));
+    connect(preferences, SIGNAL(base_unit_changed(int)),            signal_receiver, SLOT(setup_stepping(int)));
+    connect(preferences, SIGNAL(max_dist_changed(float)),           signal_receiver, SLOT(setup_max_dist(float)));
+    connect(preferences, SIGNAL(delay_offset_changed(float)),       signal_receiver, SLOT(update_delay_offset(float)));
+    connect(preferences, SIGNAL(gate_width_offset_changed(float)),  signal_receiver, SLOT(update_gate_width_offset(float)));
+    connect(preferences, SIGNAL(laser_offset_changed(float)),       signal_receiver, SLOT(update_laser_offset(float)));
+    connect(preferences, SIGNAL(ps_config_updated(bool, int, int)), signal_receiver, SLOT(update_ps_config(bool, int, int)));
+    connect(preferences, SIGNAL(laser_toggled(int)),                signal_receiver, SLOT(setup_laser(int)));
+    connect(preferences, SIGNAL(lower_3d_thresh_updated()),         signal_receiver, SLOT(update_lower_3d_thresh()));
+    connect(preferences, SIGNAL(query_tcu_param()),                 signal_receiver, SLOT(reset_custom_3d_params()));
 
     settings_menu->addAction(">> export pref.", signal_receiver, SLOT(export_config())/*, QKeySequence(Qt::ALT + Qt::Key_E)*/);
     settings_menu->addAction("<< load pref.",   signal_receiver, SLOT(prompt_for_config_file())/*, QKeySequence(Qt::ALT + Qt::Key_R)*/);

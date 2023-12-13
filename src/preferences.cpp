@@ -31,6 +31,7 @@ Preferences::Preferences(QWidget *parent) :
     gate_width_offset(0),
     max_laser_width(5000),
     laser_width_offset(0),
+    ps_step{40, 40, 40, 40},
     laser_grp(NULL),
     laser_on(0),
     save_info(true),
@@ -155,11 +156,24 @@ Preferences::Preferences(QWidget *parent) :
 
 //[3] set up ui for tcu config
     ui->TCU_LIST->addItem("default");
-    ui->TCU_LIST->addItem("#0 50ps step");
-    ui->TCU_LIST->addItem("#1 50ps step");
-    ui->TCU_LIST->addItem("#2 50ps step");
-    ui->TCU_LIST->addItem("#3 50ps step");
+//    ui->TCU_LIST->addItem("#0 50ps step");
+//    ui->TCU_LIST->addItem("#1 50ps step");
+//    ui->TCU_LIST->addItem("#2 50ps step");
+//    ui->TCU_LIST->addItem("#3 50ps step");
+    ui->TCU_LIST->addItem("40ps step");
     ui->TCU_LIST->installEventFilter(this);
+    connect(ui->TCU_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
+            [this](int index){
+                emit tcu_type_changed(index);
+                switch (index) {
+                case 0: ui->PS_CONFIG_GRP->hide(); break;
+                case 1: ui->PS_CONFIG_GRP->show(); break;
+                default: break;
+                }
+            });
+
+    connect(ui->AUTO_REP_FREQ_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit set_auto_rep_freq(auto_rep_freq = arg1); });
+    connect(ui->AUTO_MCP_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ auto_mcp = arg1; });
 
     ui->HZ_LIST->addItem("kHz");
     ui->HZ_LIST->addItem("Hz");
@@ -172,10 +186,6 @@ Preferences::Preferences(QWidget *parent) :
     ui->UNIT_LIST->setCurrentIndex(0);
     ui->UNIT_LIST->installEventFilter(this);
 
-    connect(ui->TCU_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
-            [this](int index){ emit tcu_type_changed(index); });
-    connect(ui->AUTO_REP_FREQ_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit set_auto_rep_freq(auto_rep_freq = arg1); });
-    connect(ui->AUTO_MCP_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ auto_mcp = arg1; });
     connect(ui->HZ_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
             [this](int index){ emit rep_freq_unit_changed(hz_unit = index); });
     connect(ui->UNIT_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
@@ -215,6 +225,8 @@ Preferences::Preferences(QWidget *parent) :
                 default: break;
                 }
             });
+
+    connect(ui->AB_LOCK_CHK, &QCheckBox::stateChanged, this, [this](){});
 
     connect(ui->MAX_DIST_EDT, &QLineEdit::editingFinished, this, [this](){ emit max_dist_changed(max_dist); });
     connect(ui->DELAY_OFFSET_EDT, &QLineEdit::editingFinished, this,
@@ -261,6 +273,33 @@ Preferences::Preferences(QWidget *parent) :
         emit laser_offset_changed(laser_width_offset = laser_offset_int);
         fclose(f);
     }
+
+    ui->TCU_PS_CONFIG_LIST->addItem("GW_A");
+    ui->TCU_PS_CONFIG_LIST->addItem("DELAY_A");
+    ui->TCU_PS_CONFIG_LIST->addItem("GW_B");
+    ui->TCU_PS_CONFIG_LIST->addItem("DELAY_B");
+    ui->TCU_PS_CONFIG_LIST->installEventFilter(this);
+    ui->TCU_PS_CONFIG_LIST->setCurrentIndex(0);
+    connect(ui->TCU_PS_CONFIG_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
+            [this](int idx){ emit ps_config_updated(true, idx, 0); });
+    connect(ui->PS_STEPPING_EDT, &QLineEdit::editingFinished, this,
+            [this](){
+                int max_step = ui->PS_STEPPING_EDT->text().toInt();
+                if (max_step > 100) max_step = 100;
+                if (max_step < 1)   max_step = 1;
+                ui->MAX_PS_STEP_EDT->setText(QString::number(max_step));
+                ui->PS_STEPPING_EDT->setText(QString::number(ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()] = int(std::round(4000. / max_step))));
+                emit ps_config_updated(false, ui->TCU_PS_CONFIG_LIST->currentIndex(), ui->PS_STEPPING_EDT->text().toInt());
+            });
+    connect(ui->MAX_PS_STEP_EDT, &QLineEdit::editingFinished, this,
+            [this](){
+                ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()] = ui->MAX_PS_STEP_EDT->text().toInt();
+                if (ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()] > 4000) ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()] = 4000;
+                if (ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()] < 1)    ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()] = 1;
+                ui->MAX_PS_STEP_EDT->setText(QString::number(int(std::round(4000. / ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]))));
+                ui->PS_STEPPING_EDT->setText(QString::number(ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]));
+                emit ps_config_updated(false, ui->TCU_PS_CONFIG_LIST->currentIndex(), ui->PS_STEPPING_EDT->text().toInt());
+            });
 
     connect(ui->LASER_ENABLE_CHK, &QCheckBox::stateChanged, this,
             [this](int arg1){ send_cmd(arg1 ? "88 1F 00 00 00 01 99" : "88 1F 00 00 00 00 99"); });
@@ -399,6 +438,7 @@ void Preferences::data_exchange(bool read)
             break;
         default: break;
         }
+        ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()] = ui->PS_STEPPING_EDT->text().toInt();
         laser_on = 0;
         laser_on |= ui->LASER_CHK_1->isChecked() << 0;
         laser_on |= ui->LASER_CHK_2->isChecked() << 1;
@@ -458,6 +498,8 @@ void Preferences::data_exchange(bool read)
             break;
         default: break;
         }
+        ui->PS_STEPPING_EDT->setText(QString::number(ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]));
+        ui->MAX_PS_STEP_EDT->setText(QString::number(int(std::round(4000. / ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]))));
         ui->LASER_CHK_1->setChecked(laser_on & 0b0001);
         ui->LASER_CHK_2->setChecked(laser_on & 0b0010);
         ui->LASER_CHK_3->setChecked(laser_on & 0b0100);
