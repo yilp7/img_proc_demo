@@ -1,5 +1,5 @@
-#include "userpanel.h"
-#include "version.h"
+#include "visual/userpanel.h"
+#include "util/version.h"
 
 //#define _DEBUG
 //#include "vld.h"
@@ -111,19 +111,24 @@ int main(int argc, char *argv[])
 //    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
 //    qDebug() << QTextCodec::availableCodecs();
 
-    const uint user_file_length = 23;
-    uchar INIT[user_file_length] = {VER_MAJOR, VER_MINOR, VER_PATCH, VER_TWEAK, 0};
+#if ENABLE_USER_DEFAULT
+    const uint user_file_length = 26;
+    uchar INIT[user_file_length] = {VER_MAJOR, VER_MINOR, VER_PATCH, 0};
     QFile user_file("user_default");
     QDataStream user_file_binary;
     bool reset_user_file = !user_file.exists();
     if (user_file.exists()) {
         user_file.open(QIODevice::ReadOnly);
-        // version(uchar) * 4 + com(uchar) * 5 + offset(uint) * 3 + theme(uchar) + language(uchar) = 23
-        reset_user_file |= user_file.size() - user_file_length;
+        // v0.6.2: version(uchar) * 4 + com(uchar) * 5 + offset(uint) * 3 + theme(uchar) + language(uchar) = 23
+        // v0.7.1: version(uchar) * 4 + com(uchar) * 5 + offset(uint) * 3 + theme(uchar) + language(uchar) = 23
+        //         (optional) preset heading(uchar) * 4 + preset count(uchar) + preset(name size 64 + data size 72) * count;
+        // v0.8.1: version(uchar) * 3 + theme(uchar) + language(uchar) +
+        //         com(uchar) * 5 + server(uint) + offset(uint) * 3 = 26
+        reset_user_file |= bool(user_file.size() - user_file_length);
         user_file_binary.setDevice(&user_file);
-        uchar ver[4];
-        user_file_binary.readRawData((char*)ver, 4);
-        reset_user_file |= ver[0] + ver[1] + ver[2] + ver[3] - VER_MAJOR - VER_MINOR - VER_PATCH - VER_TWEAK;
+        uchar ver[3];
+        user_file_binary.readRawData((char*)ver, 3);
+        reset_user_file |= bool(ver[0] + ver[1] + ver[2] - VER_MAJOR - VER_MINOR - VER_PATCH);
         user_file.close();
     }
     if (reset_user_file) {
@@ -136,6 +141,7 @@ int main(int argc, char *argv[])
 #ifdef WIN32
     int attr = GetFileAttributes("user_default");
     if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) SetFileAttributes("user_default", attr | FILE_ATTRIBUTE_HIDDEN);
+#endif
 #endif
 
     QApplication a(argc, argv);
@@ -183,7 +189,7 @@ int main(int argc, char *argv[])
 
     FILE *f = fopen("user_default", "rb");
     if (f) {
-        fseek(f, 22, SEEK_SET);
+        fseek(f, 3, SEEK_SET);
         fread(&app_theme, 1, 1, f);
         fclose(f);
     }

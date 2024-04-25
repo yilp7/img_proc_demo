@@ -128,4 +128,16 @@
         <file alias="ptz">status/dark/ptz.png</file>
         <file alias="tcu">status/dark/tcu.png</file>
     </qresource>
+    <qresource prefix="/nums">
+        <file alias="1">nums/1.png</file>
+        <file alias="2">nums/2.png</file>
+    </qresource>
+    <qresource prefix="/lens/dark">
+        <file alias="iris_1">lens/dark/iris_1.png</file>
+        <file alias="iris_2">lens/dark/iris_2.png</file>
+    </qresource>
+    <qresource prefix="/lens/light">
+        <file alias="iris_1">lens/light/iris_1.png</file>
+        <file alias="iris_2">lens/light/iris_2.png</file>
+    </qresource>
 </RCC>

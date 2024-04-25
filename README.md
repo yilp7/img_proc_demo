@@ -6,73 +6,92 @@
 
 ### 主界面
 
-![主界面](docs/pics/main_window.png)
+![主界面](docs/pics/GLI_main/main_window.png)
 
 ---
 
 ### 设置界面
 
-<img src='docs/pics/preferences.png' alt='设置界面' height='300px' />
+<img src='docs/pics/GLI_main/preferences.png' alt='设置界面' height='300px' />
 
 ## 分组功能
 
 ---
 
 ### 主界面
+
 #### 标题栏
 
-![title bar](docs/pics/title_bar.png)
+![title bar](docs/pics/GLI_main/title_bar.png)
 
 1. 程序图标
 
-2. 设置按键
+2. 链接按键
 
-    打开设置菜单 (设置菜单界面如下):
+	点击后程序将弹出对话框（如下图），用户可输入本地或网络串流链接以实时预览
 
-    ![settings menu](docs/pics/menu.png)
+	<img src='docs/pics/GLI_main/stream_url.png' alt='打开网络串流' height='100px' />
 
-    1. preferences 设置 (快捷键 Alt + S)
+	其中gray复选框将在ffmpeg中加入format_gray参数 (请谨慎使用), 第二行中display下拉框用于选择在主视窗或悬浮窗播放
 
-        显示设置界面 (具体内容见后)
+3. 设置按键
 
-    2. export pref. 导出设置文件 (快捷键 Alt + E)
+	打开设置菜单 (设置菜单界面如下):
 
-       程序将弹出对话框，指引使用者选择设置文件的保存位置及名称
+	<img src='docs/pics/GLI_main/menu.png' alt='菜单' height='120px' />
 
-       具体保存内容如下:
-       1. 程序设置:
-           - 4个程序所使用的串口号
-           - 图片及视频的默认保存位置
-       2. TCU设置:
-           - 激光重频及其脉宽
-           - 选通门的延时与门宽
-           - mcp及其他TCU偏好设置
+	1. preferences 设置 (快捷键 Alt + S)
 
-   3. load pref. 导入已保存的设置 (快捷键 Alt + R)
+		显示设置界面 (具体内容见后)
 
-       导入预先保存的设置, 并依此设置程序参数
+	2. export pref. 导出设置文件 (快捷键 Alt + E)
 
-       <font color=#F08080>\*注1: 此操作支持文件拖拽 (拖拽文件至程序界面中)</font>
+		- 导出到文件
 
-       <font color=#EEDC82>\*注2: 当读取设置文件失败时程序将会保持原有参数不变, 并并弹窗提示</font>
+			程序将弹出对话框，指引使用者选择设置文件的保存路径，具体保存内容如下:
 
-   4. config s.n. 配置序列号
+			1. 程序设置:
+				- 4个程序所使用的串口号
+				- 图片及视频的默认保存位置
+			2. TCU设置:
+				- 激光重频及其脉宽
+				- 选通门的延时与门宽
+				- mcp及其他TCU偏好设置
+			3. 图像参数设置
 
-       输入设备序列号相关文件以自动调整输出门宽
+		- 导出到用户预设值
 
-3. 截屏按键
+			保存到用户预置位区域(软件同级目录下user_presets.json)
+
+	3. load pref. 导入已保存的设置 (快捷键 Alt + R)
+
+		导入预先保存的设置, 并依此设置程序参数
+
+		<font color=#F08080>\*注1: 此操作支持文件拖拽 (拖拽文件至程序界面中)</font>
+
+		<font color=#EEDC82>\*注2: 当读取设置文件失败时程序将会保持原有参数不变, 并并弹窗提示</font>
+
+	4. config s.n. 配置序列号
+
+		输入设备序列号相关文件以自动调整输出门宽
+
+	5. export video 导出视频
+	
+		点击后程序将弹出对话框指引用户选择保存路径，并将拖入播放的视频经过img processing模块处理后的视频导出到用户指定的位置
+
+4. 截屏按键
 
 	单击此按键以进行程序屏幕截图, 并保存至图片储存目录 (保存的图片文件名以screenshot_起始)
 
-4. 清理按键
+5. 清理按键
 
 	单击此按键以清除界面显示 (串口数据, 图像显示界面)
 
 	<font color=#F08080>\*注: 在非预览状态下, 清除按键会额外清除程序中的图像缓存</font>
 
-5. 语言切换按键
+6. 语言切换按键
 
-	单击此按键以切换显示界面语言 (中英转换)
+	单击此按键以切换显示界面语言 (中英切换)
 
 #### 设备/串口连接
 
@@ -80,37 +99,39 @@
 
 1. Search for devices 设备搜索 (目前支持海康以太网，凌图以太网/USB工业相机)
 
-  单击此按键进行设备搜索, 当程序搜索到与电脑相连的相机时, Turn on 按键将会亮起
+	单击此按键进行设备搜索, 当程序搜索到与电脑相连的相机时, Turn on 按键将会亮起
 
-  <font color=#F08080>\*注: 当有多台相机连接至电脑时, 将会使用第一台搜索到的相机</font>
+	<font color=#F08080>\*注: 当有多台相机连接至电脑时, 将会使用第一台搜索到的相机</font>
 
 2. Turn on 连接至相机
 
-  单击此按键连接至相机, 相机开启后 Turn off 按键将会亮起
+	单击此按键连接至相机, 相机开启后 Turn off 按键将会亮起
 
-  <font color=#F08080>\*注: 当以太网相机连接失败时, 可先检查相机是否与电脑处于同一网段, 若他们处于不同网段, 则可调整电脑局域网设置, 或于设置界面调整相机ip</font>
+	<font color=#F08080>\*注: 当以太网相机连接失败时, 可先检查相机是否与电脑处于同一网段, 若他们处于不同网段, 则可调整电脑局域网设置, 或于设置界面调整相机ip</font>
 
 3. Turn off 断开连接
 
-  单击此按键断开与相机的连接
+	单击此按键断开与相机的连接
 
-  <font color=#F08080>\*注: 断开连接后会程序会自动进行一次设备搜索</font>
+	<font color=#F08080>\*注: 断开连接后会程序会自动进行一次设备搜索</font>
 
 4. TCU, RANGE, LENS, LASER 时序控制器, 测距仪, 镜头, 激光器
 
-  填写对应串口号并敲击回车以连接对应串口, 连接时默认波特率为9600, 其值可在设置界面中进行修改
+	填写对应串口号并敲击回车以连接对应串口, 连接时默认波特率为9600, 其值可在设置界面中进行修改
 
-  <font color=#F08080>\*注1: 当程序启动时将会连接默认串口 (分别为3, 0, 8, 0)</font>
+	<font color=#F08080>\*注1: 当程序启动时将会连接默认串口 (即上一次用户尝试连接的串口号)</font>
 
-  <font color=#EEDC82>\*注2: 当程序成功连接特定串口后, 对应串口标识将变为<font color=#B0C4DE>淡蓝色</font>; 若未能成功连接串口, 对应标识将变为<font color=#CD5C5C>淡红色</font></font>
+	<font color=#EEDC82>\*注2: 当程序成功连接特定串口后, 对应串口标识将变为<font color=#B0C4DE>淡蓝色</font>; 若未能成功连接串口, 对应标识将变为<font color=#CD5C5C>淡红色</font></font>
 
 5.  串口服务器模式
 
-  使用网线连接串口服务器以代替串口连接发送控制命令
+	使用网线连接串口服务器以代替串口连接发送控制命令: 使用Alt + Q快捷键以连接至串口服务器, 或从已连接的串口服务器断开
+
+	<font color=#F08080>\*注2: 当程序成功连接对应端口后, 对应串口标识将显示<u>下划线</u>; 若未能成功连接对应端口, 对应标识将不显示下划线</font>
 
 #### 相机采集控制
 
-![img. acquision](docs/pics/img_acquision.png)
+<img src='docs/pics/GLI_main/img_acquisition.png' alt='图像采集' height='100px' />
 
 1. Continuous 连续模式 (与触发模式互斥)
 
@@ -142,6 +163,12 @@
 
 	单击此按键停止图像采集的预览
 
+8. <img src='resources/tools/dark/select.png' alt='select' height='20px' style='padding-bottom: 6px;' /> 选择ROI
+
+	<img src='docs/pics/GLI_main/roi_select.png' alt='roi_select' height='200px' />
+
+	单击此按键以在弹出窗口中选择图像采集区域与大小, 如相机在采集图像, 将自动停止采集并于设置参数后恢复
+
 #### 相机参数控制
 
 ![parameters](docs/pics/parameters.png)
@@ -172,11 +199,11 @@
 
 ![laser](docs/pics/laser.png)
 
-1. laser current 激光器电流设置 (deprecated)
+1. laser current 激光器电流设置 (仅于<font color=#799B85>绿瞳</font>版本中生效)
 
 	在输入框内输入电流大小后敲击回车进行设置, 只支持整型输入
 
-2. On 开启激光器 (deprecated)
+2. On 开启激光器 (仅于<font color=#799B85>绿瞳</font>版本中生效)
 
 	单击此按键开启激光器 (此按键将会在成功连接激光器串口后亮起)
 
@@ -188,44 +215,62 @@
 
 4. Distance 测距
 
-	若程序已成功连接测距仪串口, 则会通过串口向测距仪发送测距命令, 而后获取距离信息发送至TCU
+	~~程序已成功连接测距仪串口, 则会通过串口向测距仪发送测距命令, 而后获取距离信息发送至TCU~~
 
 	若程序未连接测距仪串口, 则通过弹窗中手动输入的方式获取距离以发送至TCU
 
-	程序获取距离信息后 (通过测距仪或手动输入的方式), 将会在 Distance 按键下方显示当前距离信息
+	程序获取距离信息后 (通过~~测距仪或~~手动输入的方式), 将会在 Distance 按键下方显示当前距离信息
 
 #### 杂项显示
 
-![misc.](docs/pics/misc.png)
+![misc.](docs/pics/GLI_main/misc.png)
 
 1. data 串口数据显示
 
 	选中此项时, 下方将会显示文本框, 其中会展示向串口发送与从串口接收的数据, 分别以 sent / received 标注
 
-2. hist 图像直方图显示
-
-	选中此项时, 下方将会显示当前所显示图片的灰度直方图 (灰度值为0的像素不计)
-
-	<font color=#F08080>\*注: 灰度直方图为成比例显示, 其中以最高项为 1, 其他项为其真实计数与最高项计数的比例</font>
-
-3. PTZ 云台控制
+2. PTZ 云台控制
 
 	选中此项时, 下方将会显示云台控制按键及云台速度滑块
 
-	<font color=#9AFF9A>目前角度直接设置与获取功能调试中</font>
+3. hist 图像直方图显示
+
+	选中此项时, 下方将会显示当前所显示图片的灰度直方图 (若为彩色图将转为灰度图计算)
+
+	<font color=#F08080>\*注: 灰度直方图为成比例显示, 其中以最高项为 1, 其他项为其真实计数与最高项计数的比例, 且灰度值为0的像素不计入</font>
+
+4. alt 小窗口控制界面
+
+	包括原始视频显示 (dual display), 停止按键, 单张采图按键与视频录制按键
+	
+	<font color=#F08080>\*注: 原始视频显示于 Alt + 0 悬浮窗, 其他控制分别对应 Alt + 1/2 悬浮窗</font>
+
+5. addon (目前为海康监控机控制)
+
+	包括需控制的监控机 IP, 连接按键, 变焦/聚焦按键, 采集输出帧率控制
 
 4. ROI 兴趣区
 
 	<font color=#9AFF9A>开发中</font>
 
+	使用选择工具选择区域后, 可右键添加至ROI列表, 应用至三维距离显示界面 (Alt + V)
+
 #### TCU参数设置
 
-![TCU](docs/pics/tcu.png)
+<img src='docs/pics/GLI_main/tcu.png' alt='TCU' height='240px' />
 
 <font color=#F08080>\*注1: 此分组中数据输入均以敲击回车 (主键盘或数字键盘) 的方式进行设置, 且仅在已连接TCU串口时生效</font>
 
 <font color=#EEDC82>\*注2: 对于脉宽, 门宽, 与延时设置, 如需设置超过 999ns的数值, 可在 μs 与 ns 中分别输入, 或在ns中输入完整数值  
 例: 需求 2500ns 延时时, 可在 μs中输入2, ns中输入500后敲击回车, 或在 ns中输入2500后输入回车, 两种设置方式等价</font>
+
+0. __<u>TCU类型</u>__
+
+	目前支持 2 种TCU协议
+	- default 默认
+	- 40ps步进
+
+	<font color=#F08080>\*注: 40ps 步进协议 (上图3) 下, 激光脉宽与延时门宽三项均显示为三个输入框, 其从左至右分别为 μs, ns, ps</font>
 
 1. Frequency 激光重频 (PRF)
 
@@ -233,7 +278,7 @@
 
 2. Laser Width 激光脉宽
 
-	此项输入仅接受整型输入, 其输入框分为 μs 与 ns 两部分
+	此项输入中各个输入框均仅接受整型输入
 
 3. MCP
 
@@ -241,15 +286,15 @@
 
 	拖动滑块, 或在输入框中输入后敲击回车进行设置
 
-	<font color=#F08080>\*注: 输入框中仅接受 0 - 255 的整型输入</font>
+	<font color=#F08080>\*注: 输入框中仅接受整型输入, 数值范围依据当前TCU协议类型决定</font>
 
-4. delay N N帧延时
+4. delay A/B A/B帧延时
 
-	此项设置为A帧与B帧的延时差, 其值为 N = B - A, 此项输入仅接受整型输入
+	此项设置控制选通门开启的延时, 其输入仅接受整型输入
+	
+5. delay N N帧延时
 
-5. delay A/B A/B帧延时
-
-	此项设置控制选通门开启的延时, 其输入仅接受整型输入, 其输入框分为 μs 与 ns 两部分
+	此项设置为A帧与B帧的延时差, 其值为 N = B - A, 此项输入接受整型与浮点输入
 
 6. Estimated Distance 预估距离
 
@@ -257,11 +302,15 @@
 
 7. Gate Width A/B A/B门门宽
 
-	此项设置控制选通门的开启时间, 其输入仅接受整型输入, 其输入框分为 μs 与 ns 两部分
+	此项设置控制选通门的开启时间, 其输入仅接受整型输入
 
 	同时依据选通门开启时长显示对应景深 DOV (depth of view)
 
-8. Stepping 步长
+8. delay N N帧延时
+
+	此项设置为A帧与B帧的延时差, 其值为 N = B - A, 此项输入接受整型与浮点输入
+
+9. Stepping 步长
 
 	此项设置控制手动调整延时与门宽时的步长, 其中
 	|         | 增加5倍步长 | 减少5倍步长 | 减少1倍步长 | 增加1倍步长 |
@@ -270,6 +319,10 @@
 	| 门宽 | 键I                | 键K              | 键J               | 键L               |
 
 	<font color=#F08080>\*注: 步长单位可于设置界面调整 (目前支持 ns, μs, m)</font>
+
+10. <img src='resources/tools/dark/switch.png' alt='switch1' height='20px' style='padding-bottom: 6px;' /> <img src='resources/tools/light/switch.png' alt='switch2' height='20px' style='padding-bottom: 6px;' /> 显示切换
+
+	此按键用于切换 A-B 帧参数输入界面与延时门宽差值输入界面 (上图1, 2)
 
 #### 镜头参数控制
 
@@ -301,9 +354,9 @@
 
 1. 存储位置
 
-	- 可单击...按键开启文件夹对话框后进行选择 (新建或选择已有)
+	- 可单击 ... 按键开启文件夹对话框后进行选择 (新建或选择已有)
 	- 可直接修改存储路径至电脑已有路径
-	- 可直接于输入框中输入新路径 (新路径须位于已有路径下)
+	- 可直接于输入框中输入新路径 (新建文件夹须位于已有路径下)
 
 	<font color=#F08080>\*注: 如创建文件夹失败, 程序将弹窗提示</font>
 
@@ -355,6 +408,35 @@
 
 	<font color=#9AFF9A>开发中</font>
 
+#### 扫描设置
+
+<img src='docs/pics/GLI_main/scan_configs.png' height='240px' />
+
+1. starting / ending 起止延时 (或门宽)
+
+	执行扫描时的起始及终止延时, 输入方式同 TCU 参数设置
+
+2. frame count / stepping 扫描帧数 / 步长
+
+	此二项设置互斥, 设置任意一项后另一项依据起止延时与本项自动变更, 计算方式为 $frame\_count * stepping = ending - starting\_delay$
+
+	<font color=#A2B5CD>例: 设置起止延时分别为 0 ns 与 1 μs 后, </font>
+
+	1. <font color=#A2B5CD>设置帧数为 30, 则步长自动变更为 33.33 ns</font>
+	2. <font color=#A2B5CD>设置步长为 10 ns, 则帧数自动变更为 100</font>
+
+3. Rep. freq. 扫描时重频
+
+	执行扫描时的激光重频, 输入方式同 TCU 参数设置
+
+4. original / result 保存原始/修正图像 (或视频)
+
+	当 original 复选框被选中时, 执行扫描将会保存每帧扫描时的原始图像 (或视频)
+
+	当 result 复选框被选中时, 执行扫描将会保存每帧扫描是的修正图像 (或视频)
+
+	<font color=#F08080>\*注: 当有任一复选框被选中时, 程序执行扫描时将会创建扫描文件夹, 并保存本次扫描参数; 当无复选框被选中时, 程序执行扫描时将不会保存任何文件</font>
+
 #### 显示界面
 
 ![display](docs/pics/display.png)
@@ -383,40 +465,75 @@
 
 	选中此复选框后, 图像中心将显示中心十字线, 颜色与背景灰度相关
 
+#### 状态栏
+
+![status bar](docs/pics/GLI_main/status_bar.png)
+
+1. 图像位深
+
+	程序支持 8/10/12 位彩色/灰度图像, 其中 8 位位深图像显示为 8-bit; 10/12 位深图像将以 16 位位深图像显示并存储, 显示为 16-bit
+
+2. 图像尺寸
+
+	显示格式为 width x height, 上图中图像宽为 1608, 高为 1004
+
+3. packets lost 丢包数量
+
+	显示此次相机连接并采集的总丢包数量
+
+4. 显示帧率
+
+	显示程序在向前一秒内所显示的平均帧数
+
 ---
 
 ### 设置界面
-#### 扫描设置
 
-<img src='docs/pics/scan_options.png' alt='scan options' height='200px' />
+#### 设备设置
 
-1. starting / ending delay 起止延时
+<img src='docs/pics/GLI_main/device_options.png' alt='设备设置' height='240px' />
 
-	执行扫描时的起始及终止延时, 输入方式同 TCU 参数设置
+1. local IP 本地网卡 IP
 
-2. frame count / stepping 扫描帧数 / 步长
+	当使用网口相机时, 此项会更新为搜索到第一项设备 (或所选择设备) 对应的本地网卡 IP 地址, 如连接设备失败可尝试修改设备ip至与局域网同一网段后连接
 
-	此二项设置互斥, 设置任意一项后另一项依据起止延时与本项自动变更, 计算方式为 $frame\_count * stepping = ending - starting\_delay$
+2. devices 设备列表
 
-	<font color=#A2B5CD>例: 设置起止延时分别为 0 ns 与 1 μs 后, </font>
-	1. <font color=#A2B5CD>设置帧数为 30, 则步长自动变更为 33.33 ns</font>
-	2. <font color=#A2B5CD>设置步长为 10 ns, 则帧数自动变更为 100</font>
+	此列表在搜索设备后会显示所搜索到的所有设备
 
-3. Rep. freq. 扫描时重频
+3. device IP 设备IP
 
-	执行扫描时的激光重频, 输入方式同 TCU 参数设置
+	当使用网口相机时, 此项会亮起, 并更新至搜索到第一项设备 (或所选择设备) 的 IP, 如连接设备失败可尝试在此修改设备ip至与局域网同一网段后连接
 
-4. original / result img 保存原始/修正图像
+	<font color=#F08080>\*注: 此项当且仅当设备可达且未被连接时生效</font>
 
-	当 original 复选框被选中时, 执行扫描将会保存每帧扫描时的原始图像
+4. pixel type 像素格式
 
-	当 result 复选框被选中时, 执行扫描将会保存每帧扫描是的修正图像
+	目前支持 mono 8, mono 12, RGB 8 三种像素格式
+	
+	<font color=#F08080>\*注: 更改此选项时, 设备不应处于正在采集状态, 若设备处于正在采集状态, 程序会尝试停止采集并更改像素格式后恢复</font>
 
-	<font color=#F08080>\*注: 当有任一复选框被选中时, 程序执行扫描时将会创建扫描文件夹, 并保存本次扫描参数; 当无复选框被选中时, 程序执行扫描时将不会保存任何文件</font>
+5. flip 翻转
+
+	此选项支持将图像以 X 轴/ Y 轴/ 中心对称的方式翻转__显示__
+
+6. eBUS
+
+	使用凌图 cameralink 转以太网模块时, 勾选此选项, 否则取消勾选
+
+	<font color=#F08080>\*注: 勾选此选项后须重新搜索设备 (主界面2.1)</font>
+	
+7. CameraLink (CL)
+
+	此选项应仅在使用 euresys 品牌 cameralink 采集卡相机采集 1920 x 1080 图像时勾选
+
+8. split 
+
+	勾选此选项会将图像以十字形式分割成四份相等大小的图像
 
 #### 串口功能
 
-![serial ports](docs/pics/serial_ports.png)
+<img src='docs/pics/GLI_main/serialport_options.png' alt='串口设置' height='200px' />
 
 1. 串口选择
 
@@ -430,7 +547,17 @@
 
 	<font color=#F08080>\*注: 若更改串口波特率时串口未连接, 则修改无效</font>
 
-3. 串口数据发送
+3. use tcp server 使用串口服务器
+
+	勾选复选框后, 若已连接至串口服务器, 则使用串口服务器向端口发送数据
+
+	输入框内为串口服务器的 IP 地址
+
+4. use TCU port for all 共享TCU串口
+
+	若设备连接时镜头控制与TCU在串口上为同一线路, 则勾选此选项, 否则取消此项勾选
+
+5. 串口数据发送
 
 	在输入框内输入数据后, 将数据以设定的波特率发送至所选串口, 并读取数据 (超时设置 100ms)
 
@@ -438,17 +565,19 @@
 	<font color=#EEDC82>\*注2: 发送数据与读取数据可在串口数据显示处查看 (主界面 6.1)</font>
 	<font color=#FFA54F>\*注3: 若所选串口未连接, 则不会发送或读取数据</font>
 
-4. 共享串口
-
-	若设备连接时镜头控制与TCU在串口上为同一线路, 则勾选此选项, 否则取消此项勾选
-
-	<font color=#F08080>\*注: 此选项默认勾选</font>
-
 #### TCU选项
 
-![tcu_options](docs/pics/tcu_options.png)
+<img src='docs/pics/GLI_main/tcu_options.png' alt='TCU设置' height='320px' />
 
-1. Auto rep. freq. 重频自动设置
+1. TCU type TCU协议类型
+
+	目前支持 2 种TCU协议
+	- default 默认
+- 40ps步进
+
+	<font color=#F08080>\*注: 40ps 步进协议下, tcu 设置界面将有三项额外输入<img src='docs/pics/GLI_main/tcu_ps_options.png' height='30px' style='padding-bottom: 6px;' /> (精度选项, 精度步进, 当前步进下最大步数)</font>
+
+2. Auto rep. freq. 自动重频设置
 
 	若勾选此选项, 则在主界面 TCU 设置延时时自动根据延时调整激光脉冲最小周期, 后调整激光重频 (PRF), 目前程序自动设置时激光重频最大为 30kHZ, 最小重频与延时最大值相关 (设置界面3.4)
 
@@ -457,57 +586,75 @@
 	<font color=#F08080>\*注1: 此选项默认勾选</font>
 	<font color=#EEDC82>\*注2: 手动设置重频时, 若延时与门宽之和大于激光重频对应周期, 则 TCU 可能停止工作直至调整此三项数值至正常</font>
 
-2. Rep. freq. 激光重频单位设置
-
-	可于下拉菜单中选择, 目前支持 kHz 与 Hz, 选择后程序主界面与设置界面激光重频处会自动变更其单位及数值
-
-3. Base unit 步长单位设置
-
-	可于下拉菜单中选择, 目前支持 ns, μs, m, 选择后程序主界面与设置界面对应位置会自动变更其单位及数值:
-	- TCU步长处
-	- 图像信息显示处
-	- 延时/距离最大值设置处
-
-4. MAX delay 延时/距离最大值设置
-
-	设置 TCU 所支持的最大延时 (或最远探测距离)
-
-	修改后 TCU 对应最大延时与最小激光重频均会变更
-
-	<font color=#F08080>\*注: 程序起始时默认值为 100000ns (15000m)</font>
-
-5. laser 复选框
-
-	1, 2, 3, 4对应的四个复选框分别对应系统中的4个激光器开关, 勾选时开启, 未勾选时关闭
-
-	<font color=#F08080>\*注: 此项当且仅当 TCU 串口已连接时生效</font>
-
-6. Auto MCP MCP自适应
+3. Auto MCP MCP自适应
 
 	当此复选框被选中时, 程序会依据当前成像亮度修改 TCU 中的 MCP 输出
 
 	<font color=#F08080>\*注1: 此项当且仅当 TCU 串口已连接时生效</font>
 	<font color=#EEDC82>\*注2: 此项在 MCP 过低时不稳定 (如低于30时)</font>
 
-#### 设备设置
+4. Rep. freq. 激光重频单位设置
 
-![device options](docs/pics/device_options.png)
+	可于下拉菜单中选择, 目前支持 kHz 与 Hz, 选择后程序主界面与设置界面激光重频处会自动变更其单位及数值
 
-1. Cameralink
+5. Base unit 步长单位设置
 
-	使用凌图 cameralink 转以太网模块时, 勾选此选项, 否则取消勾选
+	可于下拉菜单中选择, 目前支持 ns, μs, m, 选择后程序主界面与设置界面对应位置会自动变更其单位及数值:
+	- TCU步长处
+	- 图像信息显示处
+	- 延时/距离最大值设置处
 
-	<font color=#F08080>\*注: 勾选此选项后须重新搜索设备 (主界面2.1)</font>
+6. MAX delay, MAX gatewidth, MAX laser width 延时, 门宽, 激光脉宽最大值设置
 
-2. IP
+	设置 TCU 所支持的最大延时 (或最远探测距离), 门宽, 与激光脉宽
 
-	当使用海康网口相机时, 此项会亮起, 如连接设备失败可尝试在此修改设备ip至与局域网同一网段后连接
+	修改后 TCU 对应最大延时与最小激光重频均会变更
 
-	<font color=#F08080>\*注: 此项当且仅当设备可达且未被连接时生效</font>
+	<font color=#F08080>\*注: 程序起始时最大延时默认值为 100000 ns (15000 m), 最大门宽默认值为 5000 ns (750 m), 最大激光脉宽默认值为 5000 ns</font>
+
+7. delay offset, gatewidth offset, laser width offset
+
+	设置程序计算延时/门宽/激光脉宽时的偏移量
+
+	<font color=#A2B5CD>例: 延时偏移量为 A, 主界面输入延时为 B, 则TCU实际输入为 A+B </font>
+
+8. laser 激活复选框与编号复选框
+
+	enable 复选框为 TCU 使能激光器额选项, 勾选时向 TCU 发送使能激光器命令, 取消勾选时向 TCU 发送停用激光器命令
+
+	1, 2, 3, 4对应的四个复选框分别对应系统中的4个激光器开关, 勾选时开启, 未勾选时关闭
+
+	<font color=#F08080>\*注: 此项当且仅当 TCU 串口已连接时生效</font>
+
+9. (*40ps 步进 TCU 协议*) <img src='docs/pics/GLI_main/tcu_ps_options.png' height='30px' style='padding-bottom: 6px;' /> A/B 门宽/延时 步进设置
+
+	于下拉列表选择需调整的步进精度, 可选择 A/B 门宽/延时
+	
+	ps 命令默认步进精度为 40 ps, ns 命令步进精度固定为 4 ns (即4000 ps), 则 ps 命令最大步进数为 4000 / 40 = 100, 若 ps 命令精度变为 41 ps, 则最大步进变为 4000 / 41 = 98 (向上取整)
+
+#### 保存与加载选项
+
+<img src='docs/pics/GLI_main/save_options.png' alt='save options' height='160px' />
+
+1. frame info when saving 在保存图像时于画面中添加 TCU 与时间信息
+
+	勾选时会在保存的图像画面中添加 TCU 与时间信息 (若有自定义信息显示则添加自定义信息)
+
+2. custom info 自定义信息显示
+
+	勾选后在图像中显示其编辑栏内用户自定义的信息显示
+
+3. save in gray 以灰度图像保存
+
+	勾选后将以灰度图像保存图片
+
+5. capture consecutive images 连续采图
+
+	勾选时以连续方式保存图像, 取消勾选时则以单张方式保存图像
 
 #### 图像增强设置
 
-<img src='docs/pics/image_enhance_options.png' alt='image enhance options' height='240px' />
+<img src='docs/pics/GLI_main/imgproc_options.png' alt='image enhance options' height='480px' />
 
 详见主界面10.1
 
@@ -515,17 +662,48 @@
 
 ### 其他设置
 
-#### 电动激光镜头
+#### <u>注意事项</u>
 
-![laser_lens](docs/pics/laser_lens.png)
+1. 软件启动时弹出的"允许应用通过网络防火墙"请__同时__勾选公用与私用并允许
 
-选中左侧 #1/#2单选框以选择控制的激光镜头, 按住上下左右按键以调整激光镜头指向
+2. <font color=#B0C4DE>*在软件同级创建dmp文件夹以生成可能的dumpfile*</font>
+
+#### 程序默认参数
+
+程序默认记忆参数:
+- 串口号
+- 串口服务器 IP
+- 延时/门宽/激光脉宽偏移量
+
+#### 电动激光镜头 (Alt + L)
+
+<img src='docs/pics/GLI_main/laser_lens_control.png' alt='激光镜头控制' height='160px' />
+
+四行控制分别对应四个激光镜头光斑大小控制，滑块为对应镜头控制速度
+
+镜头编号为：面对设备的左上为1号，右上为2号，左下为3号，右下为4号
+
+#### 三维距离显示 (Alt + V)
+
+![distance view](docs/pics/GLI_main/distance_view.png)
+
+#### 预置位 (Alt + P)
+
+<img src='docs/pics/GLI_main/user_presets.png' alt='预置位' height='320px' />
+
+保存预置位后会在软件同级目录生成user_presets.json文件，可以用来储存TCU，镜头，转台参数
+
+#### 悬浮窗显示 (Alt + 0/1/2)
+
+使用 #0 悬浮窗播放于 misc - Alt 中勾选的原始数据, 用于与处理后图像对比
+
+使用 #1 / #2 悬浮窗播放于链接中打开的串流预览
 
 #### 手柄连接
 
 1. 手柄支持
 
-	连接时使用<font color=#A2B5CD>微软Xbox手柄蓝牙连接</font> (USB连接或 PS手柄需使用不同版本手柄配置文件)
+	连接时使用<font color=#A2B5CD>微软Xbox手柄蓝牙连接</font> (USB连接或 PS/NS手柄需使用不同版本手柄配置文件)
 
 2. 手柄操作及按键说明
 

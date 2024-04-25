@@ -163,6 +163,7 @@ MiscSelection QAbstractItemView {
 	color: #433D37;
 	selection-color: #180D1C;
 	border-radius: 3px;
+	outline: 0px;
 }
 
 /* display label */
@@ -333,7 +334,9 @@ QSlider::handle:horizontal:disabled {
 }
 
 #BRIGHTNESS_SLIDER::handle:horizontal, #CONTRAST_SLIDER::handle:horizontal, 
-#GAMMA_SLIDER::handle:horizontal, #FOCUS_SPEED_SLIDER::handle:horizontal {
+#GAMMA_SLIDER::handle:horizontal, #FOCUS_SPEED_SLIDER::handle:horizontal,
+#SLIDER_SPEED_1::handle:horizontal, #SLIDER_SPEED_2::handle:horizontal,
+#SLIDER_SPEED_3::handle:horizontal, #SLIDER_SPEED_4::handle:horizontal {
 	width: 6px;
 	height: 8px;
 	margin-top: -2px;
