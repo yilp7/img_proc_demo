@@ -2,455 +2,605 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="zh_CN" sourcelanguage="en_US">
 <context>
-    <name>LaserSettings</name>
+    <name>DeveloperOptions</name>
     <message>
-        <location filename="src/laser_settings.ui" line="17"/>
+        <location filename="src/visual/developeroptions.ui" line="14"/>
         <source>Dialog</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/visual/developeroptions.ui" line="36"/>
+        <source>level</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/visual/developeroptions.ui" line="49"/>
+        <source>Lens</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/visual/developeroptions.ui" line="61"/>
+        <source> 1000</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/visual/developeroptions.ui" line="104"/>
+        <source>ZOOM</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/visual/developeroptions.ui" line="117"/>
+        <source>FOCUS</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/visual/developeroptions.ui" line="130"/>
+        <source>LASER</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/visual/developeroptions.ui" line="156"/>
+        <source> 3000</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/visual/developeroptions.ui" line="202"/>
+        <source> 6000</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/visual/developeroptions.ui" line="245"/>
+        <source>15000</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/visual/developeroptions.ui" line="279"/>
+        <source>padding</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>Distance3DView</name>
+    <message>
+        <location filename="src/visual/distance3dview.ui" line="14"/>
+        <source>Distance View</source>
+        <translation>距离三维显示</translation>
+    </message>
+    <message>
+        <location filename="src/visual/distance3dview.ui" line="57"/>
+        <source>Horizontal</source>
+        <translation>横向旋转角度</translation>
+    </message>
+    <message>
+        <location filename="src/visual/distance3dview.ui" line="64"/>
+        <location filename="src/visual/distance3dview.ui" line="94"/>
+        <source>°</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/laser_settings.ui" line="29"/>
+        <location filename="src/visual/distance3dview.ui" line="87"/>
+        <source>Vertical</source>
+        <translation>垂直旋转角度</translation>
+    </message>
+    <message>
+        <location filename="src/visual/distance3dview.ui" line="117"/>
+        <source>Scale</source>
+        <translation>缩放</translation>
+    </message>
+    <message>
+        <location filename="src/visual/distance3dview.ui" line="144"/>
+        <source>Projection</source>
+        <translation>投影维度</translation>
+    </message>
+    <message>
+        <location filename="src/visual/distance3dview.ui" line="154"/>
+        <source>Downsample</source>
+        <translation>下采样</translation>
+    </message>
+    <message>
+        <location filename="src/visual/distance3dview.ui" line="177"/>
+        <source>Consecutive</source>
+        <translation>连续获取源</translation>
+    </message>
+    <message>
+        <location filename="src/visual/distance3dview.ui" line="184"/>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+</context>
+<context>
+    <name>LaserControl</name>
+    <message>
+        <location filename="src/visual/laser_control.ui" line="17"/>
+        <source>Laser Settings</source>
+        <translation>激光镜头设置</translation>
+    </message>
+    <message>
+        <location filename="src/visual/laser_control.ui" line="146"/>
         <source># 1</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/laser_settings.ui" line="42"/>
+        <location filename="src/visual/laser_control.ui" line="192"/>
         <source># 2</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/laser_settings.ui" line="55"/>
-        <source>+</source>
+        <location filename="src/visual/laser_control.ui" line="228"/>
+        <source># 3</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/laser_settings.ui" line="68"/>
-        <source>-</source>
+        <location filename="src/visual/laser_control.ui" line="264"/>
+        <source># 4</source>
         <translation></translation>
+    </message>
+    <message>
+        <location filename="src/visual/laser_control.ui" line="277"/>
+        <source>LASER RADIUS</source>
+        <translation>调整激光光斑半径</translation>
     </message>
 </context>
 <context>
     <name>Preferences</name>
     <message>
-        <location filename="src/preferences.ui" line="17"/>
-        <source>Dialog</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/preferences.ui" line="36"/>
+        <location filename="src/visual/preferences.ui" line="36"/>
         <source>Scan</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="77"/>
+        <location filename="src/visual/preferences.ui" line="77"/>
         <source>Starting delay</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="90"/>
+        <location filename="src/visual/preferences.ui" line="90"/>
         <source>Ending delay</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="116"/>
-        <location filename="src/preferences.ui" line="233"/>
-        <location filename="src/preferences.ui" line="369"/>
-        <location filename="src/preferences.ui" line="424"/>
+        <location filename="src/visual/preferences.ui" line="116"/>
+        <location filename="src/visual/preferences.ui" line="233"/>
+        <location filename="src/visual/preferences.ui" line="369"/>
+        <location filename="src/visual/preferences.ui" line="424"/>
         <source>μs</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="129"/>
-        <location filename="src/preferences.ui" line="288"/>
-        <location filename="src/preferences.ui" line="301"/>
-        <location filename="src/preferences.ui" line="395"/>
-        <location filename="src/preferences.ui" line="437"/>
-        <location filename="src/preferences.ui" line="476"/>
-        <location filename="src/preferences.ui" line="1033"/>
-        <location filename="src/preferences.ui" line="1098"/>
-        <location filename="src/preferences.ui" line="1235"/>
-        <location filename="src/preferences.ui" line="1261"/>
-        <location filename="src/preferences.ui" line="1300"/>
-        <location filename="src/preferences.ui" line="1313"/>
-        <location filename="src/preferences.ui" line="1852"/>
-        <location filename="src/preferences.ui" line="1865"/>
+        <location filename="src/visual/preferences.ui" line="129"/>
+        <location filename="src/visual/preferences.ui" line="288"/>
+        <location filename="src/visual/preferences.ui" line="301"/>
+        <location filename="src/visual/preferences.ui" line="395"/>
+        <location filename="src/visual/preferences.ui" line="437"/>
+        <location filename="src/visual/preferences.ui" line="476"/>
+        <location filename="src/visual/preferences.ui" line="1059"/>
+        <location filename="src/visual/preferences.ui" line="1124"/>
+        <location filename="src/visual/preferences.ui" line="1261"/>
+        <location filename="src/visual/preferences.ui" line="1287"/>
+        <location filename="src/visual/preferences.ui" line="1326"/>
+        <location filename="src/visual/preferences.ui" line="1339"/>
+        <location filename="src/visual/preferences.ui" line="2010"/>
+        <location filename="src/visual/preferences.ui" line="2023"/>
         <source>ns</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="142"/>
+        <location filename="src/visual/preferences.ui" line="142"/>
         <source>original img</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="168"/>
+        <location filename="src/visual/preferences.ui" line="168"/>
         <source>Rep. freq.</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="181"/>
-        <location filename="src/preferences.ui" line="463"/>
+        <location filename="src/visual/preferences.ui" line="181"/>
+        <location filename="src/visual/preferences.ui" line="463"/>
         <source>Stepping</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="194"/>
+        <location filename="src/visual/preferences.ui" line="194"/>
         <source>Frame count</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="207"/>
+        <location filename="src/visual/preferences.ui" line="207"/>
         <source>result img</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="275"/>
+        <location filename="src/visual/preferences.ui" line="275"/>
         <source>kHz</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="327"/>
+        <location filename="src/visual/preferences.ui" line="327"/>
         <source>Ending gatewidth</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="340"/>
+        <location filename="src/visual/preferences.ui" line="340"/>
         <source>Starting gatewidth</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="489"/>
+        <location filename="src/visual/preferences.ui" line="489"/>
         <source>3D reconstruction</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="601"/>
+        <location filename="src/visual/preferences.ui" line="601"/>
         <source>Split</source>
         <translation>切分图片</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="614"/>
-        <source>Cameralink</source>
+        <location filename="src/visual/preferences.ui" line="17"/>
+        <source>Preferences</source>
+        <translation>偏好设置</translation>
+    </message>
+    <message>
+        <location filename="src/visual/preferences.ui" line="614"/>
+        <source>eBUS</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="627"/>
+        <location filename="src/visual/preferences.ui" line="627"/>
         <source>Flip</source>
         <translation>翻转</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="640"/>
+        <location filename="src/visual/preferences.ui" line="640"/>
         <source>192.168.1.159</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="656"/>
+        <location filename="src/visual/preferences.ui" line="656"/>
         <source>Local IP</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="669"/>
+        <location filename="src/visual/preferences.ui" line="669"/>
         <source>Device IP</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="702"/>
+        <location filename="src/visual/preferences.ui" line="702"/>
         <source>Pixel Type</source>
         <translation>像素格式</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="725"/>
+        <location filename="src/visual/preferences.ui" line="725"/>
         <source>Deivces</source>
         <translation>设备</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="741"/>
+        <location filename="src/visual/preferences.ui" line="741"/>
         <source>127.0.0.1</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="773"/>
+        <location filename="src/visual/preferences.ui" line="757"/>
+        <source>CL</source>
+        <translation></translation>
+    </message>
+    <message>
+        <location filename="src/visual/preferences.ui" line="770"/>
+        <source>Underwater</source>
+        <translation>水下使用</translation>
+    </message>
+    <message>
+        <location filename="src/visual/preferences.ui" line="799"/>
         <source>88 1F 00 00 00 00 99</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="799"/>
+        <location filename="src/visual/preferences.ui" line="825"/>
         <source>Use TCU port for all</source>
         <translation>全部使用TCU串口</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="815"/>
+        <location filename="src/visual/preferences.ui" line="841"/>
         <source>Custom data</source>
         <translation>自定义数据</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="828"/>
+        <location filename="src/visual/preferences.ui" line="854"/>
         <source>Baudrate</source>
         <translation>波特率</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="841"/>
+        <location filename="src/visual/preferences.ui" line="867"/>
         <source>Port</source>
         <translation>串口</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="864"/>
+        <location filename="src/visual/preferences.ui" line="890"/>
         <source>Use TCP server</source>
         <translation>使用串口服务器</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="887"/>
+        <location filename="src/visual/preferences.ui" line="913"/>
         <source>available</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="913"/>
+        <location filename="src/visual/preferences.ui" line="939"/>
         <source>192.168.1.233</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="945"/>
+        <location filename="src/visual/preferences.ui" line="971"/>
         <source>Auto MCP</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="958"/>
+        <location filename="src/visual/preferences.ui" line="984"/>
         <source>4</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="981"/>
+        <location filename="src/visual/preferences.ui" line="1007"/>
         <source>3</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="994"/>
+        <location filename="src/visual/preferences.ui" line="1020"/>
         <source>2</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1007"/>
+        <location filename="src/visual/preferences.ui" line="1033"/>
         <source>delay offset</source>
         <translation>延时偏移量</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1020"/>
+        <location filename="src/visual/preferences.ui" line="1046"/>
         <source>Base unit</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1046"/>
+        <location filename="src/visual/preferences.ui" line="1072"/>
         <source>Laser Toggle</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1072"/>
+        <location filename="src/visual/preferences.ui" line="1098"/>
         <source>Auto PRF</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1085"/>
-        <location filename="src/preferences.ui" line="1768"/>
+        <location filename="src/visual/preferences.ui" line="1111"/>
+        <location filename="src/visual/preferences.ui" line="1926"/>
         <source>enable</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1111"/>
+        <location filename="src/visual/preferences.ui" line="1137"/>
         <source>Rep. freq</source>
         <translation>激光重频</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1124"/>
+        <location filename="src/visual/preferences.ui" line="1150"/>
         <source>1</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1137"/>
+        <location filename="src/visual/preferences.ui" line="1163"/>
         <source>MAX delay</source>
         <translation>最大延时</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1183"/>
+        <location filename="src/visual/preferences.ui" line="1209"/>
         <source>TCU type</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1196"/>
+        <location filename="src/visual/preferences.ui" line="1222"/>
         <source>MAX gate width</source>
         <translation>最大门宽</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1209"/>
+        <location filename="src/visual/preferences.ui" line="1235"/>
         <source>gate offset</source>
         <translation>门宽偏移量</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1274"/>
+        <location filename="src/visual/preferences.ui" line="1300"/>
         <source>MAX laser width</source>
         <translation>最大激光脉宽</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1287"/>
+        <location filename="src/visual/preferences.ui" line="1313"/>
         <source>laser offset</source>
         <translation>激光脉宽偏移量</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1381"/>
+        <location filename="src/visual/preferences.ui" line="1413"/>
+        <source>step</source>
+        <translation></translation>
+    </message>
+    <message>
+        <location filename="src/visual/preferences.ui" line="1426"/>
+        <source>ps</source>
+        <translation></translation>
+    </message>
+    <message>
+        <location filename="src/visual/preferences.ui" line="1449"/>
+        <source>max</source>
+        <translation></translation>
+    </message>
+    <message>
+        <location filename="src/visual/preferences.ui" line="1463"/>
+        <source>AB lock</source>
+        <translation></translation>
+    </message>
+    <message>
+        <location filename="src/visual/preferences.ui" line="1539"/>
         <source>Gamma</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1394"/>
+        <location filename="src/visual/preferences.ui" line="1552"/>
         <source>low in</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1420"/>
+        <location filename="src/visual/preferences.ui" line="1578"/>
         <source>Accu. base</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1433"/>
+        <location filename="src/visual/preferences.ui" line="1591"/>
         <source>adaptive</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1459"/>
+        <location filename="src/visual/preferences.ui" line="1617"/>
         <source>low out</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1485"/>
+        <location filename="src/visual/preferences.ui" line="1643"/>
         <source>accumulative</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1508"/>
+        <location filename="src/visual/preferences.ui" line="1666"/>
         <source>upper</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1534"/>
+        <location filename="src/visual/preferences.ui" line="1692"/>
         <source>3D</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1547"/>
+        <location filename="src/visual/preferences.ui" line="1705"/>
         <source>trim</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1612"/>
+        <location filename="src/visual/preferences.ui" line="1770"/>
         <source>Dehaze %</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1625"/>
+        <location filename="src/visual/preferences.ui" line="1783"/>
         <source>Sky Tol.</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1638"/>
+        <location filename="src/visual/preferences.ui" line="1796"/>
         <source>Fast gf</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1664"/>
+        <location filename="src/visual/preferences.ui" line="1822"/>
         <source>lower</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1677"/>
+        <location filename="src/visual/preferences.ui" line="1835"/>
         <source>DCP related</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1690"/>
+        <location filename="src/visual/preferences.ui" line="1848"/>
         <source>high out</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1716"/>
+        <location filename="src/visual/preferences.ui" line="1874"/>
         <source>high in</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1742"/>
+        <location filename="src/visual/preferences.ui" line="1900"/>
         <source>thresh</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1755"/>
+        <location filename="src/visual/preferences.ui" line="1913"/>
         <source>fishnet&lt;br&gt;recognition</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1797"/>
+        <location filename="src/visual/preferences.ui" line="1955"/>
         <source>delay</source>
         <translation>延时</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1826"/>
+        <location filename="src/visual/preferences.ui" line="1984"/>
         <source>gate width</source>
         <translation>门宽</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1839"/>
+        <location filename="src/visual/preferences.ui" line="1997"/>
         <source>custom</source>
         <translation>自定义</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1907"/>
+        <location filename="src/visual/preferences.ui" line="2075"/>
         <source>Frame info when saving</source>
         <translation>存图时保存信息</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1923"/>
+        <location filename="src/visual/preferences.ui" line="2091"/>
         <source>Custom info</source>
         <translation>自定义显示</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1939"/>
+        <location filename="src/visual/preferences.ui" line="2107"/>
         <source>DIST 00000 m DOV 0000 m</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1958"/>
+        <location filename="src/visual/preferences.ui" line="2123"/>
+        <source>Capture Consecutive Images</source>
+        <translation>连续采集图像</translation>
+    </message>
+    <message>
+        <location filename="src/visual/preferences.ui" line="2139"/>
+        <source>Save in gray</source>
+        <translation>以灰度图像保存</translation>
+    </message>
+    <message>
         <source>Consecutive Capture</source>
-        <translation>连续存图</translation>
+        <translation type="vanished">连续存图</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1977"/>
         <source>Watermark</source>
-        <translation>水印</translation>
+        <translation type="vanished">水印</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="1993"/>
+        <location filename="src/visual/preferences.ui" line="2155"/>
         <source>Integrate info in file</source>
         <translation>存图时集成信息</translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="2019"/>
+        <location filename="src/visual/preferences.ui" line="2191"/>
         <source>DEVICES</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="2035"/>
+        <location filename="src/visual/preferences.ui" line="2207"/>
         <source>SERIAL PORTS</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="2051"/>
+        <location filename="src/visual/preferences.ui" line="2223"/>
         <source>TCU</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="2067"/>
+        <location filename="src/visual/preferences.ui" line="2239"/>
         <source>IMAGE PROCESS</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/preferences.ui" line="2083"/>
+        <location filename="src/visual/preferences.ui" line="2255"/>
         <source>SAVE / LOAD</source>
         <translation></translation>
     </message>
@@ -458,231 +608,231 @@
 <context>
     <name>ProgSettings</name>
     <message>
-        <location filename="src/settings.ui" line="14"/>
+        <location filename="src/_deprecated/settings.ui" line="14"/>
         <source>Dialog</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="26"/>
+        <location filename="src/_deprecated/settings.ui" line="26"/>
         <source>Scan Options</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="54"/>
+        <location filename="src/_deprecated/settings.ui" line="54"/>
         <source>Starting delay</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="67"/>
+        <location filename="src/_deprecated/settings.ui" line="67"/>
         <source>Ending delay</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="93"/>
+        <location filename="src/_deprecated/settings.ui" line="93"/>
         <source>Frame count</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="119"/>
+        <location filename="src/_deprecated/settings.ui" line="119"/>
         <source>Stepping</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="145"/>
-        <location filename="src/settings.ui" line="158"/>
-        <location filename="src/settings.ui" line="171"/>
-        <location filename="src/settings.ui" line="769"/>
+        <location filename="src/_deprecated/settings.ui" line="145"/>
+        <location filename="src/_deprecated/settings.ui" line="158"/>
+        <location filename="src/_deprecated/settings.ui" line="171"/>
+        <location filename="src/_deprecated/settings.ui" line="769"/>
         <source>ns</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="184"/>
+        <location filename="src/_deprecated/settings.ui" line="184"/>
         <source>kHz</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="210"/>
+        <location filename="src/_deprecated/settings.ui" line="210"/>
         <source>Rep. freq.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="223"/>
+        <location filename="src/_deprecated/settings.ui" line="223"/>
         <source>original img</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="236"/>
-        <location filename="src/settings.ui" line="278"/>
+        <location filename="src/_deprecated/settings.ui" line="236"/>
+        <location filename="src/_deprecated/settings.ui" line="278"/>
         <source>μs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="291"/>
+        <location filename="src/_deprecated/settings.ui" line="291"/>
         <source>result img</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="305"/>
+        <location filename="src/_deprecated/settings.ui" line="305"/>
         <source>Img Enhance Options</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="330"/>
+        <location filename="src/_deprecated/settings.ui" line="330"/>
         <source>Kernel size</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="408"/>
+        <location filename="src/_deprecated/settings.ui" line="408"/>
         <source>low in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="421"/>
+        <location filename="src/_deprecated/settings.ui" line="421"/>
         <source>high in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="434"/>
+        <location filename="src/_deprecated/settings.ui" line="434"/>
         <source>low out</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="447"/>
+        <location filename="src/_deprecated/settings.ui" line="447"/>
         <source>high out</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="460"/>
+        <location filename="src/_deprecated/settings.ui" line="460"/>
         <source>Gamma</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="486"/>
+        <location filename="src/_deprecated/settings.ui" line="486"/>
         <source>Log</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="499"/>
+        <location filename="src/_deprecated/settings.ui" line="499"/>
         <source>Accu. base</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="538"/>
+        <location filename="src/_deprecated/settings.ui" line="538"/>
         <source>Dehaze %</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="551"/>
+        <location filename="src/_deprecated/settings.ui" line="551"/>
         <source>Sky Tol.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="590"/>
+        <location filename="src/_deprecated/settings.ui" line="590"/>
         <source>Fast gf</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="603"/>
+        <location filename="src/_deprecated/settings.ui" line="603"/>
         <source>Reset 3D</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="626"/>
+        <location filename="src/_deprecated/settings.ui" line="626"/>
         <source>Symmetry</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="640"/>
+        <location filename="src/_deprecated/settings.ui" line="640"/>
         <source>Serial Port comm.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="662"/>
+        <location filename="src/_deprecated/settings.ui" line="662"/>
         <source>Share Ports</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="688"/>
+        <location filename="src/_deprecated/settings.ui" line="688"/>
         <source>Baudrate</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="701"/>
+        <location filename="src/_deprecated/settings.ui" line="701"/>
         <source>88 1F 00 00 00 00 99</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="718"/>
+        <location filename="src/_deprecated/settings.ui" line="718"/>
         <source>TCU Options</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="730"/>
+        <location filename="src/_deprecated/settings.ui" line="730"/>
         <source>Auto rep. freq.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="756"/>
+        <location filename="src/_deprecated/settings.ui" line="756"/>
         <source>MAX delay</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="782"/>
+        <location filename="src/_deprecated/settings.ui" line="782"/>
         <source>Base unit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="815"/>
+        <location filename="src/_deprecated/settings.ui" line="815"/>
         <source>Rep. freq</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="828"/>
+        <location filename="src/_deprecated/settings.ui" line="828"/>
         <source>1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="841"/>
+        <location filename="src/_deprecated/settings.ui" line="841"/>
         <source>2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="854"/>
+        <location filename="src/_deprecated/settings.ui" line="854"/>
         <source>3</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="867"/>
+        <location filename="src/_deprecated/settings.ui" line="867"/>
         <source>4</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="880"/>
+        <location filename="src/_deprecated/settings.ui" line="880"/>
         <source>Laser</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="893"/>
+        <location filename="src/_deprecated/settings.ui" line="893"/>
         <source>Auto MCP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="907"/>
+        <location filename="src/_deprecated/settings.ui" line="907"/>
         <source>Device</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="919"/>
+        <location filename="src/_deprecated/settings.ui" line="919"/>
         <source>192.168.1.159</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="932"/>
+        <location filename="src/_deprecated/settings.ui" line="932"/>
         <source>IP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.ui" line="945"/>
+        <location filename="src/_deprecated/settings.ui" line="945"/>
         <source>Cameralink</source>
         <translation type="unfinished"></translation>
     </message>
@@ -690,98 +840,98 @@
 <context>
     <name>ScanConfig</name>
     <message>
-        <location filename="src/scanconfig.ui" line="17"/>
-        <source>Dialog</source>
-        <translation></translation>
+        <location filename="src/visual/scanconfig.ui" line="17"/>
+        <source>Scan Configuration</source>
+        <translation>扫描设置</translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="29"/>
-        <location filename="src/scanconfig.ui" line="68"/>
-        <location filename="src/scanconfig.ui" line="340"/>
-        <location filename="src/scanconfig.ui" line="463"/>
+        <location filename="src/visual/scanconfig.ui" line="29"/>
+        <location filename="src/visual/scanconfig.ui" line="68"/>
+        <location filename="src/visual/scanconfig.ui" line="340"/>
+        <location filename="src/visual/scanconfig.ui" line="463"/>
         <source>μs</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="42"/>
+        <location filename="src/visual/scanconfig.ui" line="42"/>
         <source>kHz</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="110"/>
-        <location filename="src/scanconfig.ui" line="489"/>
+        <location filename="src/visual/scanconfig.ui" line="110"/>
+        <location filename="src/visual/scanconfig.ui" line="489"/>
         <source>Starting</source>
         <translation>起始</translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="123"/>
-        <location filename="src/scanconfig.ui" line="162"/>
-        <location filename="src/scanconfig.ui" line="230"/>
-        <location filename="src/scanconfig.ui" line="353"/>
-        <location filename="src/scanconfig.ui" line="379"/>
-        <location filename="src/scanconfig.ui" line="476"/>
+        <location filename="src/visual/scanconfig.ui" line="123"/>
+        <location filename="src/visual/scanconfig.ui" line="162"/>
+        <location filename="src/visual/scanconfig.ui" line="230"/>
+        <location filename="src/visual/scanconfig.ui" line="353"/>
+        <location filename="src/visual/scanconfig.ui" line="379"/>
+        <location filename="src/visual/scanconfig.ui" line="476"/>
         <source>ns</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="136"/>
-        <location filename="src/scanconfig.ui" line="434"/>
+        <location filename="src/visual/scanconfig.ui" line="136"/>
+        <location filename="src/visual/scanconfig.ui" line="434"/>
         <source>Stepping</source>
         <translation>步进</translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="217"/>
+        <location filename="src/visual/scanconfig.ui" line="217"/>
         <source>Rep. freq.</source>
         <translation>激光重频</translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="243"/>
-        <location filename="src/scanconfig.ui" line="327"/>
+        <location filename="src/visual/scanconfig.ui" line="243"/>
+        <location filename="src/visual/scanconfig.ui" line="327"/>
         <source>Ending</source>
         <translation>终止</translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="256"/>
-        <location filename="src/scanconfig.ui" line="547"/>
+        <location filename="src/visual/scanconfig.ui" line="256"/>
+        <location filename="src/visual/scanconfig.ui" line="547"/>
         <source>original</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="269"/>
-        <location filename="src/scanconfig.ui" line="534"/>
+        <location filename="src/visual/scanconfig.ui" line="269"/>
+        <location filename="src/visual/scanconfig.ui" line="534"/>
         <source>result</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="282"/>
+        <location filename="src/visual/scanconfig.ui" line="282"/>
         <source>Frame count</source>
         <translation>帧计数</translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="295"/>
+        <location filename="src/visual/scanconfig.ui" line="295"/>
         <source>DELAY</source>
         <translation>延时</translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="311"/>
+        <location filename="src/visual/scanconfig.ui" line="311"/>
         <source>GATE WIDTH</source>
         <translation>门宽</translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="502"/>
+        <location filename="src/visual/scanconfig.ui" line="502"/>
         <source>CAPTURE</source>
         <translation>抓图</translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="518"/>
+        <location filename="src/visual/scanconfig.ui" line="518"/>
         <source>RECORD</source>
         <translation>录像</translation>
     </message>
     <message>
-        <location filename="src/scanconfig.ui" line="586"/>
-        <location filename="src/scanconfig.ui" line="599"/>
-        <location filename="src/scanconfig.ui" line="638"/>
-        <location filename="src/scanconfig.ui" line="651"/>
+        <location filename="src/visual/scanconfig.ui" line="586"/>
+        <location filename="src/visual/scanconfig.ui" line="599"/>
+        <location filename="src/visual/scanconfig.ui" line="638"/>
+        <location filename="src/visual/scanconfig.ui" line="651"/>
         <source>m</source>
         <translation></translation>
     </message>
@@ -789,631 +939,680 @@
 <context>
     <name>UserPanel</name>
     <message>
-        <location filename="src/user_panel.ui" line="32"/>
+        <location filename="src/visual/user_panel.ui" line="32"/>
         <source> YJS</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="79"/>
+        <location filename="src/visual/user_panel.ui" line="79"/>
         <source>Parameters</source>
         <translation>相机参数</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="94"/>
+        <location filename="src/visual/user_panel.ui" line="94"/>
         <source>Gain</source>
         <translation>增益</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="116"/>
-        <location filename="src/user_panel.ui" line="598"/>
-        <location filename="src/user_panel.ui" line="636"/>
-        <location filename="src/user_panel.ui" line="2946"/>
-        <source>0</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/user_panel.ui" line="151"/>
+        <location filename="src/visual/user_panel.ui" line="148"/>
         <source>Set params</source>
         <translation>设置参数</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="167"/>
+        <location filename="src/visual/user_panel.ui" line="164"/>
         <source>Get params</source>
         <translation>获取参数</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="186"/>
-        <location filename="src/user_panel.ui" line="2126"/>
+        <location filename="src/visual/user_panel.ui" line="2164"/>
+        <source>DOV</source>
+        <translation>景深</translation>
+    </message>
+    <message>
+        <location filename="src/visual/user_panel.ui" line="3068"/>
         <source>5</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="208"/>
-        <source>10</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/user_panel.ui" line="227"/>
+        <location filename="src/visual/user_panel.ui" line="218"/>
         <source>ms</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="243"/>
+        <location filename="src/visual/user_panel.ui" line="234"/>
         <source>Time Expo.</source>
         <translation>曝光时间</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="262"/>
+        <location filename="src/visual/user_panel.ui" line="253"/>
         <source>CMOS Freq</source>
         <translation>相机帧频</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="281"/>
+        <location filename="src/visual/user_panel.ui" line="272"/>
         <source>Hz</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="298"/>
+        <location filename="src/visual/user_panel.ui" line="289"/>
         <source>Img aquisition</source>
         <translation>图像采集</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="313"/>
+        <location filename="src/visual/user_panel.ui" line="304"/>
         <source>Continuous</source>
         <translation>连续模式</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="329"/>
+        <location filename="src/visual/user_panel.ui" line="320"/>
         <source>Trigger</source>
         <translation>触发模式</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="345"/>
+        <location filename="src/visual/user_panel.ui" line="336"/>
         <source>By software</source>
         <translation>软触发</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="361"/>
+        <location filename="src/visual/user_panel.ui" line="352"/>
         <source>Start</source>
         <translation>开始采集</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="377"/>
-        <location filename="src/userpanel.cpp" line="1847"/>
-        <location filename="src/userpanel.cpp" line="1873"/>
-        <location filename="src/userpanel.cpp" line="3937"/>
-        <location filename="src/userpanel.cpp" line="3995"/>
-        <location filename="src/userpanel.cpp" line="4062"/>
+        <location filename="src/visual/user_panel.ui" line="368"/>
+        <location filename="src/visual/userpanel.cpp" line="2171"/>
+        <location filename="src/visual/userpanel.cpp" line="2199"/>
+        <location filename="src/visual/userpanel.cpp" line="4992"/>
+        <location filename="src/visual/userpanel.cpp" line="5052"/>
+        <location filename="src/visual/userpanel.cpp" line="5123"/>
         <source>Stop</source>
         <translation>停止采集</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="393"/>
+        <location filename="src/visual/user_panel.ui" line="384"/>
         <source>Grab</source>
         <translation>采集</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="406"/>
+        <location filename="src/visual/user_panel.ui" line="397"/>
         <source>2 x 2 binning</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="456"/>
+        <location filename="src/visual/user_panel.ui" line="470"/>
         <source>devices</source>
         <translation>设备</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="471"/>
+        <location filename="src/visual/user_panel.ui" line="485"/>
         <source>Turn off</source>
         <translation>断开</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="487"/>
+        <location filename="src/visual/user_panel.ui" line="501"/>
         <source>Turn on</source>
         <translation>连接</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="503"/>
+        <location filename="src/visual/user_panel.ui" line="517"/>
         <source>Search for devices</source>
         <translation>搜索设备</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="509"/>
+        <location filename="src/visual/user_panel.ui" line="523"/>
         <source>COMs</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="521"/>
-        <location filename="src/user_panel.ui" line="1790"/>
+        <location filename="src/visual/user_panel.ui" line="535"/>
+        <location filename="src/visual/user_panel.ui" line="2041"/>
         <source>TCU</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="534"/>
+        <location filename="src/visual/user_panel.ui" line="548"/>
         <source>RANGE</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="547"/>
+        <location filename="src/visual/user_panel.ui" line="561"/>
         <source>LENS</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="560"/>
+        <location filename="src/visual/user_panel.ui" line="574"/>
+        <location filename="src/visual/user_panel.ui" line="2884"/>
         <source>LASER</source>
-        <translation></translation>
+        <translation>激光</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="579"/>
-        <source>3</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/user_panel.ui" line="617"/>
-        <source>8</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/user_panel.ui" line="654"/>
+        <location filename="src/visual/user_panel.ui" line="656"/>
         <source>Laser</source>
         <translation>激光器</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="675"/>
-        <source>18</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/user_panel.ui" line="697"/>
-        <location filename="src/user_panel.ui" line="1617"/>
-        <location filename="src/user_panel.ui" line="1633"/>
+        <location filename="src/visual/user_panel.ui" line="696"/>
+        <location filename="src/visual/user_panel.ui" line="1798"/>
+        <location filename="src/visual/user_panel.ui" line="1814"/>
+        <location filename="src/visual/user_panel.ui" line="1989"/>
         <source>+</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1579"/>
-        <source>Zoom</source>
-        <translation>变焦</translation>
+        <location filename="src/visual/user_panel.ui" line="788"/>
+        <source>Set Dist.</source>
+        <translation>设置距离</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="735"/>
-        <location filename="src/user_panel.ui" line="1649"/>
-        <location filename="src/user_panel.ui" line="1665"/>
+        <location filename="src/visual/user_panel.ui" line="1310"/>
+        <location filename="src/visual/user_panel.ui" line="1362"/>
+        <source>CAP</source>
+        <translation></translation>
+    </message>
+    <message>
+        <location filename="src/visual/user_panel.ui" line="1323"/>
+        <location filename="src/visual/user_panel.ui" line="1375"/>
+        <source>REC</source>
+        <translation></translation>
+    </message>
+    <message>
+        <location filename="src/visual/user_panel.ui" line="1388"/>
+        <source>ALT 1</source>
+        <translation></translation>
+    </message>
+    <message>
+        <location filename="src/visual/user_panel.ui" line="1404"/>
+        <source>ALT 2</source>
+        <translation></translation>
+    </message>
+    <message>
+        <location filename="src/visual/user_panel.ui" line="1420"/>
+        <source>Dual display</source>
+        <translation>副屏显示</translation>
+    </message>
+    <message>
+        <location filename="src/visual/user_panel.ui" line="1760"/>
+        <source>Zoom</source>
+        <translation>视场</translation>
+    </message>
+    <message>
+        <location filename="src/visual/user_panel.ui" line="734"/>
+        <location filename="src/visual/user_panel.ui" line="1830"/>
+        <location filename="src/visual/user_panel.ui" line="1846"/>
+        <location filename="src/visual/user_panel.ui" line="1970"/>
         <source>-</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="713"/>
+        <location filename="src/visual/user_panel.ui" line="712"/>
+        <location filename="src/visual/user_panel.ui" line="2005"/>
         <source>Radius</source>
         <translation>光斑</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="754"/>
-        <location filename="src/userpanel.cpp" line="4134"/>
-        <location filename="src/userpanel.cpp" line="4140"/>
+        <location filename="src/visual/user_panel.ui" line="753"/>
+        <location filename="src/visual/userpanel.cpp" line="5185"/>
+        <location filename="src/visual/userpanel.cpp" line="5206"/>
+        <location filename="src/visual/userpanel.cpp" line="5213"/>
         <source>ON</source>
         <translation>开</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="789"/>
+        <location filename="src/visual/user_panel.ui" line="2110"/>
         <source>Distance</source>
-        <translation>设置距离</translation>
+        <translation>距离</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="805"/>
+        <location filename="src/visual/user_panel.ui" line="804"/>
+        <location filename="src/visual/userpanel.cpp" line="5666"/>
+        <location filename="src/visual/userpanel.cpp" line="5714"/>
         <source>FIRE</source>
         <translation>发射</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="842"/>
-        <source>data</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/user_panel.ui" line="855"/>
-        <source>hist</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/user_panel.ui" line="909"/>
+        <location filename="src/visual/user_panel.ui" line="1263"/>
         <source>PTZ</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="934"/>
+        <location filename="src/visual/user_panel.ui" line="952"/>
+        <location filename="src/visual/user_panel.ui" line="1336"/>
+        <location filename="src/visual/user_panel.ui" line="1349"/>
+        <location filename="src/visual/userpanel.cpp" line="5202"/>
+        <location filename="src/visual/userpanel.cpp" line="5689"/>
         <source>STOP</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="950"/>
-        <source>000.00</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/user_panel.ui" line="966"/>
+        <location filename="src/visual/user_panel.ui" line="981"/>
         <source>h</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1140"/>
+        <location filename="src/visual/user_panel.ui" line="1155"/>
         <source>v</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1153"/>
-        <location filename="src/user_panel.ui" line="1757"/>
+        <location filename="src/visual/user_panel.ui" line="1168"/>
+        <location filename="src/visual/user_panel.ui" line="1935"/>
         <source>get</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1191"/>
-        <source>00.00</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/user_panel.ui" line="1251"/>
-        <source>COM</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/user_panel.ui" line="1267"/>
-        <source>6</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/user_panel.ui" line="1378"/>
+        <location filename="src/visual/user_panel.ui" line="1559"/>
         <source>center</source>
         <translation>十字线</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1500"/>
+        <location filename="src/visual/user_panel.ui" line="1681"/>
         <source>info</source>
         <translation>信息</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1513"/>
+        <location filename="src/visual/user_panel.ui" line="1694"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;FISHNET&lt;br/&gt;???&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1564"/>
+        <location filename="src/visual/user_panel.ui" line="1745"/>
         <source>Lens</source>
         <translation>镜头设置</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1598"/>
+        <location filename="src/visual/user_panel.ui" line="1779"/>
         <source>Focus</source>
         <translation>聚焦</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1700"/>
-        <source>32</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="src/user_panel.ui" line="1773"/>
+        <location filename="src/visual/user_panel.ui" line="1951"/>
         <source>auto</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1824"/>
         <source>Frequency</source>
-        <translation>激光重频</translation>
+        <translation type="vanished">激光重频</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1843"/>
+        <location filename="src/visual/user_panel.ui" line="3138"/>
         <source>kHz</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1859"/>
+        <location filename="src/visual/user_panel.ui" line="2988"/>
         <source>Laser Width</source>
         <translation>激光脉宽</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1916"/>
-        <location filename="src/user_panel.ui" line="2236"/>
-        <location filename="src/user_panel.ui" line="2340"/>
-        <location filename="src/user_panel.ui" line="2564"/>
-        <location filename="src/user_panel.ui" line="2708"/>
+        <location filename="src/visual/user_panel.ui" line="2274"/>
+        <location filename="src/visual/user_panel.ui" line="2378"/>
+        <location filename="src/visual/user_panel.ui" line="2602"/>
+        <location filename="src/visual/user_panel.ui" line="2746"/>
+        <location filename="src/visual/user_panel.ui" line="3007"/>
         <source>μs</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1932"/>
-        <location filename="src/user_panel.ui" line="2018"/>
-        <location filename="src/user_panel.ui" line="2252"/>
-        <location filename="src/user_panel.ui" line="2394"/>
-        <location filename="src/user_panel.ui" line="2470"/>
-        <location filename="src/user_panel.ui" line="2618"/>
-        <location filename="src/user_panel.ui" line="2673"/>
-        <location filename="src/user_panel.ui" line="2796"/>
+        <location filename="src/visual/user_panel.ui" line="2094"/>
+        <location filename="src/visual/user_panel.ui" line="2290"/>
+        <location filename="src/visual/user_panel.ui" line="2432"/>
+        <location filename="src/visual/user_panel.ui" line="2508"/>
+        <location filename="src/visual/user_panel.ui" line="2656"/>
+        <location filename="src/visual/user_panel.ui" line="2711"/>
+        <location filename="src/visual/user_panel.ui" line="2834"/>
+        <location filename="src/visual/user_panel.ui" line="2972"/>
         <source>ns</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1964"/>
+        <location filename="src/visual/user_panel.ui" line="3087"/>
         <source>MCP</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="1999"/>
+        <location filename="src/visual/user_panel.ui" line="2021"/>
+        <location filename="src/visual/user_panel.ui" line="2075"/>
         <source>Stepping</source>
         <translation>步进</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="2034"/>
         <source>Estimated dist.</source>
-        <translation>预估距离</translation>
+        <translation type="vanished">预估距离</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="2088"/>
         <source>Depth of field</source>
-        <translation>景深</translation>
+        <translation type="vanished">景深</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="2179"/>
+        <location filename="src/visual/user_panel.ui" line="2217"/>
         <source>Delay A</source>
         <translation>延时A</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="2321"/>
+        <location filename="src/visual/user_panel.ui" line="2359"/>
         <source>Delay B</source>
         <translation>延时B</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="2432"/>
+        <location filename="src/visual/user_panel.ui" line="2470"/>
         <source>Delay N</source>
         <translation>延时差</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="2545"/>
+        <location filename="src/visual/user_panel.ui" line="2583"/>
         <source>Gate Width B</source>
         <translation>门宽B</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="2654"/>
+        <location filename="src/visual/user_panel.ui" line="2692"/>
         <source>Gate Width A</source>
         <translation>门宽A</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="2758"/>
+        <location filename="src/visual/user_panel.ui" line="2796"/>
         <source>GW diff</source>
         <translation>门宽差</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="2851"/>
+        <location filename="src/visual/user_panel.ui" line="3021"/>
+        <source>AUTO</source>
+        <translation>自动</translation>
+    </message>
+    <message>
+        <location filename="src/visual/user_panel.ui" line="3154"/>
+        <source>PRF</source>
+        <translation>重频</translation>
+    </message>
+    <message>
+        <location filename="src/visual/user_panel.ui" line="3192"/>
         <source>Img processing</source>
         <translation>图像处理</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="2866"/>
+        <location filename="src/visual/user_panel.ui" line="3207"/>
         <source>Enhance</source>
         <translation>增强</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="2895"/>
+        <location filename="src/visual/user_panel.ui" line="3236"/>
         <source>Avg</source>
         <translation>平均</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="2924"/>
+        <location filename="src/visual/user_panel.ui" line="3265"/>
         <source>3D</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="3015"/>
+        <location filename="src/visual/user_panel.ui" line="3353"/>
         <source>Brightness</source>
         <translation>亮度</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="3034"/>
+        <location filename="src/visual/user_panel.ui" line="3372"/>
         <source>Contrast</source>
         <translation>对比度</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="3078"/>
+        <location filename="src/visual/user_panel.ui" line="3416"/>
         <source>Gamma</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="3111"/>
+        <location filename="src/visual/user_panel.ui" line="3445"/>
+        <source>Pcolor</source>
+        <translation>伪彩</translation>
+    </message>
+    <message>
+        <location filename="src/visual/user_panel.ui" line="3462"/>
         <source>Save options</source>
         <translation>保存选项</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="3126"/>
-        <location filename="src/user_panel.ui" line="3174"/>
-        <location filename="src/userpanel.cpp" line="1847"/>
-        <location filename="src/userpanel.cpp" line="3937"/>
+        <location filename="src/visual/user_panel.ui" line="3477"/>
+        <location filename="src/visual/user_panel.ui" line="3525"/>
+        <location filename="src/visual/userpanel.cpp" line="2171"/>
+        <location filename="src/visual/userpanel.cpp" line="4992"/>
         <source>ORI</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="3158"/>
+        <location filename="src/visual/user_panel.ui" line="3509"/>
         <source>...</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="3190"/>
-        <location filename="src/user_panel.ui" line="3206"/>
-        <location filename="src/userpanel.cpp" line="1873"/>
-        <location filename="src/userpanel.cpp" line="4062"/>
+        <location filename="src/visual/user_panel.ui" line="3541"/>
+        <location filename="src/visual/user_panel.ui" line="3557"/>
+        <location filename="src/visual/userpanel.cpp" line="2199"/>
+        <location filename="src/visual/userpanel.cpp" line="5123"/>
         <source>RES</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="3222"/>
+        <location filename="src/visual/user_panel.ui" line="3573"/>
         <source>Capture</source>
         <translation>抓图</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="3241"/>
+        <location filename="src/visual/user_panel.ui" line="3592"/>
         <source>Record</source>
         <translation>录像</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="3276"/>
-        <location filename="src/userpanel.cpp" line="3942"/>
-        <location filename="src/userpanel.cpp" line="3995"/>
+        <location filename="src/visual/user_panel.ui" line="3627"/>
+        <location filename="src/visual/userpanel.cpp" line="4997"/>
+        <location filename="src/visual/userpanel.cpp" line="5052"/>
         <source>Scan</source>
         <translation>扫描</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="3292"/>
+        <location filename="src/visual/user_panel.ui" line="3643"/>
         <source>Continue</source>
         <translation>继续扫描</translation>
     </message>
     <message>
-        <location filename="src/user_panel.ui" line="3308"/>
+        <location filename="src/visual/user_panel.ui" line="3659"/>
         <source>Restart</source>
         <translation>重新扫描</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="159"/>
+        <location filename="src/visual/userpanel.cpp" line="274"/>
         <source>None</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="160"/>
+        <location filename="src/visual/userpanel.cpp" line="275"/>
         <source>Histogram</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="161"/>
+        <location filename="src/visual/userpanel.cpp" line="276"/>
         <source>Laplace</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="162"/>
+        <location filename="src/visual/userpanel.cpp" line="277"/>
         <source>SP-5</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="163"/>
+        <location filename="src/visual/userpanel.cpp" line="278"/>
         <source>Accumulative</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="164"/>
+        <location filename="src/visual/userpanel.cpp" line="279"/>
         <source>Sigmoid-based</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="165"/>
+        <location filename="src/visual/userpanel.cpp" line="280"/>
         <source>Adaptive</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="166"/>
+        <location filename="src/visual/userpanel.cpp" line="281"/>
         <source>Dehaze_enh</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="167"/>
+        <location filename="src/visual/userpanel.cpp" line="282"/>
         <source>DCP</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="1667"/>
+        <location filename="src/visual/userpanel.cpp" line="283"/>
+        <source>AINDANE</source>
+        <translation></translation>
+    </message>
+    <message>
+        <location filename="src/visual/userpanel.cpp" line="1969"/>
         <source>start failed</source>
         <translation>相机启动失败</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="1792"/>
+        <location filename="src/visual/userpanel.cpp" line="2110"/>
         <source>Create thread fail</source>
         <translation>开启采集线程失败</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="1921"/>
+        <location filename="src/visual/userpanel.cpp" line="2251"/>
         <source>Select folder</source>
         <translation>选择文件夹</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="2096"/>
+        <location filename="src/visual/userpanel.cpp" line="2518"/>
         <source>Name the Output Video</source>
         <translation>命名输出视频</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="2097"/>
+        <location filename="src/visual/userpanel.cpp" line="2519"/>
         <source>MPEG-4 Video           (*.mp4);;                                                    Audio Video Interleaved(*.avi);;                                                    All Files              (*.*)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="2281"/>
+        <location filename="src/visual/userpanel.cpp" line="2950"/>
         <source>Save Configuration</source>
         <translation>保存配置</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="2281"/>
-        <location filename="src/userpanel.cpp" line="2303"/>
+        <location filename="src/visual/userpanel.cpp" line="2950"/>
+        <location filename="src/visual/userpanel.cpp" line="2972"/>
         <source>YJS config(*.ssy);;All Files()</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="2296"/>
+        <location filename="src/visual/userpanel.cpp" line="2965"/>
         <source>cannot create config file</source>
         <translation>创建配置文件失败</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="2303"/>
+        <location filename="src/visual/userpanel.cpp" line="2972"/>
         <source>Load Configuration</source>
         <translation>加载配置</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="2323"/>
-        <location filename="src/userpanel.cpp" line="4287"/>
+        <location filename="src/visual/userpanel.cpp" line="2992"/>
+        <location filename="src/visual/userpanel.cpp" line="5410"/>
         <source>cannot open config file</source>
         <translation>无法打开配置文件</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="2341"/>
+        <location filename="src/visual/userpanel.cpp" line="3012"/>
         <source>cannot read config file</source>
         <translation>读取配置文件失败</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="2347"/>
+        <location filename="src/visual/userpanel.cpp" line="3088"/>
         <source>Load SN Config</source>
         <translation>加载序列号配置</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="2347"/>
+        <location filename="src/visual/userpanel.cpp" line="3088"/>
         <source>(*.csv);;All Files()</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="2512"/>
-        <source>gatewidth not supported</source>
-        <translation>不支持此门宽</translation>
+        <location filename="src/visual/userpanel.cpp" line="1657"/>
+        <location filename="src/visual/userpanel.cpp" line="2854"/>
+        <location filename="src/visual/userpanel.cpp" line="4001"/>
+        <source>IN</source>
+        <translation>大</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="2951"/>
-        <location filename="src/userpanel.cpp" line="4140"/>
+        <location filename="src/visual/userpanel.cpp" line="1658"/>
+        <location filename="src/visual/userpanel.cpp" line="2855"/>
+        <location filename="src/visual/userpanel.cpp" line="4007"/>
+        <source>OUT</source>
+        <translation>小</translation>
+    </message>
+    <message>
+        <location filename="src/visual/userpanel.cpp" line="1659"/>
+        <location filename="src/visual/userpanel.cpp" line="2856"/>
+        <location filename="src/visual/userpanel.cpp" line="4013"/>
+        <source>NEAR</source>
+        <translation>近</translation>
+    </message>
+    <message>
+        <location filename="src/visual/userpanel.cpp" line="1660"/>
+        <location filename="src/visual/userpanel.cpp" line="2857"/>
+        <location filename="src/visual/userpanel.cpp" line="4019"/>
+        <source>FAR</source>
+        <translation>远</translation>
+    </message>
+    <message>
+        <location filename="src/visual/userpanel.cpp" line="1661"/>
+        <location filename="src/visual/userpanel.cpp" line="2858"/>
+        <location filename="src/visual/userpanel.cpp" line="4025"/>
+        <source>INC</source>
+        <translation>大</translation>
+    </message>
+    <message>
+        <location filename="src/visual/userpanel.cpp" line="1662"/>
+        <location filename="src/visual/userpanel.cpp" line="2859"/>
+        <location filename="src/visual/userpanel.cpp" line="4031"/>
+        <source>DEC</source>
+        <translation>小</translation>
+    </message>
+    <message>
+        <location filename="src/visual/userpanel.cpp" line="5465"/>
+        <source>Initialize?</source>
+        <translation>是否初始化?</translation>
+    </message>
+    <message>
+        <source>gatewidth not supported</source>
+        <translation type="vanished">不支持此门宽</translation>
+    </message>
+    <message>
+        <location filename="src/visual/userpanel.cpp" line="3853"/>
+        <location filename="src/visual/userpanel.cpp" line="5213"/>
         <source>OFF</source>
         <translation>关</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="3545"/>
-        <source>File size limit (2 Gb) exceeded</source>
+        <location filename="src/visual/userpanel.cpp" line="4522"/>
+        <source>File size limit (2 GB) exceeded</source>
+        <oldsource>File size limit (2 Gb) exceeded</oldsource>
         <translation>文件大小超出限制（2GB)</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="3565"/>
+        <location filename="src/visual/userpanel.cpp" line="4542"/>
         <source>Some of the image files cannot be read</source>
         <translation>部分图像无法读取</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="3588"/>
+        <location filename="src/visual/userpanel.cpp" line="4565"/>
         <source>Cannot read local image while cam is on</source>
         <translation>相机连接时无法读取本地图像</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="3897"/>
+        <location filename="src/visual/userpanel.cpp" line="4946"/>
         <source>Cannot display image</source>
         <translation>无法显示此图片</translation>
     </message>
     <message>
-        <location filename="src/userpanel.cpp" line="4233"/>
+        <location filename="src/visual/userpanel.cpp" line="5353"/>
         <source>cannot create directory</source>
         <translation>创建路径失败</translation>
     </message>

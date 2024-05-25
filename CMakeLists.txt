@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(GLI_user_panel LANGUAGES CXX VERSION 0.8.2.0)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.9.0.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -167,8 +167,8 @@ set(SOURCE_FILES
     src/cam/mvcam.cpp
     src/thread/joystick.h
     src/thread/joystick.cpp
-    src/thread/controlportthread.h
-    src/thread/controlportthread.cpp
+#    src/thread/controlportthread.h
+#    src/thread/controlportthread.cpp
     src/port/controlport.h
     src/port/controlport.cpp
     src/port/tcu.h
