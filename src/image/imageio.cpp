@@ -346,3 +346,10 @@ bool ImageIO::load_image_tif(cv::Mat &img, QString filename)
 
     return 0;
 }
+
+void ImageIO::save_image_jpg(cv::Mat img, QString filename)
+{
+    cv::Mat img_to_save;
+    if (img.channels() == 3) cv::cvtColor(img, img_to_save, cv::COLOR_RGB2BGR);
+    cv::imwrite(filename.toLatin1().constData(), img.channels() == 3 ? img_to_save: img);
+}

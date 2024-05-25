@@ -15,11 +15,7 @@ TCU::TCU(int index, int tcu_type) :
     mcp(5),
     laser_on(0b0000),
     tcu_dist(300),
-#ifndef LVTONG
     dist_ns(3e8 * 1e-9 / 2),
-#else
-    dist_ns(3e8 * 1e-9 / 2 * 0.75),
-#endif
     delay_n(0),
     gate_width_n(0),
     delay_dist(delay_a * dist_ns),
@@ -54,6 +50,8 @@ double TCU::get(qint32 tcu_param)
         case CCD_FREQ:      return ccd_freq;
         case DUTY:          return duty;
         case MCP:           return mcp;
+        case DELAY_N:       return delay_n;
+        case GATE_WIDTH_N:  return gate_width_n;
         case OFFSET_DELAY:  return delay_offset;
         case OFFSET_GW:     return gate_width_offset;
         case OFFSET_LASER:  return laser_offset;
@@ -233,6 +231,7 @@ void TCU::set_user_param(qint32 tcu_param, double val)
         case OFFSET_DELAY:   delay_offset = val; break;
         case OFFSET_GW: gate_width_offset = val; break;
         case OFFSET_LASER:   laser_offset = val; break;
+        case LIGHT_SPEED:         dist_ns = val; break;
 
         default: break;
         }

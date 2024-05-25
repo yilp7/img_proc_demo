@@ -19,6 +19,8 @@ protected slots:
 //    bool connect_to_tcp_port(QString ip, ushort port) override;
 //    void try_communicate() override;
 
+    int laser_control(QString msg);
+
 #if ENABLE_PORT_JSON
     void load_from_json(const nlohmann::json &j) override;
 #endif

@@ -12,22 +12,22 @@ Preferences::Preferences(QWidget *parent) :
     port_idx(0),
     share_port(false),
     use_tcp(false),
-#ifdef LVTONG
-    dist_ns(3e8 * 0.75 / 2e9),
-#else
     dist_ns(3e8 / 2e9),
-#endif
     auto_rep_freq(true),
     auto_mcp(false),
     hz_unit(0),
     base_unit(0),
 #ifdef LVTONG
-    max_dist(1125),
+    max_dist(135),
 #else
     max_dist(15000),
 #endif
     delay_offset(0),
+#ifdef LVTONG
+    max_dov(4.5),
+#else
     max_dov(750),
+#endif
     gate_width_offset(0),
     max_laser_width(5000),
     laser_width_offset(0),
@@ -36,7 +36,7 @@ Preferences::Preferences(QWidget *parent) :
     laser_on(0),
     save_info(true),
     custom_topleft_info(false),
-    save_as_grayscale(false),
+    save_in_grayscale(false),
     consecutive_capture(true),
     accu_base(1),
     gamma(1.2),
@@ -101,6 +101,7 @@ Preferences::Preferences(QWidget *parent) :
 #ifndef WIN32
     ui->EBUS_CHK->setCheckable(false);
 #endif
+    connect(ui->UNDERWATER_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit device_underwater(arg1); });
     connect(ui->EBUS_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ ebus_cam = arg1; emit search_for_devices(); });
     connect(ui->CAMERALINK_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ cameralink = arg1; emit search_for_devices(); });
     connect(ui->SPLIT_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ split = arg1; });
@@ -189,7 +190,7 @@ Preferences::Preferences(QWidget *parent) :
             });
 
     connect(ui->AUTO_REP_FREQ_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit set_auto_rep_freq(auto_rep_freq = arg1); });
-    connect(ui->AUTO_MCP_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ auto_mcp = arg1; });
+    connect(ui->AUTO_MCP_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit set_auto_mcp(auto_mcp = arg1); });
 
     ui->HZ_LIST->addItem("kHz");
     ui->HZ_LIST->addItem("Hz");
@@ -355,7 +356,12 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->CUSTOM_INFO_CHK, &QCheckBox::stateChanged, this,
             [this](int arg1){ custom_topleft_info = arg1; ui->CUSTOM_INFO_EDT->setEnabled(arg1); });
     connect(ui->GRAYSCALE_CHK, &QCheckBox::stateChanged, this,
-            [this](int arg1){ save_as_grayscale = arg1; });
+            [this](int arg1){ save_in_grayscale = arg1; });
+    ui->IMG_FORMAT_LST->addItem("bmp/tiff");
+    ui->IMG_FORMAT_LST->addItem("jpg");
+    ui->IMG_FORMAT_LST->setCurrentIndex(0);
+    connect(ui->IMG_FORMAT_LST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
+            [this](int idx) { img_format = idx; });
     connect(ui->CONSECUTIVE_CAPTURE_CHK, &QCheckBox::stateChanged, this,
             [this](int arg1){ consecutive_capture = arg1; });
 //![4]

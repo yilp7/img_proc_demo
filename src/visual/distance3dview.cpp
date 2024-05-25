@@ -1,6 +1,8 @@
 #include "distance3dview.h"
 #include "ui_distance3dview.h"
 
+#include <Q3DCamera>
+
 Distance3DView::Distance3DView(QWidget *parent, QWidget *signal_sender, std::vector<cv::Rect> *list_roi) :
     QWidget(parent),
     ui(new Ui::Distance3DView),
@@ -23,8 +25,8 @@ Distance3DView::Distance3DView(QWidget *parent, QWidget *signal_sender, std::vec
     ui->H_ANGLE_SPIN->setValue(-90);
     connect(ui->H_ANGLE_SPIN, static_cast<void (QSpinBox::*)(int val)>(&QSpinBox::valueChanged), this,
             [this](int val){ scatter_graph->scene()->activeCamera()->setXRotation(val); });
-    ui->V_ANGLE_SPIN->setMinimum(-90);
-    ui->V_ANGLE_SPIN->setMaximum( 90);
+    ui->V_ANGLE_SPIN->setMinimum(-180);
+    ui->V_ANGLE_SPIN->setMaximum( 180);
     ui->V_ANGLE_SPIN->setValue(90);
     ui->V_ANGLE_SPIN->setSingleStep(5);
     connect(ui->V_ANGLE_SPIN, static_cast<void (QSpinBox::*)(int val)>(&QSpinBox::valueChanged), this,
@@ -75,6 +77,9 @@ Distance3DView::Distance3DView(QWidget *parent, QWidget *signal_sender, std::vec
     scatter_graph->addSeries(series);
     series->setMesh(QtDataVisualization::QAbstract3DSeries::MeshPoint);
 
+    scatter_graph->scene()->activeCamera()->setWrapXRotation(true);
+    scatter_graph->scene()->activeCamera()->setWrapYRotation(true);
+
     load_data();
 
     QtDataVisualization::Q3DTheme *theme = new QtDataVisualization::Q3DTheme(QtDataVisualization::Q3DTheme::ThemeStoneMoss);
@@ -83,13 +88,14 @@ Distance3DView::Distance3DView(QWidget *parent, QWidget *signal_sender, std::vec
     theme->setColorStyle(QtDataVisualization::Q3DTheme::ColorStyleRangeGradient);
     theme->setGridEnabled(true);
     QLinearGradient lg; // WideMatrix
-    lg.setColorAt(1.00, QColor(0x020f75));
-    lg.setColorAt(0.87, QColor(0x0c1db8));
-    lg.setColorAt(0.71, QColor(0x7046aa));
-    lg.setColorAt(0.52, QColor(0xc8699e));
-    lg.setColorAt(0.35, QColor(0xff7882));
-    lg.setColorAt(0.15, QColor(0xfda34b));
-    lg.setColorAt(0.00, QColor(0xfcc5e4));
+    lg.setColorAt(1.00, QColor(0x3700c4));
+    lg.setColorAt(0.86, QColor(0x4574fc));
+    lg.setColorAt(0.71, QColor(0x84c6ff));
+    lg.setColorAt(0.57, QColor(0x5fd9cb));
+    lg.setColorAt(0.43, QColor(0x39fd6a));
+    lg.setColorAt(0.29, QColor(0xfde22f));
+    lg.setColorAt(0.14, QColor(0xfd602f));
+    lg.setColorAt(0.00, QColor(0xb43a3a));
     QList<QLinearGradient> llg; llg << lg;
     theme->setBaseGradients(llg);
     scatter_graph->setActiveTheme(theme);

@@ -3,6 +3,7 @@
 
 #define ENABLE_USER_DEFAULT 1
 #define ENABLE_PORT_JSON    1
+#define SIMPLE_UI           0
 
 #include <QtCore>
 #include <QtWidgets>

@@ -49,6 +49,7 @@ signals:
     void query_dev_ip();
     void set_dev_ip(int ip, int gateway);
     void change_pixel_format(int format);
+    void device_underwater(bool underwater);
 
     // serial comm.
     void get_port_info(int com_idx);
@@ -60,6 +61,7 @@ signals:
     // tcu config
     void tcu_type_changed(int idx);
     void set_auto_rep_freq(bool _auto);
+    void set_auto_mcp(bool _auto);
     void rep_freq_unit_changed(int idx);
     void base_unit_changed(int idx);
     void max_dist_changed(float dist);
@@ -115,8 +117,9 @@ public:
     // 4 save options
     bool             save_info;
     bool             custom_topleft_info;
-    bool             save_as_grayscale;
+    bool             save_in_grayscale;
     bool             consecutive_capture;
+    int              img_format; // 0: bmp/tiff, 1: jpg
 
     // 5 img proc
     float            accu_base;

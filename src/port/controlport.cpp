@@ -185,7 +185,7 @@ void ControlPort::communicate(QByteArray write, uint read_size, uint read_timeou
     qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "sent    " << write.toHex(' ').toUpper();
 
     port->write(write.constData(), write.size());
-//    port->waitForBytesWritten(10);
+//    while (port->waitForBytesWritten(10)) ;
     write_mutex.unlock();
 
     static QElapsedTimer read_timer;
@@ -213,6 +213,8 @@ void ControlPort::communicate(QByteArray write, uint read_size, uint read_timeou
     retrieve_mutex.unlock();
     for (int i = 0; i < read.size(); i++) str_r += QString::asprintf(" %02X", (uchar)read[i]);
     if (!heartbeat) emit port_io_log(str_r);
+
+    QThread::msleep(10);
 
     return;
 }

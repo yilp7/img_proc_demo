@@ -32,7 +32,7 @@ uint Lens::get(qint32 lens_param)
         case LASER_RADIUS: return laser_radius;
         case STEPPING:     return lens_speed;
         default: return 0;
-        }
+    }
 }
 
 #if ENABLE_PORT_JSON
@@ -275,11 +275,11 @@ void Lens::load_from_json(const nlohmann::json &j)
     lens_control(ADDRESS,      j["address"].get<uchar>());
     lens_control(STEPPING,     j["speed"].get<uchar>());
 //    set_pos_temp(ZOOM_POS,     j["zoom"].get<uint>());
-    set_pos_temp(FOCUS_POS,    j["focus"].get<uint>());
+//    set_pos_temp(FOCUS_POS,    j["focus"].get<uint>());
 //    set_pos_temp(LASER_RADIUS, j["laser_radius"].get<uint>());
-//    lens_control(SET_ZOOM,     j["zoom"].get<uint>());
-//    lens_control(SET_FOCUS,    j["focus"].get<uint>());
-//    lens_control(SET_RADIUS,   j["laser_radius"].get<uint>());
+    lens_control(SET_ZOOM,     j["zoom"].get<uint>());
+    lens_control(SET_FOCUS,    j["focus"].get<uint>());
+    lens_control(SET_RADIUS,   j["laser_radius"].get<uint>());
     emit lens_param_updated(Lens::NO_PARAM, 0);
 }
 #endif

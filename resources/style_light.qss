@@ -300,7 +300,7 @@ QPushButton::menu-indicator {
 
 /* slider */
 QSlider::groove:horizontal {
-/*#MCP_SLIDER::groove:horizontal, #DELAY_SLIDER::groove:horizontal, #GAIN_SLIDER::groove:horizontal, #FOCUS_SPEED_SLIDER::groove:horizontal {*/
+/*#MCP_SLIDER::handle:horizontal, #DELAY_SLIDER::handle:horizontal, #GW_SLIDER::handle::horizontal, #GAIN_SLIDER::handle:horizontal, #PTZ_SPEED_SLIDER::handle:horizontal {*/
 	height: 4px;
     background-color: #9B9B9B;
     border-radius: 2px;
@@ -325,8 +325,7 @@ QSlider::handle:horizontal:disabled {
 	border: 1px solid #C9C0BB;
 }
 
-#MCP_SLIDER::handle:horizontal, #DELAY_SLIDER::handle:horizontal, 
-#GAIN_SLIDER::handle:horizontal, #PTZ_SPEED_SLIDER::handle:horizontal {
+#MCP_SLIDER::handle:horizontal, #DELAY_SLIDER::handle:horizontal, #GW_SLIDER::handle::horizontal, #GAIN_SLIDER::handle:horizontal, #PTZ_SPEED_SLIDER::handle:horizontal {
 	width: 8px;
 	height: 16px;
 	margin-top: -6px;

@@ -381,7 +381,7 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
     const int BARWIDTH = 104, BARHEIGHT = src1.rows;
     const int IMAGEWIDTH = src1.cols, IMAGEHEIGHT = src1.rows;
     static cv::Mat img_3d, img_3d_gray;
-    cv::Mat gray_bar(BARHEIGHT, BARWIDTH, CV_8UC1);
+    static cv::Mat gray_bar;
 
 #ifdef LVTONG
     const double c = 3e8 * 0.75;
@@ -455,24 +455,32 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
         }
     }
 */
-    int step_gray = gray_bar.step;
-    int bar_gray = 255;
-    uc_ptr = gray_bar.data;
-    int color_step = BARHEIGHT / 254;
-    int gap = (BARHEIGHT - 254 * color_step) / 2;
-    for (i = 0; i < gap; i++) for (j = 0; j < BARWIDTH; j++) uc_ptr[i * step_gray + j] = 255;
-    for (i = gap; i < BARHEIGHT - gap; i += color_step) {
-        for (j = 0; j < BARWIDTH; j++) {
-            for (int k = 0; k < color_step; k++) uc_ptr[(i + k) * step_gray + j] = bar_gray;
+    static int stored_height = 0;
+    if (stored_height != BARHEIGHT) {
+        gray_bar = cv::Mat(BARHEIGHT, BARWIDTH, CV_8UC1);
+
+        int step_gray = gray_bar.step;
+        int bar_gray = 255;
+        uc_ptr = gray_bar.data;
+        int color_step = BARHEIGHT / 254;
+        int gap = (BARHEIGHT - 254 * color_step) / 2;
+        for (i = 0; i < gap; i++) for (j = 0; j < BARWIDTH; j++) uc_ptr[i * step_gray + j] = 255;
+        for (i = gap; i < BARHEIGHT - gap; i += color_step) {
+            for (j = 0; j < BARWIDTH; j++) {
+                for (int k = 0; k < color_step; k++) uc_ptr[(i + k) * step_gray + j] = bar_gray;
+            }
+            bar_gray--;
         }
-        bar_gray--;
+        for (i = BARHEIGHT - gap; i < BARHEIGHT; i++) for (j = 0; j < BARWIDTH; j++) uc_ptr[i * step_gray + j] = 1;
+
+        stored_height = BARHEIGHT;
     }
-    for (i = BARHEIGHT - gap; i < BARHEIGHT; i++) for (j = 0; j < BARWIDTH; j++) uc_ptr[i * step_gray + j] = 1;
 
     cv::hconcat(img_3d_gray, gray_bar, img_3d_gray);
     cv::hconcat(mask, gray_bar, mask);
-    cv::applyColorMap(img_3d_gray, img_3d, colormap);
-    img_3d.copyTo(res, mask);
+//    cv::applyColorMap(img_3d_gray, img_3d, colormap);
+//    img_3d.copyTo(res, mask);
+    img_3d_gray.copyTo(res, mask);
 //    QueryPerformanceCounter(&t2);
 //    printf("-      colormap: %f\n", (double)(t2.QuadPart - t1.QuadPart) / (double)tc.QuadPart * 1e3);
 //    t1 = t2;
@@ -484,8 +492,8 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
     cv::putText(res, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT / 2 - 15), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
     sprintf(text, "%.2f", max);
     cv::putText(res, text, cv::Point(IMAGEWIDTH, IMAGEHEIGHT - 10), cv::FONT_HERSHEY_SIMPLEX, 0.77, cv::Scalar(0, 0, 0));
-    *d_min = min;
-    *d_max = max;
+    if (d_min) *d_min = min;
+    if (d_max) *d_max = max;
 }
 
 void ImageProc::paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double start_pos, double end_pos, int colormap)

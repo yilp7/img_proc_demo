@@ -45,6 +45,7 @@ public:
         PS_STEP_3     = 0x010C,
         PS_STEP_4     = 0x010D,
         AUTO_PRF      = 0x010E,
+        LIGHT_SPEED   = 0x010F,
 
         TCU_TYPE      = 0xFFFF,
     };

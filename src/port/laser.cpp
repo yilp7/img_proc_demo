@@ -19,6 +19,15 @@ nlohmann::json Laser::to_json()
         {"type", laser_type},
         };
 }
+
+int Laser::laser_control(QString msg)
+{
+    communicate(msg.toLatin1(), 0, 100);
+
+    QThread::msleep(100);
+
+    return 0;
+}
 #endif
 
 #if ENABLE_PORT_JSON

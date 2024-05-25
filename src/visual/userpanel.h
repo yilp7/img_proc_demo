@@ -123,9 +123,11 @@ public slots:
 
     // signaled in preferences ui
     void search_for_devices();
+    void update_light_speed(bool uw);
     void setup_hz(int hz_unit);
     void setup_stepping(int base_unit);
     void setup_max_dist(float max_dist);
+    void setup_max_dov(float max_dist);
     void update_delay_offset(float dist_offset);
     void update_gate_width_offset(float dov_offset);
     void update_laser_offset(float laser_offset);
@@ -143,6 +145,7 @@ public slots:
     void export_current_video();
     void set_tcu_type(int idx);
     void update_ps_config(bool read, int idx, uint val);
+    void set_auto_mcp(bool auto_mcp);
 
     // signaled by joystick input
     void joystick_button_pressed(int btn);
@@ -158,6 +161,9 @@ public slots:
 
     // signaled by Aliasing
     void set_distance_set(int id);
+
+    // ui switching
+    void switch_ui();
 
 private slots:
     // on clicking enum btn: enumerate devices
@@ -213,6 +219,10 @@ private slots:
     void on_FOCUS_FAR_BTN_released();
     void on_FOCUS_NEAR_BTN_pressed();
     void on_FOCUS_NEAR_BTN_released();
+    void on_RADIUS_INC_BTN_pressed();
+    void on_RADIUS_INC_BTN_released();
+    void on_RADIUS_DEC_BTN_pressed();
+    void on_RADIUS_DEC_BTN_released();
 
     void on_GET_LENS_PARAM_BTN_clicked();
     // TODO rewrite auto focus function
@@ -228,6 +238,7 @@ private slots:
     void change_mcp(int val);
     void change_gain(int val);
     void change_delay(int val);
+    void change_gatewidth(int val);
     void change_focus_speed(int val);
 
     // TODO add pause function
@@ -306,8 +317,11 @@ private slots:
 
     void on_IMG_REGION_BTN_clicked();
     void on_SENSOR_TAPS_BTN_clicked();
-
     void on_SWITCH_TCU_UI_BTN_clicked();
+    void on_SIMPLE_LASER_CHK_clicked();
+    void on_AUTO_MCP_CHK_clicked();
+
+    void on_PSEUDOCOLOR_CHK_stateChanged(int arg1);
 
 signals:
     // tell DATA_EXCHANGE (QTextEdit) to append data
@@ -346,6 +360,7 @@ signals:
     void send_uint_tcu_msg(qint32 tcu_param, uint val);
     void send_lens_msg(qint32 lens_param, uint val = 0);
     void set_lens_pos(qint32 lens_param, uint val);
+    void send_laser_msg(QString msg);
     void send_ptz_msg(qint32 ptz_param, double val = 0);
 
 #ifdef LVTONG
@@ -452,12 +467,14 @@ private:
     StatusBar*      status_bar;
     Preferences*    pref;
     ScanConfig*     scan_config;
-    LaserControl*  laser_settings;
+    LaserControl*   laser_settings;
     Distance3DView* view_3d;
     Aliasing*       aliasing;
     PresetPanel*    preset;
     FloatingWindow* fw_display[2];
     FloatingWindow* secondary_display;
+
+    bool simple_ui;
 
     int             calc_avg_option;            // a: 4 frames; b: 8 frames
     bool            trigger_by_software;        // whether the device gets trigger signal from sw
@@ -536,7 +553,8 @@ private:
     bool save_modified[3];   // saving modified bmp
     bool image_3d[3];        // whether to build a 3d image
     int  trigger_source;     // where the device gets the trigger signal
-    bool is_color[3];        // display in mono8 or rgb8
+    bool is_color[3];        // source in grayscale or color
+    bool pseudocolor[3];     // apply pseudocolor
     int  w[3];               // image width
     int  h[3];               // image height
     int  pixel_format[3];    // for hik cam, use mono 8 for others

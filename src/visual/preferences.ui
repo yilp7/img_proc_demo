@@ -510,7 +510,7 @@
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>0</y>
+      <y>-188</y>
       <width>324</width>
       <height>1620</height>
      </rect>
@@ -591,7 +591,7 @@
      <widget class="QCheckBox" name="SPLIT_CHK">
       <property name="geometry">
        <rect>
-        <x>210</x>
+        <x>125</x>
         <y>220</y>
         <width>71</width>
         <height>22</height>
@@ -674,7 +674,7 @@
        <rect>
         <x>120</x>
         <y>180</y>
-        <width>61</width>
+        <width>51</width>
         <height>21</height>
        </rect>
       </property>
@@ -747,7 +747,7 @@
      <widget class="QCheckBox" name="CAMERALINK_CHK">
       <property name="geometry">
        <rect>
-        <x>125</x>
+        <x>210</x>
         <y>220</y>
         <width>71</width>
         <height>22</height>
@@ -755,6 +755,19 @@
       </property>
       <property name="text">
        <string>CL</string>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="UNDERWATER_CHK">
+      <property name="geometry">
+       <rect>
+        <x>190</x>
+        <y>180</y>
+        <width>91</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Underwater</string>
       </property>
      </widget>
     </widget>
@@ -2102,7 +2115,7 @@
        <rect>
         <x>40</x>
         <y>130</y>
-        <width>211</width>
+        <width>221</width>
         <height>22</height>
        </rect>
       </property>
@@ -2134,12 +2147,22 @@
        <rect>
         <x>40</x>
         <y>100</y>
-        <width>171</width>
+        <width>221</width>
         <height>22</height>
        </rect>
       </property>
       <property name="text">
        <string>Integrate info in file</string>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="IMG_FORMAT_LST">
+      <property name="geometry">
+       <rect>
+        <x>180</x>
+        <y>40</y>
+        <width>72</width>
+        <height>20</height>
+       </rect>
       </property>
      </widget>
     </widget>
