@@ -15,10 +15,13 @@ public:
     explicit Preferences(QWidget *parent = nullptr);
     ~Preferences();
 
+    void init();
+
     void data_exchange(bool read);
     void config_ip(bool read, int ip = 0, int gateway = 0, int nic_address = 0); // ip and gateway will only be used when reading ip
     void enable_ip_editing(bool enable);
     void set_pixel_format(int idx);
+    void update_distance_display();
     void display_baudrate(int id, int baudrate);
     void switch_language(bool en, QTranslator *trans);
 

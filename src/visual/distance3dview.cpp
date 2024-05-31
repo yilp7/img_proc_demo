@@ -123,13 +123,12 @@ void Distance3DView::update_dist_mat(cv::Mat new_dist_mat, double d_min, double 
     dist_mat = new_dist_mat.clone();
     mat_mutex.unlock();
     if (consecutive) {
-#ifndef LVTONG
         static QElapsedTimer t;
-        if (t.elapsed() < 1000) return;
-        t.restart();
-#else
-        return;
-#endif
+        if (t.isValid()) {
+            if (t.elapsed() < 1000) return;
+            t.restart();
+        }
+        else t.start();
     }
     dist_min = d_min;
     dist_max = d_max;

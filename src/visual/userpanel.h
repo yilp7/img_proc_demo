@@ -97,6 +97,8 @@ public:
     UserPanel(QWidget *parent = nullptr);
     ~UserPanel();
 
+    void init();
+
     int grab_thread_process(int *display_idx);
     void swap_grab_thread_display(int display_idx1, int display_idx2);
     bool is_maximized();

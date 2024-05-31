@@ -104,11 +104,6 @@ UserPanel::UserPanel(QWidget *parent) :
     calc_avg_option(5),
     trigger_by_software(false),
     curr_cam(NULL),
-#ifdef LVTONG
-    time_exposure_edit(35000),
-    gain_analog_edit(23),
-    frame_rate_edit(25),
-#else
     time_exposure_edit(95000),
 #if SIMPLE_UI
     gain_analog_edit(23),
@@ -116,7 +111,6 @@ UserPanel::UserPanel(QWidget *parent) :
     gain_analog_edit(0),
 #endif //SIMPLE_UI
     frame_rate_edit(10),
-#endif //LVTONG
 //    ptr_tcu(NULL),
 //    ptr_lens(NULL),
 //    ptr_laser(NULL),
@@ -327,7 +321,6 @@ UserPanel::UserPanel(QWidget *parent) :
     ui->GW_SLIDER->setPageStep(25);
     ui->GW_SLIDER->setValue(0);
     connect(ui->GW_SLIDER, SIGNAL(sliderMoved(int)), SLOT(change_gatewidth(int)));
-    ui->GW_SLIDER->hide();
 
     ui->FOCUS_SPEED_SLIDER->setMinimum(1);
     ui->FOCUS_SPEED_SLIDER->setMaximum(63);
@@ -461,24 +454,14 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // set up display info (left bottom corner)
     QStringList alt_options_str;
-#ifdef ICMOS
-    alt_options_str << "DATA" << "HIST" << "ALT";
-#else //ICMOS
     alt_options_str << "DATA" << "HIST" << "PTZ" << "ALT" << "ADDON";
 //    alt_options_str << "ADDON" << "ALT" << "PTZ" << "HIST" << "DATA";
-#endif //ICMOS
     ui->MISC_OPTION_1->addItems(alt_options_str);
     ui->MISC_OPTION_2->addItems(alt_options_str);
     ui->MISC_OPTION_3->addItems(alt_options_str);
     ui->MISC_OPTION_1->setCurrentIndex(0);
-#ifdef ICMOS
-    ui->MISC_OPTION_2->setCurrentIndex(1);
-    ui->MISC_RADIO_3->hide();
-    ui->MISC_OPTION_3->hide();
-#else //ICMOS
     ui->MISC_OPTION_2->setCurrentIndex(2);
     ui->MISC_OPTION_3->setCurrentIndex(3);
-#endif //ICMOS
 //    for (int i = 0; i < ui->MISC_OPTION_1->count(); i++) ui->MISC_OPTION_1->setItemData(i, Qt::AlignCenter, Qt::TextAlignmentRole);
 //    for (int i = 0; i < ui->MISC_OPTION_2->count(); i++) ui->MISC_OPTION_1->setItemData(i, Qt::AlignCenter, Qt::TextAlignmentRole);
 //    for (int i = 0; i < ui->MISC_OPTION_3->count(); i++) ui->MISC_OPTION_1->setItemData(i, Qt::AlignCenter, Qt::TextAlignmentRole);
@@ -620,139 +603,6 @@ UserPanel::UserPanel(QWidget *parent) :
     // initialize gatewidth lut
 //    ptr_tcu->use_gw_lut = false;
 //    for (int i = 0; i < 100; i++) ptr_tcu->gw_lut[i] = i;
-
-    // - set startup focus
-    ui->ENUM_BUTTON->click();
-    (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
-
-#if SIMPLE_UI
-    ui->START_BUTTON->click();
-    ui->HIDE_BTN->click();
-    ui->START_GRABBING_BUTTON->click();
-    switch_ui();
-    QKeyEvent connect_to_TCP(QKeyEvent::KeyPress, Qt::Key_Q, Qt::AltModifier);
-    QApplication::sendEvent(this, &connect_to_TCP);
-    delay_dist = 1000;
-    depth_of_view = 75;
-    laser_width = 500;
-    update_delay();
-    update_gate_width();
-    update_laser_width();
-    pref->ui->AUTO_MCP_CHK->click();
-    pref->ui->UNIT_LIST->setCurrentIndex(2);
-    pref->ui->MAX_DIST_EDT->setText("1800.00");
-    pref->ui->MAX_DOV_EDT->setText("150.00");
-    pref->data_exchange(false);
-    pref->ui->MAX_DIST_EDT->emit editingFinished();
-    pref->ui->MAX_DOV_EDT->emit editingFinished();
-    ui->TITLE->process_maximize();
-#else //SIMPLE_UI
-    ui->AUTO_MCP_CHK->hide();
-    ui->SIMPLE_LASER_CHK->hide();
-    ui->GW_SLIDER->hide();
-
-    ui->FOCUS_SPEED_LABEL->hide();
-
-    ui->RADIUS_INC_BTN->hide();
-    ui->RADIUS_DEC_BTN->hide();
-    ui->LASER_RADIUS_LABEL->hide();
-
-    ui->PSEUDOCOLOR_CHK->hide();
-#endif //SIMPLE_UI
-
-#ifdef LVTONG
-    pref->ui->UNDERWATER_CHK->click();
-
-    ui->DISTANCE->hide();
-    ui->DIST_BTN->hide();
-    ui->CURRENT_EDIT->setText("18");
-    ui->SIMPLE_LASER_CHK->setEnabled(false);
-
-    pref->ui->SHARE_CHK->click();
-    pref->ui->IMG_FORMAT_LST->setCurrentIndex(1);
-
-    connect(this, SIGNAL(update_fishnet_result(int)), SLOT(display_fishnet_result(int)));
-
-    ui->START_BUTTON->click();
-    ui->HIDE_BTN->click();
-    ui->START_GRABBING_BUTTON->click();
-    switch_ui();
-
-    delay_dist = 9;
-    depth_of_view = 2.25;
-    update_delay();
-    update_gate_width();
-    pref->ui->UNIT_LIST->setCurrentIndex(2);
-    pref->ui->AUTO_MCP_CHK->click();
-    pref->data_exchange(false);
-#else //LVTONG
-    ui->FIRE_LASER_BTN->hide();
-    ui->FISHNET_RESULT->hide();
-#endif //LVTONG
-
-#ifdef ICMOS
-    ui->RANGE_COM->setText("R1");
-    ui->LASER_COM->setText("R2");
-    ui->RANGE_COM_EDIT->setEnabled(false);
-    ui->LASER_COM_EDIT->setEnabled(false);
-
-//    ui->PTZ_RADIO->hide();
-
-    ui->ESTIMATED->hide();
-    ui->EST_DIST->hide();
-    ui->ESTIMATED_2->hide();
-    ui->GATE_WIDTH->hide();
-    ui->DELAY_SLIDER->move(30, 153);
-
-    ui->LOGO->move(10, 0);
-    ui->INITIALIZATION->move(10, ui->INITIALIZATION->y() + 60);
-    ui->IMG_GRAB_STATIC->move(10, ui->IMG_GRAB_STATIC->y() + 60);
-    ui->PARAMS_STATIC->move(10, ui->PARAMS_STATIC->y() + 60);
-
-    ui->LASER_STATIC->hide();
-    ui->MISC_DISPLAY_GRP->setParent(ui->RIGHT);
-//    ui->MISC_DISPLAY_GRP->setGeometry(10, 365, ui->IMG_PROC_STATIC->width(), ui->MISC_DISPLAY_GRP->height());
-    ui->MISC_DISPLAY_GRP->move(25, 365);
-    ui->LENS_STATIC->hide();
-    ui->IMG_SAVE_STATIC->move(10, 265);
-    ui->IMG_PROC_STATIC->hide();
-    ui->SCAN_GRP->move(10, 560);
-    ui->IMG_3D_CHECK->hide();
-    ui->RANGE_THRESH_EDIT->hide();
-
-    temp_f.setPixelSize(11);
-    ui->DATA_EXCHANGE->setFont(temp_f);
-    ui->HIST_DISPLAY->setAlignment(Qt::AlignHCenter | Qt::AlignBottom);
-
-//    ui->DELAY_N->hide();
-//    ui->DELAY_N_EDIT_N->hide();
-//    ui->DELAY_N_UNIT_N->hide();
-//    ui->MCP_SLIDER->resize(ui->MCP_SLIDER->width() + 20, ui->MCP_SLIDER->height());
-//    ui->MCP_EDIT->move(170, 65);
-//    ui->DELAY_B_EDIT_U->setEnabled(false);
-//    ui->DELAY_B_EDIT_N->setEnabled(false);
-
-//    ui->TITLE->prog_settings->max_dist = 6000;
-//    ui->TITLE->prog_settings->data_exchange(false);
-//    ui->TITLE->prog_settings->max_dist_changed(6000);
-    pref->max_dist = 6000;
-    pref->data_exchange(false);
-    pref->max_dist_changed(6000);
-
-    ui->DUAL_LIGHT_BTN->hide();
-#else //ICMOS
-    ui->LOGO->hide();
-//    ui->ANALYSIS_RADIO->hide();
-//    ui->PLUGIN_DISPLAY_1->hide();
-
-//    pref->ui->TCU_LIST->setCurrentIndex(1);
-#ifdef USING_CAMERALINK
-    pref->ui->CAMERALINK_CHK->click();
-#else //USING_CAMERALINK
-    pref->ui->CAMERALINK_CHK->hide();
-#endif //USING_CAMERALINK
-    ui->SENSOR_TAPS_BTN->hide();
-#endif //ICMOS
 }
 
 UserPanel::~UserPanel()
@@ -797,6 +647,92 @@ UserPanel::~UserPanel()
     p_ptz->deleteLater();
 
     delete ui;
+}
+
+void UserPanel::init()
+{
+    // - set startup focus
+    ui->ENUM_BUTTON->click();
+    (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
+
+#if SIMPLE_UI
+    ui->START_BUTTON->click();
+    ui->HIDE_BTN->click();
+    ui->START_GRABBING_BUTTON->click();
+    switch_ui();
+    QKeyEvent connect_to_TCP(QKeyEvent::KeyPress, Qt::Key_Q, Qt::AltModifier);
+    QApplication::sendEvent(this, &connect_to_TCP);
+    delay_dist = 1000;
+    depth_of_view = 75;
+    laser_width = 500;
+    update_delay();
+    update_gate_width();
+    update_laser_width();
+    pref->ui->AUTO_MCP_CHK->click();
+    pref->ui->UNIT_LIST->setCurrentIndex(2);
+    pref->ui->MAX_DIST_EDT->setText("1800.00");
+    pref->ui->MAX_DOV_EDT->setText("150.00");
+    pref->data_exchange(false);
+    pref->ui->MAX_DIST_EDT->emit editingFinished();
+    pref->ui->MAX_DOV_EDT->emit editingFinished();
+    ui->TITLE->process_maximize();
+#else //SIMPLE_UI
+    ui->AUTO_MCP_CHK->hide();
+    ui->SIMPLE_LASER_CHK->hide();
+    ui->GW_SLIDER->hide();
+
+    ui->FOCUS_SPEED_LABEL->hide();
+
+    ui->RADIUS_INC_BTN->hide();
+    ui->RADIUS_DEC_BTN->hide();
+    ui->LASER_RADIUS_LABEL->hide();
+
+    ui->BRIGHTNESS_LABEL->hide();
+    ui->BRIGHTNESS_SLIDER->hide();
+    ui->PSEUDOCOLOR_CHK->show();
+#endif //SIMPLE_UI
+
+#ifdef LVTONG
+    pref->ui->UNDERWATER_CHK->click();
+
+    ui->DISTANCE->hide();
+    ui->DIST_BTN->hide();
+    ui->CURRENT_EDIT->setText("18");
+    ui->SIMPLE_LASER_CHK->setEnabled(false);
+
+    pref->ui->SHARE_CHK->click();
+    pref->ui->IMG_FORMAT_LST->setCurrentIndex(1);
+
+    connect(this, SIGNAL(update_fishnet_result(int)), SLOT(display_fishnet_result(int)));
+
+    ui->START_BUTTON->click();
+    ui->HIDE_BTN->click();
+    ui->START_GRABBING_BUTTON->click();
+    switch_ui();
+
+    delay_dist = 9;
+    depth_of_view = 2.25;
+    update_delay();
+    update_gate_width();
+    pref->ui->UNIT_LIST->setCurrentIndex(2);
+    pref->ui->AUTO_MCP_CHK->click();
+    pref->data_exchange(false);
+#else //LVTONG
+    ui->FIRE_LASER_BTN->hide();
+    ui->FISHNET_RESULT->hide();
+#endif //LVTONG
+
+    ui->LOGO->hide();
+//    ui->ANALYSIS_RADIO->hide();
+//    ui->PLUGIN_DISPLAY_1->hide();
+
+//    pref->ui->TCU_LIST->setCurrentIndex(1);
+#ifdef USING_CAMERALINK
+    pref->ui->CAMERALINK_CHK->click();
+#else //USING_CAMERALINK
+    pref->ui->CAMERALINK_CHK->hide();
+#endif //USING_CAMERALINK
+    ui->SENSOR_TAPS_BTN->hide();
 }
 
 void UserPanel::data_exchange(bool read){
@@ -983,7 +919,7 @@ int UserPanel::grab_thread_process(int *idx) {
         if (updated) {
             // calc histogram (grayscale)
             memset(hist, 0, 256 * sizeof(uint));
-            if (!is_color[thread_idx] && !pseudocolor[thread_idx]) for (int i = 0; i < _h; i++) for (int j = 0; j < _w; j++) hist[(img_mem[thread_idx].data + i * img_mem[thread_idx].cols)[j]]++;
+            if (!is_color[thread_idx]) for (int i = 0; i < _h; i++) for (int j = 0; j < _w; j++) hist[(img_mem[thread_idx].data + i * img_mem[thread_idx].cols)[j]]++;
 
             // if the image needs flipping
             if (pref->symmetry) cv::flip(img_mem[thread_idx], img_mem[thread_idx], pref->symmetry - 2);
@@ -2171,7 +2107,7 @@ void UserPanel::on_SAVE_BMP_BUTTON_clicked()
     if (device_type == -1 || !pref->consecutive_capture) save_original[0] = 1;
     else{
         save_original[0] ^= 1;
-        ui->SAVE_BMP_BUTTON->setText(save_original[0] ? tr("Stop") : tr("ORI"));
+        ui->SAVE_BMP_BUTTON->setText(save_original[0] ? tr("STOP") : tr("ORI"));
         pref->ui->CONSECUTIVE_CAPTURE_CHK->setEnabled(!save_original[0]);
     }
 }
@@ -2199,7 +2135,7 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
         image_mutex[0].unlock();
     }
     record_modified[0] ^= 1;
-    ui->SAVE_FINAL_BUTTON->setText(record_modified[0] ? tr("Stop") : tr("RES"));
+    ui->SAVE_FINAL_BUTTON->setText(record_modified[0] ? tr("STOP") : tr("RES"));
 }
 
 void UserPanel::on_SET_PARAMS_BUTTON_clicked()
@@ -2318,14 +2254,14 @@ void UserPanel::update_delay_offset(float dist_offset)
 {
 //    ptr_tcu->delay_offset = dist_offset / dist_ns;
     emit send_double_tcu_msg(TCU::OFFSET_DELAY, dist_offset / dist_ns);
-    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - dist_offset));
+//    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - dist_offset));
 }
 
 void UserPanel::update_gate_width_offset(float dov_offset)
 {
 //    ptr_tcu->gate_width_offset = dov_offset / dist_ns;
     emit send_double_tcu_msg(TCU::OFFSET_GW, dov_offset / dist_ns);
-    ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view - dov_offset));
+//    ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view - dov_offset));
 }
 
 void UserPanel::update_laser_offset(float laser_offset)
@@ -2872,9 +2808,10 @@ void UserPanel::switch_ui()
         ui->IMG_3D_CHECK->move(ui->IMG_3D_CHECK->pos() + QPoint(10, 0));
         ui->RANGE_THRESH_EDIT->move(ui->RANGE_THRESH_EDIT->pos() + QPoint(10, 0));
         ui->RESET_3D_BTN->hide();
-        ui->BRIGHTNESS_LABEL->hide();
-        ui->BRIGHTNESS_SLIDER->hide();
-        ui->PSEUDOCOLOR_CHK->show();
+//        ui->BRIGHTNESS_LABEL->hide();
+//        ui->BRIGHTNESS_SLIDER->hide();
+//        ui->PSEUDOCOLOR_CHK->show();
+        ui->PSEUDOCOLOR_CHK->move(ui->PSEUDOCOLOR_CHK->pos() + QPoint(0, 5));
 
         ui->SCAN_GRP->hide();
 //        ui->LOGO->show();
@@ -2937,9 +2874,10 @@ void UserPanel::switch_ui()
         ui->IMG_3D_CHECK->move(ui->IMG_3D_CHECK->pos() - QPoint(10, 0));
         ui->RANGE_THRESH_EDIT->move(ui->RANGE_THRESH_EDIT->pos() - QPoint(10, 0));
         ui->RESET_3D_BTN->show();
-        ui->BRIGHTNESS_LABEL->show();
-        ui->BRIGHTNESS_SLIDER->show();
-        ui->PSEUDOCOLOR_CHK->hide();
+//        ui->BRIGHTNESS_LABEL->show();
+//        ui->BRIGHTNESS_SLIDER->show();
+//        ui->PSEUDOCOLOR_CHK->hide();
+        ui->PSEUDOCOLOR_CHK->move(ui->PSEUDOCOLOR_CHK->pos() - QPoint(0, 5));
 
         ui->SCAN_GRP->show();
 //        ui->LOGO->hide();
@@ -3152,6 +3090,7 @@ void UserPanel::update_light_speed(bool uw)
 {
     c = uw ? 3e8 * 0.75 : 3e8;
     scan_config->dist_ns = pref->dist_ns = dist_ns = c * 1e-9 / 2;
+    pref->update_distance_display();
     emit send_double_tcu_msg(TCU::LIGHT_SPEED, dist_ns);
     update_delay();
     update_gate_width();
@@ -3256,7 +3195,7 @@ void UserPanel::update_delay()
 
     if (!aliasing_mode) {
 //        ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - ptr_tcu->delay_offset * dist_ns));
-        ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - p_tcu->get(TCU::OFFSET_DELAY) * dist_ns));
+//        ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
         if (!qobject_cast<QSlider*>(sender())) ui->DELAY_SLIDER->setValue(delay_dist);
 
 //        ptr_tcu->set_user_param(TCUThread::EST_DIST, delay_dist);
@@ -3306,7 +3245,7 @@ void UserPanel::update_tcu_params(qint32 tcu_param)
             ui->LASER_WIDTH_EDIT_P->setText(QString::asprintf("%03d", ps));
             break;
         case TCU::EST_DIST:
-            ui->EST_DIST->setText(QString::asprintf("%.2f m", (delay_dist = p_tcu->get(TCU::EST_DIST)) - p_tcu->get(TCU::OFFSET_DELAY) * dist_ns));
+            ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist = p_tcu->get(TCU::EST_DIST)));
             rep_freq = p_tcu->get(TCU::REPEATED_FREQ);
             setup_hz(hz_unit);
             split_value_by_unit(p_tcu->get(TCU::DELAY_A), us, ns, ps, 1);
@@ -3320,7 +3259,7 @@ void UserPanel::update_tcu_params(qint32 tcu_param)
 //            ui->DELAY_SLIDER->setValue(delay_dist);
             break;
         case TCU::EST_DOV:
-            ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", (depth_of_view = p_tcu->get(TCU::EST_DOV)) - p_tcu->get(TCU::OFFSET_GW) * dist_ns));
+            ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view = p_tcu->get(TCU::EST_DOV)));
             split_value_by_unit(p_tcu->get(TCU::GATE_WIDTH_A), us, ns, ps, 0);
             ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf(  "%d", us));
             ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%03d", ns));
@@ -3576,7 +3515,7 @@ void UserPanel::on_DIST_BTN_clicked() {
 
     // change delay and gate width according to distance
 //    delay_dist = distance + ptr_tcu->delay_offset * dist_ns;
-    delay_dist = distance + p_tcu->get(TCU::OFFSET_DELAY) * dist_ns;
+    delay_dist = distance/* + p_tcu->get(TCU::OFFSET_DELAY) * dist_ns*/;
     update_delay();
 //    update_gate_width();
 //    change_mcp(150);
@@ -3596,7 +3535,7 @@ void UserPanel::on_DIST_BTN_clicked() {
 //    ptr_tcu->set_user_param(TCUThread::DIST, distance);
 //    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - ptr_tcu->delay_offset * dist_ns));
     emit send_uint_tcu_msg(TCU::DIST, distance);
-    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - p_tcu->get(TCU::OFFSET_DELAY) * dist_ns));
+    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
 
     setup_hz(hz_unit);
     uint us, ns, ps;
@@ -4994,7 +4933,7 @@ void UserPanel::on_SAVE_AVI_BUTTON_clicked()
         image_mutex[0].unlock();
     }
     record_original[0] ^= 1;
-    ui->SAVE_AVI_BUTTON->setText(record_original[0] ? tr("Stop") : tr("ORI"));
+    ui->SAVE_AVI_BUTTON->setText(record_original[0] ? tr("STOP") : tr("ORI"));
 }
 
 void UserPanel::on_SCAN_BUTTON_clicked()
@@ -5125,7 +5064,7 @@ void UserPanel::on_SAVE_RESULT_BUTTON_clicked()
     if (device_type == -1 || !pref->consecutive_capture) save_modified[0] = 1;
     else{
         save_modified[0] ^= 1;
-        ui->SAVE_RESULT_BUTTON->setText(save_modified[0] ? tr("Stop") : tr("RES"));
+        ui->SAVE_RESULT_BUTTON->setText(save_modified[0] ? tr("STOP") : tr("RES"));
         pref->ui->CONSECUTIVE_CAPTURE_CHK->setEnabled(!save_modified[0]);
     }
 }
