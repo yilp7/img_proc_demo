@@ -19,6 +19,7 @@ nlohmann::json Laser::to_json()
         {"type", laser_type},
         };
 }
+#endif
 
 int Laser::laser_control(QString msg)
 {
@@ -28,7 +29,15 @@ int Laser::laser_control(QString msg)
 
     return 0;
 }
-#endif
+
+QByteArray Laser::get_laser_status()
+{
+    communicate("*STB?", 0, 100);
+
+    QThread::msleep(100);
+
+    return last_read;
+}
 
 #if ENABLE_PORT_JSON
 void Laser::load_from_json(const nlohmann::json &j)

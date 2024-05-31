@@ -9,7 +9,6 @@
 #include <QtWidgets>
 #include <QtSerialPort>
 #include <QtNetwork>
-#include <QtDataVisualization>
 
 #include <queue>
 #include <fstream>

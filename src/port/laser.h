@@ -10,6 +10,8 @@ public:
     explicit Laser(int index = -1, uint laser_type = 0);
     ~Laser();
 
+    QByteArray get_laser_status();
+
 #if ENABLE_PORT_JSON
     nlohmann::json to_json() override;
 #endif

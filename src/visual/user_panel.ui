@@ -2871,19 +2871,6 @@
        <enum>Qt::Horizontal</enum>
       </property>
      </widget>
-     <widget class="QCheckBox" name="SIMPLE_LASER_CHK">
-      <property name="geometry">
-       <rect>
-        <x>140</x>
-        <y>30</y>
-        <width>77</width>
-        <height>22</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>LASER</string>
-      </property>
-     </widget>
      <widget class="QFrame" name="LASER_WIDTH_GRP">
       <property name="geometry">
        <rect>
@@ -3127,7 +3114,7 @@
         <rect>
          <x>64</x>
          <y>23</y>
-         <width>21</width>
+         <width>26</width>
          <height>14</height>
         </rect>
        </property>
@@ -3158,6 +3145,32 @@
        </property>
       </widget>
      </widget>
+     <widget class="QLabel" name="CURRENT_PCT_LBL">
+      <property name="geometry">
+       <rect>
+        <x>120</x>
+        <y>14</y>
+        <width>79</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Current %</string>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="SIMPLE_LASER_CHK">
+      <property name="geometry">
+       <rect>
+        <x>160</x>
+        <y>30</y>
+        <width>77</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>LASER</string>
+      </property>
+     </widget>
      <zorder>PRF_GRP</zorder>
      <zorder>MCP_GRP</zorder>
      <zorder>LASER_WIDTH_GRP</zorder>
@@ -3173,8 +3186,9 @@
      <zorder>GATE_WIDTH</zorder>
      <zorder>SWITCH_TCU_UI_BTN</zorder>
      <zorder>GW_SLIDER</zorder>
-     <zorder>SIMPLE_LASER_CHK</zorder>
      <zorder>AUTO_MCP_CHK</zorder>
+     <zorder>CURRENT_PCT_LBL</zorder>
+     <zorder>SIMPLE_LASER_CHK</zorder>
     </widget>
     <widget class="QGroupBox" name="IMG_PROC_STATIC">
      <property name="geometry">

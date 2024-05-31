@@ -18,7 +18,6 @@
 #include "visual/preferences.h"
 #include "visual/scanconfig.h"
 #include "visual/lasercontrol.h"
-#include "visual/distance3dview.h"
 #include "visual/aliasing.h"
 #include "visual/presetpanel.h"
 
@@ -85,17 +84,19 @@ class UserPanel : public QMainWindow
 
 // enumerations only
 public:
-     enum PREF_TYPE {
-         WIN_PREF   = 0,
-         TCU_PARAMS = 1,
-         SCAN       = 2,
-         IMG        = 3,
-         TCU_PREF   = 4,
-     };
+    enum PREF_TYPE {
+        WIN_PREF   = 0,
+        TCU_PARAMS = 1,
+        SCAN       = 2,
+        IMG        = 3,
+        TCU_PREF   = 4,
+    };
 
 public:
     UserPanel(QWidget *parent = nullptr);
     ~UserPanel();
+
+    void init();
 
     int grab_thread_process(int *display_idx);
     void swap_grab_thread_display(int display_idx1, int display_idx2);
@@ -363,11 +364,6 @@ signals:
     void send_laser_msg(QString msg);
     void send_ptz_msg(qint32 ptz_param, double val = 0);
 
-#ifdef LVTONG
-    // update fishnet result in thread
-    void update_fishnet_result(int res);
-#endif
-
 protected:
 //  overload
     void keyPressEvent(QKeyEvent *event);
@@ -458,6 +454,9 @@ private:
 //    uint get_width_in_ns(float val);
 //    uint get_width_in_ps(float val, int idx = -1);
 
+    //FengYan6000
+    void update_delay_offset_FY();
+
 public:
     bool                  mouse_pressed;
     std::vector<cv::Rect> list_roi;                   // user-selected roi
@@ -468,7 +467,6 @@ private:
     Preferences*    pref;
     ScanConfig*     scan_config;
     LaserControl*   laser_settings;
-    Distance3DView* view_3d;
     Aliasing*       aliasing;
     PresetPanel*    preset;
     FloatingWindow* fw_display[2];

@@ -97,7 +97,7 @@ void log_message(QtMsgType type, const QMessageLogContext &context, const QStrin
     }
 
 //    QString message = text + QString::asprintf("File:(%s) Line (%d), ", context.file, context.line) + msg + "\n";
-    static QFile file("../log");
+    static QFile file("./logs");
     file.open(QIODevice::WriteOnly | QIODevice::Append);
     file.write((text + msg + "\n").toUtf8());
     file.flush();
@@ -156,7 +156,7 @@ int main(int argc, char *argv[])
     int monaco_id = QFontDatabase::addApplicationFont(":/fonts/monaco");
     int consolas_id = QFontDatabase::addApplicationFont(":/fonts/consolas");
     monaco = QFont(QFontDatabase::applicationFontFamilies(monaco_id).at(0));
-    monaco.setPixelSize(11);
+    monaco.setPixelSize(12);
 //    monaco.setLetterSpacing(QFont::PercentageSpacing, 120);
     consolas = QFont(QFontDatabase::applicationFontFamilies(consolas_id).at(0));
     consolas.setPixelSize(12);
@@ -210,6 +210,7 @@ int main(int argc, char *argv[])
 #endif
 
     UserPanel w;
+    w.init();
     w.show();
     return a.exec();
 }

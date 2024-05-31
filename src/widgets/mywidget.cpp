@@ -577,6 +577,7 @@ StatusBar::StatusBar(QWidget *parent) : QFrame(parent)
     packet_lost->setGeometry(456, 0, 132, 32);
     packet_lost->setObjectName("PACKET_LOST");
     packet_lost->setup("packets lost: 0");
+    packet_lost->hide();
     result_cam_fps = new StatusIcon(this);
     result_cam_fps->setGeometry(592, 0, 48, 32);
     result_cam_fps->setObjectName("RESULT_CAM_FPS");

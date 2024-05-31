@@ -17,17 +17,9 @@ Preferences::Preferences(QWidget *parent) :
     auto_mcp(false),
     hz_unit(0),
     base_unit(0),
-#ifdef LVTONG
     max_dist(135),
-#else
-    max_dist(15000),
-#endif
     delay_offset(0),
-#ifdef LVTONG
     max_dov(4.5),
-#else
-    max_dov(750),
-#endif
     gate_width_offset(0),
     max_laser_width(5000),
     laser_width_offset(0),
@@ -47,7 +39,7 @@ Preferences::Preferences(QWidget *parent) :
     dehaze_pct(0.95),
     sky_tolerance(40),
     fast_gf(1),
-    colormap(cv::COLORMAP_PARULA),
+    colormap(cv::COLORMAP_JET),
     lower_3d_thresh(0),
     upper_3d_thresh(0.981),
     truncate_3d(false),
@@ -110,13 +102,8 @@ Preferences::Preferences(QWidget *parent) :
 //[2] set up ui for serial comm.
     ui->COM_LIST->addItem("TCU");
     ui->COM_LIST->addItem("RANGE");
-#ifdef ICMOS
-    ui->COM_LIST->addItem("R1");
-    ui->COM_LIST->addItem("R2");
-#else
     ui->COM_LIST->addItem("LENS");
     ui->COM_LIST->addItem("LASER");
-#endif
     ui->COM_LIST->addItem("PTZ");
     ui->COM_LIST->installEventFilter(this);
 
@@ -194,13 +181,14 @@ Preferences::Preferences(QWidget *parent) :
 
     ui->HZ_LIST->addItem("kHz");
     ui->HZ_LIST->addItem("Hz");
+    ui->HZ_LIST->setCurrentIndex(hz_unit);
     ui->HZ_LIST->installEventFilter(this);
 
     ui->UNIT_LIST->addItem("ns");
 //    ui->UNIT_LIST->addItem(QString::fromLocal8Bit("μs"));
     ui->UNIT_LIST->addItem("μs");
     ui->UNIT_LIST->addItem("m");
-    ui->UNIT_LIST->setCurrentIndex(0);
+    ui->UNIT_LIST->setCurrentIndex(base_unit);
     ui->UNIT_LIST->installEventFilter(this);
 
     connect(ui->HZ_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
@@ -208,39 +196,7 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->UNIT_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
             [this](int index) {
                 emit base_unit_changed(base_unit = index);
-                switch (base_unit) {
-                case 0: // ns
-                    ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns), 'f', 0));
-                    ui->MAX_DIST_UNIT->setText("ns");
-                    ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset / dist_ns), 'f', 0));
-                    ui->DELAY_OFFSET_UNIT->setText("ns");
-                    ui->MAX_DOV_EDT->setText(QString::number(std::round(max_dov / dist_ns), 'f', 0));
-                    ui->MAX_DOV_UNIT->setText("ns");
-                    ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(std::round(gate_width_offset / dist_ns), 'f', 0));
-                    ui->GATE_WIDTH_OFFSET_UNIT->setText("ns");
-                    break;
-                case 1: // μs
-                    ui->MAX_DIST_EDT->setText(QString::number(max_dist / dist_ns / 1000, 'f', 3));
-                    ui->MAX_DIST_UNIT->setText("μs");
-                    ui->DELAY_OFFSET_EDT->setText(QString::number(delay_offset / dist_ns / 1000, 'f', 3));
-                    ui->DELAY_OFFSET_UNIT->setText("μs");
-                    ui->MAX_DOV_EDT->setText(QString::number(max_dov / dist_ns / 1000, 'f', 3));
-                    ui->MAX_DOV_UNIT->setText("μs");
-                    ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(gate_width_offset / dist_ns / 1000, 'f', 3));
-                    ui->GATE_WIDTH_OFFSET_UNIT->setText("μs");
-                    break;
-                case 2: // m
-                    ui->MAX_DIST_EDT->setText(QString::number(max_dist, 'f', 2));
-                    ui->MAX_DIST_UNIT->setText("m");
-                    ui->DELAY_OFFSET_EDT->setText(QString::number(delay_offset, 'f', 2));
-                    ui->DELAY_OFFSET_UNIT->setText("m");
-                    ui->MAX_DOV_EDT->setText(QString::number(max_dov, 'f', 2));
-                    ui->MAX_DOV_UNIT->setText("m");
-                    ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(gate_width_offset, 'f', 2));
-                    ui->GATE_WIDTH_OFFSET_UNIT->setText("m");
-                    break;
-                default: break;
-                }
+                update_distance_display();
             });
 
     connect(ui->AB_LOCK_CHK, &QCheckBox::stateChanged, this, [this](){});
@@ -248,11 +204,11 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->MAX_DIST_EDT, &QLineEdit::editingFinished, this, [this](){ emit max_dist_changed(max_dist); });
     connect(ui->DELAY_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
-                emit delay_offset_changed(delay_offset);
+                emit delay_offset_changed(delay_offset * dist_ns);
 #if ENABLE_USER_DEFAULT
                 FILE *f = fopen("user_default", "rb+");
                 if (!f) return;
-                int delay_offset_int = std::round(delay_offset / dist_ns);
+                int delay_offset_int = std::round(delay_offset);
                 fseek(f, 14, SEEK_SET);
                 fwrite(&delay_offset_int, 4, 1, f);
                 fclose(f);
@@ -261,11 +217,11 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->MAX_DOV_EDT, &QLineEdit::editingFinished, this, [this](){ emit max_dov_changed(max_dov); });
     connect(ui->GATE_WIDTH_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
-                emit gate_width_offset_changed(gate_width_offset);
+                emit gate_width_offset_changed(gate_width_offset * dist_ns);
 #if ENABLE_USER_DEFAULT
                 FILE *f = fopen("user_default", "rb+");
                 if (!f) return;
-                int gate_width_offset_int = std::round(gate_width_offset / dist_ns);
+                int gate_width_offset_int = std::round(gate_width_offset);
                 fseek(f, 18, SEEK_SET);
                 fwrite(&gate_width_offset_int, 4, 1, f);
                 fclose(f);
@@ -284,7 +240,7 @@ Preferences::Preferences(QWidget *parent) :
                 fclose(f);
 #endif
     });
-#if ENABLE_USER_DEFAULT
+#if not ENABLE_USER_DEFAULT
     FILE *f = fopen("user_default", "rb");
     if (f) {
         uint server_ip;
@@ -298,9 +254,9 @@ Preferences::Preferences(QWidget *parent) :
         }
         int delay_offset_int, gate_width_offset_int, laser_offset_int;
         fread(&delay_offset_int, 4, 1, f);
-        emit delay_offset_changed(delay_offset = delay_offset_int * dist_ns);
+        emit delay_offset_changed((delay_offset = delay_offset_int) * dist_ns);
         fread(&gate_width_offset_int, 4, 1, f);
-        emit gate_width_offset_changed(gate_width_offset = gate_width_offset_int * dist_ns);
+        emit gate_width_offset_changed((gate_width_offset = gate_width_offset_int) * dist_ns);
         fread(&laser_offset_int, 4, 1, f);
         emit laser_offset_changed(laser_width_offset = laser_offset_int);
         fclose(f);
@@ -388,35 +344,11 @@ Preferences::Preferences(QWidget *parent) :
                 ui->CUSTOM_3D_GW_EDT->setEnabled(arg1);
                 emit query_tcu_param();
             });
-#ifdef LVTONG
-    QStringList model_list;
-    model_list << "01 legacy" << "02 pix2pix" << "03 maskguided" /*<< "04 semantic"*/;
-    QStandardItemModel *model = new QStandardItemModel();//添加提示tootip
-    for(int i = 0; i < model_list.size(); i++){
-        QStandardItem *item = new QStandardItem(model_list[i]);
-        item->setToolTip(model_list[i]);
-        model->appendRow(item);
-    }
-    ui->MODEL_LIST->setModel(model);
-    ui->MODEL_LIST->setCurrentIndex(model_idx = 0);
-    connect(ui->MODEL_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
-            [this](int index){
-                model_idx = index;
-                ui->FISHNET_THRESH_EDIT->setEnabled(!model_idx);
-            });
-    connect(ui->FISHNET_RECOG_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ fishnet_recog = arg1; });
-    connect(ui->FISHNET_THRESH_EDIT, &QLineEdit::editingFinished, this,
-            [this](){
-                fishnet_thresh = ui->FISHNET_THRESH_EDIT->text().toFloat();
-                ui->FISHNET_THRESH_EDIT->setText(QString::number(fishnet_thresh, 'f', 2));
-            });
-#else
     ui->FISHNET->hide();
     ui->MODEL_LIST->hide();
     ui->FISHNET_RECOG_CHK->hide();
     ui->FISHNET_THRESH->hide();
     ui->FISHNET_THRESH_EDIT->hide();
-#endif
     //![5]
     data_exchange(false);
 }
@@ -424,6 +356,16 @@ Preferences::Preferences(QWidget *parent) :
 Preferences::~Preferences()
 {
     delete ui;
+}
+
+void Preferences::init()
+{
+    ui->UNDERWATER_CHK->click();
+    ui->UNIT_LIST->setCurrentIndex(2);
+    ui->AUTO_MCP_CHK->click();
+    ui->AUTO_REP_FREQ_CHK->click();
+    ui->SHARE_CHK->click();
+    ui->IMG_FORMAT_LST->setCurrentIndex(1);
 }
 
 void Preferences::data_exchange(bool read)
@@ -444,10 +386,6 @@ void Preferences::data_exchange(bool read)
         custom_3d_param = ui->CUSTOM_3D_PARAM_CHK->isChecked();
         custom_3d_delay = ui->CUSTOM_3D_DELAY_EDT->text().toFloat();
         custom_3d_gate_width = ui->CUSTOM_3D_GW_EDT->text().toFloat();
-#ifdef LVTONG
-        fishnet_recog = ui->FISHNET_RECOG_CHK->isChecked();
-        fishnet_thresh = ui->FISHNET_THRESH_EDIT->text().toFloat();
-#endif
 
         auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
         base_unit = ui->UNIT_LIST->currentIndex();
@@ -455,27 +393,27 @@ void Preferences::data_exchange(bool read)
         // ns
         case 0:
             max_dist = ui->MAX_DIST_EDT->text().toFloat() * dist_ns;
-            delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat() * dist_ns;
+            delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat();
             max_dov = ui->MAX_DOV_EDT->text().toFloat() * dist_ns;
-            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat() * dist_ns;
+            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat();
             max_laser_width = ui->MAX_LASER_EDT->text().toFloat();
             laser_width_offset = ui->LASER_OFFSET_EDT->text().toFloat();
             break;
         // μs
         case 1:
             max_dist = ui->MAX_DIST_EDT->text().toFloat() * dist_ns * 1000;
-            delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat() * dist_ns * 1000;
+            delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat() * 1000;
             max_dov = ui->MAX_DOV_EDT->text().toFloat() * dist_ns * 1000;
-            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat() * dist_ns * 1000;
+            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat() * 1000;
             max_laser_width = ui->MAX_LASER_EDT->text().toFloat();
             laser_width_offset = ui->LASER_OFFSET_EDT->text().toFloat();
             break;
         // m
         case 2:
             max_dist = ui->MAX_DIST_EDT->text().toFloat();
-            delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat();
+            delay_offset = std::round(ui->DELAY_OFFSET_EDT->text().toFloat() / dist_ns);
             max_dov = ui->MAX_DOV_EDT->text().toFloat();
-            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat();
+            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat() / dist_ns;
             max_laser_width = ui->MAX_LASER_EDT->text().toFloat();
             laser_width_offset = ui->LASER_OFFSET_EDT->text().toFloat();
             break;
@@ -504,43 +442,10 @@ void Preferences::data_exchange(bool read)
         ui->CUSTOM_3D_PARAM_CHK->setChecked(custom_3d_param);
         ui->CUSTOM_3D_DELAY_EDT->setText(QString::number((int)std::round(custom_3d_delay)));
         ui->CUSTOM_3D_GW_EDT->setText(QString::number((int)std::round(custom_3d_gate_width)));
-#ifdef LVTONG
-        ui->FISHNET_RECOG_CHK->setChecked(fishnet_recog);
-        ui->FISHNET_THRESH_EDIT->setText(QString::number(fishnet_thresh, 'f', 2));
-#endif
 
         ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
         ui->UNIT_LIST->setCurrentIndex(base_unit);
-        switch (base_unit) {
-        // ns
-        case 0:
-            ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns), 'f', 0));
-            ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset / dist_ns), 'f', 0));
-            ui->MAX_DOV_EDT->setText(QString::number(std::round(max_dov / dist_ns), 'f', 0));
-            ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(std::round(gate_width_offset / dist_ns), 'f', 0));
-            ui->MAX_LASER_EDT->setText(QString::number(std::round(max_laser_width), 'f', 0));
-            ui->LASER_OFFSET_EDT->setText(QString::number(std::round(laser_width_offset), 'f', 0));
-            break;
-        // μs
-        case 1:
-            ui->MAX_DIST_EDT->setText(QString::number(max_dist / dist_ns / 1000, 'f', 3));
-            ui->DELAY_OFFSET_EDT->setText(QString::number(delay_offset / dist_ns / 1000, 'f', 3));
-            ui->MAX_DOV_EDT->setText(QString::number(max_dov / dist_ns / 1000, 'f', 3));
-            ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(gate_width_offset / dist_ns / 1000, 'f', 3));
-            ui->MAX_LASER_EDT->setText(QString::number(std::round(max_laser_width), 'f', 0));
-            ui->LASER_OFFSET_EDT->setText(QString::number(std::round(laser_width_offset), 'f', 0));
-            break;
-        // m
-        case 2:
-            ui->MAX_DIST_EDT->setText(QString::number(max_dist, 'f', 2));
-            ui->DELAY_OFFSET_EDT->setText(QString::number(delay_offset, 'f', 2));
-            ui->MAX_DOV_EDT->setText(QString::number(max_dov, 'f', 2));
-            ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(gate_width_offset, 'f', 2));
-            ui->MAX_LASER_EDT->setText(QString::number(std::round(max_laser_width), 'f', 0));
-            ui->LASER_OFFSET_EDT->setText(QString::number(std::round(laser_width_offset), 'f', 0));
-            break;
-        default: break;
-        }
+        update_distance_display();
         ui->PS_STEPPING_EDT->setText(QString::number(ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]));
         ui->MAX_PS_STEP_EDT->setText(QString::number(int(std::round(4000. / ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]))));
         ui->LASER_CHK_1->setChecked(laser_on & 0b0001);
@@ -571,6 +476,43 @@ void Preferences::enable_ip_editing(bool enable)
 void Preferences::set_pixel_format(int idx)
 {
     ui->PIXEL_FORMAT_LIST->setCurrentIndex(idx);
+}
+
+void Preferences::update_distance_display()
+{
+    switch (base_unit) {
+    case 0: // ns
+        ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns), 'f', 0));
+        ui->MAX_DIST_UNIT->setText("ns");
+        ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset), 'f', 0));
+        ui->DELAY_OFFSET_UNIT->setText("ns");
+        ui->MAX_DOV_EDT->setText(QString::number(std::round(max_dov / dist_ns), 'f', 0));
+        ui->MAX_DOV_UNIT->setText("ns");
+        ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(std::round(gate_width_offset), 'f', 0));
+        ui->GATE_WIDTH_OFFSET_UNIT->setText("ns");
+        break;
+    case 1: // μs
+        ui->MAX_DIST_EDT->setText(QString::number(max_dist / dist_ns / 1000, 'f', 3));
+        ui->MAX_DIST_UNIT->setText("μs");
+        ui->DELAY_OFFSET_EDT->setText(QString::number(delay_offset / 1000, 'f', 3));
+        ui->DELAY_OFFSET_UNIT->setText("μs");
+        ui->MAX_DOV_EDT->setText(QString::number(max_dov / dist_ns / 1000, 'f', 3));
+        ui->MAX_DOV_UNIT->setText("μs");
+        ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(gate_width_offset / 1000, 'f', 3));
+        ui->GATE_WIDTH_OFFSET_UNIT->setText("μs");
+        break;
+    case 2: // m
+        ui->MAX_DIST_EDT->setText(QString::number(max_dist, 'f', 2));
+        ui->MAX_DIST_UNIT->setText("m");
+        ui->DELAY_OFFSET_EDT->setText(QString::number(delay_offset * dist_ns, 'f', 2));
+        ui->DELAY_OFFSET_UNIT->setText("m");
+        ui->MAX_DOV_EDT->setText(QString::number(max_dov, 'f', 2));
+        ui->MAX_DOV_UNIT->setText("m");
+        ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(gate_width_offset * dist_ns, 'f', 2));
+        ui->GATE_WIDTH_OFFSET_UNIT->setText("m");
+        break;
+    default: break;
+    }
 }
 
 void Preferences::display_baudrate(int id, int baudrate)
