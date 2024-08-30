@@ -21,6 +21,8 @@ public:
         SET_ZOOM      = 0x0A,
         SET_FOCUS     = 0x0B,
         SET_RADIUS    = 0x0C,
+        RELAY1_ON     = 0x0D,
+        RELAY1_OFF    = 0x0E,
 
         ADDRESS       = 0x100,
         STEPPING      = 0x101,
@@ -45,8 +47,8 @@ protected slots:
     bool connect_to_tcp_port(QString ip, ushort port) override;
     void try_communicate() override;
 
-    int lens_control(qint32 lens_prarm, uint val = 0);
-    int lens_control_addr(qint32 lens_prarm, uchar addr, uchar speed = 0, uint val = 0);
+    int lens_control(qint32 lens_param, uint val = 0);
+    int lens_control_addr(qint32 lens_param, uchar addr, uchar speed = 0, uint val = 0);
     void set_pos_temp(qint32 lens_param, uint val);
 
 #if ENABLE_PORT_JSON

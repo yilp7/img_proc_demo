@@ -454,7 +454,7 @@ private:
     void update_pixel_depth(int depth, int display_idx = 0);
 
     // tcu_type
-    void update_tcu_param_pos(QLabel *u_unit, QLineEdit *n_input, QLabel *n_unit, QLineEdit *p_input);
+    void update_tcu_param_pos(int dir, QLabel *u_unit, QLineEdit *n_input, QLabel *n_unit, QLineEdit *p_input);
     void split_value_by_unit(float val, uint &us, uint &ns, uint &ps, int idx = -1);
 //    uint get_width_in_us(float val);
 //    uint get_width_in_ns(float val);

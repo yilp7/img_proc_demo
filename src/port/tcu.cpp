@@ -42,9 +42,24 @@ double TCU::get(qint32 tcu_param)
     switch (tcu_param)
     {
         case REPEATED_FREQ: return rep_freq;
-        case LASER_WIDTH:   return laser_width;
-        case DELAY_A:       return delay_a;
+        case LASER_WIDTH:
+            switch (tcu_type)
+            {
+            case 2:  return gate_width_a;
+            default: return laser_width;
+            }
+        case DELAY_A:
+            switch (tcu_type)
+            {
+            case 2:  return delay_b;
+            default: return delay_a;
+            }
         case GATE_WIDTH_A:  return gate_width_a;
+            switch (tcu_type)
+            {
+            case 2:  return gate_width_b;
+            default: return gate_width_a;
+            }
         case DELAY_B:       return delay_b;
         case GATE_WIDTH_B:  return gate_width_b;
         case CCD_FREQ:      return ccd_freq;
@@ -139,7 +154,7 @@ bool TCU::connect_to_tcp_port(QString ip, ushort port)
 
 void TCU::try_communicate()
 {
-    ControlPort::try_communicate();
+    ControlPort::try_communicate(); return;
 
     static int write_idx = 0;
 
@@ -159,12 +174,13 @@ void TCU::set_user_param(qint32 tcu_param, double val)
     switch (tcu_type.load()) {
         case 0: clock_cycle = 8; break;
         case 1: clock_cycle = 4; break;
+        case 2: clock_cycle = 4; break;
         default: break;
     }
 
     switch (tcu_param) {
         case REPEATED_FREQ: rep_freq = val;     set_tcu_param(tcu_param, (1e6 / clock_cycle) / rep_freq); break;
-        case LASER_WIDTH  : laser_width = val;  set_tcu_param(tcu_param, laser_width / clock_cycle); break;
+        case LASER_WIDTH  : laser_width = val;  set_tcu_param(tcu_param, laser_width); break;
         case DELAY_A:       delay_a = val;      set_tcu_param(tcu_param, delay_a); break;
         case GATE_WIDTH_A:  gate_width_a = val; set_tcu_param(tcu_param, gate_width_a); break;
         case DELAY_B:       delay_b = val;      set_tcu_param(tcu_param, delay_b); break;
@@ -363,7 +379,7 @@ void TCU::set_tcu_param(qint32 tcu_param, double val)
             out_1[3] = integer_part & 0xFF; integer_part >>= 8;
             out_1[2] = integer_part & 0xFF;
 
-            communicate(out_1, 1, 10);
+            communicate(out_1, 7, 40);
 
             if (param_ps != TCU::PARAMS::NO_PARAM) {
                 QByteArray out_2(7, 0x00);
@@ -376,7 +392,66 @@ void TCU::set_tcu_param(qint32 tcu_param, double val)
                 out_2[3] = decimal_part & 0xFF; decimal_part >>= 8;
                 out_2[2] = decimal_part & 0xFF;
 
-                communicate(out_2, 1, 10);
+                communicate(out_2, 7, 40);
+            }
+            break;
+        }
+        case 2:
+        {
+            TCU::PARAMS param_ps = TCU::PARAMS::NO_PARAM;
+            int step = 0;
+            switch (tcu_param) {
+            case DELAY_A:
+                tcu_param = DELAY_B;
+                param_ps = DELAY_B_PS;
+                integer_part = int(val + 0.001);
+                decimal_part = std::round((val - integer_part + 0.001) * 1000 / 11.23);
+                delay_b = integer_part + decimal_part * 11.23 / 1000.;
+                break;
+            case LASER_WIDTH:
+                tcu_param = GATE_WIDTH_A;
+                param_ps = GW_A_PS;
+                integer_part = int(val + 0.001);
+                decimal_part = std::round((val - integer_part + 0.001) * 1000 / 14.9);
+                gate_width_a = integer_part + decimal_part * 14.9 / 1000.;
+                break;
+            case GATE_WIDTH_B:
+                tcu_param = GATE_WIDTH_B;
+                param_ps = GW_B_PS;
+                integer_part = int(val + 0.001);
+                decimal_part = std::round((val - integer_part + 0.001) * 1000 / 14.9);
+                gate_width_b = integer_part + decimal_part * 14.9 / 1000.;
+                break;
+            default:
+                integer_part = int(val);
+                decimal_part = 0;
+                break;
+            }
+
+            QByteArray out_1(7, 0x00);
+            out_1[0] = 0x88;
+            out_1[1] = tcu_param;
+            out_1[6] = 0x99;
+
+            out_1[5] = integer_part & 0xFF; integer_part >>= 8;
+            out_1[4] = integer_part & 0xFF; integer_part >>= 8;
+            out_1[3] = integer_part & 0xFF; integer_part >>= 8;
+            out_1[2] = integer_part & 0xFF;
+
+            communicate(out_1, 7, 40);
+
+            if (param_ps != TCU::PARAMS::NO_PARAM) {
+                QByteArray out_2(7, 0x00);
+                out_2[0] = 0x88;
+                out_2[1] = param_ps;
+                out_2[6] = 0x99;
+
+                out_2[5] = decimal_part & 0xFF; decimal_part >>= 8;
+                out_2[4] = decimal_part & 0xFF; decimal_part >>= 8;
+                out_2[3] = decimal_part & 0xFF; decimal_part >>= 8;
+                out_2[2] = decimal_part & 0xFF;
+
+                communicate(out_2, 7, 40);
             }
             break;
         }

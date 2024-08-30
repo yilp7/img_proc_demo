@@ -46,6 +46,8 @@ public:
         PS_STEP_4     = 0x010D,
         AUTO_PRF      = 0x010E,
         LIGHT_SPEED   = 0x010F,
+        OFFSET_ND     = 0x0110,
+        OFFSET_NG     = 0x0111,
 
         TCU_TYPE      = 0xFFFF,
     };
@@ -81,7 +83,8 @@ private:
 
 private:
     // 0: default, head(88) cmd(00) data(MM NN PP QQ) tail(99)
-    // 1: step-50ps, head(88) cmd(00) data(MM NN PP QQ SS) tail(99), SS->step by 50ps (max 80)
+    // 1: step-40ps, head(88) cmd(00) data(MM NN PP QQ) tail(99), ps cmd step by 40ps (max 100)
+    // 1: step-10ps, head(88) cmd(00) data(MM NN PP QQ) tail(99), ps cmd step by 10ps (max 100)
     std::atomic<uint> tcu_type;
     bool   scan_mode; // 0: default, 1: scan
 

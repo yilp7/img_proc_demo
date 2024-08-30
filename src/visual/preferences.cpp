@@ -30,6 +30,7 @@ Preferences::Preferences(QWidget *parent) :
     custom_topleft_info(false),
     save_in_grayscale(false),
     consecutive_capture(true),
+    img_format(0),
     accu_base(1),
     gamma(1.2),
     low_in(0),
@@ -170,14 +171,14 @@ Preferences::Preferences(QWidget *parent) :
 //    ui->TCU_LIST->addItem("#2 50ps step");
 //    ui->TCU_LIST->addItem("#3 50ps step");
     ui->TCU_LIST->addItem("40ps step");
+    ui->TCU_LIST->addItem("10ps step");
     ui->TCU_LIST->installEventFilter(this);
     connect(ui->TCU_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
             [this](int index){
                 emit tcu_type_changed(index);
                 switch (index) {
-                case 0: ui->PS_CONFIG_GRP->hide(); break;
-                case 1: ui->PS_CONFIG_GRP->show(); break;
-                default: break;
+                case 1:  ui->PS_CONFIG_GRP->show(); break;
+                default: ui->PS_CONFIG_GRP->hide(); break;
                 }
             });
 
@@ -416,7 +417,36 @@ void Preferences::data_exchange(bool read)
 
         auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
         base_unit = ui->UNIT_LIST->currentIndex();
-        update_distance_display();
+        switch (base_unit) {
+        // ns
+        case 0:
+            max_dist = ui->MAX_DIST_EDT->text().toFloat() * dist_ns;
+            delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat();
+            max_dov = ui->MAX_DOV_EDT->text().toFloat() * dist_ns;
+            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat();
+            max_laser_width = ui->MAX_LASER_EDT->text().toFloat();
+            laser_width_offset = ui->LASER_OFFSET_EDT->text().toFloat();
+            break;
+        // μs
+        case 1:
+            max_dist = ui->MAX_DIST_EDT->text().toFloat() * dist_ns * 1000;
+            delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat() * 1000;
+            max_dov = ui->MAX_DOV_EDT->text().toFloat() * dist_ns * 1000;
+            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat() * 1000;
+            max_laser_width = ui->MAX_LASER_EDT->text().toFloat();
+            laser_width_offset = ui->LASER_OFFSET_EDT->text().toFloat();
+            break;
+        // m
+        case 2:
+            max_dist = ui->MAX_DIST_EDT->text().toFloat();
+            delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat() / dist_ns;
+            max_dov = ui->MAX_DOV_EDT->text().toFloat();
+            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat() / dist_ns;
+            max_laser_width = ui->MAX_LASER_EDT->text().toFloat();
+            laser_width_offset = ui->LASER_OFFSET_EDT->text().toFloat();
+            break;
+        default: break;
+        }
         ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()] = ui->PS_STEPPING_EDT->text().toInt();
         laser_on = 0;
         laser_on |= ui->LASER_CHK_1->isChecked() << 0;
@@ -447,36 +477,7 @@ void Preferences::data_exchange(bool read)
 
         ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
         ui->UNIT_LIST->setCurrentIndex(base_unit);
-        switch (base_unit) {
-        // ns
-        case 0:
-            ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns), 'f', 0));
-            ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset), 'f', 0));
-            ui->MAX_DOV_EDT->setText(QString::number(std::round(max_dov / dist_ns), 'f', 0));
-            ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(std::round(gate_width_offset), 'f', 0));
-            ui->MAX_LASER_EDT->setText(QString::number(std::round(max_laser_width), 'f', 0));
-            ui->LASER_OFFSET_EDT->setText(QString::number(std::round(laser_width_offset), 'f', 0));
-            break;
-        // μs
-        case 1:
-            ui->MAX_DIST_EDT->setText(QString::number(max_dist / dist_ns / 1000, 'f', 3));
-            ui->DELAY_OFFSET_EDT->setText(QString::number(delay_offset / 1000, 'f', 3));
-            ui->MAX_DOV_EDT->setText(QString::number(max_dov / dist_ns / 1000, 'f', 3));
-            ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(gate_width_offset / 1000, 'f', 3));
-            ui->MAX_LASER_EDT->setText(QString::number(std::round(max_laser_width), 'f', 0));
-            ui->LASER_OFFSET_EDT->setText(QString::number(std::round(laser_width_offset), 'f', 0));
-            break;
-        // m
-        case 2:
-            ui->MAX_DIST_EDT->setText(QString::number(max_dist, 'f', 2));
-            ui->DELAY_OFFSET_EDT->setText(QString::number(delay_offset * dist_ns, 'f', 2));
-            ui->MAX_DOV_EDT->setText(QString::number(max_dov, 'f', 2));
-            ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(gate_width_offset * dist_ns, 'f', 2));
-            ui->MAX_LASER_EDT->setText(QString::number(std::round(max_laser_width), 'f', 0));
-            ui->LASER_OFFSET_EDT->setText(QString::number(std::round(laser_width_offset), 'f', 0));
-            break;
-        default: break;
-        }
+        update_distance_display();
         ui->PS_STEPPING_EDT->setText(QString::number(ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]));
         ui->MAX_PS_STEP_EDT->setText(QString::number(int(std::round(4000. / ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]))));
         ui->LASER_CHK_1->setChecked(laser_on & 0b0001);

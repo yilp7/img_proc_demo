@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(GLI_user_panel LANGUAGES CXX VERSION 0.9.0.0)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.9.1.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -179,6 +179,10 @@ set(SOURCE_FILES
     src/port/laser.cpp
     src/port/ptz.h
     src/port/ptz.cpp
+    src/port/rangefinder.h
+    src/port/rangefinder.cpp
+    src/port/huanyu.h
+    src/port/huanyu.cpp
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss
@@ -353,15 +357,6 @@ qt5_use_modules(GLI_params Widgets SerialPort Network DataVisualization)
 target_link_libraries(GLI_params ${PROJECT_LIBS})
 if(USING_CAMERALINK)
     target_compile_definitions(GLI_params PRIVATE USING_CAMERALINK=1)
-endif()
-
-add_executable(ICMOS WIN32 ${TRANSLATE} ${SOURCE_FILES})
-target_compile_definitions(ICMOS PRIVATE ICMOS=1)
-qt5_use_modules(ICMOS Widgets SerialPort Network DataVisualization)
-target_link_libraries(ICMOS ${PROJECT_LIBS})
-target_link_libraries(ICMOS ${PROJECT_LIBS})
-if(USING_CAMERALINK)
-    target_compile_definitions(ICMOS PRIVATE USING_CAMERALINK=1)
 endif()
 
 add_executable(LvTong WIN32 ${TRANSLATE} ${SOURCE_FILES})

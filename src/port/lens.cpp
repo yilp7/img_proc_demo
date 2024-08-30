@@ -110,10 +110,10 @@ void Lens::try_communicate()
     write_idx = (write_idx + 1) % 3;
 }
 
-int Lens::lens_control(qint32 lens_prarm, uint val)
+int Lens::lens_control(qint32 lens_param, uint val)
 {
     QByteArray command;
-    switch (lens_prarm)
+    switch (lens_param)
     {
         case STOP:         command = generate_ba(new uchar[7]{0xFF, address, 0x00, 0x00, 0x00, 0x00, 0x00}, 7); goto chksm;
         case ZOOM_IN:      command = generate_ba(new uchar[7]{0xFF, address, 0x00, 0x20, 0x00, lens_speed, 0x00}, 7); goto chksm;
@@ -141,6 +141,16 @@ int Lens::lens_control(qint32 lens_prarm, uint val)
         {
             command = generate_ba(new uchar[7]{0xFF, address, 0x00, 0x81, uchar((val >> 8) & 0xFF), uchar(val & 0xFF), 0x00}, 7);
             laser_radius = val;
+            goto chksm;
+        }
+        case RELAY1_ON:
+        {
+            command = generate_ba(new uchar[7]{0xFF, address, 0x00, 0x09, 0x00, 0x00, 0x00}, 7);
+            goto chksm;
+        }
+        case RELAY1_OFF:
+        {
+            command = generate_ba(new uchar[7]{0xFF, address, 0x00, 0x0B, 0x00, 0x00, 0x00}, 7);
             goto chksm;
         }
         case STEPPING:
@@ -171,7 +181,7 @@ chksm:
     command[6] = checksum(command);
 send:
     if (hold.load()) return -1;
-    switch (lens_prarm)
+    switch (lens_param)
     {
         case ZOOM_POS:
         case FOCUS_POS:
@@ -184,11 +194,11 @@ send:
             retrieve_mutex.unlock();
 
             uint lens_fb = (uchar(read[4]) << 8) + uchar(read[5]);
-            switch (lens_prarm)
+            switch (lens_param)
             {
-                case ZOOM_POS:     emit lens_param_updated(lens_prarm, zoom = lens_fb); break;
-                case FOCUS_POS:    emit lens_param_updated(lens_prarm, focus = lens_fb); break;
-                case LASER_RADIUS: emit lens_param_updated(lens_prarm, laser_radius = lens_fb); break;
+                case ZOOM_POS:     emit lens_param_updated(lens_param, zoom = lens_fb); break;
+                case FOCUS_POS:    emit lens_param_updated(lens_param, focus = lens_fb); break;
+                case LASER_RADIUS: emit lens_param_updated(lens_param, laser_radius = lens_fb); break;
             }
             break;
         }
@@ -199,10 +209,10 @@ send:
     return 0;
 }
 
-int Lens::lens_control_addr(qint32 lens_prarm, uchar addr, uchar speed, uint val)
+int Lens::lens_control_addr(qint32 lens_param, uchar addr, uchar speed, uint val)
 {
     QByteArray command;
-    switch (lens_prarm)
+    switch (lens_param)
     {
         case STOP:         command = generate_ba(new uchar[7]{0xFF, addr, 0x00, 0x00, 0x00,  0x00, 0x00}, 7); break;
         case ZOOM_IN:      command = generate_ba(new uchar[7]{0xFF, addr, 0x00, 0x20, 0x00, speed, 0x00}, 7); break;

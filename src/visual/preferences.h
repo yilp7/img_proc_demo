@@ -107,9 +107,9 @@ public:
     int              hz_unit;   // 0: kHz, 1:Hz
     int              base_unit; // 0: ns, 1: μs, 2: m
     float            max_dist;
-    float            delay_offset; // distance offset (from hardware)
+    float            delay_offset; // distance offset (unit: ns)
     float            max_dov;
-    float            gate_width_offset; // depth offset (from hardware)
+    float            gate_width_offset; // depth offset (unit: ns)
     float            max_laser_width;
     float            laser_width_offset; // laser width offset (from hardware)
     uint             ps_step[4]; // ps-stepping in ps-TCU

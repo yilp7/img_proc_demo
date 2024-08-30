@@ -676,6 +676,8 @@ void UserPanel::init()
     pref->ui->MAX_DIST_EDT->emit editingFinished();
     pref->ui->MAX_DOV_EDT->emit editingFinished();
     ui->TITLE->process_maximize();
+
+    ui->FRAME_AVG_CHECK->setText("Filter");
 #else //SIMPLE_UI
     ui->AUTO_MCP_CHK->hide();
     ui->SIMPLE_LASER_CHK->hide();
@@ -687,10 +689,12 @@ void UserPanel::init()
     ui->RADIUS_DEC_BTN->hide();
     ui->LASER_RADIUS_LABEL->hide();
 
+    ui->FRAME_AVG_CHECK->setText("Avg");
+#endif //SIMPLE_UI
+
     ui->BRIGHTNESS_LABEL->hide();
     ui->BRIGHTNESS_SLIDER->hide();
     ui->PSEUDOCOLOR_CHK->show();
-#endif //SIMPLE_UI
 
 #ifdef LVTONG
     pref->ui->UNDERWATER_CHK->click();
@@ -726,7 +730,7 @@ void UserPanel::init()
 //    ui->ANALYSIS_RADIO->hide();
 //    ui->PLUGIN_DISPLAY_1->hide();
 
-//    pref->ui->TCU_LIST->setCurrentIndex(1);
+    pref->ui->TCU_LIST->setCurrentIndex(1);
 #ifdef USING_CAMERALINK
     pref->ui->CAMERALINK_CHK->click();
 #else //USING_CAMERALINK
@@ -824,7 +828,7 @@ void UserPanel::data_exchange(bool read){
         ui->DELAY_B_EDIT_P->setText(QString::asprintf("%03d", ps));
         ui->GATE_WIDTH_N_EDIT_N->setText(QString::asprintf("%d", int(std::round(p_tcu->get(TCU::GATE_WIDTH_N)))));
         ui->DELAY_N_EDIT_N->setText(QString::asprintf("%d", int(std::round(p_tcu->get(TCU::DELAY_N)))));
-        ui->GATE_WIDTH_N->setText(QString::asprintf("%d", int(std::round(p_tcu->get(TCU::GATE_WIDTH_N)))));
+//        ui->GATE_WIDTH_N->setText(QString::asprintf("%d", int(std::round(p_tcu->get(TCU::GATE_WIDTH_N)))));
         ui->DELAY_SLIDER->setValue(delay_dist);
         ui->GW_SLIDER->setValue(depth_of_view);
         ui->MCP_SLIDER->setValue(std::round(p_tcu->get(TCU::MCP)));
@@ -1065,7 +1069,7 @@ int UserPanel::grab_thread_process(int *idx) {
         if (pref->split) ImageProc::split_img(modified_result[thread_idx], modified_result[thread_idx]);
 
         // process 3d image construction from ABN frames
-        if (ui->IMG_3D_CHECK->isChecked()) {
+        if (ui->IMG_3D_CHECK->isChecked() && thread_idx == 0 && !is_color[thread_idx]) {
             ww = _w + 104;
             hh = _h;
             double dist_min = 0, dist_max = 0;
@@ -1270,7 +1274,17 @@ int UserPanel::grab_thread_process(int *idx) {
             ImageProc::brightness_and_contrast(modified_result[thread_idx], modified_result[thread_idx], tan((20 - ui->GAMMA_SLIDER->value()) / 40. * M_PI));
         }
 
-        if (ui->PSEUDOCOLOR_CHK->isChecked()) {
+        if (ui->PSEUDOCOLOR_CHK->isChecked() && thread_idx == 0 && modified_result[thread_idx].channels() == 1) {
+            cv::Mat mask;
+//            if (true) {
+//                cv::Mat mean, stddev;
+//                cv::meanStdDev(modified_result[thread_idx], mean, stddev);
+//                double m = mean.at<double>(0, 0), s = stddev.at<double>(0, 0);
+//                cv::threshold(modified_result[thread_idx], modified_result[thread_idx], m - 2 * s, 0, cv::THRESH_TOZERO);
+//                cv::threshold(modified_result[thread_idx], modified_result[thread_idx], m + 2 * s, 0, cv::THRESH_TOZERO_INV);
+//                modified_result[thread_idx].convertTo(mask, CV_8UC1);
+//            }
+            cv::normalize(modified_result[thread_idx], modified_result[thread_idx], 0, 255, cv::NORM_MINMAX, CV_8UC1, mask);
             cv::Mat temp_mask = modified_result[thread_idx], result_3d;
             cv::applyColorMap(modified_result[thread_idx], result_3d, pref->colormap);
             result_3d.copyTo(modified_result[thread_idx], temp_mask);
@@ -1417,7 +1431,7 @@ int UserPanel::grab_thread_process(int *idx) {
                 cv::putText(temp, info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(temp, info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             }
-            if (is_color[thread_idx] || pseudocolor[thread_idx]) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
+            if (is_color[thread_idx]) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
             // inc by 1 because main display uses two videowriter
             if (*idx) vid_out[thread_idx + 1].write(temp);
             else      vid_out[0].write(temp);
@@ -2131,7 +2145,7 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
         image_mutex[0].lock();
         res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi");
 //        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || image_3d[0]);
-        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('X', '2', '6', '4'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0]);
+        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('X', '2', '6', '4'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || pseudocolor[0]);
         image_mutex[0].unlock();
     }
     record_modified[0] ^= 1;
@@ -2504,6 +2518,9 @@ void UserPanel::set_tcu_type(int idx)
 //    if (ptr_tcu->tcu_type == 0 && idx) diff = 1;
 //    if (ptr_tcu->tcu_type && idx == 0) diff = -1;
 //    ptr_tcu->tcu_type = idx;
+    if (idx == 2) update_tcu_param_pos(1, ui->LASER_WIDTH_UNIT_U, ui->LASER_WIDTH_EDIT_N, ui->LASER_WIDTH_UNIT_N, ui->LASER_WIDTH_EDIT_P);
+    if (p_tcu->type() == 2) update_tcu_param_pos(-1, ui->LASER_WIDTH_UNIT_U, ui->LASER_WIDTH_EDIT_N, ui->LASER_WIDTH_UNIT_N, ui->LASER_WIDTH_EDIT_P);
+
     if (p_tcu->type() == 0 && idx) diff = 1;
     if (p_tcu->type() && idx == 0) diff = -1;
     p_tcu->set_type(idx);
@@ -2513,15 +2530,15 @@ void UserPanel::set_tcu_type(int idx)
     ui->GATE_WIDTH_A->resize(QSize(ui->GATE_WIDTH_A->width() + 12 * diff, ui->GATE_WIDTH_A->height()));
     ui->GATE_WIDTH_B->resize(QSize(ui->GATE_WIDTH_B->width() + 12 * diff, ui->GATE_WIDTH_B->height()));
     ui->GATE_WIDTH_GRP->move(idx ? -6 : 0, 180);
-//    update_tcu_param_pos(ui->LASER_WIDTH_UNIT_U, ui->LASER_WIDTH_EDIT_N, ui->LASER_WIDTH_UNIT_N, ui->LASER_WIDTH_EDIT_P);
-    if (diff) update_tcu_param_pos(ui->DELAY_A_UNIT_U, ui->DELAY_A_EDIT_N, ui->DELAY_A_UNIT_N, ui->DELAY_A_EDIT_P);
-    if (diff) update_tcu_param_pos(ui->DELAY_B_UNIT_U, ui->DELAY_B_EDIT_N, ui->DELAY_B_UNIT_N, ui->DELAY_B_EDIT_P);
-    if (diff) update_tcu_param_pos(ui->GATE_WIDTH_A_UNIT_U, ui->GATE_WIDTH_A_EDIT_N, ui->GATE_WIDTH_A_UNIT_N, ui->GATE_WIDTH_A_EDIT_P);
-    if (diff) update_tcu_param_pos(ui->GATE_WIDTH_B_UNIT_U, ui->GATE_WIDTH_B_EDIT_N, ui->GATE_WIDTH_B_UNIT_N, ui->GATE_WIDTH_B_EDIT_P);
+    if (diff) update_tcu_param_pos(diff, ui->DELAY_A_UNIT_U, ui->DELAY_A_EDIT_N, ui->DELAY_A_UNIT_N, ui->DELAY_A_EDIT_P);
+    if (diff) update_tcu_param_pos(diff, ui->DELAY_B_UNIT_U, ui->DELAY_B_EDIT_N, ui->DELAY_B_UNIT_N, ui->DELAY_B_EDIT_P);
+    if (diff) update_tcu_param_pos(diff, ui->GATE_WIDTH_A_UNIT_U, ui->GATE_WIDTH_A_EDIT_N, ui->GATE_WIDTH_A_UNIT_N, ui->GATE_WIDTH_A_EDIT_P);
+    if (diff) update_tcu_param_pos(diff, ui->GATE_WIDTH_B_UNIT_U, ui->GATE_WIDTH_B_EDIT_N, ui->GATE_WIDTH_B_UNIT_N, ui->GATE_WIDTH_B_EDIT_P);
 
     switch (idx) {
     case 0: mcp_max = 255; break;
     case 1: mcp_max = 4095; break;
+    case 2: mcp_max = 4095; break;
     default: break;
     }
     ui->MCP_SLIDER->setMaximum(mcp_max);
@@ -2812,6 +2829,7 @@ void UserPanel::switch_ui()
 //        ui->BRIGHTNESS_SLIDER->hide();
 //        ui->PSEUDOCOLOR_CHK->show();
         ui->PSEUDOCOLOR_CHK->move(ui->PSEUDOCOLOR_CHK->pos() + QPoint(0, 5));
+        ui->FRAME_AVG_CHECK->setText("Filter");
 
         ui->SCAN_GRP->hide();
 //        ui->LOGO->show();
@@ -2878,6 +2896,7 @@ void UserPanel::switch_ui()
 //        ui->BRIGHTNESS_SLIDER->show();
 //        ui->PSEUDOCOLOR_CHK->hide();
         ui->PSEUDOCOLOR_CHK->move(ui->PSEUDOCOLOR_CHK->pos() - QPoint(0, 5));
+        ui->FRAME_AVG_CHECK->setText("Avg");
 
         ui->SCAN_GRP->show();
 //        ui->LOGO->hide();
@@ -3452,6 +3471,7 @@ void UserPanel::connect_to_serial_server_tcp()
 //    connected |= ptr_ptz->  setup_tcp_port(ip, 10000, true);
 //    ptr_ptz->share_port_from(ptr_lens);
     p_tcu-> emit connect_to_tcp(pref->ui->TCP_SERVER_IP_EDIT->text(), 10001);
+    QThread::msleep(200);
     p_lens->emit connect_to_tcp(pref->ui->TCP_SERVER_IP_EDIT->text(), 10002);
 //    pref->ui->TCP_SERVER_CHK->setEnabled(connected);
 //    pref->ui->TCP_SERVER_CHK->setChecked(connected);
@@ -4031,8 +4051,8 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
                 update_gate_width();
             }
             else if (edit == ui->LASER_WIDTH_EDIT_N) {
-                if (edit->text().toInt() > 999) laser_width = edit->text().toInt() + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.;
-                else laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.;
+                if (edit->text().toInt() > 999) laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_P->text().toInt() / 1000.;
+                else laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_P->text().toInt() / 1000.;
 //                ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
 //                ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
                 update_laser_width();
@@ -4450,7 +4470,7 @@ void UserPanel::dragEnterEvent(QDragEnterEvent *event)
 {
     QMainWindow::dragEnterEvent(event);
 
-    if (event->mimeData()->urls().length() < 9) event->acceptProposedAction();
+    if (event->mimeData()->urls().length() < 99) event->acceptProposedAction();
 }
 
 void UserPanel::dropEvent(QDropEvent *event)
@@ -4478,6 +4498,7 @@ void UserPanel::dropEvent(QDropEvent *event)
     }
     else {
         bool result = true, init = true;
+        uint count = 0;
         for (QUrl path : event->mimeData()->urls()) {
             bool temp = load_image_file(path.toLocalFile(), init);
             if (init) init = !temp;
@@ -4745,7 +4766,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                             if (not_rtsp_stream && display && frame->pts != AV_NOPTS_VALUE) {
                                 if (last_pts != AV_NOPTS_VALUE) {
                                     delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1e6;
-                                    //                                qDebug() << av_rescale_q(frame->pts - last_pts, time_base, time_base_q) << elapsed_timer.nsecsElapsed() / 1000;
+//                                    qDebug() << av_rescale_q(frame->pts - last_pts, time_base, time_base_q) << elapsed_timer.nsecsElapsed() / 1000;
                                     if (delay > 0 && delay < 1000000) av_usleep(delay);
                                     elapsed_timer.restart();
                                 }
@@ -4793,11 +4814,11 @@ void UserPanel::update_pixel_depth(int depth, int display_idx)
     status_bar->img_pixel_depth->set_text(QString::number(depth) + "-bit");
 }
 
-inline void UserPanel::update_tcu_param_pos(QLabel *u_unit, QLineEdit *n_input, QLabel *n_unit, QLineEdit *p_input)
+inline void UserPanel::update_tcu_param_pos(int dir, QLabel *u_unit, QLineEdit *n_input, QLabel *n_unit, QLineEdit *p_input)
 {
 //    switch (ptr_tcu->tcu_type) {
-    switch (p_tcu->type()) {
-        case 0:
+    switch (dir) {
+        case -1:
             u_unit->setText("μs");
             n_unit->setText("ns");
             u_unit->move(u_unit->pos() + QPoint(3, 0));
@@ -4806,8 +4827,6 @@ inline void UserPanel::update_tcu_param_pos(QLabel *u_unit, QLineEdit *n_input, 
             p_input->hide();
             break;
         case 1:
-        case 2:
-        case 3:
             u_unit->setText(",");
             n_unit->setText(".");
             u_unit->move(u_unit->pos() - QPoint(3, 0));
@@ -4821,13 +4840,33 @@ inline void UserPanel::update_tcu_param_pos(QLabel *u_unit, QLineEdit *n_input, 
 
 inline void UserPanel::split_value_by_unit(float val, uint &us, uint &ns, uint &ps, int idx) {
     static float ONE = 1.f;
-    us = uint(val + 0.001) / 1000;
-    ns = uint(val + 0.001) % 1000;
-    if (idx < 0) ps = 0;
-//    else         ps = std::round(std::modf(val + 0.001, &ONE) * 1000 / ptr_tcu->ps_step[idx]) * ptr_tcu->ps_step[idx];
-    else         ps = std::round(std::modf(val + 0.001, &ONE) * 1000 / p_tcu->get(TCU::PS_STEP_1 + idx)) * p_tcu->get(TCU::PS_STEP_1 + idx);
-    while (ps > 999) ps -= 1000, ns++;
-    while (ns > 999) ns -= 1000, us++;
+    switch (p_tcu->type())
+    {
+    case 0:
+    case 1:
+    {
+        us = uint(val + 0.001) / 1000;
+        ns = uint(val + 0.001) % 1000;
+        if (idx < 0) ps = 0;
+//        else         ps = std::round(std::modf(val + 0.001, &ONE) * 1000 / ptr_tcu->ps_step[idx]) * ptr_tcu->ps_step[idx];
+        else         ps = std::round(std::modf(val + 0.001, &ONE) * 1000 / p_tcu->get(TCU::PS_STEP_1 + idx)) * p_tcu->get(TCU::PS_STEP_1 + idx);
+        while (ps > 999) ps -= 1000, ns++;
+        while (ns > 999) ns -= 1000, us++;
+        break;
+    }
+    case 2:
+    {
+        double step = 14.9;
+        if (idx == 1) step = 11.23;
+        us = uint(val + 0.001) / 1000;
+        ns = uint(val + 0.001) % 1000;
+        ps = std::round(std::modf(val + 0.001, &ONE) * 1000 / step) * step;
+        while (ps > 999) ps -= 1000, ns++;
+        while (ns > 999) ns -= 1000, us++;
+        break;
+    }
+    default: break;
+    }
 }
 
 //inline uint UserPanel::get_width_in_us(float val)

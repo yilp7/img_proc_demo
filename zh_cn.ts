@@ -51,7 +51,7 @@
     <message>
         <location filename="src/visual/developeroptions.ui" line="245"/>
         <source>15000</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">三维 {15000?}</translation>
     </message>
     <message>
         <location filename="src/visual/developeroptions.ui" line="279"/>
@@ -789,22 +789,22 @@
     <message>
         <location filename="src/_deprecated/settings.ui" line="828"/>
         <source>1</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">三维 {1?}</translation>
     </message>
     <message>
         <location filename="src/_deprecated/settings.ui" line="841"/>
         <source>2</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">三维 {2?}</translation>
     </message>
     <message>
         <location filename="src/_deprecated/settings.ui" line="854"/>
         <source>3</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">三维 {3?}</translation>
     </message>
     <message>
         <location filename="src/_deprecated/settings.ui" line="867"/>
         <source>4</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">三维 {4?}</translation>
     </message>
     <message>
         <location filename="src/_deprecated/settings.ui" line="880"/>
@@ -824,7 +824,7 @@
     <message>
         <location filename="src/_deprecated/settings.ui" line="919"/>
         <source>192.168.1.159</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">三维 {192.168.1.159?}</translation>
     </message>
     <message>
         <location filename="src/_deprecated/settings.ui" line="932"/>
@@ -969,7 +969,7 @@
         <translation>景深</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3068"/>
+        <location filename="src/visual/user_panel.ui" line="3055"/>
         <source>5</source>
         <translation></translation>
     </message>
@@ -1020,11 +1020,7 @@
     </message>
     <message>
         <location filename="src/visual/user_panel.ui" line="368"/>
-        <location filename="src/visual/userpanel.cpp" line="2171"/>
-        <location filename="src/visual/userpanel.cpp" line="2199"/>
-        <location filename="src/visual/userpanel.cpp" line="4992"/>
-        <location filename="src/visual/userpanel.cpp" line="5052"/>
-        <location filename="src/visual/userpanel.cpp" line="5123"/>
+        <location filename="src/visual/userpanel.cpp" line="4899"/>
         <source>Stop</source>
         <translation>停止采集</translation>
     </message>
@@ -1081,7 +1077,7 @@
     </message>
     <message>
         <location filename="src/visual/user_panel.ui" line="574"/>
-        <location filename="src/visual/user_panel.ui" line="2884"/>
+        <location filename="src/visual/user_panel.ui" line="3171"/>
         <source>LASER</source>
         <translation>激光</translation>
     </message>
@@ -1151,9 +1147,9 @@
     </message>
     <message>
         <location filename="src/visual/user_panel.ui" line="753"/>
-        <location filename="src/visual/userpanel.cpp" line="5185"/>
-        <location filename="src/visual/userpanel.cpp" line="5206"/>
-        <location filename="src/visual/userpanel.cpp" line="5213"/>
+        <location filename="src/visual/userpanel.cpp" line="5032"/>
+        <location filename="src/visual/userpanel.cpp" line="5053"/>
+        <location filename="src/visual/userpanel.cpp" line="5060"/>
         <source>ON</source>
         <translation>开</translation>
     </message>
@@ -1164,8 +1160,8 @@
     </message>
     <message>
         <location filename="src/visual/user_panel.ui" line="804"/>
-        <location filename="src/visual/userpanel.cpp" line="5666"/>
-        <location filename="src/visual/userpanel.cpp" line="5714"/>
+        <location filename="src/visual/userpanel.cpp" line="5513"/>
+        <location filename="src/visual/userpanel.cpp" line="5563"/>
         <source>FIRE</source>
         <translation>发射</translation>
     </message>
@@ -1178,8 +1174,12 @@
         <location filename="src/visual/user_panel.ui" line="952"/>
         <location filename="src/visual/user_panel.ui" line="1336"/>
         <location filename="src/visual/user_panel.ui" line="1349"/>
-        <location filename="src/visual/userpanel.cpp" line="5202"/>
-        <location filename="src/visual/userpanel.cpp" line="5689"/>
+        <location filename="src/visual/userpanel.cpp" line="1956"/>
+        <location filename="src/visual/userpanel.cpp" line="1984"/>
+        <location filename="src/visual/userpanel.cpp" line="4839"/>
+        <location filename="src/visual/userpanel.cpp" line="4970"/>
+        <location filename="src/visual/userpanel.cpp" line="5049"/>
+        <location filename="src/visual/userpanel.cpp" line="5537"/>
         <source>STOP</source>
         <translation>停止</translation>
     </message>
@@ -1234,12 +1234,12 @@
         <translation type="vanished">激光重频</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3138"/>
+        <location filename="src/visual/user_panel.ui" line="3125"/>
         <source>kHz</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="2988"/>
+        <location filename="src/visual/user_panel.ui" line="2975"/>
         <source>Laser Width</source>
         <translation>激光脉宽</translation>
     </message>
@@ -1248,7 +1248,7 @@
         <location filename="src/visual/user_panel.ui" line="2378"/>
         <location filename="src/visual/user_panel.ui" line="2602"/>
         <location filename="src/visual/user_panel.ui" line="2746"/>
-        <location filename="src/visual/user_panel.ui" line="3007"/>
+        <location filename="src/visual/user_panel.ui" line="2994"/>
         <source>μs</source>
         <translation></translation>
     </message>
@@ -1260,14 +1260,14 @@
         <location filename="src/visual/user_panel.ui" line="2656"/>
         <location filename="src/visual/user_panel.ui" line="2711"/>
         <location filename="src/visual/user_panel.ui" line="2834"/>
-        <location filename="src/visual/user_panel.ui" line="2972"/>
+        <location filename="src/visual/user_panel.ui" line="2959"/>
         <source>ns</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3087"/>
+        <location filename="src/visual/user_panel.ui" line="3074"/>
         <source>MCP</source>
-        <translation></translation>
+        <translation>亮度</translation>
     </message>
     <message>
         <location filename="src/visual/user_panel.ui" line="2021"/>
@@ -1314,269 +1314,287 @@
         <translation>门宽差</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3021"/>
+        <location filename="src/visual/user_panel.ui" line="3008"/>
         <source>AUTO</source>
         <translation>自动</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3154"/>
+        <location filename="src/visual/user_panel.ui" line="3141"/>
         <source>PRF</source>
         <translation>重频</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3192"/>
+        <location filename="src/visual/user_panel.ui" line="3158"/>
+        <source>Current %</source>
+        <translation>能量 %</translation>
+    </message>
+    <message>
+        <location filename="src/visual/user_panel.ui" line="3206"/>
         <source>Img processing</source>
         <translation>图像处理</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3207"/>
+        <location filename="src/visual/user_panel.ui" line="3221"/>
         <source>Enhance</source>
         <translation>增强</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3236"/>
+        <location filename="src/visual/user_panel.ui" line="3250"/>
         <source>Avg</source>
         <translation>平均</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3265"/>
+        <location filename="src/visual/user_panel.ui" line="3279"/>
         <source>3D</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3353"/>
+        <location filename="src/visual/user_panel.ui" line="3367"/>
         <source>Brightness</source>
         <translation>亮度</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3372"/>
+        <location filename="src/visual/user_panel.ui" line="3386"/>
         <source>Contrast</source>
         <translation>对比度</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3416"/>
+        <location filename="src/visual/user_panel.ui" line="3430"/>
         <source>Gamma</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3445"/>
+        <location filename="src/visual/user_panel.ui" line="3459"/>
         <source>Pcolor</source>
         <translation>伪彩</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3462"/>
+        <location filename="src/visual/user_panel.ui" line="3476"/>
         <source>Save options</source>
         <translation>保存选项</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3477"/>
-        <location filename="src/visual/user_panel.ui" line="3525"/>
-        <location filename="src/visual/userpanel.cpp" line="2171"/>
-        <location filename="src/visual/userpanel.cpp" line="4992"/>
+        <location filename="src/visual/user_panel.ui" line="3491"/>
+        <location filename="src/visual/user_panel.ui" line="3539"/>
+        <location filename="src/visual/userpanel.cpp" line="1956"/>
+        <location filename="src/visual/userpanel.cpp" line="2753"/>
+        <location filename="src/visual/userpanel.cpp" line="4839"/>
         <source>ORI</source>
-        <translation></translation>
+        <translation>原始</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3509"/>
+        <location filename="src/visual/user_panel.ui" line="3523"/>
         <source>...</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3541"/>
-        <location filename="src/visual/user_panel.ui" line="3557"/>
-        <location filename="src/visual/userpanel.cpp" line="2199"/>
-        <location filename="src/visual/userpanel.cpp" line="5123"/>
+        <location filename="src/visual/user_panel.ui" line="3555"/>
+        <location filename="src/visual/user_panel.ui" line="3571"/>
+        <location filename="src/visual/userpanel.cpp" line="1984"/>
+        <location filename="src/visual/userpanel.cpp" line="2754"/>
+        <location filename="src/visual/userpanel.cpp" line="4970"/>
         <source>RES</source>
-        <translation></translation>
+        <translation>结果</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3573"/>
+        <location filename="src/visual/user_panel.ui" line="3587"/>
         <source>Capture</source>
         <translation>抓图</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3592"/>
+        <location filename="src/visual/user_panel.ui" line="3606"/>
         <source>Record</source>
         <translation>录像</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3627"/>
-        <location filename="src/visual/userpanel.cpp" line="4997"/>
-        <location filename="src/visual/userpanel.cpp" line="5052"/>
+        <location filename="src/visual/user_panel.ui" line="3641"/>
+        <location filename="src/visual/userpanel.cpp" line="4844"/>
+        <location filename="src/visual/userpanel.cpp" line="4899"/>
         <source>Scan</source>
         <translation>扫描</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3643"/>
+        <location filename="src/visual/user_panel.ui" line="3657"/>
         <source>Continue</source>
         <translation>继续扫描</translation>
     </message>
     <message>
-        <location filename="src/visual/user_panel.ui" line="3659"/>
+        <location filename="src/visual/user_panel.ui" line="3673"/>
         <source>Restart</source>
         <translation>重新扫描</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="274"/>
+        <location filename="src/visual/userpanel.cpp" line="263"/>
         <source>None</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="275"/>
+        <location filename="src/visual/userpanel.cpp" line="264"/>
         <source>Histogram</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="276"/>
+        <location filename="src/visual/userpanel.cpp" line="265"/>
         <source>Laplace</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="277"/>
+        <location filename="src/visual/userpanel.cpp" line="266"/>
         <source>SP-5</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="278"/>
+        <location filename="src/visual/userpanel.cpp" line="267"/>
         <source>Accumulative</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="279"/>
+        <location filename="src/visual/userpanel.cpp" line="268"/>
         <source>Sigmoid-based</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="280"/>
+        <location filename="src/visual/userpanel.cpp" line="269"/>
         <source>Adaptive</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="281"/>
+        <location filename="src/visual/userpanel.cpp" line="270"/>
         <source>Dehaze_enh</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="282"/>
+        <location filename="src/visual/userpanel.cpp" line="271"/>
         <source>DCP</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="283"/>
+        <location filename="src/visual/userpanel.cpp" line="272"/>
         <source>AINDANE</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="1969"/>
+        <location filename="src/visual/userpanel.cpp" line="1754"/>
         <source>start failed</source>
         <translation>相机启动失败</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="2110"/>
+        <location filename="src/visual/userpanel.cpp" line="1895"/>
         <source>Create thread fail</source>
         <translation>开启采集线程失败</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="2251"/>
+        <location filename="src/visual/userpanel.cpp" line="2036"/>
         <source>Select folder</source>
         <translation>选择文件夹</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="2518"/>
+        <location filename="src/visual/userpanel.cpp" line="2303"/>
         <source>Name the Output Video</source>
         <translation>命名输出视频</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="2519"/>
+        <location filename="src/visual/userpanel.cpp" line="2304"/>
         <source>MPEG-4 Video           (*.mp4);;                                                    Audio Video Interleaved(*.avi);;                                                    All Files              (*.*)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="2950"/>
+        <location filename="src/visual/userpanel.cpp" line="2673"/>
+        <source>2-D</source>
+        <oldsource>2D</oldsource>
+        <translation>二维</translation>
+    </message>
+    <message>
+        <location filename="src/visual/userpanel.cpp" line="2674"/>
+        <source>3-D</source>
+        <translation>三维</translation>
+    </message>
+    <message>
+        <location filename="src/visual/userpanel.cpp" line="2765"/>
         <source>Save Configuration</source>
         <translation>保存配置</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="2950"/>
-        <location filename="src/visual/userpanel.cpp" line="2972"/>
+        <location filename="src/visual/userpanel.cpp" line="2765"/>
+        <location filename="src/visual/userpanel.cpp" line="2787"/>
         <source>YJS config(*.ssy);;All Files()</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="2965"/>
+        <location filename="src/visual/userpanel.cpp" line="2780"/>
         <source>cannot create config file</source>
         <translation>创建配置文件失败</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="2972"/>
+        <location filename="src/visual/userpanel.cpp" line="2787"/>
         <source>Load Configuration</source>
         <translation>加载配置</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="2992"/>
-        <location filename="src/visual/userpanel.cpp" line="5410"/>
+        <location filename="src/visual/userpanel.cpp" line="2807"/>
+        <location filename="src/visual/userpanel.cpp" line="5257"/>
         <source>cannot open config file</source>
         <translation>无法打开配置文件</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="3012"/>
+        <location filename="src/visual/userpanel.cpp" line="2827"/>
         <source>cannot read config file</source>
         <translation>读取配置文件失败</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="3088"/>
+        <location filename="src/visual/userpanel.cpp" line="2903"/>
         <source>Load SN Config</source>
         <translation>加载序列号配置</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="3088"/>
+        <location filename="src/visual/userpanel.cpp" line="2903"/>
         <source>(*.csv);;All Files()</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="1657"/>
-        <location filename="src/visual/userpanel.cpp" line="2854"/>
-        <location filename="src/visual/userpanel.cpp" line="4001"/>
+        <location filename="src/visual/userpanel.cpp" line="1441"/>
+        <location filename="src/visual/userpanel.cpp" line="2644"/>
+        <location filename="src/visual/userpanel.cpp" line="3826"/>
         <source>IN</source>
         <translation>大</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="1658"/>
-        <location filename="src/visual/userpanel.cpp" line="2855"/>
-        <location filename="src/visual/userpanel.cpp" line="4007"/>
+        <location filename="src/visual/userpanel.cpp" line="1442"/>
+        <location filename="src/visual/userpanel.cpp" line="2645"/>
+        <location filename="src/visual/userpanel.cpp" line="3832"/>
         <source>OUT</source>
         <translation>小</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="1659"/>
-        <location filename="src/visual/userpanel.cpp" line="2856"/>
-        <location filename="src/visual/userpanel.cpp" line="4013"/>
+        <location filename="src/visual/userpanel.cpp" line="1443"/>
+        <location filename="src/visual/userpanel.cpp" line="2646"/>
+        <location filename="src/visual/userpanel.cpp" line="3838"/>
         <source>NEAR</source>
         <translation>近</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="1660"/>
-        <location filename="src/visual/userpanel.cpp" line="2857"/>
-        <location filename="src/visual/userpanel.cpp" line="4019"/>
+        <location filename="src/visual/userpanel.cpp" line="1444"/>
+        <location filename="src/visual/userpanel.cpp" line="2647"/>
+        <location filename="src/visual/userpanel.cpp" line="3844"/>
         <source>FAR</source>
         <translation>远</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="1661"/>
-        <location filename="src/visual/userpanel.cpp" line="2858"/>
-        <location filename="src/visual/userpanel.cpp" line="4025"/>
+        <location filename="src/visual/userpanel.cpp" line="1445"/>
+        <location filename="src/visual/userpanel.cpp" line="2648"/>
+        <location filename="src/visual/userpanel.cpp" line="3850"/>
         <source>INC</source>
         <translation>大</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="1662"/>
-        <location filename="src/visual/userpanel.cpp" line="2859"/>
-        <location filename="src/visual/userpanel.cpp" line="4031"/>
+        <location filename="src/visual/userpanel.cpp" line="1446"/>
+        <location filename="src/visual/userpanel.cpp" line="2649"/>
+        <location filename="src/visual/userpanel.cpp" line="3856"/>
         <source>DEC</source>
         <translation>小</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="5465"/>
+        <location filename="src/visual/userpanel.cpp" line="5312"/>
         <source>Initialize?</source>
         <translation>是否初始化?</translation>
     </message>
@@ -1585,34 +1603,34 @@
         <translation type="vanished">不支持此门宽</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="3853"/>
-        <location filename="src/visual/userpanel.cpp" line="5213"/>
+        <location filename="src/visual/userpanel.cpp" line="3678"/>
+        <location filename="src/visual/userpanel.cpp" line="5060"/>
         <source>OFF</source>
         <translation>关</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="4522"/>
+        <location filename="src/visual/userpanel.cpp" line="4346"/>
         <source>File size limit (2 GB) exceeded</source>
         <oldsource>File size limit (2 Gb) exceeded</oldsource>
         <translation>文件大小超出限制（2GB)</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="4542"/>
+        <location filename="src/visual/userpanel.cpp" line="4366"/>
         <source>Some of the image files cannot be read</source>
         <translation>部分图像无法读取</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="4565"/>
+        <location filename="src/visual/userpanel.cpp" line="4389"/>
         <source>Cannot read local image while cam is on</source>
         <translation>相机连接时无法读取本地图像</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="4946"/>
+        <location filename="src/visual/userpanel.cpp" line="4793"/>
         <source>Cannot display image</source>
         <translation>无法显示此图片</translation>
     </message>
     <message>
-        <location filename="src/visual/userpanel.cpp" line="5353"/>
+        <location filename="src/visual/userpanel.cpp" line="5200"/>
         <source>cannot create directory</source>
         <translation>创建路径失败</translation>
     </message>
