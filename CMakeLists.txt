@@ -183,6 +183,8 @@ set(SOURCE_FILES
     src/port/rangefinder.cpp
     src/port/huanyu.h
     src/port/huanyu.cpp
+    src/port/usbcan.h
+    src/port/usbcan.cpp
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss
