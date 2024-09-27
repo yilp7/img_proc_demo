@@ -17,11 +17,11 @@ Preferences::Preferences(QWidget *parent) :
     auto_mcp(false),
     hz_unit(0),
     base_unit(0),
-    max_dist(15000),
+    max_dist(150),
     delay_offset(0),
-    max_dov(750),
+    max_dov(90),
     gate_width_offset(0),
-    max_laser_width(5000),
+    max_laser_width(200),
     laser_width_offset(0),
     ps_step{40, 40, 40, 40},
     laser_grp(NULL),
@@ -40,7 +40,7 @@ Preferences::Preferences(QWidget *parent) :
     dehaze_pct(0.95),
     sky_tolerance(40),
     fast_gf(1),
-    colormap(cv::COLORMAP_PARULA),
+    colormap(cv::COLORMAP_JET),
     lower_3d_thresh(0),
     upper_3d_thresh(0.981),
     truncate_3d(false),
@@ -545,6 +545,8 @@ void Preferences::update_distance_display()
         break;
     default: break;
     }
+    ui->MAX_LASER_EDT->setText(QString::number(max_laser_width, 'f', 0));
+
 }
 
 void Preferences::display_baudrate(int id, int baudrate)

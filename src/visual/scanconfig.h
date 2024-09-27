@@ -17,8 +17,12 @@ public:
 
     void data_exchange(bool read);
 
+    std::vector<std::pair<float, float>> get_ptz_route();
+    std::vector<float> get_tcu_route();
+
 public slots:
-    void update_scan();
+    void update_scan_tcu();
+    void update_scan_ptz();
     void setup_hz(int idx);
     void setup_unit(int idx);
 
@@ -53,6 +57,15 @@ public:
     // TODO implement record function in main
     bool           record_scan_ori;
     bool           record_scan_res;
+    float          starting_h;
+    float          ending_h;
+    float          starting_v;
+    float          ending_v;
+    float          step_h;
+    float          step_v;
+    int            count_h;
+    int            count_v;
+    uint           ptz_direction;
 };
 
 #endif // SCANCONFIG_H

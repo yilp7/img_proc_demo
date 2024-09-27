@@ -71,8 +71,8 @@ protected slots:
     bool connect_to_tcp_port(QString ip, ushort port) override;
     void try_communicate() override;
 
-    void   set_user_param(qint32 tcu_param, double val);
-    void   set_user_param(qint32 tcu_param, uint val);
+    void set_user_param(qint32 tcu_param, double val);
+    void set_user_param(qint32 tcu_param, uint val);
 
 #if ENABLE_PORT_JSON
     void load_from_json(const nlohmann::json &j) override;

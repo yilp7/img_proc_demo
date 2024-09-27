@@ -32,6 +32,7 @@ if(WIN32)
     set(eBUS_DIR "${SDK_DIR}/eBUS")
     set(OpenCV_DIR "${SDK_DIR}/opencv")
     set(FFmpeg_DIR "${SDK_DIR}/ffmpeg")
+    set(GCAN_DIR "${SDK_DIR}/GCAN")
 else()
     set(OpenCV_DIR "/opt/OpenCV4.8.0")
     set(FFmpeg_DIR "/opt/FFmpeg5.1.3")
@@ -78,6 +79,7 @@ if(WIN32)
     include_directories(${eBUS_DIR}/include)
     include_directories(${EIGEN_DIR}/include)
     include_directories(${JSON_DIR}/include)
+    include_directories(${GCAN_DIR}/include)
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         link_directories(${Hik_SDK_DIR}/lib/x64)
@@ -90,6 +92,7 @@ if(WIN32)
             link_directories(${OpenCV_DIR}/lib/x64)
         endif()
         link_directories(${eBUS_DIR}/lib)
+        link_directories(${GCAN_DIR}/lib)
     else()
         link_directories(${Hik_SDK_DIR}/lib/x86)
         link_directories(${HQV_DIR}/lib)
@@ -274,6 +277,8 @@ if(WIN32)
         ws2_32
         Secur32
         Bcrypt
+        # gcan
+        ECanVci64
     )
     if(BUILD_STATIC)
         string(LENGTH ${QT_DIR} LEN_QT_DIR)

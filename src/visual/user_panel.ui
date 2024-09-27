@@ -884,7 +884,7 @@
        </rect>
       </property>
       <property name="currentIndex">
-       <number>6</number>
+       <number>3</number>
       </property>
       <widget class="QWidget" name="NULL_PAGE"/>
       <widget class="QWidget" name="DATA_PAGE">

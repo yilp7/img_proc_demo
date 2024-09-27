@@ -128,9 +128,9 @@ UserPanel::UserPanel(QWidget *parent) :
     focus(0),
     distance(0),
     rep_freq(30),
-    laser_width(100),
+    laser_width(40),
     delay_dist(15),
-    depth_of_view(15),
+    depth_of_view(6),
     mcp_max(255),
     aliasing_mode(false),
     aliasing_level(0),
@@ -637,14 +637,21 @@ UserPanel::~UserPanel()
     th_lens->quit();
     th_laser->quit();
     th_ptz->quit();
+    th_rf->quit();
     th_tcu->deleteLater();
     th_lens->deleteLater();
     th_laser->deleteLater();
     th_ptz->deleteLater();
+    th_rf->deleteLater();
     p_tcu->deleteLater();
     p_lens->deleteLater();
     p_laser->deleteLater();
     p_ptz->deleteLater();
+    p_rf->deleteLater();
+
+    th_usbcan->quit();
+    th_usbcan->deleteLater();
+    p_usbcan->deleteLater();
 
     delete ui;
 }
@@ -1384,15 +1391,26 @@ int UserPanel::grab_thread_process(int *idx) {
 //        qDebug() << QDateTime::currentDateTime().toString("ss.zzz");
 
         // process scan
-        if (scan && updated) {
+        if (scan && updated && thread_idx == 0) {
             static cv::Mat temp;
-            if (scan_img_count < 0) scan_img_count = ui->FRAME_AVG_CHECK->isChecked() ? 5 : 1;
             scan_img_count -= 1;
+            if (scan_img_count < 0) scan_img_count = 0;
+
+            static QString scan_save_path_a, scan_save_path;
+            static int save_img_num = 20;
+            if (scan_img_count > 0 && scan_img_count <= save_img_num) save_scan_img(scan_save_path, QString::number(save_img_num - scan_img_count + 1) + ".bmp");
+            if (scan_img_count == 1) {
+                QPixmap screenshot = window()->grab();
+                screenshot.save(scan_save_path + "/screenshot_" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".png");
+            }
+
+//            qDebug() << scan_img_count;
             if (!scan_img_count) {
+/*
                 save_scan_img();
 
                 delay_dist += scan_step;
-                scan_img_count = ui->FRAME_AVG_CHECK->isChecked() ? 5 : 1;
+                scan_img_count = scan_img_count = frame_rate_edit * 8;
                 filter_scan();
                 if (!auto_scan_mode) {
                     img_mem[thread_idx].convertTo(temp, CV_64F);
@@ -1408,10 +1426,48 @@ int UserPanel::grab_thread_process(int *idx) {
                     emit send_double_tcu_msg(TCU::LASER_USR, laser_width = 2500);
                     emit send_double_tcu_msg(TCU::EST_DOV, depth_of_view = 375);
                 }
+*/
+                scan_img_count = frame_rate_edit * (6 + save_img_num / frame_rate_edit);
+
+//                qDebug() << "delay" << scan_tcu_idx;
+                if (scan_tcu_idx == scan_tcu_route.size() - 1 || scan_tcu_idx == -1) {
+                    scan_tcu_idx = -1;
+                    scan_ptz_idx++;
+
+                    if (scan_ptz_idx < scan_ptz_route.size()) {
+//                        qDebug() << scan_ptz_route[scan_ptz_idx];
+                        p_usbcan->emit control(USBCAN::POSITION, scan_ptz_route[scan_ptz_idx].first);
+                        p_usbcan->emit control(USBCAN::PITCH, scan_ptz_route[scan_ptz_idx].second);
+
+                        scan_save_path_a = save_location + "/" + scan_name + "/" + QString::number(scan_ptz_idx);
+                        QDir().mkdir(scan_save_path_a);
+                        QFile params(scan_save_path_a + "/params");
+                        params.open(QIODevice::WriteOnly);
+                        params.write(QString::asprintf("angle: \n"
+                                                       "    H: %6.2f\n"
+                                                       "    V: %5.2f\n",
+                                                       scan_ptz_route[scan_ptz_idx].first,
+                                                       scan_ptz_route[scan_ptz_idx].second).toUtf8());
+                    }
+                    else {
+                        scan_img_count = -1;
+                        on_SCAN_BUTTON_clicked();
+                    }
+                }
+
+                scan_tcu_idx++;
+                delay_dist = scan_tcu_route[scan_tcu_idx] * dist_ns;
+                scan_save_path = scan_save_path_a + "/" + QString::number(scan_tcu_route[scan_tcu_idx], 'f', 2) + " ns";
+                QDir().mkdir(scan_save_path);
+                QDir().mkdir(scan_save_path + "/ori_bmp");
+                QDir().mkdir(scan_save_path + "/res_bmp");
+//                if (grab_image[1]) QDir().mkdir(scan_save_path + "/alt_bmp");
+
                 emit update_delay_in_thread();
             }
         }
-        if (scan && std::round(delay_dist / dist_ns) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
+//        if (thread_idx == 0 && scan && scan_tcu_idx == scan_tcu_route.size() && scan_ptz_idx == scan_ptz_route.size() - 1) on_SCAN_BUTTON_clicked();
+//        if (scan && std::round(delay_dist / dist_ns) > scan_stopping_delay) {on_SCAN_BUTTON_clicked();}
 
 //        cv::imwrite("../a.bmp", img_mem[thread_idx]);
 //        cv::imwrite("../b.bmp", modified_result[thread_idx]);
@@ -1718,18 +1774,22 @@ void UserPanel::init_control_port()
     p_lens  = new Lens(1);
     p_laser = new Laser(2);
     p_ptz   = new PTZ(3);
+    p_rf    = new RangeFinder(4);
     th_tcu   = new QThread(this);
     th_lens  = new QThread(this);
     th_laser = new QThread(this);
     th_ptz   = new QThread(this);
+    th_rf    = new QThread(this);
     p_tcu  ->moveToThread(th_tcu);
     p_lens ->moveToThread(th_lens);
     p_laser->moveToThread(th_laser);
     p_ptz  ->moveToThread(th_ptz);
+    p_rf   ->moveToThread(th_rf);
     th_tcu  ->start();
     th_lens ->start();
     th_laser->start();
     th_ptz  ->start();
+    th_rf   ->start();
 
     connect(ui->TCU_COM_EDIT, &QLineEdit::returnPressed, this, [this]() { p_tcu->emit connect_to_serial(ui->TCU_COM_EDIT->text()); });
     connect(p_tcu, &ControlPort::port_status_updated, this, [this]() { update_port_status(p_tcu, ui->TCU_COM); });
@@ -1755,6 +1815,14 @@ void UserPanel::init_control_port()
     connect(p_ptz, &ControlPort::port_io_log, this, &UserPanel::append_data, Qt::QueuedConnection);
     connect(p_ptz, &PTZ::ptz_param_updated, this, &UserPanel::update_ptz_params);
     connect(this, SIGNAL(send_ptz_msg(qint32, double)), p_ptz, SLOT(ptz_control(qint32, double)), Qt::QueuedConnection);
+
+    connect(p_rf, &RangeFinder::distance_updated, this, &UserPanel::update_distance);
+
+    p_usbcan = new USBCAN();
+    th_usbcan = new QThread(this);
+    p_usbcan->moveToThread(th_usbcan);
+    th_usbcan->start();
+    connect(p_usbcan, &USBCAN::angle_updated, this, &UserPanel::update_usbcan_angle);
 }
 
 void UserPanel::save_to_file(bool save_result, int idx) {
@@ -1814,7 +1882,7 @@ void UserPanel::save_to_file(bool save_result, int idx) {
     }
 }
 
-void UserPanel::save_scan_img() {
+void UserPanel::save_scan_img(QString path, QString name) {
 //    QString temp = QString(TEMP_SAVE_LOCATION + "/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp"),
 //            dest = QString(save_location + "/" + scan_name + "/ori_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), img_mem);
@@ -1824,7 +1892,10 @@ void UserPanel::save_scan_img() {
 //        std::thread t_ori(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
 //        t_ori.detach();
 //        tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
-        tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", p_tcu->get(TCU::DELAY_A))) + ".bmp"));
+//        tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", p_tcu->get(TCU::DELAY_A))) + ".bmp"));
+        tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), path + "/ori_bmp/" + name));
+
+//        if (grab_image[1]) tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[1].clone(), path + "/alt_bmp/" + name));
     }
 //    dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), modified_result);
@@ -1834,7 +1905,8 @@ void UserPanel::save_scan_img() {
 //        std::thread t_res(save_image_bmp, modified_result, save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
 //        t_res.detach();
 //        tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
-        tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", p_tcu->get(TCU::DELAY_A))) + ".bmp"));
+//        tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", p_tcu->get(TCU::DELAY_A))) + ".bmp"));
+        tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), path + "/res_bmp/" + name));
     }
 }
 
@@ -1933,7 +2005,8 @@ void UserPanel::on_START_BUTTON_clicked()
     ui->GAIN_SLIDER->setValue(gain_analog_edit);
     connect(ui->GAIN_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_gain(int)));
 
-    on_CONTINUOUS_RADIO_clicked();
+//    on_CONTINUOUS_RADIO_clicked();
+    on_TRIGGER_RADIO_clicked();
 
     curr_cam->time_exposure(true, &time_exposure_edit);
     curr_cam->gain_analog(true, &gain_analog_edit);
@@ -2748,6 +2821,17 @@ void UserPanel::update_ptz_params(qint32 ptz_param, double val)
     }
 }
 
+void UserPanel::update_distance(double distance)
+{
+    ui->DISTANCE->setText(QString::asprintf("%.2f m", distance));
+}
+
+void UserPanel::update_usbcan_angle(float _h, float _v)
+{
+    if (!ui->ANGLE_H_EDIT->hasFocus()) ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", _h));
+    if (!ui->ANGLE_V_EDIT->hasFocus()) ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", _v));
+}
+
 void UserPanel::set_distance_set(int id)
 {
     aliasing_mode = true;
@@ -3470,7 +3554,7 @@ void UserPanel::connect_to_serial_server_tcp()
 //    connected |= ptr_laser->setup_tcp_port(ip, 10000, true);
 //    connected |= ptr_ptz->  setup_tcp_port(ip, 10000, true);
 //    ptr_ptz->share_port_from(ptr_lens);
-    p_tcu-> emit connect_to_tcp(pref->ui->TCP_SERVER_IP_EDIT->text(), 10001);
+    p_tcu->emit connect_to_tcp(pref->ui->TCP_SERVER_IP_EDIT->text(), 10001);
     QThread::msleep(200);
     p_lens->emit connect_to_tcp(pref->ui->TCP_SERVER_IP_EDIT->text(), 10002);
 //    pref->ui->TCP_SERVER_CHK->setEnabled(connected);
@@ -3478,6 +3562,8 @@ void UserPanel::connect_to_serial_server_tcp()
 //    qDebug() << ptr_tcu->get_port_status() << ptr_lens->get_port_status() << ptr_laser->get_port_status() << ptr_ptz->get_port_status();
 //    if (connected) QMessageBox::information(this, "serial port server", "connected to server");
 //    else           QMessageBox::information(this, "serial port server", "cannot connect to server");
+    QThread::msleep(200);
+    p_rf->emit connect_to_tcp(pref->ui->TCP_SERVER_IP_EDIT->text(), 10003);
 
     QTimer::singleShot(1000,
     [this]()
@@ -4156,11 +4242,17 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             }
             else if (edit == ui->ANGLE_H_EDIT) {
                 angle_h = ui->ANGLE_H_EDIT->text().toDouble();
-                emit send_ptz_msg(PTZ::SET_H, angle_h);
+//                emit send_ptz_msg(PTZ::SET_H, angle_h);
+                p_usbcan->emit control(USBCAN::POSITION, angle_h);
             }
             else if (edit == ui->ANGLE_V_EDIT) {
                 angle_v = ui->ANGLE_V_EDIT->text().toDouble();
-                emit send_ptz_msg(PTZ::SET_V, angle_v);
+//                emit send_ptz_msg(PTZ::SET_V, angle_v);
+                p_usbcan->emit control(USBCAN::PITCH, angle_v);
+            }
+            else if (edit == ui->PTZ_COM_EDIT) {
+                if (ui->PTZ_COM_EDIT->text().isEmpty())  p_usbcan->emit disconnect_from();
+                else p_usbcan->emit connect_to();
             }
             this->focusWidget()->clearFocus();
             break;
@@ -4986,18 +5078,23 @@ void UserPanel::on_SCAN_BUTTON_clicked()
         scan_sum = cv::Mat::zeros(h[0], w[0], CV_64F);
         scan_idx = 0;
 
+        scan_ptz_idx = -1;
+        scan_tcu_idx = -1;
+        scan_ptz_route = scan_config->get_ptz_route();
+        scan_tcu_route = scan_config->get_tcu_route();
+
         rep_freq = scan_config->rep_freq;
         delay_dist = scan_config->starting_delay * dist_ns;
-        scan_stopping_delay = scan_config->ending_delay;
+//        scan_stopping_delay = scan_config->ending_delay;
         scan_step = scan_config->step_size_delay * dist_ns;
-        depth_of_view = scan_config->starting_gw * dist_ns;
+//        depth_of_view = scan_config->starting_gw * dist_ns;
 
         if (scan_config->capture_scan_ori || scan_config->capture_scan_res) {
             scan_name = "scan_" + QDateTime::currentDateTime().toString("MMdd_hhmmss");
             if (!QDir(save_location + "/" + scan_name).exists()) {
                 QDir().mkdir(save_location + "/" + scan_name);
-                QDir().mkdir(save_location + "/" + scan_name + "/ori_bmp");
-                QDir().mkdir(save_location + "/" + scan_name + "/res_bmp");
+//                QDir().mkdir(save_location + "/" + scan_name + "/ori_bmp");
+//                QDir().mkdir(save_location + "/" + scan_name + "/res_bmp");
             }
 
             QFile params(save_location + "/" + scan_name + "/scan_params");
@@ -5009,10 +5106,12 @@ void UserPanel::on_SCAN_BUTTON_clicked()
                                            "repeated frequency: %06d Hz\n"
                                            "laser width:        %06d ns\n"
                                            "gate width:         %06d ns\n"
-                                           "MCP:                %03d",
+                                           "MCP:                %04d",
                                            scan_config->starting_delay, scan_config->ending_delay, scan_config->frame_count, scan_config->step_size_delay,
 //                                           (int)(rep_freq * 1000), (int)laser_width, scan_config->starting_gw, ptr_tcu->mcp).toUtf8());
-                                           (int)(rep_freq * 1000), (int)laser_width, scan_config->starting_gw, std::round(p_tcu->get(TCU::MCP))).toUtf8());
+                                           (int)(rep_freq * 1000), (int)laser_width, std::round(p_tcu->get(TCU::GATE_WIDTH_A)), std::round(p_tcu->get(TCU::MCP))).toUtf8());
+            qDebug() << "scan param" << p_tcu->get(TCU::DELAY_A) << std::round(p_tcu->get(TCU::DELAY_A));
+            qDebug() << "scan param" << p_tcu->get(TCU::GATE_WIDTH_A) << std::round(p_tcu->get(TCU::GATE_WIDTH_A));
             params.close();
         }
 
@@ -5021,6 +5120,10 @@ void UserPanel::on_SCAN_BUTTON_clicked()
     else {
         emit update_scan(false);
         scan = false;
+
+//        ui->CONTINUE_SCAN_BUTTON->show();
+//        ui->RESTART_SCAN_BUTTON->show();
+        ui->SCAN_BUTTON->setText(tr("Scan"));
 
 //        for (uint i = scan_q.size(); i; i--) qDebug("dist %f", scan_q.front()), scan_q.pop_front();
 
@@ -5032,7 +5135,7 @@ void UserPanel::on_SCAN_BUTTON_clicked()
 //        QFile::rename(TEMP_SAVE_LOCATION + "/" + scan_name + "_result.bmp", save_location + "/" + scan_name + "/result.bmp");
     }
 
-    ui->SCAN_BUTTON->setText(start_scan ? tr("Stop") : tr("Scan"));
+//    ui->SCAN_BUTTON->setText(start_scan ? tr("Pause") : tr("Scan"));
 }
 
 void UserPanel::on_CONTINUE_SCAN_BUTTON_clicked()
@@ -5040,11 +5143,15 @@ void UserPanel::on_CONTINUE_SCAN_BUTTON_clicked()
     scan = true;
     emit update_scan(true);
 
-    update_delay();
-    update_gate_width();
+//    ui->CONTINUE_SCAN_BUTTON->hide();
+//    ui->RESTART_SCAN_BUTTON->hide();
+    ui->SCAN_BUTTON->setText(tr("Pause"));
+
+//    update_delay();
+//    update_gate_width();
 //    ptr_tcu->communicate_display(convert_to_send_tcu(0x00, (uint)(1.25e5 / ptr_tcu->rep_freq)), 7, 1, false);
 //    ptr_tcu->set_user_param(TCUThread::REPEATED_FREQ, rep_freq);
-    emit send_double_tcu_msg(TCUThread::REPEATED_FREQ, rep_freq);
+//    emit send_double_tcu_msg(TCUThread::REPEATED_FREQ, rep_freq);
 }
 
 void UserPanel::on_RESTART_SCAN_BUTTON_clicked()
@@ -5071,16 +5178,17 @@ void UserPanel::enable_scan_options(bool show)
 {
 //    if (delay_dist > scan_q.back()) scan_q.push_back(delay_dist);
     ui->CONTINUE_SCAN_BUTTON->setEnabled(!scan);
-    ui->RESTART_SCAN_BUTTON->setEnabled(!scan);
+//    ui->RESTART_SCAN_BUTTON->setEnabled(!scan);
+    ui->RESTART_SCAN_BUTTON->setEnabled(false);
 
-    if (show) {
-        ui->CONTINUE_SCAN_BUTTON->show();
-        ui->RESTART_SCAN_BUTTON->show();
-    }
-    else {
-        ui->CONTINUE_SCAN_BUTTON->hide();
-        ui->RESTART_SCAN_BUTTON->hide();
-    }
+//    if (show) {
+//        ui->CONTINUE_SCAN_BUTTON->show();
+//        ui->RESTART_SCAN_BUTTON->show();
+//    }
+//    else {
+//        ui->CONTINUE_SCAN_BUTTON->hide();
+//        ui->RESTART_SCAN_BUTTON->hide();
+//    }
 }
 
 void UserPanel::on_FRAME_AVG_CHECK_stateChanged(int arg1)
@@ -5446,7 +5554,47 @@ void UserPanel::ptz_button_pressed(int id) {
 //    ptr_ptz->ptz_control(static_cast<PTZThread::PARAMS>(id + 1));
 
     if (id == 4) if (QMessageBox::warning(nullptr, "PTZ", tr("Initialize?"), QMessageBox::StandardButton::Ok | QMessageBox::StandardButton::Cancel) != QMessageBox::StandardButton::Ok) return;
-    emit send_ptz_msg(id + 1);
+//    emit send_ptz_msg(id + 1);
+
+    switch (id) {
+    case 0:
+        p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
+        p_usbcan->emit control(USBCAN::UP, ui->PTZ_SPEED_SLIDER->value());
+        break;
+    case 1:
+        p_usbcan->emit control(USBCAN::UP, ui->PTZ_SPEED_SLIDER->value());
+        break;
+    case 2:
+        p_usbcan->emit control(USBCAN::RIGHT, ui->PTZ_SPEED_SLIDER->value());
+        p_usbcan->emit control(USBCAN::UP, ui->PTZ_SPEED_SLIDER->value());
+        break;
+    case 3:
+        p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
+        break;
+    case 4:
+        p_usbcan->emit transmit(USBCAN::OFF);
+        QThread::msleep(1000);
+        p_usbcan->emit transmit(USBCAN::SELF_CHECK);
+        QThread::msleep(1000);
+        p_usbcan->emit transmit(USBCAN::LOCK);
+        QThread::msleep(1000);
+        break;
+    case 5:
+        p_usbcan->emit control(USBCAN::RIGHT, ui->PTZ_SPEED_SLIDER->value());
+        break;
+    case 6:
+        p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
+        p_usbcan->emit control(USBCAN::DOWN, ui->PTZ_SPEED_SLIDER->value());
+        break;
+    case 7:
+        p_usbcan->emit control(USBCAN::DOWN, ui->PTZ_SPEED_SLIDER->value());
+        break;
+    case 8:
+        p_usbcan->emit control(USBCAN::RIGHT, ui->PTZ_SPEED_SLIDER->value());
+        p_usbcan->emit control(USBCAN::DOWN, ui->PTZ_SPEED_SLIDER->value());
+        break;
+    default: break;
+    }
 }
 
 void UserPanel::ptz_button_released(int id) {
@@ -5454,7 +5602,8 @@ void UserPanel::ptz_button_released(int id) {
     if (id == 4) return;
 //    ptr_ptz->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 //    ptr_ptz->ptz_control(PTZThread::STOP);
-    emit send_ptz_msg(PTZ::STOP);
+//    emit send_ptz_msg(PTZ::STOP);
+    p_usbcan->emit control(USBCAN::STOP, 0);
 }
 
 void UserPanel::on_PTZ_SPEED_SLIDER_valueChanged(int value)
@@ -5541,13 +5690,20 @@ void UserPanel::set_ptz_angle()
 
 //    emit send_ptz_msg(PTZ::SET_H, angle_h);
 //    emit send_ptz_msg(PTZ::SET_V, angle_v);
+
+    p_usbcan->emit control(USBCAN::POSITION, angle_h);
+    p_usbcan->emit transmit(USBCAN::POSITION);
+    p_usbcan->emit control(USBCAN::PITCH, angle_v);
+    p_usbcan->emit transmit(USBCAN::PITCH);
 }
 
 void UserPanel::on_STOP_BTN_clicked()
 {
 //    ptr_ptz->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 //    ptr_ptz->ptz_control(PTZThread::STOP);
-    emit send_ptz_msg(PTZ::STOP);
+//    emit send_ptz_msg(PTZ::STOP);
+
+    p_usbcan->emit control(USBCAN::STOP, 0);
 }
 
 void UserPanel::point_ptz_to_target(QPoint target)

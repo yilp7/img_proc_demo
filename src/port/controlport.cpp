@@ -182,7 +182,7 @@ void ControlPort::communicate(QByteArray write, uint read_size, uint read_timeou
         write_mutex.unlock();
         return;
     }
-    qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "sent    " << write.toHex(' ').toUpper();
+//    qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "sent    " << write.toHex(' ').toUpper();
 
     port->write(write.constData(), write.size());
 //    while (port->waitForBytesWritten(10)) ;
@@ -196,14 +196,14 @@ void ControlPort::communicate(QByteArray write, uint read_size, uint read_timeou
     read_mutex.lock();
     if (read_size) {
         read = received.left(read_size);
-        qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "received" << read.toHex(' ').toUpper();
+//        qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "received" << read.toHex(' ').toUpper();
 //        qDebug() << received.toHex(' ').toUpper();
         received = received.right(received.length() - read.size());
 //        qDebug() << received.toHex(' ').toUpper();
     }
     else {
         read = received;
-        qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "received" << read.toHex(' ').toUpper();
+//        qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "received" << read.toHex(' ').toUpper();
         received.clear();
     }
     read_mutex.unlock();

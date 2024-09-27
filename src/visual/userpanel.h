@@ -27,6 +27,8 @@
 #include "port/laser.h"
 //#include "port/inclin.h"
 #include "port/ptz.h"
+#include "port/rangefinder.h"
+#include "port/usbcan.h"
 
 #include "thread/joystick.h"
 #include "thread/controlportthread.h"
@@ -160,6 +162,8 @@ public slots:
     void update_port_status(int connected_status);
     void update_lens_params(qint32 lens_param, uint val);
     void update_ptz_params(qint32 ptz_param, double val);
+    void update_distance(double distance);
+    void update_usbcan_angle(float _h, float _v);
 
     // signaled by Aliasing
     void set_distance_set(int id);
@@ -414,7 +418,7 @@ private:
 
     // save img in buffer to file; or save imgs while scanning
     void save_to_file(bool save_result, int idx);
-    void save_scan_img();
+    void save_scan_img(QString path, QString name);
 
     // convert data to be sent to HEX buffer
     QByteArray convert_to_send_tcu(uchar num, unsigned int send);
@@ -506,11 +510,15 @@ private:
     Lens    *p_lens;
     Laser   *p_laser;
     PTZ     *p_ptz;
+    RangeFinder *p_rf;
+    USBCAN  *p_usbcan;
     QThread *th_tcu;
     QThread *th_lens;
     QThread *th_laser;
 //    QThread *th_inclin;
     QThread *th_ptz;
+    QThread *th_rf;
+    QThread *th_usbcan;
 
     // WARNING port communication mostly moved to new class ControlPort
     QSerialPort*  serial_port[5];           // 0: tcu, 1: rangefinder, 2: lens, 3: laser, 4: PTZ
@@ -597,6 +605,10 @@ private:
     cv::Mat                 scan_3d;
     cv::Mat                 scan_sum;
     int                     scan_idx;
+    std::vector<std::pair<float, float>> scan_ptz_route;
+    std::vector<float>      scan_tcu_route;
+    int                     scan_ptz_idx;
+    int                     scan_tcu_idx;
 
     float                   c;                          // light speed
     float                   dist_ns;                    // dist of light per ns

@@ -4,9 +4,36 @@ RangeFinder::RangeFinder(int index) {}
 
 RangeFinder::~RangeFinder() {}
 
+#if ENABLE_PORT_JSON
+nlohmann::json RangeFinder::to_json() { return nlohmann::json(); }
+void RangeFinder::load_from_json(const nlohmann::json &j){}
+#endif
+
 bool RangeFinder::connect_to_serial_port(QString port_name, qint32 baudrate)
 {
-    return true;
+    return false;
+}
+
+bool RangeFinder::connect_to_tcp_port(QString ip, ushort port)
+{
+    bool success = ControlPort::connect_to_tcp_port(ip, port);
+
+    return success;
+}
+
+void RangeFinder::try_communicate()
+{
+    ControlPort::try_communicate();
+
+    communicate(QByteArray(), 20, 100, false);
+    QByteArray read;
+    retrieve_mutex.lock();
+    read = last_read;
+    retrieve_mutex.unlock();
+
+    read_distance(read.mid(read.indexOf(0x5C), 4));
+//    if (read.size() != 1 || read[0] != char(0x15)) successive_count = 0;
+//    else                                           successive_count++;
 }
 
 inline void check_sum(QByteArray command)
@@ -70,9 +97,10 @@ int RangeFinder::read_distance(QByteArray data)
     if (data.length() != 4) return -1;
     if (!data.startsWith(0x5C)) return -2;
 
-    uint distance = (uint(data[1]) << 8) + uint(data[2]);
+    uint distance = (uint(data[2]) << 8) + uint(data[1]);
     uchar checksum = uchar(data[1]) + uchar(data[2]);
     if (~checksum != data[3]) return -3;
 
+    emit distance_updated(distance / 100.);
     return distance;
 }
