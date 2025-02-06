@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(GLI_user_panel LANGUAGES CXX VERSION 0.9.1.0)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.9.2.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -13,6 +13,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(BUILD_STATIC 0)
 set(USING_CAMERALINK 0)
+set(DISTANCE_3D_VIEW 0)
 
 add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
@@ -64,7 +65,10 @@ endif()
 # They need to be set before the find_package(Qt5 ...) call.
 
 find_package(QT NAMES Qt5 REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort Network DataVisualization REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort Network REQUIRED)
+if (DISTANCE_3D_VIEW)
+    find_package(Qt${QT_VERSION_MAJOR} COMPONENTS DataVisualization REQUIRED)
+endif(DISTANCE_3D_VIEW)
 
 #message(${CMAKE_HOST_SYSTEM_PROCESSOR})
 
@@ -151,12 +155,12 @@ set(SOURCE_FILES
     src/visual/lasercontrol.cpp
     src/visual/lasercontrol.h
     src/visual/laser_control.ui
-    src/visual/distance3dview.h
-    src/visual/distance3dview.cpp
-    src/visual/distance3dview.ui
     src/visual/developeroptions.h
     src/visual/developeroptions.cpp
     src/visual/developeroptions.ui
+    src/visual/serialserver.h
+    src/visual/serialserver.cpp
+    src/visual/serialserver.ui
     src/visual/presetpanel.h
     src/visual/presetpanel.cpp
     src/visual/aliasing.h
@@ -203,6 +207,15 @@ set(SOURCE_FILES
 #    src/videosurface.cpp
 )
 
+if (DISTANCE_3D_VIEW)
+    set(SOURCE_FILES
+        ${SOURCE_FILES}
+        src/visual/distance3dview.h
+        src/visual/distance3dview.cpp
+        src/visual/distance3dview.ui
+    )
+endif(DISTANCE_3D_VIEW)
+
 if(WIN32)
     set(SOURCE_FILES
         ${SOURCE_FILES}
@@ -210,7 +223,7 @@ if(WIN32)
         src/cam/ebuscam.cpp
         resources/gist.rc
     )
-endif()
+endif(WIN32)
 
 if(USING_CAMERALINK)
     set(SOURCE_FILES
@@ -218,14 +231,13 @@ if(USING_CAMERALINK)
         src/cam/euresyscam.h
         src/cam/euresyscam.cpp
     )
-endif()
+endif(USING_CAMERALINK)
 
 set(PROJECT_LIBS
     Qt${QT_VERSION_MAJOR}::Core
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::SerialPort
     Qt${QT_VERSION_MAJOR}::Network
-    Qt${QT_VERSION_MAJOR}::DataVisualization
 #    Qt${QT_VERSION_MAJOR}::Concurrent
     # mvs
     MvCameraControl
@@ -233,6 +245,12 @@ set(PROJECT_LIBS
     MultiCam
 #   clallserial
 )
+if (DISTANCE_3D_VIEW)
+    set(PROJECT_LIBS
+        ${PROJECT_LIBS}
+        Qt${QT_VERSION_MAJOR}::DataVisualization
+    )
+endif(DISTANCE_3D_VIEW)
 
 #if (CMAKE_SIZEOF_VOID_P EQUAL 8)
 #    set(PROJECT_LIBS
@@ -262,6 +280,8 @@ if(WIN32)
         opencv_imgcodecs454
         opencv_imgproc454
         opencv_videoio454
+#        opencv_dnn454
+#        opencv_dnn_superres454
         # ffmpeg
         avcodec
         avformat
@@ -360,21 +380,29 @@ endif()
 
 add_executable(GLI_params WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(GLI_params PRIVATE PARAM=1)
-qt5_use_modules(GLI_params Widgets SerialPort Network DataVisualization)
-target_link_libraries(GLI_params ${PROJECT_LIBS})
 if(USING_CAMERALINK)
     target_compile_definitions(GLI_params PRIVATE USING_CAMERALINK=1)
 endif()
+qt5_use_modules(GLI_params Widgets SerialPort Network)
+if (DISTANCE_3D_VIEW)
+    qt5_use_modules(GLI_params DataVisualization)
+    target_compile_definitions(GLI_params PRIVATE DISTANCE_3D_VIEW=1)
+endif(DISTANCE_3D_VIEW)
+target_link_libraries(GLI_params ${PROJECT_LIBS})
 
 add_executable(LvTong WIN32 ${TRANSLATE} ${SOURCE_FILES})
 target_compile_definitions(LvTong PRIVATE LVTONG=1)
-qt5_use_modules(LvTong Widgets SerialPort Network DataVisualization)
+if(USING_CAMERALINK)
+    target_compile_definitions(LvTong PRIVATE USING_CAMERALINK=1)
+endif()
+qt5_use_modules(LvTong Widgets SerialPort Network)
+if (DISTANCE_3D_VIEW)
+    qt5_use_modules(LvTong DataVisualization)
+    target_compile_definitions(LvTong PRIVATE DISTANCE_3D_VIEW=1)
+endif(DISTANCE_3D_VIEW)
 if(WIN32)
     target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn454)
 else()
     target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn)
 endif()
 target_link_libraries(LvTong ${PROJECT_LIBS})
-if(USING_CAMERALINK)
-    target_compile_definitions(LvTong PRIVATE USING_CAMERALINK=1)
-endif()

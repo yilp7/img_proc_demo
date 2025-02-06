@@ -48,6 +48,7 @@ public:
         LIGHT_SPEED   = 0x010F,
         OFFSET_ND     = 0x0110,
         OFFSET_NG     = 0x0111,
+        AB_LOCK       = 0x0112,
 
         TCU_TYPE      = 0xFFFF,
     };

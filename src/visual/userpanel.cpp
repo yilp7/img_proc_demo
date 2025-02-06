@@ -96,7 +96,9 @@ UserPanel::UserPanel(QWidget *parent) :
     pref(NULL),
     scan_config(NULL),
     laser_settings(NULL),
+#ifdef DISTANCE_3D_VIEW
     view_3d(NULL),
+#endif //DISTANCE_3D_VIEW
     aliasing(NULL),
     fw_display{NULL},
     secondary_display(NULL),
@@ -146,7 +148,9 @@ UserPanel::UserPanel(QWidget *parent) :
     save_original{false},
     save_modified{false},
     image_3d{false},
+    image_rotate{0},
     is_color{false},
+    pseudocolor{false},
     w{640, 480, 480},
     h{400, 270, 270},
     pixel_format{PixelType_Gvsp_Mono8},
@@ -226,7 +230,11 @@ UserPanel::UserPanel(QWidget *parent) :
     // connect title bar to the main window (UserPanel*)
     ui->TITLE->setup(this);
     pref = ui->TITLE->preferences;
+    pref->init();
     scan_config = ui->TITLE->scan_config;
+
+    SerialServer *s = new SerialServer();
+    s->show();
 
 #if ENABLE_USER_DEFAULT
     FILE *f = fopen("user_default", "rb");
@@ -558,8 +566,11 @@ UserPanel::UserPanel(QWidget *parent) :
 
 //    connect(pref, &Preferences::set_auto_rep_freq, ptr_tcu, [this](bool arg1){ ptr_tcu->auto_rep_freq = arg1;});
     connect(pref, &Preferences::set_auto_rep_freq, p_tcu, [this](bool arg1){ emit send_uint_tcu_msg(TCU::AUTO_PRF, arg1); });
+    connect(pref, &Preferences::set_ab_lock, p_tcu, [this](bool arg1){ emit send_uint_tcu_msg(TCU::AB_LOCK, arg1); });
 
+#ifdef DISTANCE_3D_VIEW
     view_3d = new Distance3DView(nullptr, this, &list_roi);
+#endif //DISTANCE_3D_VIEW
     aliasing = new Aliasing();
     connect(aliasing, &Aliasing::delay_set_selected, this, &UserPanel::set_distance_set);
 
@@ -621,7 +632,9 @@ UserPanel::~UserPanel()
 
     tp.stop();
     delete laser_settings;
+#ifdef DISTANCE_3D_VIEW
     delete view_3d;
+#endif //DISTANCE_3D_VIEW
     delete aliasing;
     delete preset;
 
@@ -870,7 +883,8 @@ int UserPanel::grab_thread_process(int *idx) {
     prev_3d = cv::Mat(_h, _w, CV_8UC3);
     prev_img = cv::Mat(_h, _w, CV_MAKETYPE(_pixel_depth == 8 ? CV_8U : CV_16U, is_color[thread_idx] ? 3 : 1));
     user_mask[thread_idx] = cv::Mat::zeros(_h, _w, CV_8UC1);
-    static int packets_lost = 0;
+    static int packets_lost;
+    packets_lost = 0;
 //    double *range = (double*)calloc(w * h, sizeof(double));
 #ifdef LVTONG
     pref->ui->MODEL_LIST->setEnabled(false);
@@ -923,11 +937,52 @@ int UserPanel::grab_thread_process(int *idx) {
 //            cv::imwrite("../a.bmp", img_mem[thread_idx]);
             q_fps_calc.add_to_q();
         }
+//        sr.upsample(img_mem[thread_idx].clone(), img_mem[thread_idx]);
+//        cv::resize(img_mem[thread_idx].clone(), img_mem[thread_idx], img_mem[thread_idx].size() * 2);
 
         image_mutex[thread_idx].lock();
 //        qDebug () << QDateTime::currentDateTime().toString() << updated << img_mem.data;
 
         if (updated) {
+            switch (image_rotate[0]) {
+            case 0:
+                if (_w != w[thread_idx]) {
+                    prev_img.release(), prev_3d.release();
+                    seq_sum.release(), frame_a_sum.release(), frame_b_sum.release();
+                    for (auto& m: seq) m.release();
+                    seq_idx = 0;
+                }
+                _w = w[thread_idx];
+                _h = h[thread_idx];
+                break;
+            case 2:
+                cv::flip(img_mem[thread_idx], img_mem[thread_idx], -1);
+                if (_w != w[thread_idx]) {
+                    prev_img.release(), prev_3d.release();
+                    seq_sum.release(), frame_a_sum.release(), frame_b_sum.release();
+                    for (auto& m: seq) m.release();
+                    seq_idx = 0;
+                }
+                _w = w[thread_idx];
+                _h = h[thread_idx];
+                break;
+            case 1:
+                cv::flip(img_mem[thread_idx], img_mem[thread_idx], -1);
+            case 3:
+                cv::flip(img_mem[thread_idx], img_mem[thread_idx], 0);
+                cv::transpose(img_mem[thread_idx], img_mem[thread_idx]);
+                if (_w != h[thread_idx]) {
+                    prev_img.release(), prev_3d.release();
+                    seq_sum.release(), frame_a_sum.release(), frame_b_sum.release();
+                    for (auto& m: seq) m.release();
+                    seq_idx = 0;  }
+                _w = h[thread_idx];
+                _h = w[thread_idx];
+                break;
+            default:
+                break;
+            }
+
             // calc histogram (grayscale)
             memset(hist, 0, 256 * sizeof(uint));
             if (!is_color[thread_idx]) for (int i = 0; i < _h; i++) for (int j = 0; j < _w; j++) hist[(img_mem[thread_idx].data + i * img_mem[thread_idx].cols)[j]]++;
@@ -1377,6 +1432,7 @@ int UserPanel::grab_thread_process(int *idx) {
         // image display
 //        stream = QImage(cropped_img.data, cropped_img.cols, cropped_img.rows, cropped_img.step, QImage::Format_RGB888);
         stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, is_color[thread_idx] || pseudocolor[thread_idx] ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+//        qDebug() << "img display" << img_display.cols << img_display.rows << disp->size() << is_color[thread_idx] << pseudocolor[thread_idx] << stream.isNull();
 //        ui->SOURCE_DISPLAY->setPixmap(QPixmap::fromImage(stream.scaled(ui->SOURCE_DISPLAY->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
         // use signal->slot instead of directly call
         disp->emit set_pixmap(QPixmap::fromImage(stream.scaled(disp->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
@@ -1390,44 +1446,29 @@ int UserPanel::grab_thread_process(int *idx) {
         }
 //        qDebug() << QDateTime::currentDateTime().toString("ss.zzz");
 
+//        qDebug() << "--------------------" << thread_idx;
         // process scan
-        if (scan && updated && thread_idx == 0) {
+        if (thread_idx ==0 && scan && updated) {
             static cv::Mat temp;
             scan_img_count -= 1;
             if (scan_img_count < 0) scan_img_count = 0;
 
             static QString scan_save_path_a, scan_save_path;
-            static int save_img_num = 20;
-            if (scan_img_count > 0 && scan_img_count <= save_img_num) save_scan_img(scan_save_path, QString::number(save_img_num - scan_img_count + 1) + ".bmp");
-            if (scan_img_count == 1) {
-                QPixmap screenshot = window()->grab();
-                screenshot.save(scan_save_path + "/screenshot_" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".png");
+            static int save_img_num = 8;
+//            if (thread_idx == 1) qDebug() << "##--##" << scan_img_count << save_img_num;
+            if (scan_img_count > 0 && scan_img_count <= save_img_num) {
+//                qDebug() << "====================" << thread_idx;
+                save_scan_img(scan_save_path, QString::number(save_img_num - scan_img_count + 1) + ".bmp");
+            }
+            if (thread_idx == 0 && scan_img_count == save_img_num) {
+                window()->grab().save(scan_save_path + "/screenshot_" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".png");
             }
 
-//            qDebug() << scan_img_count;
-            if (!scan_img_count) {
-/*
-                save_scan_img();
+            if (scan_img_count == 0) ;
 
-                delay_dist += scan_step;
-                scan_img_count = scan_img_count = frame_rate_edit * 8;
-                filter_scan();
-                if (!auto_scan_mode) {
-                    img_mem[thread_idx].convertTo(temp, CV_64F);
-                    cv::threshold(temp, temp, 20, 255, cv::THRESH_TOZERO);
-                    scan_3d += temp * (++scan_idx);
-                    scan_sum += temp;
-                }
-                else if (fabs(delay_dist - 4000) < 1e-4) {
-//                    ptr_tcu->set_user_param(TCUThread::REPEATED_FREQ, rep_freq = 17);
-//                    ptr_tcu->set_user_param(TCUThread::LASER_USR, laser_width = 2500);
-//                    ptr_tcu->set_user_param(TCUThread::EST_DOV, depth_of_view = 375);
-                    emit send_double_tcu_msg(TCU::REPEATED_FREQ, rep_freq = 17);
-                    emit send_double_tcu_msg(TCU::LASER_USR, laser_width = 2500);
-                    emit send_double_tcu_msg(TCU::EST_DOV, depth_of_view = 375);
-                }
-*/
-                scan_img_count = frame_rate_edit * (6 + save_img_num / frame_rate_edit);
+            if (!scan_img_count) {
+                scan_img_count = frame_rate_edit * (2 + save_img_num / frame_rate_edit);
+//                qDebug() << "scan idx" << scan_tcu_idx << scan_ptz_idx;
 
 //                qDebug() << "delay" << scan_tcu_idx;
                 if (scan_tcu_idx == scan_tcu_route.size() - 1 || scan_tcu_idx == -1) {
@@ -1444,8 +1485,8 @@ int UserPanel::grab_thread_process(int *idx) {
                         QFile params(scan_save_path_a + "/params");
                         params.open(QIODevice::WriteOnly);
                         params.write(QString::asprintf("angle: \n"
-                                                       "    H: %6.2f\n"
-                                                       "    V: %5.2f\n",
+                                                       "    H: %06.2f\n"
+                                                       "    V:  %05.2f\n",
                                                        scan_ptz_route[scan_ptz_idx].first,
                                                        scan_ptz_route[scan_ptz_idx].second).toUtf8());
                     }
@@ -1458,10 +1499,11 @@ int UserPanel::grab_thread_process(int *idx) {
                 scan_tcu_idx++;
                 delay_dist = scan_tcu_route[scan_tcu_idx] * dist_ns;
                 scan_save_path = scan_save_path_a + "/" + QString::number(scan_tcu_route[scan_tcu_idx], 'f', 2) + " ns";
+//                qDebug() << scan_save_path;
                 QDir().mkdir(scan_save_path);
                 QDir().mkdir(scan_save_path + "/ori_bmp");
                 QDir().mkdir(scan_save_path + "/res_bmp");
-//                if (grab_image[1]) QDir().mkdir(scan_save_path + "/alt_bmp");
+                if (grab_image[1]) QDir().mkdir(scan_save_path + "/alt_bmp");
 
                 emit update_delay_in_thread();
             }
@@ -1883,31 +1925,33 @@ void UserPanel::save_to_file(bool save_result, int idx) {
 }
 
 void UserPanel::save_scan_img(QString path, QString name) {
-//    QString temp = QString(TEMP_SAVE_LOCATION + "/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp"),
-//            dest = QString(save_location + "/" + scan_name + "/ori_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
-//    cv::imwrite(temp.toLatin1().data(), img_mem);
-//    QFile::rename(temp, dest);
-//    if (ui->TITLE->prog_settings->save_scan_ori) QPixmap::fromImage(QImage(img_mem.data, img_mem.cols, img_mem.rows, img_mem.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
+//        QString temp = QString(TEMP_SAVE_LOCATION + "/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp"),
+//                dest = QString(save_location + "/" + scan_name + "/ori_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
+//        cv::imwrite(temp.toLatin1().data(), img_mem);
+//        QFile::rename(temp, dest);
+//        if (ui->TITLE->prog_settings->save_scan_ori) QPixmap::fromImage(QImage(img_mem.data, img_mem.cols, img_mem.rows, img_mem.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
     if (scan_config->capture_scan_ori) {
-//        std::thread t_ori(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
-//        t_ori.detach();
-//        tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
-//        tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", p_tcu->get(TCU::DELAY_A))) + ".bmp"));
+//            std::thread t_ori(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
+//            t_ori.detach();
+//            tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
+//            tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", p_tcu->get(TCU::DELAY_A))) + ".bmp"));
         tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), path + "/ori_bmp/" + name));
 
-//        if (grab_image[1]) tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[1].clone(), path + "/alt_bmp/" + name));
     }
-//    dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
-//    cv::imwrite(temp.toLatin1().data(), modified_result);
-//    QFile::rename(temp, dest);
-//    if (ui->TITLE->prog_settings->save_scan_res) QPixmap::fromImage(QImage(modified_result.data, modified_result.cols, modified_result.rows, modified_result.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
+//        dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
+//        cv::imwrite(temp.toLatin1().data(), modified_result);
+//        QFile::rename(temp, dest);
+//        if (ui->TITLE->prog_settings->save_scan_res) QPixmap::fromImage(QImage(modified_result.data, modified_result.cols, modified_result.rows, modified_result.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
     if (scan_config->capture_scan_res) {
-//        std::thread t_res(save_image_bmp, modified_result, save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
-//        t_res.detach();
-//        tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
-//        tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", p_tcu->get(TCU::DELAY_A))) + ".bmp"));
+//            std::thread t_res(save_image_bmp, modified_result, save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
+//            t_res.detach();
+//            tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
+//            tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", p_tcu->get(TCU::DELAY_A))) + ".bmp"));
         tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), path + "/res_bmp/" + name));
     }
+
+//    qDebug() << "####################" << thread_idx;
+    if (grab_image[1]) tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[1].clone(), path + "/alt_bmp/" + name));
 }
 
 void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, int baud_rate) {
@@ -3135,6 +3179,8 @@ void UserPanel::prompt_for_serial_file()
 
 void UserPanel::prompt_for_input_file()
 {
+    bool sp_mode = QApplication::keyboardModifiers() & Qt::ShiftModifier;
+
     QDialog input_file_dialog(this, Qt::FramelessWindowHint);
     input_file_dialog.resize(400, 80);
     QGridLayout grid(&input_file_dialog);
@@ -3150,13 +3196,18 @@ void UserPanel::prompt_for_input_file()
     QComboBox *file_path_x = new QComboBox(&input_file_dialog);
     static QStringList file_paths = (QStringList() << "rtsp://192.168.2.xxx/mainstream"
                                      << "rtsp://admin:abcd1234@192.168.1.xxx:554/h264/ch1/main/av_stream"
-                                     << "rtsp://admin:abcd1234@192.168.1.xxx:554"
-                                     << "https://mst3k-localnow.amagi.tv/playlist.m3u8");
+                                     << "rtsp://admin:abcd1234@192.168.1.xxx:554");
+    static QStringList sp_paths = (QStringList() << "https://mst3k-localnow.amagi.tv/playlist.m3u8"
+                                   << "http://109.233.89.170/Disney_Channel/mono.m3u8"
+                                   << "https://travelxp-travelxp-1-nz.samsung.wurl.tv/playlist.m3u8"
+                                   << "https://aegis-cloudfront-1.tubi.video/dc8bda97-ce9e-4091-b4e8-11254dea4da6/playlist.m3u8");
     file_path_x->addItems(file_paths);
+    if (sp_mode) file_path_x->addItems(sp_paths);
     file_path_x->setEditable(true);
     grid.addWidget(file_path_x, 1, 0, 1, 3);
 
     QCheckBox *use_gray_format = new QCheckBox("gray", &input_file_dialog);
+    use_gray_format->setEnabled(sp_mode);
     grid.addWidget(use_gray_format, 2, 0);
 
     QLabel *spacer = new QLabel("", &input_file_dialog);
@@ -3359,7 +3410,7 @@ void UserPanel::update_tcu_params(qint32 tcu_param)
             ui->DELAY_B_EDIT_U->setText(QString::asprintf(  "%d", us));
             ui->DELAY_B_EDIT_N->setText(QString::asprintf("%03d", ns));
             ui->DELAY_B_EDIT_P->setText(QString::asprintf("%03d", ps));
-//            ui->DELAY_SLIDER->setValue(delay_dist);
+            ui->DELAY_SLIDER->setValue(delay_dist);
             break;
         case TCU::EST_DOV:
             ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view = p_tcu->get(TCU::EST_DOV)));
@@ -3371,7 +3422,7 @@ void UserPanel::update_tcu_params(qint32 tcu_param)
             ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf(  "%d", us));
             ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%03d", ns));
             ui->GATE_WIDTH_B_EDIT_P->setText(QString::asprintf("%03d", ps));
-//            ui->GW_SLIDER->setValue(depth_of_view);
+            ui->GW_SLIDER->setValue(depth_of_view);
             break;
         case TCU::NO_PARAM:
             update_tcu_params(TCU::LASER_USR);
@@ -4133,8 +4184,15 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             }
             else if (edit == ui->GATE_WIDTH_B_EDIT_U) {
 //                depth_of_view = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt() + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - ptr_tcu->gate_width_n) * dist_ns;
-                depth_of_view = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt() + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::GATE_WIDTH_N)) * dist_ns;
-                update_gate_width();
+                if (p_tcu->get(TCU::AB_LOCK)) {
+                    depth_of_view = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt() + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::GATE_WIDTH_N)) * dist_ns;
+                    update_gate_width();
+                }
+                else {
+                    double temp_gw_b;
+                    temp_gw_b = edit->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt() + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::GATE_WIDTH_N);
+                    emit send_double_tcu_msg(TCU::GATE_WIDTH_B, temp_gw_b);
+                }
             }
             else if (edit == ui->LASER_WIDTH_EDIT_N) {
                 if (edit->text().toInt() > 999) laser_width = edit->text().toInt() + ui->LASER_WIDTH_EDIT_P->text().toInt() / 1000.;
@@ -4152,9 +4210,17 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             else if (edit == ui->GATE_WIDTH_B_EDIT_N) {
 //                if (edit->text().toInt() > 999) depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - ptr_tcu->gate_width_n) * dist_ns;
 //                else depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - ptr_tcu->gate_width_n) * dist_ns;
-                if (edit->text().toInt() > 999) depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::GATE_WIDTH_N)) * dist_ns;
-                else depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::GATE_WIDTH_N)) * dist_ns;
-                update_gate_width();
+                if (p_tcu->get(TCU::AB_LOCK)) {
+                    if (edit->text().toInt() > 999) depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::GATE_WIDTH_N)) * dist_ns;
+                    else depth_of_view = (edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::GATE_WIDTH_N)) * dist_ns;
+                    update_gate_width();
+                }
+                else {
+                    double temp_gw_b;
+                    if (edit->text().toInt() > 999) temp_gw_b = edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::GATE_WIDTH_N);
+                    else temp_gw_b = edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::GATE_WIDTH_N);
+                    emit send_double_tcu_msg(TCU::GATE_WIDTH_B, temp_gw_b);
+                }
             }
             else if (edit == ui->LASER_WIDTH_EDIT_P) {
                 laser_width = edit->text().toInt() / 1000. + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt();
@@ -4169,8 +4235,15 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             }
             else if (edit == ui->GATE_WIDTH_B_EDIT_P) {
 //                depth_of_view = (edit->text().toInt() / 1000. + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt() - ptr_tcu->gate_width_n) * dist_ns;
-                depth_of_view = (edit->text().toInt() / 1000. + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt() - p_tcu->get(TCU::GATE_WIDTH_N)) * dist_ns;
-                update_gate_width();
+                if (p_tcu->get(TCU::AB_LOCK)) {
+                    depth_of_view = (edit->text().toInt() / 1000. + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt() - p_tcu->get(TCU::GATE_WIDTH_N)) * dist_ns;
+                    update_gate_width();
+                }
+                else {
+                    double temp_gw_b;
+                    temp_gw_b = edit->text().toInt() / 1000. + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_N->text().toInt() - p_tcu->get(TCU::GATE_WIDTH_N);
+                    emit send_double_tcu_msg(TCU::GATE_WIDTH_B, temp_gw_b);
+                }
             }
             else if (edit == ui->DELAY_A_EDIT_U) {
                 delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt() + ui->DELAY_A_EDIT_P->text().toInt() / 1000.) * dist_ns;
@@ -4178,8 +4251,15 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             }
             else if (edit == ui->DELAY_B_EDIT_U) {
 //                delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt() + ui->DELAY_A_EDIT_P->text().toInt() / 1000. - ptr_tcu->delay_n) * dist_ns;
-                delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt() + ui->DELAY_A_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::DELAY_N)) * dist_ns;
-                update_delay();
+                if (p_tcu->get(TCU::AB_LOCK)) {
+                    delay_dist = (edit->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt() + ui->DELAY_A_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::DELAY_N)) * dist_ns;
+                    update_delay();
+                }
+                else {
+                    double temp_delay_b;
+                    temp_delay_b = edit->text().toInt() * 1000 + ui->DELAY_B_EDIT_N->text().toInt() + ui->DELAY_A_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::DELAY_N);
+                    emit send_double_tcu_msg(TCU::DELAY_B, temp_delay_b);
+                }
             }
             else if (edit == ui->DELAY_A_EDIT_N) {
                 if (edit->text().toInt() > 999) delay_dist = (edit->text().toInt() + ui->DELAY_A_EDIT_P->text().toInt() / 1000.) * dist_ns;
@@ -4189,9 +4269,17 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             else if (edit == ui->DELAY_B_EDIT_N) {
 //                if (edit->text().toInt() > 999) delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_P->text().toInt() / 1000.) * dist_ns - ptr_tcu->delay_n;
 //                else delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000 + ui->DELAY_B_EDIT_P->text().toInt() / 1000. - ptr_tcu->delay_n) * dist_ns;
-                if (edit->text().toInt() > 999) delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_P->text().toInt() / 1000.) * dist_ns - p_tcu->get(TCU::DELAY_N);
-                else delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000 + ui->DELAY_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::DELAY_N)) * dist_ns;
-                update_delay();
+                if (p_tcu->get(TCU::AB_LOCK)) {
+                    if (edit->text().toInt() > 999) delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::DELAY_N)) * dist_ns;
+                    else delay_dist = (edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000 + ui->DELAY_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::DELAY_N)) * dist_ns;
+                    update_delay();
+                }
+                else {
+                    double temp_delay_b;
+                    if (edit->text().toInt() > 999) temp_delay_b = edit->text().toInt() + ui->DELAY_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::DELAY_N);
+                    else temp_delay_b = edit->text().toInt() + ui->DELAY_B_EDIT_U->text().toInt() * 1000 + ui->DELAY_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::DELAY_N);
+                    emit send_double_tcu_msg(TCU::DELAY_B, temp_delay_b);
+                }
             }
             else if (edit == ui->DELAY_A_EDIT_P) {
                 delay_dist = (edit->text().toInt() / 1000. + ui->DELAY_A_EDIT_U->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt()) * dist_ns;
@@ -4199,8 +4287,15 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             }
             else if (edit == ui->DELAY_B_EDIT_P) {
 //                delay_dist = (edit->text().toInt() / 1000. + ui->DELAY_B_EDIT_U->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt() - ptr_tcu->delay_n) * dist_ns;
-                delay_dist = (edit->text().toInt() / 1000. + ui->DELAY_B_EDIT_U->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt() - p_tcu->get(TCU::DELAY_N)) * dist_ns;
-                update_delay();
+                if (p_tcu->get(TCU::AB_LOCK)) {
+                    delay_dist = (edit->text().toInt() / 1000. + ui->DELAY_B_EDIT_U->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt() - p_tcu->get(TCU::DELAY_N)) * dist_ns;
+                    update_delay();
+                }
+                else {
+                    double temp_delay_b;
+                    temp_delay_b = edit->text().toInt() / 1000. + ui->DELAY_B_EDIT_U->text().toInt() * 1000 + ui->DELAY_A_EDIT_N->text().toInt() - p_tcu->get(TCU::DELAY_N);
+                    emit send_double_tcu_msg(TCU::DELAY_B, temp_delay_b);
+                }
             }
             else if (edit == ui->GATE_WIDTH_N_EDIT_N) {
 //                ptr_tcu->gate_width_n = edit->text().toFloat();
@@ -4242,13 +4337,13 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             }
             else if (edit == ui->ANGLE_H_EDIT) {
                 angle_h = ui->ANGLE_H_EDIT->text().toDouble();
-//                emit send_ptz_msg(PTZ::SET_H, angle_h);
-                p_usbcan->emit control(USBCAN::POSITION, angle_h);
+                if (!pref->gcan) emit send_ptz_msg(PTZ::SET_H, angle_h);
+                else            p_usbcan->emit control(USBCAN::POSITION, angle_h);
             }
             else if (edit == ui->ANGLE_V_EDIT) {
                 angle_v = ui->ANGLE_V_EDIT->text().toDouble();
-//                emit send_ptz_msg(PTZ::SET_V, angle_v);
-                p_usbcan->emit control(USBCAN::PITCH, angle_v);
+                if (!pref->gcan) emit send_ptz_msg(PTZ::SET_V, angle_v);
+                else             p_usbcan->emit control(USBCAN::PITCH, angle_v);
             }
             else if (edit == ui->PTZ_COM_EDIT) {
                 if (ui->PTZ_COM_EDIT->text().isEmpty())  p_usbcan->emit disconnect_from();
@@ -4329,8 +4424,10 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             laser_settings->raise();
             break;
         case Qt::Key_V:
+#ifdef DISTANCE_3D_VIEW
             view_3d->show();
             view_3d->raise();
+#endif //DISTANCE_3D_VIEW
             break;
         case Qt::Key_A:
             // FIXME: aliasing function temporary banned
@@ -4373,7 +4470,18 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
 
 void UserPanel::resizeEvent(QResizeEvent *event)
 {
-    int ww = ui->IMG_3D_CHECK->isChecked() ? w[0] + 104 : w[0];
+    int ww, hh;
+    switch (image_rotate[0]) {
+    case 1:
+    case 3:
+        ww = h[0]; hh = w[0]; break;
+    case 0:
+    case 2:
+    default:
+        ww = w[0]; hh = h[0]; break;
+    }
+//    ww = w[0]; hh = h[0];
+    ww = ui->IMG_3D_CHECK->isChecked() ? ww + 104 : ww;
     QRect window = this->geometry();
 //    qDebug() << window;
     int grp_width = ui->RIGHT->width();
@@ -4385,12 +4493,12 @@ void UserPanel::resizeEvent(QResizeEvent *event)
 
     int mid_width = window.width() - 12 - grp_width - 10 - ui->LEFT->width();
     ui->MID->setGeometry(10 + ui->LEFT->width(), 40, mid_width, window.height() - 40 - ui->STATUS->height());
-    int width = mid_width - 20, height = width * h[0] / ww;
+    int width = mid_width - 20, height = width * hh / ww;
 //    qDebug("width %d, height %d\n", width, height);
     int height_constraint = ui->MID->height() - 30 - 24, // bottom padding 24 pixels
-        width_constraint = height_constraint * ww / h[0];
+        width_constraint = height_constraint * ww / hh;
 //    qDebug("width_constraint %d, height_constraint %d\n", width_constraint, height_constraint);
-    if (width < width_constraint) width_constraint = width, height_constraint = width_constraint * h[0] / ww;
+    if (width < width_constraint) width_constraint = width, height_constraint = width_constraint * hh / ww;
     if (height > height_constraint) {
         center = center * width_constraint / region.width();
         region.setRect(10 + (width - width_constraint) / 2, 40, width_constraint, height_constraint);
@@ -4738,6 +4846,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
         std::thread t([this, filename, format_gray, process_frame, ptr, display_idx, display](){
             if (current_video_filename != filename) current_video_filename = "";
             if (display) {
+                qDebug() << display_idx;
                 grab_image[display_idx] = false;
                 if (!display_mutex[display_idx].tryLock(1e3)) return -1;
             }
@@ -4772,6 +4881,12 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
             format_context->interrupt_callback.callback = ffmpeg_interrupt_callback;
             format_context->interrupt_callback.opaque = &start_time;
 
+            // set buffer size //TODO: set frame buffer size
+//            AVIOContext *avio_ctx = nullptr;
+//            uint8_t *frame_buffer = (uint8_t *)av_malloc(33554432); // Allocate a buffer (32 MB)
+//            avio_ctx = avio_alloc_context(frame_buffer, 33554432, 0, nullptr, nullptr, nullptr, nullptr);
+//            format_context->pb = avio_ctx;
+
             // open input video
             AVInputFormat *input_format = (AVInputFormat *)av_find_input_format("dshow");
             start_time = time(NULL);
@@ -4780,12 +4895,15 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
             // fetch video info
             if (avformat_find_stream_info(format_context, NULL) < 0) { if (display) display_mutex[display_idx].unlock(); return -2; }
 
-            // find the first video stream
+            // find the video stream with max resolution (in width)
             int video_stream_idx = -1;
+            int max_res_w = 0;
             for (uint i = 0; i < format_context->nb_streams; i++) {
                 if (format_context->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-                    video_stream_idx = i;
-                    break;
+                    if (format_context->streams[i]->codecpar->width > max_res_w) {
+                        video_stream_idx = i;
+                        max_res_w = format_context->streams[i]->codecpar->width;
+                    }
                 }
             }
             if (video_stream_idx == -1) { if (display) display_mutex[display_idx].unlock(); return -2; }
@@ -4959,6 +5077,16 @@ inline void UserPanel::split_value_by_unit(float val, uint &us, uint &ns, uint &
     }
     default: break;
     }
+}
+
+void UserPanel::rotate(int angle)
+{
+    image_mutex[0].lock();
+    image_rotate[0] = angle;
+    image_mutex[0].unlock();
+
+    QResizeEvent e(this->size(), this->size());
+    resizeEvent(&e);
 }
 
 //inline uint UserPanel::get_width_in_us(float val)
@@ -5554,46 +5682,47 @@ void UserPanel::ptz_button_pressed(int id) {
 //    ptr_ptz->ptz_control(static_cast<PTZThread::PARAMS>(id + 1));
 
     if (id == 4) if (QMessageBox::warning(nullptr, "PTZ", tr("Initialize?"), QMessageBox::StandardButton::Ok | QMessageBox::StandardButton::Cancel) != QMessageBox::StandardButton::Ok) return;
-//    emit send_ptz_msg(id + 1);
-
-    switch (id) {
-    case 0:
-        p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
-        p_usbcan->emit control(USBCAN::UP, ui->PTZ_SPEED_SLIDER->value());
-        break;
-    case 1:
-        p_usbcan->emit control(USBCAN::UP, ui->PTZ_SPEED_SLIDER->value());
-        break;
-    case 2:
-        p_usbcan->emit control(USBCAN::RIGHT, ui->PTZ_SPEED_SLIDER->value());
-        p_usbcan->emit control(USBCAN::UP, ui->PTZ_SPEED_SLIDER->value());
-        break;
-    case 3:
-        p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
-        break;
-    case 4:
-        p_usbcan->emit transmit(USBCAN::OFF);
-        QThread::msleep(1000);
-        p_usbcan->emit transmit(USBCAN::SELF_CHECK);
-        QThread::msleep(1000);
-        p_usbcan->emit transmit(USBCAN::LOCK);
-        QThread::msleep(1000);
-        break;
-    case 5:
-        p_usbcan->emit control(USBCAN::RIGHT, ui->PTZ_SPEED_SLIDER->value());
-        break;
-    case 6:
-        p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
-        p_usbcan->emit control(USBCAN::DOWN, ui->PTZ_SPEED_SLIDER->value());
-        break;
-    case 7:
-        p_usbcan->emit control(USBCAN::DOWN, ui->PTZ_SPEED_SLIDER->value());
-        break;
-    case 8:
-        p_usbcan->emit control(USBCAN::RIGHT, ui->PTZ_SPEED_SLIDER->value());
-        p_usbcan->emit control(USBCAN::DOWN, ui->PTZ_SPEED_SLIDER->value());
-        break;
-    default: break;
+    if (!pref->gcan) emit send_ptz_msg(id + 1);
+    else {
+        switch (id) {
+        case 0:
+            p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
+            p_usbcan->emit control(USBCAN::UP, ui->PTZ_SPEED_SLIDER->value());
+            break;
+        case 1:
+            p_usbcan->emit control(USBCAN::UP, ui->PTZ_SPEED_SLIDER->value());
+            break;
+        case 2:
+            p_usbcan->emit control(USBCAN::RIGHT, ui->PTZ_SPEED_SLIDER->value());
+            p_usbcan->emit control(USBCAN::UP, ui->PTZ_SPEED_SLIDER->value());
+            break;
+        case 3:
+            p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
+            break;
+        case 4:
+            p_usbcan->emit transmit(USBCAN::OFF);
+            QThread::msleep(1000);
+            p_usbcan->emit transmit(USBCAN::SELF_CHECK);
+            QThread::msleep(1000);
+            p_usbcan->emit transmit(USBCAN::LOCK);
+            QThread::msleep(1000);
+            break;
+        case 5:
+            p_usbcan->emit control(USBCAN::RIGHT, ui->PTZ_SPEED_SLIDER->value());
+            break;
+        case 6:
+            p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
+            p_usbcan->emit control(USBCAN::DOWN, ui->PTZ_SPEED_SLIDER->value());
+            break;
+        case 7:
+            p_usbcan->emit control(USBCAN::DOWN, ui->PTZ_SPEED_SLIDER->value());
+            break;
+        case 8:
+            p_usbcan->emit control(USBCAN::RIGHT, ui->PTZ_SPEED_SLIDER->value());
+            p_usbcan->emit control(USBCAN::DOWN, ui->PTZ_SPEED_SLIDER->value());
+            break;
+        default: break;
+        }
     }
 }
 
@@ -5602,8 +5731,8 @@ void UserPanel::ptz_button_released(int id) {
     if (id == 4) return;
 //    ptr_ptz->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 //    ptr_ptz->ptz_control(PTZThread::STOP);
-//    emit send_ptz_msg(PTZ::STOP);
-    p_usbcan->emit control(USBCAN::STOP, 0);
+    if (!pref->gcan) emit send_ptz_msg(PTZ::STOP);
+    else             p_usbcan->emit control(USBCAN::STOP, 0);
 }
 
 void UserPanel::on_PTZ_SPEED_SLIDER_valueChanged(int value)
@@ -5688,22 +5817,24 @@ void UserPanel::set_ptz_angle()
 //    ptr_ptz->ptz_control(PTZThread::SET_H, &angle_h);
 //    ptr_ptz->ptz_control(PTZThread::SET_V, &angle_v);
 
-//    emit send_ptz_msg(PTZ::SET_H, angle_h);
-//    emit send_ptz_msg(PTZ::SET_V, angle_v);
-
-    p_usbcan->emit control(USBCAN::POSITION, angle_h);
-    p_usbcan->emit transmit(USBCAN::POSITION);
-    p_usbcan->emit control(USBCAN::PITCH, angle_v);
-    p_usbcan->emit transmit(USBCAN::PITCH);
+    if (!pref->gcan) {
+        emit send_ptz_msg(PTZ::SET_H, angle_h);
+        emit send_ptz_msg(PTZ::SET_V, angle_v);
+    }
+    else {
+        p_usbcan->emit control(USBCAN::POSITION, angle_h);
+        p_usbcan->emit transmit(USBCAN::POSITION);
+        p_usbcan->emit control(USBCAN::PITCH, angle_v);
+        p_usbcan->emit transmit(USBCAN::PITCH);
+    }
 }
 
 void UserPanel::on_STOP_BTN_clicked()
 {
 //    ptr_ptz->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 //    ptr_ptz->ptz_control(PTZThread::STOP);
-//    emit send_ptz_msg(PTZ::STOP);
-
-    p_usbcan->emit control(USBCAN::STOP, 0);
+    if (!pref->gcan) emit send_ptz_msg(PTZ::STOP);
+    else             p_usbcan->emit control(USBCAN::STOP, 0);
 }
 
 void UserPanel::point_ptz_to_target(QPoint target)

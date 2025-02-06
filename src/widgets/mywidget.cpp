@@ -310,6 +310,7 @@ void TitleBar::setup(QObject *ptr)
     connect(preferences, SIGNAL(query_dev_ip()),                     signal_receiver, SLOT(update_dev_ip()));
     connect(preferences, SIGNAL(set_dev_ip(int, int)),               signal_receiver, SLOT(set_dev_ip(int, int)));
     connect(preferences, SIGNAL(change_pixel_format(int)),           signal_receiver, SLOT(change_pixel_format(int)));
+    connect(preferences, SIGNAL(rotate_image(int)),                  signal_receiver, SLOT(rotate(int)));
     connect(preferences, SIGNAL(device_underwater(bool)),            signal_receiver, SLOT(update_light_speed(bool)));
     connect(preferences, SIGNAL(get_port_info(int)),                 signal_receiver, SLOT(display_port_info(int)));
     connect(preferences, SIGNAL(change_baudrate(int, int)),          signal_receiver, SLOT(set_baudrate(int, int)));

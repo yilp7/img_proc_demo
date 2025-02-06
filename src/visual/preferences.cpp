@@ -6,22 +6,26 @@ Preferences::Preferences(QWidget *parent) :
     ui(new Ui::Preferences),
     pressed(false),
     device_idx(0),
+    rotation(0),
     symmetry(0),
-    ebus_cam(false),
     split(false),
+    ebus_cam(false),
+    gcan(false),
+    cameralink(false),
     port_idx(0),
     share_port(false),
     use_tcp(false),
     dist_ns(3e8 / 2e9),
-    auto_rep_freq(true),
+    auto_rep_freq(false),
     auto_mcp(false),
+    ab_lock(true),
     hz_unit(0),
     base_unit(0),
-    max_dist(150),
+    max_dist(15000),
     delay_offset(0),
-    max_dov(90),
+    max_dov(15000),
     gate_width_offset(0),
-    max_laser_width(200),
+    max_laser_width(25000),
     laser_width_offset(0),
     ps_step{40, 40, 40, 40},
     laser_grp(NULL),
@@ -74,6 +78,13 @@ Preferences::Preferences(QWidget *parent) :
     ui->DEVICE_LIST->installEventFilter(this);
     connect(ui->DEVICE_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
             [this](int index){ device_idx = index; emit query_dev_ip(); });
+    ui->ROTATE_OPTION_LIST->addItem("  0°");
+    ui->ROTATE_OPTION_LIST->addItem(" 90°");
+    ui->ROTATE_OPTION_LIST->addItem("180°");
+    ui->ROTATE_OPTION_LIST->addItem("270°");
+    ui->ROTATE_OPTION_LIST->installEventFilter(this);
+    connect(ui->ROTATE_OPTION_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
+            [this](int index){ emit rotate_image(rotation = index); });
     ui->FLIP_OPTION_LIST->addItem("None");
     ui->FLIP_OPTION_LIST->addItem("Both");
     ui->FLIP_OPTION_LIST->addItem("X");
@@ -94,10 +105,11 @@ Preferences::Preferences(QWidget *parent) :
 #ifndef WIN32
     ui->EBUS_CHK->setCheckable(false);
 #endif
+    connect(ui->SPLIT_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ split = arg1; });
     connect(ui->UNDERWATER_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit device_underwater(arg1); });
     connect(ui->EBUS_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ ebus_cam = arg1; emit search_for_devices(); });
+    connect(ui->GCAN_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ gcan = arg1; });
     connect(ui->CAMERALINK_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ cameralink = arg1; emit search_for_devices(); });
-    connect(ui->SPLIT_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ split = arg1; });
 //![1]
 
 //[2] set up ui for serial comm.
@@ -184,6 +196,7 @@ Preferences::Preferences(QWidget *parent) :
 
     connect(ui->AUTO_REP_FREQ_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit set_auto_rep_freq(auto_rep_freq = arg1); });
     connect(ui->AUTO_MCP_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit set_auto_mcp(auto_mcp = arg1); });
+    connect(ui->AB_LOCK_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit set_ab_lock(ab_lock = arg1); });
 
     ui->HZ_LIST->addItem("kHz");
     ui->HZ_LIST->addItem("Hz");
@@ -390,6 +403,7 @@ Preferences::~Preferences()
 
 void Preferences::init()
 {
+    ui->GCAN_CHK->click();
 }
 
 void Preferences::data_exchange(bool read)
@@ -416,6 +430,7 @@ void Preferences::data_exchange(bool read)
 #endif
 
         auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
+        ab_lock = ui->AB_LOCK_CHK->isChecked();
         base_unit = ui->UNIT_LIST->currentIndex();
         switch (base_unit) {
         // ns
@@ -476,6 +491,7 @@ void Preferences::data_exchange(bool read)
 #endif
 
         ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
+        ui->AB_LOCK_CHK->setChecked(ab_lock);
         ui->UNIT_LIST->setCurrentIndex(base_unit);
         update_distance_display();
         ui->PS_STEPPING_EDT->setText(QString::number(ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]));

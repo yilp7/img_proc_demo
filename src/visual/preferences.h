@@ -52,6 +52,7 @@ signals:
     void query_dev_ip();
     void set_dev_ip(int ip, int gateway);
     void change_pixel_format(int format);
+    void rotate_image(int angle);
     void device_underwater(bool underwater);
 
     // serial comm.
@@ -65,6 +66,7 @@ signals:
     void tcu_type_changed(int idx);
     void set_auto_rep_freq(bool _auto);
     void set_auto_mcp(bool _auto);
+    void set_ab_lock(bool _auto);
     void rep_freq_unit_changed(int idx);
     void base_unit_changed(int idx);
     void max_dist_changed(float dist);
@@ -89,11 +91,13 @@ public:
 
     // 1 device
     int              device_idx;
+    int              rotation;
     int              symmetry;
     int              pixel_type;
-    bool             ebus_cam;
-    bool             cameralink;
     bool             split;
+    bool             ebus_cam;
+    bool             gcan;
+    bool             cameralink;
 
     // 2 serial comm.
     int              port_idx;
@@ -104,6 +108,7 @@ public:
     float            dist_ns;
     bool             auto_rep_freq;
     bool             auto_mcp;
+    bool             ab_lock;
     int              hz_unit;   // 0: kHz, 1:Hz
     int              base_unit; // 0: ns, 1: μs, 2: m
     float            max_dist;

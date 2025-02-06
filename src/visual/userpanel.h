@@ -8,7 +8,7 @@
 #endif
 #ifdef USING_CAMERALINK
 #include "cam/euresyscam.h"
-#endif
+#endif //USING_CAMERALINK
 //#include "hqvscam.h"
 //#include "euresyscam.h"
 
@@ -18,9 +18,12 @@
 #include "visual/preferences.h"
 #include "visual/scanconfig.h"
 #include "visual/lasercontrol.h"
+#ifdef DISTANCE_3D_VIEW
 #include "visual/distance3dview.h"
+#endif //DISTANCE_3D_VIEW
 #include "visual/aliasing.h"
 #include "visual/presetpanel.h"
+#include "visual/serialserver.h"
 
 #include "port/tcu.h"
 #include "port/lens.h"
@@ -127,6 +130,7 @@ public slots:
 
     // signaled in preferences ui
     void search_for_devices();
+    void rotate(int angle);
     void update_light_speed(bool uw);
     void setup_hz(int hz_unit);
     void setup_stepping(int base_unit);
@@ -474,7 +478,9 @@ private:
     Preferences*    pref;
     ScanConfig*     scan_config;
     LaserControl*   laser_settings;
+#ifdef DISTANCE_3D_VIEW
     Distance3DView* view_3d;
+#endif //DISTANCE_3D_VIEW
     Aliasing*       aliasing;
     PresetPanel*    preset;
     FloatingWindow* fw_display[2];
@@ -562,6 +568,7 @@ private:
     bool save_original[3];   // saving original bmp
     bool save_modified[3];   // saving modified bmp
     bool image_3d[3];        // whether to build a 3d image
+    int  image_rotate[3];    // rotate image ccw
     int  trigger_source;     // where the device gets the trigger signal
     bool is_color[3];        // source in grayscale or color
     bool pseudocolor[3];     // apply pseudocolor

@@ -9,7 +9,9 @@
 #include <QtWidgets>
 #include <QtSerialPort>
 #include <QtNetwork>
+#ifdef DISTANCE_3D_VIEW
 #include <QtDataVisualization>
+#endif //DISTANCE_3D_VIEW
 
 #include <queue>
 #include <fstream>

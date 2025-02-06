@@ -175,7 +175,8 @@ void Distance3DView::load_data()
     float *ptr = (float*)result_dist_mat.data;
     for (int i = 0; i < result_dist_mat.rows; i += downsample) {
         for (int j = 0; j < result_dist_mat.cols; j += downsample) {
-            array->append(QVector3D(i, ptr[i * result_dist_mat.cols + j], j));
+            float temp = ptr[i * result_dist_mat.cols + j];
+            if (temp > dist_min && temp < dist_max) array->append(QVector3D(i, temp, j));
         }
     }
     scatter_graph->axisX()->setRange(0, result_dist_mat.rows);

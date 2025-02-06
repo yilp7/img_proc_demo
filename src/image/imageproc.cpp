@@ -378,6 +378,8 @@ void ImageProc::gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double de
 //    QueryPerformanceFrequency(&tc);
 //    QueryPerformanceCounter(&t1);
 
+    if (src1.size() != src2.size()) return;
+
     const int BARWIDTH = 104, BARHEIGHT = src1.rows;
     const int IMAGEWIDTH = src1.cols, IMAGEHEIGHT = src1.rows;
     static cv::Mat img_3d, img_3d_gray;

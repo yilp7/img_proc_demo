@@ -20,7 +20,7 @@ TCU::TCU(int index, int tcu_type) :
     gate_width_n(0),
     delay_dist(delay_a * dist_ns),
     depth_of_view(gate_width_a * dist_ns),
-    auto_rep_freq(true),
+    auto_rep_freq(false),
     ab_lock(true),
     laser_offset(0),
     delay_offset(0),
@@ -76,6 +76,7 @@ double TCU::get(qint32 tcu_param)
         case PS_STEP_4:     return ps_step[3];
         case EST_DIST:      return delay_dist;
         case EST_DOV:       return depth_of_view;
+        case AB_LOCK:       return ab_lock;
         default:            return 0;
         }
 }
@@ -180,11 +181,11 @@ void TCU::set_user_param(qint32 tcu_param, double val)
 
     switch (tcu_param) {
         case REPEATED_FREQ: rep_freq = val;     set_tcu_param(tcu_param, (1e6 / clock_cycle) / rep_freq); break;
-        case LASER_WIDTH  : laser_width = val;  set_tcu_param(tcu_param, laser_width); break;
+        case LASER_WIDTH  : laser_width = val;  set_tcu_param(tcu_param, tcu_type.load() == 0 ? laser_width / 8 : laser_width); break;
         case DELAY_A:       delay_a = val;      set_tcu_param(tcu_param, delay_a); break;
         case GATE_WIDTH_A:  gate_width_a = val; set_tcu_param(tcu_param, gate_width_a); break;
-        case DELAY_B:       delay_b = val;      set_tcu_param(tcu_param, delay_b); break;
-        case GATE_WIDTH_B:  gate_width_b = val; set_tcu_param(tcu_param, gate_width_b); break;
+        case DELAY_B:       delay_b = val;      set_tcu_param(tcu_param, delay_b); emit tcu_param_updated(EST_DIST); break;
+        case GATE_WIDTH_B:  gate_width_b = val; set_tcu_param(tcu_param, gate_width_b); emit tcu_param_updated(EST_DOV); break;
         case CCD_FREQ:      ccd_freq = val;     set_tcu_param(tcu_param, (1e9 / clock_cycle) / ccd_freq); break;
         case DUTY:          duty = val;         set_tcu_param(tcu_param, duty * 1e3 / clock_cycle); break;
         case DELAY_N:       delay_n = val;                                     break;
@@ -201,7 +202,7 @@ void TCU::set_user_param(qint32 tcu_param, double val)
         {
             delay_dist = val;
             delay_a = delay_dist / dist_ns;
-            delay_b = delay_a + delay_n;
+            if (ab_lock) delay_b = delay_a + delay_n;
 
             if (scan_mode) rep_freq = rep_freq_scan;
             else if (auto_rep_freq) {
@@ -212,7 +213,7 @@ void TCU::set_user_param(qint32 tcu_param, double val)
                 set_user_param(TCU::REPEATED_FREQ, rep_freq);
             }
             set_user_param(TCU::DELAY_A, delay_a + delay_offset);
-            set_user_param(TCU::DELAY_B, delay_b + delay_offset);
+            if (ab_lock) set_user_param(TCU::DELAY_B, delay_b + delay_offset);
 
             emit tcu_param_updated(EST_DIST);
             break;
@@ -235,9 +236,9 @@ void TCU::set_user_param(qint32 tcu_param, double val)
 #else
             depth_of_view = val;
             gate_width_a = (depth_of_view = val) / dist_ns;
-            gate_width_b = gate_width_a + gate_width_n;
+            if (ab_lock) gate_width_b = gate_width_a + gate_width_n;
             set_user_param(TCU::GATE_WIDTH_A, gate_width_a + gate_width_offset);
-            set_user_param(TCU::GATE_WIDTH_B, gate_width_b + gate_width_offset);
+            if (ab_lock) set_user_param(TCU::GATE_WIDTH_B, gate_width_b + gate_width_offset);
 
             emit tcu_param_updated(EST_DOV);
             break;
@@ -277,6 +278,7 @@ void TCU::set_user_param(qint32 tcu_param, uint val)
         case PS_STEP_4: ps_step[3] = val; break;
 //        case TCU_TYPE:  tcu_type = val; break;
         case AUTO_PRF:  auto_rep_freq = val; break;
+        case AB_LOCK:   ab_lock = val; break;
         default: break;
     }
 }

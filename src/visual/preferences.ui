@@ -20,7 +20,7 @@
    <property name="geometry">
     <rect>
      <x>530</x>
-     <y>20</y>
+     <y>60</y>
      <width>421</width>
      <height>321</height>
     </rect>
@@ -510,7 +510,7 @@
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>-188</y>
+      <y>0</y>
       <width>324</width>
       <height>1620</height>
      </rect>
@@ -525,7 +525,7 @@
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>270</y>
+       <y>310</y>
        <width>271</width>
        <height>20</height>
       </rect>
@@ -538,7 +538,7 @@
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>520</y>
+       <y>560</y>
        <width>271</width>
        <height>20</height>
       </rect>
@@ -551,7 +551,7 @@
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>1080</y>
+       <y>1120</y>
        <width>271</width>
        <height>20</height>
       </rect>
@@ -579,7 +579,7 @@
        <x>20</x>
        <y>10</y>
        <width>291</width>
-       <height>261</height>
+       <height>301</height>
       </rect>
      </property>
      <property name="frameShape">
@@ -591,8 +591,8 @@
      <widget class="QCheckBox" name="SPLIT_CHK">
       <property name="geometry">
        <rect>
-        <x>125</x>
-        <y>220</y>
+        <x>190</x>
+        <y>180</y>
         <width>71</width>
         <height>22</height>
        </rect>
@@ -605,7 +605,7 @@
       <property name="geometry">
        <rect>
         <x>40</x>
-        <y>220</y>
+        <y>260</y>
         <width>71</width>
         <height>22</height>
        </rect>
@@ -618,7 +618,7 @@
       <property name="geometry">
        <rect>
         <x>40</x>
-        <y>183</y>
+        <y>223</y>
         <width>71</width>
         <height>16</height>
        </rect>
@@ -673,7 +673,7 @@
       <property name="geometry">
        <rect>
         <x>120</x>
-        <y>180</y>
+        <y>220</y>
         <width>51</width>
         <height>21</height>
        </rect>
@@ -748,7 +748,7 @@
       <property name="geometry">
        <rect>
         <x>210</x>
-        <y>220</y>
+        <y>260</y>
         <width>71</width>
         <height>22</height>
        </rect>
@@ -761,7 +761,7 @@
       <property name="geometry">
        <rect>
         <x>190</x>
-        <y>180</y>
+        <y>220</y>
         <width>91</width>
         <height>22</height>
        </rect>
@@ -770,12 +770,48 @@
        <string>Underwater</string>
       </property>
      </widget>
+     <widget class="QComboBox" name="ROTATE_OPTION_LIST">
+      <property name="geometry">
+       <rect>
+        <x>120</x>
+        <y>180</y>
+        <width>51</width>
+        <height>21</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="ROTATE">
+      <property name="geometry">
+       <rect>
+        <x>40</x>
+        <y>183</y>
+        <width>71</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Rotate</string>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="GCAN_CHK">
+      <property name="geometry">
+       <rect>
+        <x>120</x>
+        <y>260</y>
+        <width>71</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>GCAN</string>
+      </property>
+     </widget>
     </widget>
     <widget class="QFrame" name="SERIAL_PORTS_GRP">
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>290</y>
+       <y>330</y>
        <width>291</width>
        <height>231</height>
       </rect>
@@ -947,7 +983,7 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>540</y>
+       <y>580</y>
        <width>291</width>
        <height>361</height>
       </rect>
@@ -1502,7 +1538,7 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>1100</y>
+       <y>1140</y>
        <width>291</width>
        <height>501</height>
       </rect>
@@ -2038,7 +2074,7 @@
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>900</y>
+       <y>940</y>
        <width>271</width>
        <height>20</height>
       </rect>
@@ -2051,7 +2087,7 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>920</y>
+       <y>960</y>
        <width>291</width>
        <height>161</height>
       </rect>
