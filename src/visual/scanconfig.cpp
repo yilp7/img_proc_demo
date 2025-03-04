@@ -28,7 +28,9 @@ ScanConfig::ScanConfig(QWidget *parent) :
     step_v(0),
     count_h(1),
     count_v(1),
-    ptz_direction(0)
+    ptz_direction(0),
+    ptz_wait_time(4),
+    num_single_pos(8)
 {
     ui->setupUi(this);
 
@@ -67,6 +69,19 @@ ScanConfig::ScanConfig(QWidget *parent) :
     connect(ui->RADIO_PTZ_DIRECTION_N, &QRadioButton::clicked, this, [this]() { ui->RADIO_PTZ_DIRECTION_Z->setChecked(false); ptz_direction = 0; });
     connect(ui->RADIO_PTZ_DIRECTION_Z, &QRadioButton::clicked, this, [this]() { ui->RADIO_PTZ_DIRECTION_N->setChecked(false); ptz_direction = 1; });
     ui->RADIO_PTZ_DIRECTION_N->setChecked(true);
+
+    connect(ui->PTZ_WAIT_TIME_EDT, &QLineEdit::editingFinished, this,
+            [this]() {
+                ptz_wait_time = ui->PTZ_WAIT_TIME_EDT->text().toInt();
+                if (ptz_wait_time < 0) ptz_wait_time = 0;
+                if (ptz_wait_time > 20) ptz_wait_time = 20;
+            });
+    connect(ui->NUM_SINGLE_POS_EDT, &QLineEdit::editingFinished, this,
+            [this]() {
+                num_single_pos = ui->NUM_SINGLE_POS_EDT->text().toInt();
+                if (num_single_pos < 1) num_single_pos = 1;
+                if (num_single_pos > 20) num_single_pos = 20;
+            });
 
     data_exchange(false);
     setup_hz(0);

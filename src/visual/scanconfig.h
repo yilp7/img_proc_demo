@@ -66,6 +66,8 @@ public:
     int            count_h;
     int            count_v;
     uint           ptz_direction;
+    int            ptz_wait_time;
+    int            num_single_pos;
 };
 
 #endif // SCANCONFIG_H

@@ -247,7 +247,7 @@
    <property name="geometry">
     <rect>
      <x>150</x>
-     <y>220</y>
+     <y>200</y>
      <width>80</width>
      <height>20</height>
     </rect>
@@ -260,7 +260,7 @@
    <property name="geometry">
     <rect>
      <x>150</x>
-     <y>240</y>
+     <y>220</y>
      <width>80</width>
      <height>20</height>
     </rect>
@@ -279,7 +279,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Frame count</string>
+    <string>Frames count</string>
    </property>
   </widget>
   <widget class="QLabel" name="DELAY_LBL">
@@ -493,7 +493,7 @@
    <property name="geometry">
     <rect>
      <x>150</x>
-     <y>200</y>
+     <y>180</y>
      <width>80</width>
      <height>16</height>
     </rect>
@@ -509,7 +509,7 @@
    <property name="geometry">
     <rect>
      <x>240</x>
-     <y>200</y>
+     <y>180</y>
      <width>80</width>
      <height>16</height>
     </rect>
@@ -525,7 +525,7 @@
    <property name="geometry">
     <rect>
      <x>240</x>
-     <y>240</y>
+     <y>220</y>
      <width>80</width>
      <height>20</height>
     </rect>
@@ -538,7 +538,7 @@
    <property name="geometry">
     <rect>
      <x>240</x>
-     <y>220</y>
+     <y>200</y>
      <width>80</width>
      <height>20</height>
     </rect>
@@ -689,6 +689,9 @@
      <height>21</height>
     </rect>
    </property>
+   <property name="alignment">
+    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+   </property>
   </widget>
   <widget class="QLineEdit" name="START_ANGLE_V_EDT">
    <property name="geometry">
@@ -698,6 +701,9 @@
      <width>41</width>
      <height>21</height>
     </rect>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
    </property>
   </widget>
   <widget class="QLabel" name="START_ANGLE_H">
@@ -734,6 +740,9 @@
      <width>41</width>
      <height>21</height>
     </rect>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
    </property>
   </widget>
   <widget class="QLabel" name="END_PTZ_LBL">
@@ -784,6 +793,9 @@
      <height>21</height>
     </rect>
    </property>
+   <property name="alignment">
+    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+   </property>
   </widget>
   <widget class="QLabel" name="STEP_GW_LBL_2">
    <property name="geometry">
@@ -806,6 +818,9 @@
      <width>41</width>
      <height>21</height>
     </rect>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
    </property>
   </widget>
   <widget class="QLabel" name="STEP_ANGLE_H">
@@ -830,6 +845,9 @@
      <height>21</height>
     </rect>
    </property>
+   <property name="alignment">
+    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+   </property>
   </widget>
   <widget class="QLabel" name="STEP_ANGLE_V">
    <property name="geometry">
@@ -844,7 +862,7 @@
     <string>v</string>
    </property>
   </widget>
-  <widget class="QLabel" name="FRAME_PTZ_LBL">
+  <widget class="QLabel" name="POS_CNT_PTZ_LBL">
    <property name="geometry">
     <rect>
      <x>330</x>
@@ -854,7 +872,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Frame count</string>
+    <string>Pos. count</string>
    </property>
   </widget>
   <widget class="QLabel" name="FRAME_V">
@@ -892,6 +910,9 @@
      <height>21</height>
     </rect>
    </property>
+   <property name="alignment">
+    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+   </property>
   </widget>
   <widget class="QLineEdit" name="FRAME_H_EDT">
    <property name="geometry">
@@ -902,12 +923,15 @@
      <height>21</height>
     </rect>
    </property>
+   <property name="alignment">
+    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+   </property>
   </widget>
   <widget class="QRadioButton" name="RADIO_PTZ_DIRECTION_N">
    <property name="geometry">
     <rect>
-     <x>330</x>
-     <y>230</y>
+     <x>160</x>
+     <y>250</y>
      <width>41</width>
      <height>22</height>
     </rect>
@@ -919,14 +943,66 @@
   <widget class="QRadioButton" name="RADIO_PTZ_DIRECTION_Z">
    <property name="geometry">
     <rect>
-     <x>400</x>
-     <y>230</y>
+     <x>250</x>
+     <y>250</y>
      <width>41</width>
      <height>22</height>
     </rect>
    </property>
    <property name="text">
     <string>Z</string>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="NUM_SINGLE_POS_EDT">
+   <property name="geometry">
+    <rect>
+     <x>400</x>
+     <y>240</y>
+     <width>41</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="PTZ_WAIT_TIME_EDT">
+   <property name="geometry">
+    <rect>
+     <x>340</x>
+     <y>240</y>
+     <width>41</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+   </property>
+  </widget>
+  <widget class="QLabel" name="PTZ_WAIT_TIME_LBL">
+   <property name="geometry">
+    <rect>
+     <x>340</x>
+     <y>225</y>
+     <width>49</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>PTZ wait</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="NUM_SINGLE_POS_LBL">
+   <property name="geometry">
+    <rect>
+     <x>400</x>
+     <y>225</y>
+     <width>49</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>num.</string>
    </property>
   </widget>
   <zorder>START_GW_EDIT_M</zorder>
@@ -992,13 +1068,17 @@
   <zorder>STEP_ANGLE_H</zorder>
   <zorder>STEP_ANGLE_H_EDT</zorder>
   <zorder>STEP_ANGLE_V</zorder>
-  <zorder>FRAME_PTZ_LBL</zorder>
+  <zorder>POS_CNT_PTZ_LBL</zorder>
   <zorder>FRAME_V</zorder>
   <zorder>FRAME_H</zorder>
   <zorder>FRAME_V_EDT</zorder>
   <zorder>FRAME_H_EDT</zorder>
   <zorder>RADIO_PTZ_DIRECTION_N</zorder>
   <zorder>RADIO_PTZ_DIRECTION_Z</zorder>
+  <zorder>NUM_SINGLE_POS_EDT</zorder>
+  <zorder>PTZ_WAIT_TIME_EDT</zorder>
+  <zorder>PTZ_WAIT_TIME_LBL</zorder>
+  <zorder>NUM_SINGLE_POS_LBL</zorder>
  </widget>
  <resources/>
  <connections/>
