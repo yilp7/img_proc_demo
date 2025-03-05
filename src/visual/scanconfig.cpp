@@ -75,12 +75,14 @@ ScanConfig::ScanConfig(QWidget *parent) :
                 ptz_wait_time = ui->PTZ_WAIT_TIME_EDT->text().toInt();
                 if (ptz_wait_time < 0) ptz_wait_time = 0;
                 if (ptz_wait_time > 20) ptz_wait_time = 20;
+                ui->PTZ_WAIT_TIME_EDT->setText(QString::number(ptz_wait_time));
             });
     connect(ui->NUM_SINGLE_POS_EDT, &QLineEdit::editingFinished, this,
             [this]() {
                 num_single_pos = ui->NUM_SINGLE_POS_EDT->text().toInt();
                 if (num_single_pos < 1) num_single_pos = 1;
                 if (num_single_pos > 20) num_single_pos = 20;
+                ui->NUM_SINGLE_POS_EDT->setText(QString::number(num_single_pos));
             });
 
     data_exchange(false);
@@ -126,6 +128,17 @@ void ScanConfig::data_exchange(bool read)
         capture_scan_res = ui->CAPTURE_SCAN_RES_CHK->isChecked();
         record_scan_ori = ui->RECORD_SCAN_ORI_CHK->isChecked();
         record_scan_res = ui->RECORD_SCAN_RES_CHK->isChecked();
+
+        starting_h = ui->START_ANGLE_H_EDT->text().toFloat();
+        starting_v = ui->START_ANGLE_V_EDT->text().toFloat();
+        ending_h = ui->END_ANGLE_H_EDT->text().toFloat();
+        ending_v = ui->END_ANGLE_V_EDT->text().toFloat();
+        step_h = ui->STEP_ANGLE_H_EDT->text().toFloat();
+        step_v = ui->STEP_ANGLE_V_EDT->text().toFloat();
+        count_h = ui->FRAME_H_EDT->text().toInt();
+        count_v = ui->FRAME_V_EDT->text().toInt();
+        ptz_wait_time = ui->PTZ_WAIT_TIME_EDT->text().toInt();
+        num_single_pos = ui->NUM_SINGLE_POS_EDT->text().toInt();
     }
     else {
         switch (base_unit) {
@@ -163,6 +176,17 @@ void ScanConfig::data_exchange(bool read)
         ui->CAPTURE_SCAN_RES_CHK->setChecked(capture_scan_res);
         ui->RECORD_SCAN_ORI_CHK->setChecked(record_scan_ori);
         ui->RECORD_SCAN_RES_CHK->setChecked(record_scan_res);
+
+        ui->START_ANGLE_H_EDT->setText(QString::number(starting_h, 'f', 2));
+        ui->START_ANGLE_V_EDT->setText(QString::number(starting_v, 'f', 2));
+        ui->END_ANGLE_H_EDT->setText(QString::number(ending_h, 'f', 2));
+        ui->END_ANGLE_V_EDT->setText(QString::number(ending_v, 'f', 2));
+        ui->STEP_ANGLE_H_EDT->setText(QString::number(step_h, 'f', 2));
+        ui->STEP_ANGLE_V_EDT->setText(QString::number(step_v, 'f', 2));
+        ui->FRAME_H_EDT->setText(QString::number(count_h));
+        ui->FRAME_V_EDT->setText(QString::number(count_v));
+        ui->PTZ_WAIT_TIME_EDT->setText(QString::number(ptz_wait_time));
+        ui->NUM_SINGLE_POS_EDT->setText(QString::number(num_single_pos));
     }
 }
 

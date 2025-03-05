@@ -233,8 +233,8 @@ UserPanel::UserPanel(QWidget *parent) :
     pref->init();
     scan_config = ui->TITLE->scan_config;
 
-    SerialServer *s = new SerialServer();
-    s->show();
+//    SerialServer *s = new SerialServer();
+//    s->show();
 
 #if ENABLE_USER_DEFAULT
     FILE *f = fopen("user_default", "rb");
@@ -1454,7 +1454,7 @@ int UserPanel::grab_thread_process(int *idx) {
             if (scan_img_count < 0) scan_img_count = 0;
 
             static QString scan_save_path_a, scan_save_path;
-            static int save_img_num = 8;
+            int save_img_num = scan_config->num_single_pos;
 //            if (thread_idx == 1) qDebug() << "##--##" << scan_img_count << save_img_num;
             if (scan_img_count > 0 && scan_img_count <= save_img_num) {
 //                qDebug() << "====================" << thread_idx;
@@ -1467,7 +1467,7 @@ int UserPanel::grab_thread_process(int *idx) {
             if (scan_img_count == 0) ;
 
             if (!scan_img_count) {
-                scan_img_count = frame_rate_edit * (2 + save_img_num / frame_rate_edit);
+                scan_img_count = frame_rate_edit * (scan_config->ptz_wait_time + save_img_num / frame_rate_edit);
 //                qDebug() << "scan idx" << scan_tcu_idx << scan_ptz_idx;
 
 //                qDebug() << "delay" << scan_tcu_idx;

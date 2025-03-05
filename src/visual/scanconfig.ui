@@ -956,9 +956,9 @@
   <widget class="QLineEdit" name="NUM_SINGLE_POS_EDT">
    <property name="geometry">
     <rect>
-     <x>400</x>
+     <x>410</x>
      <y>240</y>
-     <width>41</width>
+     <width>31</width>
      <height>21</height>
     </rect>
    </property>
@@ -971,7 +971,7 @@
     <rect>
      <x>340</x>
      <y>240</y>
-     <width>41</width>
+     <width>31</width>
      <height>21</height>
     </rect>
    </property>
@@ -984,8 +984,8 @@
     <rect>
      <x>340</x>
      <y>225</y>
-     <width>49</width>
-     <height>16</height>
+     <width>61</width>
+     <height>14</height>
     </rect>
    </property>
    <property name="text">
@@ -995,14 +995,27 @@
   <widget class="QLabel" name="NUM_SINGLE_POS_LBL">
    <property name="geometry">
     <rect>
-     <x>400</x>
+     <x>410</x>
      <y>225</y>
      <width>49</width>
-     <height>16</height>
+     <height>14</height>
     </rect>
    </property>
    <property name="text">
-    <string>num.</string>
+    <string>Num.</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="UNIT_S">
+   <property name="geometry">
+    <rect>
+     <x>375</x>
+     <y>245</y>
+     <width>21</width>
+     <height>14</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>s</string>
    </property>
   </widget>
   <zorder>START_GW_EDIT_M</zorder>
@@ -1079,6 +1092,7 @@
   <zorder>PTZ_WAIT_TIME_EDT</zorder>
   <zorder>PTZ_WAIT_TIME_LBL</zorder>
   <zorder>NUM_SINGLE_POS_LBL</zorder>
+  <zorder>UNIT_S</zorder>
  </widget>
  <resources/>
  <connections/>
