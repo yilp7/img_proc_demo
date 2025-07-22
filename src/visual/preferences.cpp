@@ -96,10 +96,11 @@ Preferences::Preferences(QWidget *parent) :
     ui->PIXEL_FORMAT_LIST->addItem("Mono10");
     ui->PIXEL_FORMAT_LIST->addItem("Mono12");
     ui->PIXEL_FORMAT_LIST->addItem("RGB8");
+    ui->PIXEL_FORMAT_LIST->addItem("BayerRG8");
     ui->PIXEL_FORMAT_LIST->installEventFilter(this);
     connect(ui->PIXEL_FORMAT_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
             [this](int index){
-                static int pixel_format[4] = {PixelType_Gvsp_Mono8, PixelType_Gvsp_Mono10, PixelType_Gvsp_Mono12, PixelType_Gvsp_RGB8_Packed};
+                static int pixel_format[5] = {PixelType_Gvsp_Mono8, PixelType_Gvsp_Mono10, PixelType_Gvsp_Mono12, PixelType_Gvsp_RGB8_Packed, PixelType_Gvsp_BayerRG8};
                 emit change_pixel_format(pixel_format[index]);
             });
 #ifndef WIN32

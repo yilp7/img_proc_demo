@@ -757,6 +757,8 @@ void UserPanel::init()
     pref->ui->CAMERALINK_CHK->hide();
 #endif //USING_CAMERALINK
     ui->SENSOR_TAPS_BTN->hide();
+
+    switch_ui();
 }
 
 void UserPanel::data_exchange(bool read){
@@ -872,7 +874,7 @@ int UserPanel::grab_thread_process(int *idx) {
     bool updated;
     cv::Mat img_display, prev_img, prev_3d;
     cv::Mat seq[8], seq_sum, frame_a_sum, frame_b_sum;
-    int seq_idx;
+    int seq_idx = 0;
     uint hist[256];
     cv::Mat hist_mat, dist_mat;
 //    ProgSettings *settings = ui->TITLE->prog_settings;
@@ -1096,7 +1098,7 @@ int UserPanel::grab_thread_process(int *idx) {
         if (frame_b_sum.empty()) frame_b_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
         if (ui->FRAME_AVG_CHECK->isChecked()) {
             if (updated) {
-                calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
+//                calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
                 if (seq[7].empty()) for (auto& m: seq) m = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
 
                 seq_sum -= seq[(seq_idx + 4) & 7];
@@ -1143,6 +1145,10 @@ int UserPanel::grab_thread_process(int *idx) {
                     static cv::Mat frame_a_avg, frame_b_avg;
                     frame_a_sum.convertTo(frame_a_avg, _pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
                     frame_b_sum.convertTo(frame_b_avg, _pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
+//                    if (is_color[thread_idx]) {
+//                        cv::cvtColor(frame_a_avg.clone(), frame_a_avg, cv::COLOR_BGR2GRAY);
+//                        cv::cvtColor(frame_b_avg.clone(), frame_b_avg, cv::COLOR_BGR2GRAY);
+//                    }
 //                    ImageProc::gated3D_v2(frame_a_3d ? frame_b_avg : frame_a_avg, frame_a_3d ? frame_a_avg : frame_b_avg, modified_result[thread_idx],
 //                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - ptr_tcu->delay_offset * dist_ns) / dist_ns,
 //                                          pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - ptr_tcu->gate_width_offset * dist_ns) / dist_ns,
@@ -2872,7 +2878,10 @@ void UserPanel::update_distance(double distance)
 
 void UserPanel::update_usbcan_angle(float _h, float _v)
 {
-    if (!ui->ANGLE_H_EDIT->hasFocus()) ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", _h));
+    // Ensure horizontal angle is always positive (0 to 360)
+    float display_h = _h < 0 ? _h + 360.0f : _h;
+    
+    if (!ui->ANGLE_H_EDIT->hasFocus()) ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", display_h));
     if (!ui->ANGLE_V_EDIT->hasFocus()) ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", _v));
 }
 
@@ -4337,6 +4346,8 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             }
             else if (edit == ui->ANGLE_H_EDIT) {
                 angle_h = ui->ANGLE_H_EDIT->text().toDouble();
+                // Ensure horizontal angle is always positive (0 to 360)
+                angle_h = fmod(angle_h + 360.0, 360.0);
                 if (!pref->gcan) emit send_ptz_msg(PTZ::SET_H, angle_h);
                 else            p_usbcan->emit control(USBCAN::POSITION, angle_h);
             }
@@ -5847,6 +5858,9 @@ void UserPanel::point_ptz_to_target(QPoint target)
     display_height = ui->SOURCE_DISPLAY->height();
     angle_h += target.x() * tot_h / display_width - tot_h / 2;
     angle_v += target.y() * tot_v / display_height - tot_v / 2;
+    
+    // Ensure horizontal angle is always positive (0 to 360)
+    angle_h = fmod(angle_h + 360.0, 360.0);
 
     set_ptz_angle();
 }

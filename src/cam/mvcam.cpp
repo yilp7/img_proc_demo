@@ -1,6 +1,7 @@
 #include "mvcam.h"
 
 cv::Mat mv_img;
+cv::Mat bayer_temp;
 
 MvCam::MvCam()
 {
@@ -220,7 +221,9 @@ int MvCam::pixel_type(bool read, int *val)
     }
     else {
         switch (*val) {
+        case PixelType_Gvsp_BayerRG8:
         case PixelType_Gvsp_RGB8_Packed:
+            bayer_temp = cv::Mat(mv_img.rows, mv_img.cols, CV_8UC1);
             mv_img = cv::Mat(mv_img.rows, mv_img.cols, CV_8UC3);
             break;
         case PixelType_Gvsp_Mono8:
@@ -293,6 +296,9 @@ void MvCam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void
     case PixelType_Gvsp_Mono10_Packed:
     case PixelType_Gvsp_Mono12_Packed:
         break;
+    case PixelType_Gvsp_BayerRG8:
+        memcpy(bayer_temp.data, data, frame_info->nFrameLen);
+        cv::cvtColor(bayer_temp, mv_img, cv::COLOR_BayerRG2RGB);
     default:
         mv_img = 0;
         break;

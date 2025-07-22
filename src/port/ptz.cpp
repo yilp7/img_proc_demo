@@ -87,7 +87,10 @@ void PTZ::try_communicate()
             if (read[3] == char(0x59)) {
                 successive_count++;
                 angle_fb %= 36000;
-                emit ptz_param_updated(PTZ::ANGLE_H, angle_h = angle_fb / 100.);
+                double temp_angle = angle_fb / 100.;
+                // Ensure horizontal angle is always positive (0 to 360)
+                temp_angle = temp_angle < 0 ? temp_angle + 360.0 : temp_angle;
+                emit ptz_param_updated(PTZ::ANGLE_H, angle_h = temp_angle);
             }
             else successive_count = 0;
             break;
@@ -185,7 +188,15 @@ send:
             int angle = (uchar(read[4]) << 8) + uchar(read[5]);
             switch (ptz_param)
             {
-                case ANGLE_H: angle %= 36000; emit ptz_param_updated(ptz_param, angle_h = angle / 100.); break;
+                case ANGLE_H: 
+                    angle %= 36000; 
+                    {
+                        double temp_angle = angle / 100.;
+                        // Ensure horizontal angle is always positive (0 to 360)
+                        temp_angle = temp_angle < 0 ? temp_angle + 360.0 : temp_angle;
+                        emit ptz_param_updated(ptz_param, angle_h = temp_angle);
+                    }
+                    break;
                 case ANGLE_V:
                     angle = (angle + 4000) % 36000 - 4000;
                     angle = std::min(std::max(angle, -4000), 4000);
