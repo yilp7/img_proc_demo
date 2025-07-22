@@ -282,14 +282,23 @@ void Lens::load_from_json(const nlohmann::json &j)
     std::cout << j << std::endl;
     std::cout.flush();
     cout_mutex.unlock();
-    lens_control(ADDRESS,      j["address"].get<uchar>());
-    lens_control(STEPPING,     j["speed"].get<uchar>());
-//    set_pos_temp(ZOOM_POS,     j["zoom"].get<uint>());
-//    set_pos_temp(FOCUS_POS,    j["focus"].get<uint>());
-//    set_pos_temp(LASER_RADIUS, j["laser_radius"].get<uint>());
-    lens_control(SET_ZOOM,     j["zoom"].get<uint>());
-    lens_control(SET_FOCUS,    j["focus"].get<uint>());
-    lens_control(SET_RADIUS,   j["laser_radius"].get<uint>());
+    
+    try {
+        if (j.contains("address") && j["address"].is_number())
+            lens_control(ADDRESS, j["address"].get<uchar>());
+        if (j.contains("speed") && j["speed"].is_number())  
+            lens_control(STEPPING, j["speed"].get<uchar>());
+        if (j.contains("zoom") && j["zoom"].is_number())
+            lens_control(SET_ZOOM, j["zoom"].get<uint>());
+        if (j.contains("focus") && j["focus"].is_number())
+            lens_control(SET_FOCUS, j["focus"].get<uint>());
+        if (j.contains("laser_radius") && j["laser_radius"].is_number())
+            lens_control(SET_RADIUS, j["laser_radius"].get<uint>());
+    }
+    catch (const nlohmann::json::exception& e) {
+        qWarning("JSON parsing error in lens configuration: %s", e.what());
+    }
+    
     emit lens_param_updated(Lens::NO_PARAM, 0);
 }
 #endif

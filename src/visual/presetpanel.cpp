@@ -103,7 +103,15 @@ PresetPanel::PresetPanel(QWidget *parent):
     for (int i = 0 ; i < total + 1; i++) {
 //        PresetNameItem *name_item = new PresetNameItem(QString::fromUtf8(presets[i]["name"].get<std::string>().c_str()));
         QString name;
-        if (presets[i].contains("name")) name = QString::fromUtf8(presets[i]["name"].get<std::string>().c_str());
+        if (presets[i].contains("name") && presets[i]["name"].is_string()) {
+            try {
+                name = QString::fromUtf8(presets[i]["name"].get<std::string>().c_str());
+            }
+            catch (const nlohmann::json::exception& e) {
+                qWarning("JSON error parsing preset name: %s", e.what());
+                name = QString("Preset %1").arg(i);
+            }
+        }
         PresetNameItem *name_item = new PresetNameItem(name);
         name_item->setEditable(true);
         name_item->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);

@@ -290,18 +290,37 @@ void TCU::load_from_json(const nlohmann::json &j)
     std::cout << j << std::endl;
     std::cout.flush();
     cout_mutex.unlock();
-    set_user_param(TCU_TYPE,      j["type"].get<uint>());
-    set_user_param(REPEATED_FREQ, j["PRF"].get<double>());
-    set_user_param(LASER_USR,     j["laser_width"].get<double>());
-    set_user_param(DELAY_A,       j["delay_a"].get<double>());
-    set_user_param(GATE_WIDTH_A,  j["gw_a"].get<double>());
-    set_user_param(DELAY_B,       j["delay_b"].get<double>());
-    set_user_param(GATE_WIDTH_B,  j["gw_b"].get<double>());
-    set_user_param(CCD_FREQ,      j["ccd_freq"].get<double>());
-    set_user_param(DUTY,          j["duty"].get<double>());
-    set_user_param(MCP,           j["mcp"].get<uint>());
-    set_user_param(DELAY_N,       j["delay_n"].get<double>());
-    set_user_param(GATE_WIDTH_N,  j["gw_n"].get<double>());
+    
+    try {
+        if (j.contains("type") && j["type"].is_number())
+            set_user_param(TCU_TYPE, j["type"].get<uint>());
+        if (j.contains("PRF") && j["PRF"].is_number())
+            set_user_param(REPEATED_FREQ, j["PRF"].get<double>());
+        if (j.contains("laser_width") && j["laser_width"].is_number())
+            set_user_param(LASER_USR, j["laser_width"].get<double>());
+        if (j.contains("delay_a") && j["delay_a"].is_number())
+            set_user_param(DELAY_A, j["delay_a"].get<double>());
+        if (j.contains("gw_a") && j["gw_a"].is_number())
+            set_user_param(GATE_WIDTH_A, j["gw_a"].get<double>());
+        if (j.contains("delay_b") && j["delay_b"].is_number())
+            set_user_param(DELAY_B, j["delay_b"].get<double>());
+        if (j.contains("gw_b") && j["gw_b"].is_number())
+            set_user_param(GATE_WIDTH_B, j["gw_b"].get<double>());
+        if (j.contains("ccd_freq") && j["ccd_freq"].is_number())
+            set_user_param(CCD_FREQ, j["ccd_freq"].get<double>());
+        if (j.contains("duty") && j["duty"].is_number())
+            set_user_param(DUTY, j["duty"].get<double>());
+        if (j.contains("mcp") && j["mcp"].is_number())
+            set_user_param(MCP, j["mcp"].get<uint>());
+        if (j.contains("delay_n") && j["delay_n"].is_number())
+            set_user_param(DELAY_N, j["delay_n"].get<double>());
+        if (j.contains("gw_n") && j["gw_n"].is_number())
+            set_user_param(GATE_WIDTH_N, j["gw_n"].get<double>());
+    }
+    catch (const nlohmann::json::exception& e) {
+        qWarning("JSON parsing error in TCU configuration: %s", e.what());
+    }
+    
     delay_dist = delay_a * dist_ns;
     depth_of_view = gate_width_a * dist_ns;
     emit tcu_param_updated(NO_PARAM);

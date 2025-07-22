@@ -446,9 +446,18 @@ Coordinate::Coordinate(QWidget *parent) : QFrame(parent), pair(0, 0), set_name(N
 
 void Coordinate::setup(QString name)
 {
-    if (set_name) delete set_name;
-    if (coord_x) delete coord_x;
-    if (coord_y) delete coord_y;
+    if (set_name) {
+        delete set_name;
+        set_name = NULL;
+    }
+    if (coord_x) {
+        delete coord_x;
+        coord_x = NULL;
+    }
+    if (coord_y) {
+        delete coord_y;
+        coord_y = NULL;
+    }
     set_name = new InfoLabel(this);
     set_name->setText(name);
     set_name->setFont(monaco);

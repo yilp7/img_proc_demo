@@ -219,10 +219,21 @@ void PTZ::load_from_json(const nlohmann::json &j)
     std::cout << j << std::endl;
     std::cout.flush();
     cout_mutex.unlock();
-    ptz_control(ADDRESS, j["address"].get<uchar>());
-    ptz_control(SPEED,   j["speed"].get<uchar>());
-    ptz_control(SET_H,   j["angle_h"].get<double>());
-    ptz_control(SET_V,   j["angle_v"].get<double>());
+    
+    try {
+        if (j.contains("address") && j["address"].is_number())
+            ptz_control(ADDRESS, j["address"].get<uchar>());
+        if (j.contains("speed") && j["speed"].is_number())
+            ptz_control(SPEED, j["speed"].get<uchar>());
+        if (j.contains("angle_h") && j["angle_h"].is_number())
+            ptz_control(SET_H, j["angle_h"].get<double>());
+        if (j.contains("angle_v") && j["angle_v"].is_number())
+            ptz_control(SET_V, j["angle_v"].get<double>());
+    }
+    catch (const nlohmann::json::exception& e) {
+        qWarning("JSON parsing error in PTZ configuration: %s", e.what());
+    }
+    
     emit ptz_param_updated(PTZ::NO_PARAM, 0);
 }
 #endif

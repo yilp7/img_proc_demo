@@ -651,6 +651,14 @@ UserPanel::~UserPanel()
     th_laser->quit();
     th_ptz->quit();
     th_rf->quit();
+    
+    // Wait for I/O threads to finish - 100ms is sufficient for serial/TCP operations
+    th_tcu->wait(100);
+    th_lens->wait(100);
+    th_laser->wait(100);
+    th_ptz->wait(100);
+    th_rf->wait(100);
+    
     th_tcu->deleteLater();
     th_lens->deleteLater();
     th_laser->deleteLater();
@@ -663,6 +671,7 @@ UserPanel::~UserPanel()
     p_rf->deleteLater();
 
     th_usbcan->quit();
+    th_usbcan->wait(100);
     th_usbcan->deleteLater();
     p_usbcan->deleteLater();
 
@@ -905,44 +914,55 @@ int UserPanel::grab_thread_process(int *idx) {
     while (grab_image[thread_idx]) {
         disp = displays[*idx];
 
-        while (q_img[thread_idx].size() > 5) {
-            q_img[thread_idx].pop();
-            if (device_type == 1) q_frame_info.pop();
-        }
+        {
+            QMutexLocker locker(&image_mutex[thread_idx]);
+            
+            // Limit queue size safely
+            while (q_img[thread_idx].size() > 5) {
+                q_img[thread_idx].pop();
+                if (device_type == 1) q_frame_info.pop();
+            }
 
-        if (q_img[thread_idx].empty()) {
+            // Safe check and access
+            if (q_img[thread_idx].empty()) {
 #ifdef LVTONG
-            QThread::msleep(10);
-            continue;
+                locker.unlock();
+                QThread::msleep(10);
+                continue;
 #else
-//            if (device_type == -2) continue;
-            img_mem[thread_idx] = prev_img.clone();
-            updated = false;
+//                if (device_type == -2) continue;
+                img_mem[thread_idx] = prev_img.clone();
+                updated = false;
 #endif
-        }
-        else {
-            img_mem[thread_idx] = q_img[thread_idx].front();
-            q_img[thread_idx].pop();
-            int packets_lost_frame = device_type == 1 ? q_frame_info.front() : 0;
-            packets_lost += packets_lost_frame;
-            if (packets_lost_frame) ui->STATUS->packet_lost->set_text("packets lost: " + QString::number(packets_lost));
-//            if (packet_lost > 10) {
-//                static bool msgbox = false;
-//                if (!msgbox) {
-//                    msgbox = true;
-//                    msgbox = !QMessageBox::warning(nullptr, "PROMPT", "packet loss detected: " + QString::number(packet_lost));
+            }
+            else {
+                img_mem[thread_idx] = q_img[thread_idx].front();
+                q_img[thread_idx].pop();
+                int packets_lost_frame = 0;
+                if (device_type == 1 && !q_frame_info.empty()) {
+                    packets_lost_frame = q_frame_info.front();
+                    q_frame_info.pop();
+                }
+                packets_lost += packets_lost_frame;
+                if (packets_lost_frame) ui->STATUS->packet_lost->set_text("packets lost: " + QString::number(packets_lost));
+//                if (packet_lost > 10) {
+//                    static bool msgbox = false;
+//                    if (!msgbox) {
+//                        msgbox = true;
+//                        msgbox = !QMessageBox::warning(nullptr, "PROMPT", "packet loss detected: " + QString::number(packet_lost));
+//                    }
 //                }
-//            }
-            if (device_type == 1) q_frame_info.pop();
-            updated = true;
-            if (device_type == -1) q_img[thread_idx].push(img_mem[thread_idx].clone());
+                updated = true;
+                if (device_type == -1) q_img[thread_idx].push(img_mem[thread_idx].clone());
+            }
 //            cv::imwrite("../a.bmp", img_mem[thread_idx]);
             q_fps_calc.add_to_q();
         }
 //        sr.upsample(img_mem[thread_idx].clone(), img_mem[thread_idx]);
 //        cv::resize(img_mem[thread_idx].clone(), img_mem[thread_idx], img_mem[thread_idx].size() * 2);
 
-        image_mutex[thread_idx].lock();
+        {
+            QMutexLocker processing_locker(&image_mutex[thread_idx]);
 //        qDebug () << QDateTime::currentDateTime().toString() << updated << img_mem.data;
 
         if (updated) {
@@ -1562,7 +1582,7 @@ int UserPanel::grab_thread_process(int *idx) {
         }
 
         if (updated) prev_img = img_mem[thread_idx].clone();
-        image_mutex[thread_idx].unlock();
+        } // QMutexLocker automatically unlocks here
     }
 //    free(range);
 #ifdef LVTONG
@@ -1764,8 +1784,15 @@ int UserPanel::shut_down() {
 
     if (!q_img[0].empty()) std::queue<cv::Mat>().swap(q_img[0]);
 
-    if (curr_cam) curr_cam->shut_down();
-    if (curr_cam) delete curr_cam, curr_cam = NULL;
+    if (curr_cam) {
+        int shutdown_result = curr_cam->shut_down();
+        if (shutdown_result != 0) {
+            qWarning("Camera shutdown failed with error code: %d", shutdown_result);
+            // Try to force cleanup even if shutdown failed
+        }
+        delete curr_cam;
+        curr_cam = NULL;
+    }
 
     start_grabbing = false;
     device_on = false;
@@ -2040,6 +2067,11 @@ void UserPanel::on_START_BUTTON_clicked()
 {
     if (device_on) return;
 
+    if (!curr_cam) {
+        QMessageBox::warning(this, "PROMPT", tr("No camera available"));
+        return;
+    }
+
     if (curr_cam->start(pref->device_idx)) {
         QMessageBox::warning(this, "PROMPT", tr("start failed"));
         return;
@@ -2125,6 +2157,10 @@ void UserPanel::on_SOFTWARE_CHECK_stateChanged(int arg1)
 
 void UserPanel::on_SOFTWARE_TRIGGER_BUTTON_clicked()
 {
+    if (!curr_cam || !device_on) {
+        qWarning("Cannot trigger: camera not initialized or device not on");
+        return;
+    }
     curr_cam->trigger_once();
 }
 
@@ -2190,10 +2226,12 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
 
     if (curr_cam->start_grabbing()) {
         grab_image[0] = false;
-        h_grab_thread[0]->quit();
-        h_grab_thread[0]->wait();
-        delete h_grab_thread[0];
-        h_grab_thread[0] = NULL;
+        if (h_grab_thread[0]) {
+            h_grab_thread[0]->quit();
+            h_grab_thread[0]->wait();
+            delete h_grab_thread[0];
+            h_grab_thread[0] = NULL;
+        }
         return;
     }
     start_grabbing = true;
@@ -2255,9 +2293,10 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
 //    cv::imwrite(QString(save_location + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".jpg").toLatin1().data(), modified_result);
     if (record_modified[0]) {
 //        curr_cam->stop_recording(0);
-        image_mutex[0].lock();
-        vid_out[1].release();
-        image_mutex[0].unlock();
+        {
+            QMutexLocker locker(&image_mutex[0]);
+            vid_out[1].release();
+        }
         QString dest = save_location + "/" + res_avi.section('/', -1, -1);
         std::thread t(UserPanel::move_to_dest, QString(res_avi), QString(dest));
         t.detach();
@@ -2265,11 +2304,12 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
     }
     else {
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
-        image_mutex[0].lock();
-        res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi");
-//        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || image_3d[0]);
-        vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('X', '2', '6', '4'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || pseudocolor[0]);
-        image_mutex[0].unlock();
+        {
+            QMutexLocker locker(&image_mutex[0]);
+            res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi");
+//            vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || image_3d[0]);
+            vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('X', '2', '6', '4'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || pseudocolor[0]);
+        }
     }
     record_modified[0] ^= 1;
     ui->SAVE_FINAL_BUTTON->setText(record_modified[0] ? tr("STOP") : tr("RES"));
@@ -3048,19 +3088,18 @@ void UserPanel::save_config_to_file()
     if (config_name.isEmpty()) return;
     if (!config_name.endsWith(".ssy")) config_name.append(".ssy");
     QFile config(config_name);
-    config.open(QIODevice::WriteOnly);
-    if (config.isOpen()) {
-        QDataStream out(&config);
-        convert_write(out, WIN_PREF);
-        convert_write(out, TCU_PARAMS);
-        convert_write(out, SCAN);
-        convert_write(out, IMG);
-        convert_write(out, TCU_PREF);
-        config.close();
-    }
-    else {
+    if (!config.open(QIODevice::WriteOnly)) {
         QMessageBox::warning(this, "PROMPT", tr("cannot create config file"));
+        return;
     }
+    
+    QDataStream out(&config);
+    convert_write(out, WIN_PREF);
+    convert_write(out, TCU_PARAMS);
+    convert_write(out, SCAN);
+    convert_write(out, IMG);
+    convert_write(out, TCU_PREF);
+    config.close();
 }
 
 void UserPanel::prompt_for_config_file()
@@ -3074,20 +3113,19 @@ void UserPanel::load_config(QString config_name)
 {
     if (config_name.isEmpty()) return;
     QFile config(config_name);
-    config.open(QIODevice::ReadOnly);
-    bool read_success = true;
-    if (config.isOpen()) {
-        QDataStream out(&config);
-        read_success &= convert_read(out, WIN_PREF);
-        read_success &= convert_read(out, TCU_PARAMS);
-        read_success &= convert_read(out, SCAN);
-        read_success &= convert_read(out, IMG);
-        read_success &= convert_read(out, TCU_PREF);
-        config.close();
-    }
-    else {
+    if (!config.open(QIODevice::ReadOnly)) {
         QMessageBox::warning(this, "PROMPT", tr("cannot open config file"));
+        return;
     }
+    
+    bool read_success = true;
+    QDataStream out(&config);
+    read_success &= convert_read(out, WIN_PREF);
+    read_success &= convert_read(out, TCU_PARAMS);
+    read_success &= convert_read(out, SCAN);
+    read_success &= convert_read(out, IMG);
+    read_success &= convert_read(out, TCU_PREF);
+    config.close();
     if (read_success) {
 //        data_exchange(false);
         update_delay();
@@ -3297,10 +3335,26 @@ QByteArray UserPanel::communicate_display(int id, QByteArray write, int write_si
             return QByteArray();
         }
         serial_port[id]->clear();
-        serial_port[id]->write(write, write_size);
-        while (serial_port[id]->waitForBytesWritten(10)) ;
+        qint64 bytes_written = serial_port[id]->write(write, write_size);
+        if (bytes_written == -1) {
+            qWarning("Serial port write error on port %d", id);
+            port_mutex.unlock();
+            return QByteArray();
+        }
+        
+        int write_retries = 5; // 5 * 10ms = 50ms max
+        while (serial_port[id]->waitForBytesWritten(10) && --write_retries > 0 && serial_port[id]->isOpen()) ;
 
-        if (fb) while (serial_port[id]->waitForReadyRead(100)) ;
+        if (fb && serial_port[id]->isOpen()) {
+            int read_retries = 2; // 2 * 100ms = 200ms max  
+            while (serial_port[id]->waitForReadyRead(100) && --read_retries > 0 && serial_port[id]->isOpen()) ;
+        }
+
+        if (!serial_port[id]->isOpen()) {
+            qWarning("Serial port disconnected during communication on port %d", id);
+            port_mutex.unlock();
+            return QByteArray();
+        }
 
         read = read_size ? serial_port[id]->read(read_size) : serial_port[id]->readAll();
         for (char i = 0; i < read.size(); i++) str_r += QString::asprintf(" %02X", (uchar)read[i]);
@@ -3312,10 +3366,26 @@ QByteArray UserPanel::communicate_display(int id, QByteArray write, int write_si
 //            image_mutex.unlock();
             return QByteArray();
         }
-        tcp_port[id]->write(write, write_size);
-        while (tcp_port[id]->waitForBytesWritten(10)) ;
+        qint64 bytes_written = tcp_port[id]->write(write, write_size);
+        if (bytes_written == -1) {
+            qWarning("TCP port write error on port %d", id);
+            port_mutex.unlock();
+            return QByteArray();
+        }
+        
+        int write_retries = 5; // 5 * 10ms = 50ms max
+        while (tcp_port[id]->waitForBytesWritten(10) && --write_retries > 0 && tcp_port[id]->isOpen()) ;
 
-        if (fb) while (tcp_port[id]->waitForReadyRead(100)) ;
+        if (fb && tcp_port[id]->isOpen()) {
+            int read_retries = 2; // 2 * 100ms = 200ms max
+            while (tcp_port[id]->waitForReadyRead(100) && --read_retries > 0 && tcp_port[id]->isOpen()) ;
+        }
+
+        if (!tcp_port[id]->isOpen()) {
+            qWarning("TCP port disconnected during communication on port %d", id);
+            port_mutex.unlock();
+            return QByteArray();
+        }
 
         read = read_size ? tcp_port[id]->read(read_size) : tcp_port[id]->readAll();
         for (char i = 0; i < read.size(); i++) str_r += QString::asprintf(" %02X", (uchar)read[i]);
@@ -5619,9 +5689,11 @@ void UserPanel::transparent_transmission_file(int id)
         if (!serial_port[0]->isOpen()) continue;
         serial_port[0]->clear();
         serial_port[0]->write(cmd, write_size);
-        while (serial_port[0]->waitForBytesWritten(10)) ;
+        int write_retries = 5; // 5 * 10ms = 50ms max
+        while (serial_port[0]->waitForBytesWritten(10) && --write_retries > 0) ;
 
-        while (serial_port[0]->waitForReadyRead(100)) ;
+        int read_retries = 2; // 2 * 100ms = 200ms max
+        while (serial_port[0]->waitForReadyRead(100) && --read_retries > 0) ;
 
         QByteArray read = serial_port[0]->readAll();
         for (char i = 0; i < read.length(); i++) str_r += QString::asprintf(" %02X", i < 0 ? 0 : (uchar)read[i]);
@@ -5635,11 +5707,11 @@ void UserPanel::transparent_transmission_file(int id)
 void UserPanel::config_gatewidth(QString filename)
 {
     QFile config_file(filename);
-    config_file.open(QIODevice::ReadOnly);
-    if (!config_file.isOpen()) {
+    if (!config_file.open(QIODevice::ReadOnly)) {
         QMessageBox::warning(this, "PROMPT", tr("cannot open config file"));
         return;
     }
+    
     QByteArray line;
 //    for (int i = 0; i < 100; i++) ptr_tcu->gw_lut[i] = -1;
     while (!(line = config_file.readLine(128)).isEmpty()) {
@@ -5650,6 +5722,7 @@ void UserPanel::config_gatewidth(QString filename)
 //        ptr_tcu->gw_lut[ori] = res;
     }
 //    ptr_tcu->use_gw_lut = true;
+    config_file.close();
 }
 
 void UserPanel::send_ctrl_cmd(uchar dir)
@@ -6109,9 +6182,11 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
         new_y = y_spinbox->value();
         bool was_playing = start_grabbing;
         if (was_playing) ui->STOP_GRABBING_BUTTON->click();
-        curr_cam->frame_size(false, &new_w, &new_h);
-        curr_cam->frame_offset(false, &new_x, &new_y);
-        if (device_on) curr_cam->frame_size(true, &w[0], &h[0]);
+        if (curr_cam) {
+            curr_cam->frame_size(false, &new_w, &new_h);
+            curr_cam->frame_offset(false, &new_x, &new_y);
+        }
+        if (device_on && curr_cam) curr_cam->frame_size(true, &w[0], &h[0]);
         status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
         QResizeEvent e(this->size(), this->size());
         resizeEvent(&e);
