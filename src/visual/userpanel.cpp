@@ -96,6 +96,7 @@ UserPanel::UserPanel(QWidget *parent) :
     pref(NULL),
     scan_config(NULL),
     laser_settings(NULL),
+    config(NULL),
 #ifdef DISTANCE_3D_VIEW
     view_3d(NULL),
 #endif //DISTANCE_3D_VIEW
@@ -183,7 +184,7 @@ UserPanel::UserPanel(QWidget *parent) :
     lang(0),
     tp(40),
     ptz_grp(NULL),
-    ptz_speed(16),
+    ptz_speed(32),
     angle_h(0),
     angle_v(0),
     alt_ctrl_grp(NULL)
@@ -233,10 +234,13 @@ UserPanel::UserPanel(QWidget *parent) :
     pref->init();
     scan_config = ui->TITLE->scan_config;
 
+    // initialize config system
+    config = new Config(this);
+
 //    SerialServer *s = new SerialServer();
 //    s->show();
 
-#if ENABLE_USER_DEFAULT
+#if ENABLE_USER_DEFAULT // DEPRECATED: user_default language loading replaced by JSON config
     FILE *f = fopen("user_default", "rb");
     if (f) {
         uchar use_zh;
@@ -245,6 +249,8 @@ UserPanel::UserPanel(QWidget *parent) :
         fclose(f);
         if (use_zh) switch_language();
     }
+#else
+    // Language will be set from JSON config during auto-load
 #endif
     // initialization
     // - default save path
@@ -442,10 +448,10 @@ UserPanel::UserPanel(QWidget *parent) :
     ui->SWITCH_TCU_UI_BTN->setIcon(QIcon(":/tools/" + QString(app_theme ? "light" : "dark") + "/switch"));
 
     ui->PTZ_SPEED_SLIDER->setMinimum(1);
-    ui->PTZ_SPEED_SLIDER->setMaximum(63);
+    ui->PTZ_SPEED_SLIDER->setMaximum(64);
     ui->PTZ_SPEED_SLIDER->setSingleStep(1);
-    ui->PTZ_SPEED_SLIDER->setValue(31);
-    ui->PTZ_SPEED_EDIT->setText("31");
+    ui->PTZ_SPEED_SLIDER->setValue(32);
+    ui->PTZ_SPEED_EDIT->setText("32");
 
 //    q_scan.push_back(-1);
 //    setup_stepping(0);
@@ -579,20 +585,8 @@ UserPanel::UserPanel(QWidget *parent) :
     connect(this, SIGNAL(save_to_preset(int, nlohmann::json)), preset, SLOT(save_preset(int, nlohmann::json)), Qt::QueuedConnection);
     connect(preset, &PresetPanel::preset_selected, this, &UserPanel::apply_preset, Qt::QueuedConnection);
 
-    uchar com[5] = {0};
-#ifdef ENABLE_USER_DEFAULT
-    f = fopen("user_default", "rb");
-    if (f) {
-        fseek(f, 5, SEEK_SET);
-        fread(com, 1, 5, f);
-        fclose(f);
-    }
-#endif //ENABLE_USER_DEFAULT
-    for (int i = 0; i < 5; i++) com_edit[i]->setText(QString::number(com[i])), com_edit[i]->emit returnPressed();
-
     for (int i = 0; i < 5; i++) serial_port[i] = new QSerialPort(this)/*, setup_serial_port(serial_port + i, i, com_edit[i]->text(), 9600)*/;
     for (int i = 0; i < 5; i++) tcp_port[i] = new QTcpSocket(this);
-    if (serial_port[0]->isOpen() && serial_port[3]->isOpen()) on_LASER_BTN_clicked();
 
     // connect ptz targeting slots (moved to signal updated_pos)
 //    connect(ui->SOURCE_DISPLAY, SIGNAL(ptz_target(QPoint)), this, SLOT(point_ptz_to_target(QPoint)));
@@ -651,14 +645,14 @@ UserPanel::~UserPanel()
     th_laser->quit();
     th_ptz->quit();
     th_rf->quit();
-    
+
     // Wait for I/O threads to finish - 100ms is sufficient for serial/TCP operations
     th_tcu->wait(100);
     th_lens->wait(100);
     th_laser->wait(100);
     th_ptz->wait(100);
     th_rf->wait(100);
-    
+
     th_tcu->deleteLater();
     th_lens->deleteLater();
     th_laser->deleteLater();
@@ -675,11 +669,24 @@ UserPanel::~UserPanel()
     th_usbcan->deleteLater();
     p_usbcan->deleteLater();
 
+    th_udpptz->quit();
+    th_udpptz->wait(100);
+    th_udpptz->deleteLater();
+    p_udpptz->deleteLater();
+
     delete ui;
 }
 
 void UserPanel::init()
 {
+    // auto-load default config if it exists
+    QString default_config_path = QCoreApplication::applicationDirPath() + "/default.json";
+    if (QFile::exists(default_config_path)) {
+        if (config->loadFromFile(default_config_path)) {
+            syncConfigToPreferences();
+        }
+    }
+
     // - set startup focus
     ui->ENUM_BUTTON->click();
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
@@ -759,7 +766,6 @@ void UserPanel::init()
 //    ui->ANALYSIS_RADIO->hide();
 //    ui->PLUGIN_DISPLAY_1->hide();
 
-    pref->ui->TCU_LIST->setCurrentIndex(1);
 #ifdef USING_CAMERALINK
     pref->ui->CAMERALINK_CHK->click();
 #else //USING_CAMERALINK
@@ -767,7 +773,23 @@ void UserPanel::init()
 #endif //USING_CAMERALINK
     ui->SENSOR_TAPS_BTN->hide();
 
-    switch_ui();
+    uchar com[5] = {0};
+#if ENABLE_USER_DEFAULT // DEPRECATED: user_default COM port loading replaced by JSON config
+    f = fopen("user_default", "rb");
+    if (f) {
+        fseek(f, 5, SEEK_SET);
+        fread(com, 1, 5, f);
+        fclose(f);
+    }
+#else
+    // COM ports will be loaded from JSON config during auto-load
+    uchar default_com[5] = {1, 2, 3, 4, 5}; // Default COM port numbers
+    memcpy(com, default_com, 5);
+#endif
+    for (int i = 0; i < 5; i++) com_edit[i]->emit returnPressed();
+
+    if (serial_port[0]->isOpen() && serial_port[3]->isOpen()) on_LASER_BTN_clicked();
+
 }
 
 void UserPanel::data_exchange(bool read){
@@ -916,7 +938,7 @@ int UserPanel::grab_thread_process(int *idx) {
 
         {
             QMutexLocker locker(&image_mutex[thread_idx]);
-            
+
             // Limit queue size safely
             while (q_img[thread_idx].size() > 5) {
                 q_img[thread_idx].pop();
@@ -1690,12 +1712,15 @@ void UserPanel::set_theme()
 
     laser_settings->set_theme();
 
-#if ENABLE_USER_DEFAULT
+#if ENABLE_USER_DEFAULT // DEPRECATED: user_default theme saving replaced by JSON config
     FILE *f = fopen("user_default", "rb+");
     if (!f) return;
     fseek(f, 3, SEEK_SET);
     fwrite(&app_theme, 1, 1, f);
     fclose(f);
+#else
+    config->getData().ui.dark_theme = (app_theme == 0);
+    config->autoSave();
 #endif
 }
 
@@ -1746,12 +1771,15 @@ void UserPanel::switch_language()
         ui->RADIUS_DEC_BTN->setText("-");
     }
 
-#if ENABLE_USER_DEFAULT
+#if ENABLE_USER_DEFAULT // DEPRECATED: user_default language saving replaced by JSON config
     FILE *f = fopen("user_default", "rb+");
     if (!f) return;
     fseek(f, 4, SEEK_SET);
     fwrite(&lang, 1, 1, f);
     fclose(f);
+#else
+    config->getData().ui.english = (lang == 0);
+    config->autoSave();
 #endif
 }
 
@@ -1866,27 +1894,80 @@ void UserPanel::init_control_port()
     th_ptz  ->start();
     th_rf   ->start();
 
-    connect(ui->TCU_COM_EDIT, &QLineEdit::returnPressed, this, [this]() { p_tcu->emit connect_to_serial(ui->TCU_COM_EDIT->text()); });
+    connect(ui->TCU_COM_EDIT, &QLineEdit::returnPressed, this, [this]() {
+        p_tcu->emit connect_to_serial(ui->TCU_COM_EDIT->text());
+        QString port_text = ui->TCU_COM_EDIT->text();
+#ifdef WIN32
+        config->getData().com_tcu.port = port_text.isEmpty() ? "" : "COM" + port_text;
+#else
+        config->getData().com_tcu.port = port_text;
+#endif
+        config->autoSave();
+    });
     connect(p_tcu, &ControlPort::port_status_updated, this, [this]() { update_port_status(p_tcu, ui->TCU_COM); });
     connect(p_tcu, &ControlPort::port_io_log, this, &UserPanel::append_data, Qt::QueuedConnection);
     connect(p_tcu, &TCU::tcu_param_updated, this, &UserPanel::update_tcu_params);
     connect(this, SIGNAL(send_double_tcu_msg(qint32, double)), p_tcu, SLOT(set_user_param(qint32, double)), Qt::QueuedConnection);
     connect(this, SIGNAL(send_uint_tcu_msg(qint32, uint)), p_tcu, SLOT(set_user_param(qint32, uint)), Qt::QueuedConnection);
 
-    connect(ui->LENS_COM_EDIT, &QLineEdit::returnPressed, this, [this]() { p_lens->emit connect_to_serial(ui->LENS_COM_EDIT->text()); });
+    connect(ui->LENS_COM_EDIT, &QLineEdit::returnPressed, this, [this]() {
+        p_lens->emit connect_to_serial(ui->LENS_COM_EDIT->text());
+        QString port_text = ui->LENS_COM_EDIT->text();
+#ifdef WIN32
+        config->getData().com_lens.port = port_text.isEmpty() ? "" : "COM" + port_text;
+#else
+        config->getData().com_lens.port = port_text;
+#endif
+        config->autoSave();
+    });
     connect(p_lens, &ControlPort::port_status_updated, this, [this]() { update_port_status(p_lens, ui->LENS_COM); });
     connect(p_lens, &ControlPort::port_io_log, this, &UserPanel::append_data, Qt::QueuedConnection);
     connect(p_lens, &Lens::lens_param_updated, this, &UserPanel::update_lens_params);
     connect(this, SIGNAL(send_lens_msg(qint32, uint)), p_lens, SLOT(lens_control(qint32, uint)), Qt::QueuedConnection);
     connect(this, SIGNAL(set_lens_pos(qint32, uint)), p_lens, SLOT(set_pos_temp(qint32, uint)), Qt::QueuedConnection);
 
-    connect(ui->LASER_COM_EDIT, &QLineEdit::returnPressed, this, [this]() { p_laser->emit connect_to_serial(ui->LASER_COM_EDIT->text()); });
+    connect(ui->LASER_COM_EDIT, &QLineEdit::returnPressed, this, [this]() {
+        p_laser->emit connect_to_serial(ui->LASER_COM_EDIT->text());
+        QString port_text = ui->LASER_COM_EDIT->text();
+#ifdef WIN32
+        config->getData().com_laser.port = port_text.isEmpty() ? "" : "COM" + port_text;
+#else
+        config->getData().com_laser.port = port_text;
+#endif
+        config->autoSave();
+    });
     connect(p_laser, &ControlPort::port_status_updated, this, [this]() { update_port_status(p_laser, ui->LASER_COM); });
     connect(this, SIGNAL(send_laser_msg(QString)), p_laser, SLOT(laser_control(QString)), Qt::QueuedConnection);
 //    connect(p_laser, &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
 
-    connect(ui->PTZ_COM_EDIT, &QLineEdit::returnPressed, this, [this]() { p_ptz->emit connect_to_serial(ui->PTZ_COM_EDIT->text()); });
-    connect(p_ptz, &ControlPort::port_status_updated, this, [this]() { update_port_status(p_ptz, ui->PTZ_COM); });
+    connect(ui->PTZ_COM_EDIT, &QLineEdit::returnPressed, this, [this]() {
+        switch (pref->ptz_type) {
+        case 0:
+            if (ui->PTZ_COM_EDIT->text().isEmpty()) p_ptz->emit disconnect_from(true);
+            else p_ptz->emit connect_to_serial(ui->PTZ_COM_EDIT->text());
+            break;
+        case 1:
+            if (ui->PTZ_COM_EDIT->text().isEmpty()) p_usbcan->emit disconnect_from();
+            else p_usbcan->emit connect_to();
+            break;
+        case 2:
+            if (ui->PTZ_COM_EDIT->text().isEmpty()) p_udpptz->emit disconnect_from();
+            else p_udpptz->emit connect_to();
+            break;
+        }
+        QString port_text = ui->PTZ_COM_EDIT->text();
+#ifdef WIN32
+        config->getData().com_ptz.port = port_text.isEmpty() ? "" : "COM" + port_text;
+#else
+        config->getData().com_ptz.port = port_text;
+#endif
+        config->autoSave();
+    });
+    connect(p_ptz, &ControlPort::port_status_updated, this, [this]() {
+        update_port_status(p_ptz, ui->PTZ_COM);
+        bool connected = p_ptz->get_port_status() & (ControlPort::SERIAL_CONNECTED | ControlPort::TCP_CONNECTED);
+        pref->set_ptz_type_enabled(!connected);
+    });
     connect(p_ptz, &ControlPort::port_io_log, this, &UserPanel::append_data, Qt::QueuedConnection);
     connect(p_ptz, &PTZ::ptz_param_updated, this, &UserPanel::update_ptz_params);
     connect(this, SIGNAL(send_ptz_msg(qint32, double)), p_ptz, SLOT(ptz_control(qint32, double)), Qt::QueuedConnection);
@@ -1898,6 +1979,27 @@ void UserPanel::init_control_port()
     p_usbcan->moveToThread(th_usbcan);
     th_usbcan->start();
     connect(p_usbcan, &USBCAN::angle_updated, this, &UserPanel::update_usbcan_angle);
+    connect(p_usbcan, &USBCAN::connection_status_changed, this, [this](bool connected) {
+        pref->set_ptz_type_enabled(!connected);
+    });
+    connect(p_usbcan, &USBCAN::connection_status_changed, this, &UserPanel::update_ptz_status);
+    connect(p_usbcan, &USBCAN::connect_to, this, [this]() { pref->set_ptz_type_enabled(false); });
+    connect(p_usbcan, &USBCAN::disconnect_from, this, [this]() { pref->set_ptz_type_enabled(true); });
+
+    p_udpptz = new UDPPTZ();
+    th_udpptz = new QThread(this);
+    p_udpptz->moveToThread(th_udpptz);
+    th_udpptz->start();
+    connect(p_udpptz, &UDPPTZ::angle_updated, this, &UserPanel::update_udpptz_angle);
+    connect(p_udpptz, &UDPPTZ::connection_status_changed, this, [this](bool connected) {
+        pref->set_ptz_type_enabled(!connected);
+    });
+    connect(p_udpptz, &UDPPTZ::connection_status_changed, this, &UserPanel::update_ptz_status);
+    connect(p_udpptz, &UDPPTZ::connect_to, this, [this]() { pref->set_ptz_type_enabled(false); });
+    connect(p_udpptz, &UDPPTZ::disconnect_from, this, [this]() { pref->set_ptz_type_enabled(true); });
+
+    // Initialize PTZ status display
+    update_ptz_status();
 }
 
 void UserPanel::save_to_file(bool save_result, int idx) {
@@ -2029,13 +2131,16 @@ void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, 
         serial_port_connected[id] = false;
         com_label[id]->setStyleSheet("color: #CD5C5C;");
     }
-#if 0
+
+#if ENABLE_USER_DEFAULT // DEPRECATED: user_default COM port saving replaced by JSON config
     FILE *f = fopen("user_default", "rb+");
     if (!f) return;
     uchar port_num_uchar = port_num.toUInt() & 0xFF;
     fseek(f, id, SEEK_SET);
     fwrite(&port_num_uchar, 1, 1, f);
     fclose(f);
+#else
+    // COM port changes will be saved to JSON config when user saves configuration
 #endif
 }
 
@@ -2920,9 +3025,44 @@ void UserPanel::update_usbcan_angle(float _h, float _v)
 {
     // Ensure horizontal angle is always positive (0 to 360)
     float display_h = _h < 0 ? _h + 360.0f : _h;
-    
+
     if (!ui->ANGLE_H_EDIT->hasFocus()) ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", display_h));
     if (!ui->ANGLE_V_EDIT->hasFocus()) ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", _v));
+}
+
+void UserPanel::update_udpptz_angle(float _h, float _v)
+{
+    // Ensure horizontal angle is always positive (0 to 360)
+    float display_h = _h < 0 ? _h + 360.0f : _h;
+
+    if (!ui->ANGLE_H_EDIT->hasFocus()) ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", display_h));
+    if (!ui->ANGLE_V_EDIT->hasFocus()) ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", _v));
+}
+
+void UserPanel::update_ptz_status()
+{
+    QString style;
+    bool connected = false;
+    bool is_network = false;
+
+    switch (pref->ptz_type) {
+    case 0: // pelco-p - use existing ControlPort status
+        return; // ControlPort handles this automatically
+    case 1: // usbcan - treat as serial connection when connected
+        connected = p_usbcan->is_connected();
+        is_network = false;
+        break;
+    case 2: // udp-scw370 - treat as network connection when connected
+        connected = p_udpptz->is_connected();
+        is_network = true;
+        break;
+    }
+
+    // Apply the same styling as other ControlPort labels
+    style = QString(connected && !is_network ? (app_theme ? "color: #180D1C;" : "color: #B0C4DE;") : "color: #CD5C5C;") +
+            QString(connected && is_network ? "text-decoration:underline;" : "");
+
+    ui->PTZ_COM->setStyleSheet(style);
 }
 
 void UserPanel::set_distance_set(int id)
@@ -3080,72 +3220,177 @@ void UserPanel::switch_ui()
     }
 }
 
-// FIXME update config i/o
 void UserPanel::save_config_to_file()
 {
-//    QString config_name = QFileDialog::getSaveFileName(this, tr("Save Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/config.ssy", tr("*.ssy"));
-    QString config_name = QFileDialog::getSaveFileName(this, tr("Save Configuration"), save_location + "/config.ssy", tr("YJS config(*.ssy);;All Files()"));
+    QString config_name = QFileDialog::getSaveFileName(this, tr("Save Configuration"), save_location + "/config.json", tr("JSON config(*.json);;All Files()"));
     if (config_name.isEmpty()) return;
-    if (!config_name.endsWith(".ssy")) config_name.append(".ssy");
-    QFile config(config_name);
-    if (!config.open(QIODevice::WriteOnly)) {
-        QMessageBox::warning(this, "PROMPT", tr("cannot create config file"));
-        return;
+    if (!config_name.endsWith(".json")) config_name.append(".json");
+
+    // Update config with current settings
+    syncPreferencesToConfig();
+
+    if (!config->saveToFile(config_name)) {
+        QMessageBox::warning(this, "PROMPT", tr("Cannot save config file"));
     }
-    
-    QDataStream out(&config);
-    convert_write(out, WIN_PREF);
-    convert_write(out, TCU_PARAMS);
-    convert_write(out, SCAN);
-    convert_write(out, IMG);
-    convert_write(out, TCU_PREF);
-    config.close();
 }
 
 void UserPanel::prompt_for_config_file()
 {
-//    QString config_name = QFileDialog::getOpenFileName(this, tr("Load Configuration"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation), tr("*.ssy"));
-    QString config_filename = QFileDialog::getOpenFileName(this, tr("Load Configuration"), save_location, tr("YJS config(*.ssy);;All Files()"));
+    QString config_filename = QFileDialog::getOpenFileName(this, tr("Load Configuration"), save_location, tr("JSON config(*.json);;All Files()"));
     load_config(config_filename);
 }
 
 void UserPanel::load_config(QString config_name)
 {
     if (config_name.isEmpty()) return;
-    QFile config(config_name);
-    if (!config.open(QIODevice::ReadOnly)) {
-        QMessageBox::warning(this, "PROMPT", tr("cannot open config file"));
+
+    if (!config->loadFromFile(config_name)) {
+        QMessageBox::warning(this, "PROMPT", tr("Cannot load config file"));
         return;
     }
-    
-    bool read_success = true;
-    QDataStream out(&config);
-    read_success &= convert_read(out, WIN_PREF);
-    read_success &= convert_read(out, TCU_PARAMS);
-    read_success &= convert_read(out, SCAN);
-    read_success &= convert_read(out, IMG);
-    read_success &= convert_read(out, TCU_PREF);
-    config.close();
-    if (read_success) {
-//        data_exchange(false);
-        update_delay();
-        update_gate_width();
-//        ptr_tcu->communicate_display(convert_to_send_tcu(0x01, (laser_width + offset_laser_width) / 8), 7, 1, false);
-//        ptr_tcu->set_user_param(TCU::LASER_WIDTH, ptr_tcu->laser_width);
-//        ptr_tcu->set_user_param(TCUThread::LASER_USR, ptr_tcu->laser_width);
-        emit send_double_tcu_msg(TCU::LASER_USR, p_tcu->get(TCU::LASER_WIDTH));
-//        ui->MCP_SLIDER->setValue(ptr_tcu->mcp);
-        ui->MCP_SLIDER->setValue(std::round(p_tcu->get(TCU::MCP)));
-        on_SET_PARAMS_BUTTON_clicked();
-//        ui->TITLE->prog_settings->data_exchange(false);
-        pref->data_exchange(false);
+
+    // Apply config to current settings
+    syncConfigToPreferences();
+
+    // Update UI elements
+    pref->data_exchange(false);
+    update_delay();
+    update_gate_width();
+    update_laser_width();
+    ui->MCP_SLIDER->setValue(std::round(p_tcu->get(TCU::MCP)));
+    on_SET_PARAMS_BUTTON_clicked();
+}
+
+
+void UserPanel::syncPreferencesToConfig()
+{
+    Config::ConfigData& data = config->getData();
+
+    // Sync COM settings from UI
+#ifdef WIN32
+    data.com_tcu.port = "COM" + com_edit[0]->text();
+    data.com_lens.port = "COM" + com_edit[1]->text();
+    data.com_laser.port = "COM" + com_edit[2]->text();
+    data.com_ptz.port = "COM" + com_edit[3]->text();
+    data.com_range.port = "COM" + com_edit[4]->text();
+#else
+    data.com_tcu.port = com_edit[0]->text();
+    data.com_lens.port = com_edit[1]->text();
+    data.com_laser.port = com_edit[2]->text();
+    data.com_ptz.port = com_edit[3]->text();
+    data.com_range.port = com_edit[4]->text();
+#endif
+
+    // Sync network settings
+    if (pref->ui->TCP_SERVER_IP_EDIT) {
+        data.network.tcp_server_address = pref->ui->TCP_SERVER_IP_EDIT->text();
     }
-    else {
-        data_exchange(true);
-//        ui->TITLE->prog_settings->data_exchange(true);
-        pref->data_exchange(true);
-        QMessageBox::warning(this, "PROMPT", tr("cannot read config file"));
+
+    // Sync UI settings
+    data.ui.simplified = simple_ui;
+    data.ui.dark_theme = !app_theme; // app_theme seems to be inverted
+    data.ui.english = (lang == 0);
+
+    // Sync camera settings
+    data.camera.continuous_mode = !trigger_mode_on;
+    data.camera.frequency = static_cast<int>(frame_rate_edit);
+    data.camera.time_exposure = time_exposure_edit;
+    data.camera.gain = gain_analog_edit;
+
+    // Sync TCU settings from preferences
+    data.tcu.type = pref->device_idx;
+    data.tcu.auto_rep_freq = pref->auto_rep_freq;
+    data.tcu.auto_mcp = pref->auto_mcp;
+    data.tcu.ab_lock = pref->ab_lock;
+    data.tcu.hz_unit = pref->hz_unit;
+    data.tcu.base_unit = pref->base_unit;
+    data.tcu.max_dist = pref->max_dist;
+    data.tcu.delay_offset = pref->delay_offset;
+    data.tcu.max_dov = pref->max_dov;
+    data.tcu.gate_width_offset = pref->gate_width_offset;
+    data.tcu.max_laser_width = pref->max_laser_width;
+    data.tcu.laser_width_offset = pref->laser_width_offset;
+    for (int i = 0; i < 4; ++i) {
+        data.tcu.ps_step[i] = pref->ps_step[i];
     }
+    data.tcu.laser_on = pref->laser_on;
+
+    // Sync device settings
+    data.device.flip = (pref->symmetry != 0);
+    data.device.underwater = false; // Would need to get from actual setting
+    data.device.ebus = pref->ebus_cam;
+    data.device.share_tcu_port = pref->share_port;
+    data.device.ptz_type = pref->ptz_type;
+}
+
+void UserPanel::syncConfigToPreferences()
+{
+    const Config::ConfigData& data = config->getData();
+
+    // Sync COM settings to UI
+#ifdef WIN32
+    com_edit[0]->setText(data.com_tcu.port.startsWith("COM") ? data.com_tcu.port.mid(3) : data.com_tcu.port);
+    com_edit[1]->setText(data.com_lens.port.startsWith("COM") ? data.com_lens.port.mid(3) : data.com_lens.port);
+    com_edit[2]->setText(data.com_laser.port.startsWith("COM") ? data.com_laser.port.mid(3) : data.com_laser.port);
+    com_edit[3]->setText(data.com_ptz.port.startsWith("COM") ? data.com_ptz.port.mid(3) : data.com_ptz.port);
+    com_edit[4]->setText(data.com_range.port.startsWith("COM") ? data.com_range.port.mid(3) : data.com_range.port);
+#else
+    com_edit[0]->setText(data.com_tcu.port);
+    com_edit[1]->setText(data.com_lens.port);
+    com_edit[2]->setText(data.com_laser.port);
+    com_edit[3]->setText(data.com_ptz.port);
+    com_edit[4]->setText(data.com_range.port);
+#endif
+
+    // Sync network settings
+    if (pref->ui->TCP_SERVER_IP_EDIT) {
+        pref->ui->TCP_SERVER_IP_EDIT->setText(data.network.tcp_server_address);
+    }
+
+    // Sync UI settings
+    bool simplify_ui = data.ui.simplified;
+    if (simple_ui != simplify_ui) switch_ui();
+    bool new_theme = data.ui.dark_theme ? 0 : 1;
+    if (new_theme != app_theme) set_theme();
+    lang = data.ui.english ? 0 : 1;
+    if (!data.ui.english) switch_language();
+
+    // Sync camera settings
+    trigger_mode_on = !data.camera.continuous_mode;
+    frame_rate_edit = static_cast<float>(data.camera.frequency);
+    time_exposure_edit = data.camera.time_exposure;
+    gain_analog_edit = data.camera.gain;
+
+    // Sync TCU settings to preferences
+    pref->device_idx = data.tcu.type;
+    pref->auto_rep_freq = data.tcu.auto_rep_freq;
+    pref->auto_mcp = data.tcu.auto_mcp;
+    pref->ab_lock = data.tcu.ab_lock;
+    pref->hz_unit = data.tcu.hz_unit;
+    pref->base_unit = data.tcu.base_unit;
+    pref->max_dist = data.tcu.max_dist;
+    pref->delay_offset = data.tcu.delay_offset;
+    pref->max_dov = data.tcu.max_dov;
+    pref->gate_width_offset = data.tcu.gate_width_offset;
+    pref->max_laser_width = data.tcu.max_laser_width;
+    pref->laser_width_offset = data.tcu.laser_width_offset;
+    for (int i = 0; i < 4; ++i) {
+        pref->ps_step[i] = data.tcu.ps_step[i];
+    }
+    pref->laser_on = data.tcu.laser_on;
+
+    // Sync device settings
+    pref->symmetry = data.device.flip ? 1 : 0;
+    pref->ebus_cam = data.device.ebus;
+    pref->share_port = data.device.share_tcu_port;
+    pref->ptz_type = data.device.ptz_type;
+
+    // Update UI comboboxes before data_exchange
+    pref->ui->TCU_LIST->setCurrentIndex(data.tcu.type);
+    pref->ui->PTZ_TYPE_LIST->setCurrentIndex(data.device.ptz_type);
+
+    data_exchange(false);
+    pref->data_exchange(false);
 }
 
 void UserPanel::generate_preset_data(int idx)
@@ -3341,12 +3586,12 @@ QByteArray UserPanel::communicate_display(int id, QByteArray write, int write_si
             port_mutex.unlock();
             return QByteArray();
         }
-        
+
         int write_retries = 5; // 5 * 10ms = 50ms max
         while (serial_port[id]->waitForBytesWritten(10) && --write_retries > 0 && serial_port[id]->isOpen()) ;
 
         if (fb && serial_port[id]->isOpen()) {
-            int read_retries = 2; // 2 * 100ms = 200ms max  
+            int read_retries = 2; // 2 * 100ms = 200ms max
             while (serial_port[id]->waitForReadyRead(100) && --read_retries > 0 && serial_port[id]->isOpen()) ;
         }
 
@@ -3372,7 +3617,7 @@ QByteArray UserPanel::communicate_display(int id, QByteArray write, int write_si
             port_mutex.unlock();
             return QByteArray();
         }
-        
+
         int write_retries = 5; // 5 * 10ms = 50ms max
         while (tcp_port[id]->waitForBytesWritten(10) && --write_retries > 0 && tcp_port[id]->isOpen()) ;
 
@@ -4418,17 +4663,25 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
                 angle_h = ui->ANGLE_H_EDIT->text().toDouble();
                 // Ensure horizontal angle is always positive (0 to 360)
                 angle_h = fmod(angle_h + 360.0, 360.0);
-                if (!pref->gcan) emit send_ptz_msg(PTZ::SET_H, angle_h);
-                else            p_usbcan->emit control(USBCAN::POSITION, angle_h);
+                switch (pref->ptz_type) {
+                case 0: emit send_ptz_msg(PTZ::SET_H, angle_h); break;
+                case 1: p_usbcan->emit control(USBCAN::POSITION, angle_h); break;
+                case 2: p_udpptz->emit control(UDPPTZ::ANGLE_POSITION, angle_h); break;
+                }
             }
             else if (edit == ui->ANGLE_V_EDIT) {
                 angle_v = ui->ANGLE_V_EDIT->text().toDouble();
-                if (!pref->gcan) emit send_ptz_msg(PTZ::SET_V, angle_v);
-                else             p_usbcan->emit control(USBCAN::PITCH, angle_v);
-            }
-            else if (edit == ui->PTZ_COM_EDIT) {
-                if (ui->PTZ_COM_EDIT->text().isEmpty())  p_usbcan->emit disconnect_from();
-                else p_usbcan->emit connect_to();
+                // Clamp vertical angle to -90 to 90 range for UDPPTZ
+                if (pref->ptz_type == 2) {
+                    if (angle_v > 90.0) angle_v = 90.0;
+                    if (angle_v < -90.0) angle_v = -90.0;
+                    ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", angle_v));
+                }
+                switch (pref->ptz_type) {
+                case 0: emit send_ptz_msg(PTZ::SET_V, angle_v); break;
+                case 1: p_usbcan->emit control(USBCAN::PITCH, angle_v); break;
+                case 2: p_udpptz->emit control(UDPPTZ::ANGLE_POSITION, angle_v); break;
+                }
             }
             this->focusWidget()->clearFocus();
             break;
@@ -5711,7 +5964,7 @@ void UserPanel::config_gatewidth(QString filename)
         QMessageBox::warning(this, "PROMPT", tr("cannot open config file"));
         return;
     }
-    
+
     QByteArray line;
 //    for (int i = 0; i < 100; i++) ptr_tcu->gw_lut[i] = -1;
     while (!(line = config_file.readLine(128)).isEmpty()) {
@@ -5732,8 +5985,8 @@ void UserPanel::send_ctrl_cmd(uchar dir)
     buffer_out[1] = 0x01;
     buffer_out[2] = 0x00;
     buffer_out[3] = dir;
-    buffer_out[4] = dir < 5 ? ptz_speed : 0x00;
-    buffer_out[5] = dir > 5 ? ptz_speed : 0x00;
+    buffer_out[4] = dir < 5 ? ptz_speed - 1 : 0x00;
+    buffer_out[5] = dir > 5 ? ptz_speed - 1 : 0x00;
     int sum = 0;
     for (int i = 1; i < 6; i++) sum += buffer_out[i];
     buffer_out[6] = sum & 0xFF;
@@ -5766,8 +6019,12 @@ void UserPanel::ptz_button_pressed(int id) {
 //    ptr_ptz->ptz_control(static_cast<PTZThread::PARAMS>(id + 1));
 
     if (id == 4) if (QMessageBox::warning(nullptr, "PTZ", tr("Initialize?"), QMessageBox::StandardButton::Ok | QMessageBox::StandardButton::Cancel) != QMessageBox::StandardButton::Ok) return;
-    if (!pref->gcan) emit send_ptz_msg(id + 1);
-    else {
+
+    switch (pref->ptz_type) {
+    case 0: // pelco-p
+        emit send_ptz_msg(id + 1);
+        break;
+    case 1: // usbcan
         switch (id) {
         case 0:
             p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
@@ -5807,6 +6064,51 @@ void UserPanel::ptz_button_pressed(int id) {
             break;
         default: break;
         }
+        break;
+    case 2: // udp-scw370
+        {
+            float velocity = ui->PTZ_SPEED_SLIDER->value() / 4.0f; // 1-64 slider -> 0.25-16 deg/s
+            switch (id) {
+            case 0: // UP_LEFT
+                p_udpptz->set_velocities(-velocity, velocity); // left, up
+                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
+                break;
+            case 1: // UP
+                p_udpptz->set_velocities(0, velocity); // no horizontal, up
+                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
+                break;
+            case 2: // UP_RIGHT
+                p_udpptz->set_velocities(velocity, velocity); // right, up
+                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
+                break;
+            case 3: // LEFT
+                p_udpptz->set_velocities(-velocity, 0); // left, no vertical
+                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
+                break;
+            case 4: // RETURN_ZERO (keep as is)
+                p_udpptz->emit transmit_data(UDPPTZ::RETURN_ZERO);
+                break;
+            case 5: // RIGHT
+                p_udpptz->set_velocities(velocity, 0); // right, no vertical
+                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
+                break;
+            case 6: // DOWN_LEFT
+                p_udpptz->set_velocities(-velocity, -velocity); // left, down
+                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
+                break;
+            case 7: // DOWN
+                p_udpptz->set_velocities(0, -velocity); // no horizontal, down
+                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
+                break;
+            case 8: // DOWN_RIGHT
+                p_udpptz->set_velocities(velocity, -velocity); // right, down
+                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
+                break;
+            default:
+                break;
+            }
+        }
+        break;
     }
 }
 
@@ -5815,8 +6117,14 @@ void UserPanel::ptz_button_released(int id) {
     if (id == 4) return;
 //    ptr_ptz->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 //    ptr_ptz->ptz_control(PTZThread::STOP);
-    if (!pref->gcan) emit send_ptz_msg(PTZ::STOP);
-    else             p_usbcan->emit control(USBCAN::STOP, 0);
+    switch (pref->ptz_type) {
+    case 0: emit send_ptz_msg(PTZ::STOP); break;
+    case 1: p_usbcan->emit control(USBCAN::STOP, 0); break;
+    case 2:
+        p_udpptz->set_velocities(0, 0); // zero velocity in both directions
+        p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
+        break;
+    }
 }
 
 void UserPanel::on_PTZ_SPEED_SLIDER_valueChanged(int value)
@@ -5901,15 +6209,21 @@ void UserPanel::set_ptz_angle()
 //    ptr_ptz->ptz_control(PTZThread::SET_H, &angle_h);
 //    ptr_ptz->ptz_control(PTZThread::SET_V, &angle_v);
 
-    if (!pref->gcan) {
+    switch (pref->ptz_type) {
+    case 0:
         emit send_ptz_msg(PTZ::SET_H, angle_h);
         emit send_ptz_msg(PTZ::SET_V, angle_v);
-    }
-    else {
+        break;
+    case 1:
         p_usbcan->emit control(USBCAN::POSITION, angle_h);
         p_usbcan->emit transmit(USBCAN::POSITION);
         p_usbcan->emit control(USBCAN::PITCH, angle_v);
         p_usbcan->emit transmit(USBCAN::PITCH);
+        break;
+    case 2:
+        p_udpptz->emit control(UDPPTZ::ANGLE_POSITION, angle_h);
+        p_udpptz->emit control(UDPPTZ::ANGLE_POSITION, angle_v);
+        break;
     }
 }
 
@@ -5917,8 +6231,11 @@ void UserPanel::on_STOP_BTN_clicked()
 {
 //    ptr_ptz->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
 //    ptr_ptz->ptz_control(PTZThread::STOP);
-    if (!pref->gcan) emit send_ptz_msg(PTZ::STOP);
-    else             p_usbcan->emit control(USBCAN::STOP, 0);
+    switch (pref->ptz_type) {
+    case 0: emit send_ptz_msg(PTZ::STOP); break;
+    case 1: p_usbcan->emit control(USBCAN::STOP, 0); break;
+    case 2: p_udpptz->emit transmit_data(UDPPTZ::STANDBY); break;
+    }
 }
 
 void UserPanel::point_ptz_to_target(QPoint target)
@@ -5931,7 +6248,7 @@ void UserPanel::point_ptz_to_target(QPoint target)
     display_height = ui->SOURCE_DISPLAY->height();
     angle_h += target.x() * tot_h / display_width - tot_h / 2;
     angle_v += target.y() * tot_v / display_height - tot_v / 2;
-    
+
     // Ensure horizontal angle is always positive (0 to 360)
     angle_h = fmod(angle_h + 360.0, 360.0);
 

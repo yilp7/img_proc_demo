@@ -24,6 +24,7 @@ public:
     void update_distance_display();
     void display_baudrate(int id, int baudrate);
     void switch_language(bool en, QTranslator *trans);
+    void set_ptz_type_enabled(bool enabled);
 
 protected:
     void keyPressEvent(QKeyEvent *event);
@@ -96,7 +97,7 @@ public:
     int              pixel_type;
     bool             split;
     bool             ebus_cam;
-    bool             gcan;
+    int              ptz_type;  // 0: pelco-p, 1: usbcan, 2: udp-scw370
     bool             cameralink;
 
     // 2 serial comm.

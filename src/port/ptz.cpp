@@ -72,7 +72,7 @@ void PTZ::try_communicate()
     ControlPort::try_communicate();
 
     static int write_idx = 0;
-    
+
     communicate(query[write_idx], 7, 40, true);
     QByteArray read;
     retrieve_mutex.lock();
@@ -188,8 +188,8 @@ send:
             int angle = (uchar(read[4]) << 8) + uchar(read[5]);
             switch (ptz_param)
             {
-                case ANGLE_H: 
-                    angle %= 36000; 
+                case ANGLE_H:
+                    angle %= 36000;
                     {
                         double temp_angle = angle / 100.;
                         // Ensure horizontal angle is always positive (0 to 360)
@@ -219,7 +219,7 @@ void PTZ::load_from_json(const nlohmann::json &j)
     std::cout << j << std::endl;
     std::cout.flush();
     cout_mutex.unlock();
-    
+
     try {
         if (j.contains("address") && j["address"].is_number())
             ptz_control(ADDRESS, j["address"].get<uchar>());
@@ -233,7 +233,7 @@ void PTZ::load_from_json(const nlohmann::json &j)
     catch (const nlohmann::json::exception& e) {
         qWarning("JSON parsing error in PTZ configuration: %s", e.what());
     }
-    
+
     emit ptz_param_updated(PTZ::NO_PARAM, 0);
 }
 #endif
@@ -248,7 +248,7 @@ void PTZ::send_ctrl_cmd(uchar dir)
     command[4] = dir < 5 ? ptz_speed : 0x00;
     command[5] = dir > 5 ? ptz_speed : 0x00;
     command[6] = checksum(command);
-    
+
     communicate(command, 0, 0);
 }
 

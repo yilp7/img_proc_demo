@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(GLI_user_panel LANGUAGES CXX VERSION 0.9.2.0)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.10.0.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -141,6 +141,8 @@ set(SOURCE_FILES
     src/util/util.cpp
     src/util/threadpool.h
     src/util/threadpool.cpp
+    src/util/config.h
+    src/util/config.cpp
     src/widgets/mywidget.h
     src/widgets/mywidget.cpp
     src/visual/userpanel.h
@@ -192,6 +194,8 @@ set(SOURCE_FILES
     src/port/huanyu.cpp
     src/port/usbcan.h
     src/port/usbcan.cpp
+    src/port/udpptz.h
+    src/port/udpptz.cpp
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss

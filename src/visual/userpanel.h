@@ -24,6 +24,7 @@
 #include "visual/aliasing.h"
 #include "visual/presetpanel.h"
 #include "visual/serialserver.h"
+#include "util/config.h"
 
 #include "port/tcu.h"
 #include "port/lens.h"
@@ -32,6 +33,7 @@
 #include "port/ptz.h"
 #include "port/rangefinder.h"
 #include "port/usbcan.h"
+#include "port/udpptz.h"
 
 #include "thread/joystick.h"
 #include "thread/controlportthread.h"
@@ -168,6 +170,8 @@ public slots:
     void update_ptz_params(qint32 ptz_param, double val);
     void update_distance(double distance);
     void update_usbcan_angle(float _h, float _v);
+    void update_udpptz_angle(float _h, float _v);
+    void update_ptz_status();
 
     // signaled by Aliasing
     void set_distance_set(int id);
@@ -444,6 +448,10 @@ private:
 
     // read device config by config
     void read_gatewidth_lookup_table(QFile *fp);
+    
+    // config sync functions
+    void syncConfigToPreferences();
+    void syncPreferencesToConfig();
 
     // connect to serial port using tcp socket
     void connect_to_serial_server_tcp();
@@ -478,6 +486,7 @@ private:
     Preferences*    pref;
     ScanConfig*     scan_config;
     LaserControl*   laser_settings;
+    Config*         config;
 #ifdef DISTANCE_3D_VIEW
     Distance3DView* view_3d;
 #endif //DISTANCE_3D_VIEW
@@ -518,6 +527,7 @@ private:
     PTZ     *p_ptz;
     RangeFinder *p_rf;
     USBCAN  *p_usbcan;
+    UDPPTZ  *p_udpptz;
     QThread *th_tcu;
     QThread *th_lens;
     QThread *th_laser;
@@ -525,6 +535,7 @@ private:
     QThread *th_ptz;
     QThread *th_rf;
     QThread *th_usbcan;
+    QThread *th_udpptz;
 
     // WARNING port communication mostly moved to new class ControlPort
     QSerialPort*  serial_port[5];           // 0: tcu, 1: rangefinder, 2: lens, 3: laser, 4: PTZ

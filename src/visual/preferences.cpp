@@ -10,7 +10,7 @@ Preferences::Preferences(QWidget *parent) :
     symmetry(0),
     split(false),
     ebus_cam(false),
-    gcan(false),
+    ptz_type(0),
     cameralink(false),
     port_idx(0),
     share_port(false),
@@ -109,7 +109,12 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->SPLIT_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ split = arg1; });
     connect(ui->UNDERWATER_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit device_underwater(arg1); });
     connect(ui->EBUS_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ ebus_cam = arg1; emit search_for_devices(); });
-    connect(ui->GCAN_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ gcan = arg1; });
+    ui->PTZ_TYPE_LIST->addItem("pelco-p");
+    ui->PTZ_TYPE_LIST->addItem("usbcan");
+    ui->PTZ_TYPE_LIST->addItem("udp-scw370");
+    ui->PTZ_TYPE_LIST->installEventFilter(this);
+    connect(ui->PTZ_TYPE_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
+            [this](int index){ ptz_type = index; });
     connect(ui->CAMERALINK_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ cameralink = arg1; emit search_for_devices(); });
 //![1]
 
@@ -155,7 +160,8 @@ Preferences::Preferences(QWidget *parent) :
             [this](const QString &arg1){ emit change_baudrate(ui->COM_LIST->currentIndex(), arg1.toInt()); });
     connect(ui->TCP_SERVER_CHK, &QCheckBox::stateChanged, this,
             [this](int arg1){ emit set_tcp_status(ui->COM_LIST->currentIndex(), arg1); });
-#if ENABLE_USER_DEFAULT
+
+#if ENABLE_USER_DEFAULT // DEPRECATED: user_default TCP server IP saving replaced by JSON config
     connect(ui->TCP_SERVER_IP_EDIT, &QLineEdit::returnPressed, this,
             [this]() {
                 FILE *f = fopen("user_default", "rb+");
@@ -225,7 +231,7 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->DELAY_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
                 emit delay_offset_changed(delay_offset * dist_ns);
-#if ENABLE_USER_DEFAULT
+#if ENABLE_USER_DEFAULT // DEPRECATED: user_default offset saving replaced by JSON config
                 FILE *f = fopen("user_default", "rb+");
                 if (!f) return;
                 int delay_offset_int = std::round(delay_offset);
@@ -238,7 +244,7 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->GATE_WIDTH_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
                 emit gate_width_offset_changed(gate_width_offset * dist_ns);
-#if ENABLE_USER_DEFAULT
+#if ENABLE_USER_DEFAULT // DEPRECATED: user_default offset saving replaced by JSON config
                 FILE *f = fopen("user_default", "rb+");
                 if (!f) return;
                 int gate_width_offset_int = std::round(gate_width_offset);
@@ -251,7 +257,7 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->LASER_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
                 emit laser_offset_changed(laser_width_offset);
-#if ENABLE_USER_DEFAULT
+#if ENABLE_USER_DEFAULT // DEPRECATED: user_default offset saving replaced by JSON config
                 FILE *f = fopen("user_default", "rb+");
                 if (!f) return;
                 int laser_offset_int = std::round(laser_width_offset);
@@ -260,7 +266,7 @@ Preferences::Preferences(QWidget *parent) :
                 fclose(f);
 #endif
     });
-#if ENABLE_USER_DEFAULT
+#if ENABLE_USER_DEFAULT // DEPRECATED: user_default loading replaced by JSON config
     FILE *f = fopen("user_default", "rb");
     if (f) {
         uint server_ip;
@@ -404,7 +410,6 @@ Preferences::~Preferences()
 
 void Preferences::init()
 {
-    ui->GCAN_CHK->click();
 }
 
 void Preferences::data_exchange(bool read)
@@ -588,6 +593,11 @@ void Preferences::display_baudrate(int id, int baudrate)
 void Preferences::switch_language(bool en, QTranslator *trans)
 {
     ui->retranslateUi(this);
+}
+
+void Preferences::set_ptz_type_enabled(bool enabled)
+{
+    ui->PTZ_TYPE_LIST->setEnabled(enabled);
 }
 
 void Preferences::keyPressEvent(QKeyEvent *event)

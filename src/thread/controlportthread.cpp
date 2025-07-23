@@ -98,7 +98,8 @@ void ControlPortThread::setup_serial_port()
         connected_to_serial = false;
         lbl->setStyleSheet("color: #CD5C5C;");
     }
-#if 0
+    // DEPRECATED: user_default COM port saving replaced by JSON config
+#if ENABLE_USER_DEFAULT
     // TODO: test for user utilities
     FILE *f = fopen("user_default", "rb+");
     if (!f) return;
@@ -106,6 +107,8 @@ void ControlPortThread::setup_serial_port()
     fseek(f, 5 + idx, SEEK_SET);
     fwrite(&port_num_uchar, 1, 1, f);
     fclose(f);
+#else
+    // COM port changes will be saved to JSON config when user saves configuration
 #endif
 }
 

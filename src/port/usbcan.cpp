@@ -61,6 +61,7 @@ bool USBCAN::connect_to_device()
     if (connected) return false;
     if (OpenDevice(device_type, device_index, 0) != STATUS_OK) {
         qDebug() << "Connect to device failed";
+        emit connection_status_changed(false);
         return false;
     }
 //    qDebug() << "GCAN connected";
@@ -75,12 +76,14 @@ bool USBCAN::connect_to_device()
     if (InitCAN(device_type, device_index, CAN_index, &init_config) != STATUS_OK) {
         qDebug() << "CAN1 init failed";
         CloseDevice(device_type, device_index);
+        emit connection_status_changed(false);
         return false;
     }
 //    qDebug() << "CAN1 initiated";
     if (StartCAN(device_type, device_index, CAN_index) != STATUS_OK) {
         qDebug() << "CAN1 start failed";
         CloseDevice(device_type, device_index);
+        emit connection_status_changed(false);
         return false;
     }
 //    qDebug() << "CAN1 connected";
@@ -89,15 +92,19 @@ bool USBCAN::connect_to_device()
     connected = true;
     timer_r5->stop();
     timer_r5->start();
+    emit connection_status_changed(true);
     qDebug() << "gcan connected";
-//    successive_count = 0;
-//    emit port_status_updated();
+    return true;
 }
 
 void USBCAN::disconnect_from_device()
 {
     if (!connected) return;
     CloseDevice(device_type, device_index);
+    connected = false;
+    timer_r5->stop();
+    emit connection_status_changed(false);
+    qDebug() << "gcan disconnected";
 }
 
 void USBCAN::transmit_data(qint32 op)

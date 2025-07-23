@@ -28,6 +28,7 @@ public:
     explicit USBCAN();
     ~USBCAN();
 
+    bool is_connected() const { return connected; }
     void update_timer_interval(uint interval = 0);
     void communicate(QByteArray write, uint read_size = 0, uint read_timeout = 40, bool heartbeat = false);
 
@@ -46,6 +47,7 @@ signals:
     void transmit(qint32 param);
     void control(qint32 param, float val);
     void angle_updated(float _h, float _v);
+    void connection_status_changed(bool connected);
 
 private:
     DWORD device_type;

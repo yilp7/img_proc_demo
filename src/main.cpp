@@ -142,7 +142,7 @@ int main(int argc, char *argv[])
     int attr = GetFileAttributes("user_default");
     if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) SetFileAttributes("user_default", attr | FILE_ATTRIBUTE_HIDDEN);
 #endif
-#endif
+#endif // ENABLE_USER_DEFAULT - DEPRECATED
 
     QApplication a(argc, argv);
 
@@ -187,12 +187,18 @@ int main(int argc, char *argv[])
     cursor_light_resize_md = QCursor(QPixmap(":/cursor/light/resize_md").scaled(16, 16));
     cursor_light_resize_sd = QCursor(QPixmap(":/cursor/light/resize_sd").scaled(16, 16));
 
+#if ENABLE_USER_DEFAULT // DEPRECATED: user_default theme loading replaced by JSON config
     FILE *f = fopen("user_default", "rb");
     if (f) {
         fseek(f, 3, SEEK_SET);
         fread(&app_theme, 1, 1, f);
         fclose(f);
     }
+#else
+    // Theme will be loaded from JSON config in UserPanel initialization
+    // Default to dark theme
+    app_theme = 0;
+#endif
 
     a.setStyleSheet(app_theme ? theme_light : theme_dark);
     cursor_curr_pointer   = app_theme ? cursor_light_pointer   : cursor_dark_pointer;

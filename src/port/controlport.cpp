@@ -112,7 +112,7 @@ bool ControlPort::connect_to_serial_port(QString port_num, qint32 baudrate)
     }
     emit port_status_updated();
 
-#if ENABLE_USER_DEFAULT
+#if ENABLE_USER_DEFAULT // DEPRECATED: user_default COM port saving replaced by JSON config
     // TODO: test for user utilities
     if (idx < 0) return connected_to_serial;
     FILE *f = fopen("user_default", "rb+");
@@ -121,6 +121,8 @@ bool ControlPort::connect_to_serial_port(QString port_num, qint32 baudrate)
     fseek(f, 5 + idx, SEEK_SET);
     fwrite(&port_num_uchar, 1, 1, f);
     fclose(f);
+#else
+    // COM port saving will be handled by UserPanel through config
 #endif
     return connected_to_serial;
 }
