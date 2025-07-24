@@ -60,8 +60,7 @@ private:
     quint16 local_port;
     
     bool connected;
-    QMutex write_mutex;
-    QMutex read_mutex;
+    QMutex socket_mutex;
     QMutex retrieve_mutex;
 
     QTimer *timer_tx;

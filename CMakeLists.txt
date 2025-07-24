@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(GLI_user_panel LANGUAGES CXX VERSION 0.10.0.0)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.10.1.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 

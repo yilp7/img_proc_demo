@@ -682,7 +682,7 @@ void UserPanel::init()
     // auto-load default config if it exists
     QString default_config_path = QCoreApplication::applicationDirPath() + "/default.json";
     if (QFile::exists(default_config_path)) {
-        if (config->loadFromFile(default_config_path)) {
+        if (config->load_from_file(default_config_path)) {
             syncConfigToPreferences();
         }
     }
@@ -1719,8 +1719,8 @@ void UserPanel::set_theme()
     fwrite(&app_theme, 1, 1, f);
     fclose(f);
 #else
-    config->getData().ui.dark_theme = (app_theme == 0);
-    config->autoSave();
+    config->get_data().ui.dark_theme = (app_theme == 0);
+    config->auto_save();
 #endif
 }
 
@@ -1778,8 +1778,8 @@ void UserPanel::switch_language()
     fwrite(&lang, 1, 1, f);
     fclose(f);
 #else
-    config->getData().ui.english = (lang == 0);
-    config->autoSave();
+    config->get_data().ui.english = (lang == 0);
+    config->auto_save();
 #endif
 }
 
@@ -1898,11 +1898,11 @@ void UserPanel::init_control_port()
         p_tcu->emit connect_to_serial(ui->TCU_COM_EDIT->text());
         QString port_text = ui->TCU_COM_EDIT->text();
 #ifdef WIN32
-        config->getData().com_tcu.port = port_text.isEmpty() ? "" : "COM" + port_text;
+        config->get_data().com_tcu.port = port_text.isEmpty() ? "" : "COM" + port_text;
 #else
         config->getData().com_tcu.port = port_text;
 #endif
-        config->autoSave();
+        config->auto_save();
     });
     connect(p_tcu, &ControlPort::port_status_updated, this, [this]() { update_port_status(p_tcu, ui->TCU_COM); });
     connect(p_tcu, &ControlPort::port_io_log, this, &UserPanel::append_data, Qt::QueuedConnection);
@@ -1914,11 +1914,11 @@ void UserPanel::init_control_port()
         p_lens->emit connect_to_serial(ui->LENS_COM_EDIT->text());
         QString port_text = ui->LENS_COM_EDIT->text();
 #ifdef WIN32
-        config->getData().com_lens.port = port_text.isEmpty() ? "" : "COM" + port_text;
+        config->get_data().com_lens.port = port_text.isEmpty() ? "" : "COM" + port_text;
 #else
         config->getData().com_lens.port = port_text;
 #endif
-        config->autoSave();
+        config->auto_save();
     });
     connect(p_lens, &ControlPort::port_status_updated, this, [this]() { update_port_status(p_lens, ui->LENS_COM); });
     connect(p_lens, &ControlPort::port_io_log, this, &UserPanel::append_data, Qt::QueuedConnection);
@@ -1930,11 +1930,11 @@ void UserPanel::init_control_port()
         p_laser->emit connect_to_serial(ui->LASER_COM_EDIT->text());
         QString port_text = ui->LASER_COM_EDIT->text();
 #ifdef WIN32
-        config->getData().com_laser.port = port_text.isEmpty() ? "" : "COM" + port_text;
+        config->get_data().com_laser.port = port_text.isEmpty() ? "" : "COM" + port_text;
 #else
         config->getData().com_laser.port = port_text;
 #endif
-        config->autoSave();
+        config->auto_save();
     });
     connect(p_laser, &ControlPort::port_status_updated, this, [this]() { update_port_status(p_laser, ui->LASER_COM); });
     connect(this, SIGNAL(send_laser_msg(QString)), p_laser, SLOT(laser_control(QString)), Qt::QueuedConnection);
@@ -1957,11 +1957,11 @@ void UserPanel::init_control_port()
         }
         QString port_text = ui->PTZ_COM_EDIT->text();
 #ifdef WIN32
-        config->getData().com_ptz.port = port_text.isEmpty() ? "" : "COM" + port_text;
+        config->get_data().com_ptz.port = port_text.isEmpty() ? "" : "COM" + port_text;
 #else
         config->getData().com_ptz.port = port_text;
 #endif
-        config->autoSave();
+        config->auto_save();
     });
     connect(p_ptz, &ControlPort::port_status_updated, this, [this]() {
         update_port_status(p_ptz, ui->PTZ_COM);
@@ -3229,7 +3229,7 @@ void UserPanel::save_config_to_file()
     // Update config with current settings
     syncPreferencesToConfig();
 
-    if (!config->saveToFile(config_name)) {
+    if (!config->save_to_file(config_name)) {
         QMessageBox::warning(this, "PROMPT", tr("Cannot save config file"));
     }
 }
@@ -3244,7 +3244,7 @@ void UserPanel::load_config(QString config_name)
 {
     if (config_name.isEmpty()) return;
 
-    if (!config->loadFromFile(config_name)) {
+    if (!config->load_from_file(config_name)) {
         QMessageBox::warning(this, "PROMPT", tr("Cannot load config file"));
         return;
     }
@@ -3264,7 +3264,7 @@ void UserPanel::load_config(QString config_name)
 
 void UserPanel::syncPreferencesToConfig()
 {
-    Config::ConfigData& data = config->getData();
+    Config::ConfigData& data = config->get_data();
 
     // Sync COM settings from UI
 #ifdef WIN32
@@ -3325,7 +3325,7 @@ void UserPanel::syncPreferencesToConfig()
 
 void UserPanel::syncConfigToPreferences()
 {
-    const Config::ConfigData& data = config->getData();
+    const Config::ConfigData& data = config->get_data();
 
     // Sync COM settings to UI
 #ifdef WIN32
@@ -5204,8 +5204,8 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
             std::shared_ptr<uint8_t> deleter_buffer(buffer, av_free);
             SwsContext *sws_context = NULL;
             std::shared_ptr<SwsContext> deleter_sws_context(sws_context, sws_freeContext);
-            static AVFilterContext *buffersink_ctx = NULL;
-            static AVFilterContext *buffersrc_ctx = NULL;
+            AVFilterContext *buffersink_ctx = nullptr;
+            AVFilterContext *buffersrc_ctx = nullptr;
             AVFilterGraph *filter_graph = avfilter_graph_alloc();
             std::shared_ptr<AVFilterGraph*> deleter_filter_graph(&filter_graph, avfilter_graph_free);
 
@@ -5221,13 +5221,21 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
 //            avio_ctx = avio_alloc_context(frame_buffer, 33554432, 0, nullptr, nullptr, nullptr, nullptr);
 //            format_context->pb = avio_ctx;
 
+            // Helper lambda for cleanup on early return with error code
+            auto cleanup_and_return = [&](int error_code) {
+                if (display) display_mutex[display_idx].unlock();
+                if (!display) this->video_stopped();
+                qDebug() << "FFmpeg video capture failed with error code:" << error_code;
+                return error_code;
+            };
+
             // open input video
             AVInputFormat *input_format = (AVInputFormat *)av_find_input_format("dshow");
             start_time = time(NULL);
-            if (avformat_open_input(&format_context, filename.toUtf8().constData(), input_format, NULL) != 0) { if (display) display_mutex[display_idx].unlock(); return -2; }
+            if (avformat_open_input(&format_context, filename.toUtf8().constData(), input_format, NULL) != 0) return cleanup_and_return(-2);
 
             // fetch video info
-            if (avformat_find_stream_info(format_context, NULL) < 0) { if (display) display_mutex[display_idx].unlock(); return -2; }
+            if (avformat_find_stream_info(format_context, NULL) < 0) return cleanup_and_return(-2);
 
             // find the video stream with max resolution (in width)
             int video_stream_idx = -1;
@@ -5240,20 +5248,19 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                     }
                 }
             }
-            if (video_stream_idx == -1) { if (display) display_mutex[display_idx].unlock(); return -2; }
+            if (video_stream_idx == -1) return cleanup_and_return(-2);
 
             // point the codec parameter to the first stream's
             codec_param = format_context->streams[video_stream_idx]->codecpar;
 
-//            if (display) ptr_tcu->ccd_freq = frame_rate_edit = std::round(format_context->streams[video_stream_idx]->r_frame_rate.num / format_context->streams[video_stream_idx]->r_frame_rate.den);
             if (display) emit send_double_tcu_msg(TCU::CCD_FREQ, frame_rate_edit = std::round(format_context->streams[video_stream_idx]->r_frame_rate.num / format_context->streams[video_stream_idx]->r_frame_rate.den));
 
             codec = avcodec_find_decoder(codec_param->codec_id);
-            if (codec == NULL) { if (display) display_mutex[display_idx].unlock(); return -3; }
+            if (codec == NULL) return cleanup_and_return(-3);
 
-            if (avcodec_parameters_to_context(codec_context, codec_param) < 0) { if (display) display_mutex[display_idx].unlock(); return -3; }
+            if (avcodec_parameters_to_context(codec_context, codec_param) < 0) return cleanup_and_return(-3);
 
-            if (avcodec_open2(codec_context, codec, NULL) < 0) { if (display) display_mutex[display_idx].unlock(); return -3; }
+            if (avcodec_open2(codec_context, codec, NULL) < 0) return cleanup_and_return(-3);
 
             cv::Mat cv_frame(codec_context->height, codec_context->width, CV_MAKETYPE(CV_8U, format_gray ? 1 : 3));
 
@@ -5331,15 +5338,6 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                     }
                 }
             }
-            //        avfilter_graph_free(&filter_graph);
-            //        sws_freeContext(sws_context);
-            //        av_free(&buffer);
-            //        av_frame_free(&frame_filter);
-            //        av_frame_free(&frame_result);
-            //        av_frame_free(&frame);
-            //        avcodec_free_context(&codec_context);
-            //        avcodec_parameters_free(&codec_param);
-            //        avformat_close_input(&format_context);
 
             if (display) display_mutex[display_idx].unlock();
 

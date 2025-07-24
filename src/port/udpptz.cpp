@@ -22,10 +22,10 @@ UDPPTZ::UDPPTZ():
     servo_status(STANDBY),
     last_received_time(0)
 {
-    connect(this, &UDPPTZ::connect_to, this, &UDPPTZ::connect_to_device);
-    connect(this, &UDPPTZ::disconnect_from, this, &UDPPTZ::disconnect_from_device);
-    connect(this, &UDPPTZ::transmit, this, &UDPPTZ::transmit_data);
-    connect(this, &UDPPTZ::control, this, &UDPPTZ::device_control);
+    connect(this, &UDPPTZ::connect_to, this, &UDPPTZ::connect_to_device, Qt::QueuedConnection);
+    connect(this, &UDPPTZ::disconnect_from, this, &UDPPTZ::disconnect_from_device, Qt::QueuedConnection);
+    connect(this, &UDPPTZ::transmit, this, &UDPPTZ::transmit_data, Qt::QueuedConnection);
+    connect(this, &UDPPTZ::control, this, &UDPPTZ::device_control, Qt::QueuedConnection);
 
     timer_tx = new QTimer(this);
     timer_tx->setTimerType(Qt::PreciseTimer);
@@ -83,8 +83,14 @@ void UDPPTZ::disconnect_from_device()
 {
     if (!connected) return;
 
+    // Acquire mutex to ensure timer callbacks aren't running
+    socket_mutex.lock();
+    
+    // Now safe to stop timers - callbacks can't be executing
     timer_tx->stop();
     timer_rx->stop();
+    
+    socket_mutex.unlock();  // Release before cleanup
 
     if (udp_socket) {
         udp_socket->close();
@@ -124,10 +130,8 @@ void UDPPTZ::transmit_data(qint32 op)
         return;
     }
 
-    write_mutex.lock();
     qint64 bytes_sent = udp_socket->writeDatagram(frame, target_ip, target_port);
-    write_mutex.unlock();
-
+    
     if (bytes_sent == -1) {
         qDebug() << "Failed to send UDP datagram:" << udp_socket->errorString();
     }
@@ -177,7 +181,7 @@ void UDPPTZ::handle_received()
 {
     if (!connected || !udp_socket) return;
 
-    read_mutex.lock();
+    socket_mutex.lock();
     while (udp_socket->hasPendingDatagrams()) {
         QByteArray datagram;
         datagram.resize(udp_socket->pendingDatagramSize());
@@ -202,7 +206,7 @@ void UDPPTZ::handle_received()
             retrieve_mutex.unlock();
         }
     }
-    read_mutex.unlock();
+    socket_mutex.unlock();
 }
 
 void UDPPTZ::transmit_status()

@@ -12,12 +12,12 @@ class Config : public QObject
 
 public:
     struct ComSettings {
-        QString port = "COM1";
+        QString port = "COM0";
         int baudrate = 9600;
     };
 
     struct NetworkSettings {
-        QString tcp_server_address = "192.168.1.100";
+        QString tcp_server_address = "192.168.1.233";
         QString udp_target_ip = "192.168.1.10";
         int udp_target_port = 30000;
         QString udp_listen_ip = "192.168.1.100";
@@ -88,44 +88,44 @@ public:
     explicit Config(QObject *parent = nullptr);
     ~Config();
 
-    bool loadFromFile(const QString &filepath);
-    bool saveToFile(const QString &filepath) const;
+    bool load_from_file(const QString &filepath);
+    bool save_to_file(const QString &filepath) const;
 
-    void loadDefaults();
+    void load_defaults();
 
-    void autoSave();
+    void auto_save();
 
-    const ConfigData& getData() const { return m_data; }
-    ConfigData& getData() { return m_data; }
+    const ConfigData& get_data() const { return m_data; }
+    ConfigData& get_data() { return m_data; }
 
-    QString getVersion() const { return m_data.version; }
-    void setVersion(const QString &version) { m_data.version = version; }
+    QString get_version() const { return m_data.version; }
+    void set_version(const QString &version) { m_data.version = version; }
 
 private:
     ConfigData m_data;
 
-    nlohmann::json comSettingsToJson(const ComSettings &settings) const;
-    ComSettings comSettingsFromJson(const nlohmann::json &obj) const;
+    nlohmann::json com_settings_to_json(const ComSettings &settings) const;
+    ComSettings com_settings_from_json(const nlohmann::json &obj) const;
 
-    nlohmann::json networkSettingsToJson(const NetworkSettings &settings) const;
-    NetworkSettings networkSettingsFromJson(const nlohmann::json &obj) const;
+    nlohmann::json network_settings_to_json(const NetworkSettings &settings) const;
+    NetworkSettings network_settings_from_json(const nlohmann::json &obj) const;
 
-    nlohmann::json uiSettingsToJson(const UISettings &settings) const;
-    UISettings uiSettingsFromJson(const nlohmann::json &obj) const;
+    nlohmann::json ui_settings_to_json(const UISettings &settings) const;
+    UISettings ui_settings_from_json(const nlohmann::json &obj) const;
 
-    nlohmann::json cameraSettingsToJson(const CameraSettings &settings) const;
-    CameraSettings cameraSettingsFromJson(const nlohmann::json &obj) const;
+    nlohmann::json camera_settings_to_json(const CameraSettings &settings) const;
+    CameraSettings camera_settings_from_json(const nlohmann::json &obj) const;
 
-    nlohmann::json tcuSettingsToJson(const TCUSettings &settings) const;
-    TCUSettings tcuSettingsFromJson(const nlohmann::json &obj) const;
+    nlohmann::json tcu_settings_to_json(const TCUSettings &settings) const;
+    TCUSettings tcu_settings_from_json(const nlohmann::json &obj) const;
 
-    nlohmann::json deviceSettingsToJson(const DeviceSettings &settings) const;
-    DeviceSettings deviceSettingsFromJson(const nlohmann::json &obj) const;
+    nlohmann::json device_settings_to_json(const DeviceSettings &settings) const;
+    DeviceSettings device_settings_from_json(const nlohmann::json &obj) const;
 
 signals:
-    void configLoaded();
-    void configSaved();
-    void configError(const QString &error);
+    void config_loaded();
+    void config_saved();
+    void config_error(const QString &error);
 };
 
 #endif // CONFIG_H
