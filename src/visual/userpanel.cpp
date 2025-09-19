@@ -187,7 +187,8 @@ UserPanel::UserPanel(QWidget *parent) :
     ptz_speed(32),
     angle_h(0),
     angle_v(0),
-    alt_ctrl_grp(NULL)
+    alt_ctrl_grp(NULL),
+    m_auto_scan_controller(nullptr)
 {
     ui->setupUi(this);
 
@@ -680,7 +681,8 @@ UserPanel::~UserPanel()
 void UserPanel::init()
 {
     // auto-load default config if it exists
-    QString default_config_path = QCoreApplication::applicationDirPath() + "/default.json";
+//    QString default_config_path = QCoreApplication::applicationDirPath() + "/default.json";
+    QString default_config_path = "default.json";
     if (QFile::exists(default_config_path)) {
         if (config->load_from_file(default_config_path)) {
             syncConfigToPreferences();
@@ -942,7 +944,27 @@ int UserPanel::grab_thread_process(int *idx) {
             // Limit queue size safely
             while (q_img[thread_idx].size() > 5) {
                 q_img[thread_idx].pop();
-                if (device_type == 1) q_frame_info.pop();
+                // Only pop frame info if it exists and device expects it
+                if (device_type == 1) {
+                    QMutexLocker frame_locker(&frame_info_mutex);
+                    if (!q_frame_info.empty()) {
+                        q_frame_info.pop();
+                    }
+                }
+            }
+
+            // Detect and handle queue desynchronization for device_type == 1
+            if (device_type == 1) {
+                QMutexLocker frame_locker(&frame_info_mutex);
+                if (q_img[thread_idx].size() != q_frame_info.size()) {
+                    qDebug() << "WARNING: Queue desynchronization detected!"
+                             << "q_img size:" << q_img[thread_idx].size()
+                             << "q_frame_info size:" << q_frame_info.size();
+                    // Clear the smaller queue to resynchronize
+                    while (!q_frame_info.empty() && q_frame_info.size() > q_img[thread_idx].size()) {
+                        q_frame_info.pop();
+                    }
+                }
             }
 
             // Safe check and access
@@ -961,9 +983,12 @@ int UserPanel::grab_thread_process(int *idx) {
                 img_mem[thread_idx] = q_img[thread_idx].front();
                 q_img[thread_idx].pop();
                 int packets_lost_frame = 0;
-                if (device_type == 1 && !q_frame_info.empty()) {
-                    packets_lost_frame = q_frame_info.front();
-                    q_frame_info.pop();
+                if (device_type == 1) {
+                    QMutexLocker frame_locker(&frame_info_mutex);
+                    if (!q_frame_info.empty()) {
+                        packets_lost_frame = q_frame_info.front();
+                        q_frame_info.pop();
+                    }
                 }
                 packets_lost += packets_lost_frame;
                 if (packets_lost_frame) ui->STATUS->packet_lost->set_text("packets lost: " + QString::number(packets_lost));
@@ -976,9 +1001,9 @@ int UserPanel::grab_thread_process(int *idx) {
 //                }
                 updated = true;
                 if (device_type == -1) q_img[thread_idx].push(img_mem[thread_idx].clone());
+//                cv::imwrite("../a.bmp", img_mem[thread_idx]);
+                q_fps_calc.add_to_q();
             }
-//            cv::imwrite("../a.bmp", img_mem[thread_idx]);
-            q_fps_calc.add_to_q();
         }
 //        sr.upsample(img_mem[thread_idx].clone(), img_mem[thread_idx]);
 //        cv::resize(img_mem[thread_idx].clone(), img_mem[thread_idx], img_mem[thread_idx].size() * 2);
@@ -1869,6 +1894,9 @@ void UserPanel::enable_controls(bool cam_rdy) {
 //    ui->SCAN_BUTTON->setEnabled(start_grabbing || device_type > 0);
     ui->INFO_CHECK->setEnabled(start_grabbing);
     ui->CENTER_CHECK->setEnabled(start_grabbing);
+
+    // Signal that initialization is complete
+    emit initialization_complete();
 }
 
 void UserPanel::init_control_port()
@@ -2274,7 +2302,7 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
 //    if (!device_on || start_grabbing || curr_cam == NULL) return;
     if (!device_on || curr_cam == NULL) return;
 
-    static struct main_ui_info cam_union = {&q_frame_info, q_img + 0};
+    static struct main_ui_info cam_union = {&q_frame_info, q_img + 0, &frame_info_mutex, &image_mutex[0]};
     curr_cam->set_user_pointer(&cam_union);
 
     // TODO complete BayerGB process & display
@@ -2681,7 +2709,7 @@ void UserPanel::update_dev_ip()
     pref->enable_ip_editing(device_type > 0 && pref->device_idx < curr_cam->gige_device_num());
     if (device_type > 0) {
         int ip, gateway, nic_address;
-        curr_cam->ip_address(true, &ip, &gateway, &nic_address);
+        curr_cam->ip_address(true, pref->device_idx, &ip, &gateway, &nic_address);
 //        ui->TITLE->prog_settings->config_ip(true, ip, gateway);
         pref->config_ip(true, ip, gateway, nic_address);
     }
@@ -2691,7 +2719,7 @@ void UserPanel::set_dev_ip(int ip, int gateway)
 {
     int static_ip = MV_IP_CFG_STATIC;
     curr_cam->ip_config(false, &static_ip);
-    curr_cam->ip_address(false, &ip, &gateway);
+    curr_cam->ip_address(false, pref->device_idx, &ip, &gateway);
     ui->ENUM_BUTTON->click();
 }
 
@@ -3346,6 +3374,8 @@ void UserPanel::syncConfigToPreferences()
     if (pref->ui->TCP_SERVER_IP_EDIT) {
         pref->ui->TCP_SERVER_IP_EDIT->setText(data.network.tcp_server_address);
     }
+    p_udpptz->set_target(QHostAddress(data.network.udp_target_ip), data.network.udp_target_port);
+    p_udpptz->set_listen(QHostAddress(data.network.udp_listen_ip), data.network.udp_listen_port);
 
     // Sync UI settings
     bool simplify_ui = data.ui.simplified;
@@ -4663,10 +4693,11 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
                 angle_h = ui->ANGLE_H_EDIT->text().toDouble();
                 // Ensure horizontal angle is always positive (0 to 360)
                 angle_h = fmod(angle_h + 360.0, 360.0);
+                ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", angle_h));
                 switch (pref->ptz_type) {
                 case 0: emit send_ptz_msg(PTZ::SET_H, angle_h); break;
                 case 1: p_usbcan->emit control(USBCAN::POSITION, angle_h); break;
-                case 2: p_udpptz->emit control(UDPPTZ::ANGLE_POSITION, angle_h); break;
+                case 2: p_udpptz->emit control(UDPPTZ::ANGLE_H, angle_h); break;
                 }
             }
             else if (edit == ui->ANGLE_V_EDIT) {
@@ -4675,12 +4706,12 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
                 if (pref->ptz_type == 2) {
                     if (angle_v > 90.0) angle_v = 90.0;
                     if (angle_v < -90.0) angle_v = -90.0;
-                    ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", angle_v));
                 }
+                ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", angle_v));
                 switch (pref->ptz_type) {
                 case 0: emit send_ptz_msg(PTZ::SET_V, angle_v); break;
                 case 1: p_usbcan->emit control(USBCAN::PITCH, angle_v); break;
-                case 2: p_udpptz->emit control(UDPPTZ::ANGLE_POSITION, angle_v); break;
+                case 2: p_udpptz->emit control(UDPPTZ::ANGLE_V, angle_v); break;
                 }
             }
             this->focusWidget()->clearFocus();
@@ -6119,8 +6150,9 @@ void UserPanel::ptz_button_released(int id) {
     case 0: emit send_ptz_msg(PTZ::STOP); break;
     case 1: p_usbcan->emit control(USBCAN::STOP, 0); break;
     case 2:
-        p_udpptz->set_velocities(0, 0); // zero velocity in both directions
-        p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
+//        p_udpptz->set_velocities(0, 0);
+//        p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
+        p_udpptz->emit transmit_data(UDPPTZ::STANDBY);
         break;
     }
 }
@@ -6219,8 +6251,8 @@ void UserPanel::set_ptz_angle()
         p_usbcan->emit transmit(USBCAN::PITCH);
         break;
     case 2:
-        p_udpptz->emit control(UDPPTZ::ANGLE_POSITION, angle_h);
-        p_udpptz->emit control(UDPPTZ::ANGLE_POSITION, angle_v);
+        p_udpptz->emit control(UDPPTZ::ANGLE_H, angle_h);
+        p_udpptz->emit control(UDPPTZ::ANGLE_V, angle_v);
         break;
     }
 }
@@ -6558,4 +6590,16 @@ void UserPanel::on_PSEUDOCOLOR_CHK_stateChanged(int arg1)
     pseudocolor[0] = arg1;
     image_mutex[0].unlock();
 }
+
+// Auto-scan support methods
+void UserPanel::set_command_line_args(const QStringList& args)
+{
+    m_command_line_args = args;
+}
+
+void UserPanel::set_auto_scan_controller(AutoScan* autoScan)
+{
+    m_auto_scan_controller = autoScan;
+}
+
 

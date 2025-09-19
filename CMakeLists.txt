@@ -196,6 +196,10 @@ set(SOURCE_FILES
     src/port/usbcan.cpp
     src/port/udpptz.h
     src/port/udpptz.cpp
+    src/automation/scanpreset.h
+    src/automation/scanpreset.cpp
+    src/automation/autoscan.h
+    src/automation/autoscan.cpp
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss

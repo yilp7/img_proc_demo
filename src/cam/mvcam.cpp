@@ -195,17 +195,19 @@ int MvCam::ip_config(bool read, int *val)
     return ret;
 }
 
-int MvCam::ip_address(bool read, int *ip, int *gateway, int *nic_address)
+int MvCam::ip_address(bool read, int idx, int *ip, int *gateway, int *nic_address)
 {
     if (read) {
-        if (curr_idx >= gige_dev_list.nDeviceNum) return 0;
-        *ip = gige_dev_list.pDeviceInfo[curr_idx]->SpecialInfo.stGigEInfo.nCurrentIp;
-        *gateway = gige_dev_list.pDeviceInfo[curr_idx]->SpecialInfo.stGigEInfo.nDefultGateWay;
-        if (nic_address) *nic_address = gige_dev_list.pDeviceInfo[curr_idx]->SpecialInfo.stGigEInfo.nNetExport;
+        if (idx >= gige_dev_list.nDeviceNum) return 0;
+        *ip = gige_dev_list.pDeviceInfo[idx]->SpecialInfo.stGigEInfo.nCurrentIp;
+        *gateway = gige_dev_list.pDeviceInfo[idx]->SpecialInfo.stGigEInfo.nDefultGateWay;
+        if (nic_address) *nic_address = gige_dev_list.pDeviceInfo[idx]->SpecialInfo.stGigEInfo.nNetExport;
         return 0;
     }
     else {
-        int ret = MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
+        if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;
+        int ret = MV_CC_CreateHandle(&dev_handle, idx < gige_dev_list.nDeviceNum ? gige_dev_list.pDeviceInfo[idx] : usb3_dev_list.pDeviceInfo[idx - gige_dev_list.nDeviceNum]);
+        ret = MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
 //        qDebug() << "modify ip: " << hex << ret;
         return ret;
     }
@@ -252,9 +254,9 @@ QStringList MvCam::get_device_list()
 {
     QStringList sl;
     for (int i = 0; i < gige_dev_list.nDeviceNum; i++)
-        sl << QString::asprintf("%s %s", gige_dev_list.pDeviceInfo[i]->SpecialInfo.stGigEInfo.chModelName, gige_dev_list.pDeviceInfo[i]->SpecialInfo.stGigEInfo.chManufacturerName);
+        sl << QString::asprintf("%s (%s)", gige_dev_list.pDeviceInfo[i]->SpecialInfo.stGigEInfo.chUserDefinedName, gige_dev_list.pDeviceInfo[i]->SpecialInfo.stGigEInfo.chModelName);
     for (int i = 0; i < usb3_dev_list.nDeviceNum; i++)
-        sl << QString::asprintf("%s %s", usb3_dev_list.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chModelName, usb3_dev_list.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chManufacturerName);
+        sl << QString::asprintf("%s (%s)", usb3_dev_list.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chUserDefinedName, usb3_dev_list.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chModelName);
     return sl;
 }
 
@@ -307,7 +309,16 @@ void MvCam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void
 //    ImageIO::save_image_bmp(mv_img, "imgs/" + QDateTime::currentDateTime().toString("hhMMss.zzz") + ".bmp");
 
     struct main_ui_info *ptr = (struct main_ui_info*)user_data;
-    ptr->frame_info_q->push(frame_info->nLostPacket);
-    ptr->img_q->push(mv_img.clone());
+
+    // Protect both queues with their respective mutexes
+    if (ptr->frame_info_mutex) {
+        QMutexLocker frame_locker(ptr->frame_info_mutex);
+        ptr->frame_info_q->push(frame_info->nLostPacket);
+    }
+
+    if (ptr->img_mutex) {
+        QMutexLocker img_locker(ptr->img_mutex);
+        ptr->img_q->push(mv_img.clone());
+    }
 //    cv::imwrite("../mv.bmp", mv_img);
 }

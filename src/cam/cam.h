@@ -34,7 +34,7 @@ public:
     virtual void trigger_mode(bool read, bool *val) = 0;
     virtual void trigger_source(bool read, bool *val) = 0;
     virtual int ip_config(bool read, int *val) = 0;
-    virtual int ip_address(bool read, int *ip, int *gateway, int *nic_address = NULL) = 0;
+    virtual int ip_address(bool read, int idx, int *ip, int *gateway, int *nic_address = NULL) = 0;
     virtual int pixel_type(bool read, int *val) = 0;
     virtual void trigger_once() = 0;
 
@@ -47,6 +47,8 @@ public:
 struct main_ui_info {
     std::queue<int> *frame_info_q;
     std::queue<cv::Mat> *img_q;
+    QMutex *frame_info_mutex;  // Mutex to protect frame_info_q
+    QMutex *img_mutex;          // Mutex to protect img_q
 };
 #endif
 #endif // CAM_H

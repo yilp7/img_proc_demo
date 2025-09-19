@@ -281,8 +281,18 @@ void EuresysCam::frame_cb(PMCCALLBACKINFO cb_info)
     memcpy(img.data, data, x * y * 3);
     cv::cvtColor(img, img_rb_swapped, cv::COLOR_BGR2RGB);
     // pointer named user passed in here is called by cb_info->Context
-    ((struct main_ui_info*)(cb_info->Context))->frame_info_q->push(0);
-    ((struct main_ui_info*)(cb_info->Context))->img_q->push(img_rb_swapped.clone());
+    struct main_ui_info *ptr = (struct main_ui_info*)(cb_info->Context);
+
+    // Protect both queues with their respective mutexes
+    if (ptr->frame_info_mutex) {
+        QMutexLocker frame_locker(ptr->frame_info_mutex);
+        ptr->frame_info_q->push(0);
+    }
+
+    if (ptr->img_mutex) {
+        QMutexLocker img_locker(ptr->img_mutex);
+        ptr->img_q->push(img_rb_swapped.clone());
+    }
 }
 
 #if CLALLSERIAL

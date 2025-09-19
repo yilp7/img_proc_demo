@@ -25,6 +25,7 @@
 #include "visual/presetpanel.h"
 #include "visual/serialserver.h"
 #include "util/config.h"
+#include "automation/autoscan.h"
 
 #include "port/tcu.h"
 #include "port/lens.h"
@@ -105,6 +106,10 @@ public:
     ~UserPanel();
 
     void init();
+    
+    // Auto-scan support
+    void set_command_line_args(const QStringList& args);
+    void set_auto_scan_controller(class AutoScan* autoScan);
 
     int grab_thread_process(int *display_idx);
     void swap_grab_thread_display(int display_idx1, int display_idx2);
@@ -348,6 +353,9 @@ signals:
     // pause / continue scan
     void update_scan(bool show);
 
+    // signal that initialization is complete
+    void initialization_complete();
+
     // queue update_delay, mcp in thread
     void update_delay_in_thread();
     void update_mcp_in_thread(int new_mcp);
@@ -398,6 +406,7 @@ protected:
 // control functions
 private:
     void data_exchange(bool read);
+    
 
     // shut the cam down
     int shut_down();
@@ -502,6 +511,7 @@ private:
     QMutex          image_mutex[3];             // img handle lock
     QMutex          port_mutex;                 // port handle lock
     QMutex          display_mutex[3];           // display handle lock
+    QMutex          frame_info_mutex;           // q_frame_info queue lock (shared across threads)
     Cam*            curr_cam;                   // current camera
     float           time_exposure_edit;
     float           gain_analog_edit;
@@ -667,6 +677,10 @@ private:
     // TEMP ONLY
     // TODO move to addons
     PluginInterface*        pluginInterface;            // for ir with visible light
+
+    // Auto-scan support
+    QStringList             m_command_line_args;
+    class AutoScan*         m_auto_scan_controller;
 
 };
 #endif // USERPANEL_H

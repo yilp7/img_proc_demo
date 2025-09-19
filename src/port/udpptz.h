@@ -13,16 +13,20 @@ public:
         SCAN            = 0x03,
         MANUAL_SEARCH   = 0x04,
         ANGLE_POSITION  = 0x07,
+        ANGLE_H         = 0x08,
+        ANGLE_V         = 0x09,
     };
 
     explicit UDPPTZ();
     ~UDPPTZ();
 
-    bool is_connected() const { 
+    void set_target(QHostAddress target, quint16 port);
+    void set_listen(QHostAddress listen, quint16 port);
+    bool is_connected() const {
         return connected && udp_socket != nullptr;
         // TODO: Implement real-time connection check based on received data
         // qint64 current_time = QDateTime::currentMSecsSinceEpoch();
-        // return connected && (current_time - last_received_time) < CONNECTION_TIMEOUT_MS; 
+        // return connected && (current_time - last_received_time) < CONNECTION_TIMEOUT_MS;
     }
     void set_velocities(float h_vel, float v_vel) { horizontal_velocity = h_vel; vertical_velocity = v_vel; }
     void update_timer_interval(uint interval = 0);
@@ -58,7 +62,7 @@ private:
     quint16 target_port;
     QHostAddress local_ip;
     quint16 local_port;
-    
+
     bool connected;
     QMutex socket_mutex;
     QMutex retrieve_mutex;
@@ -79,7 +83,7 @@ private:
 
     QByteArray received;
     QByteArray last_read;
-    
+
     // Connection monitoring
     qint64 last_received_time;
     static const qint64 CONNECTION_TIMEOUT_MS = 3000; // 3 seconds timeout

@@ -141,8 +141,17 @@ int EbusCam::start_grabbing() {
                 if (buffer->GetPayloadType() == PvPayloadTypeImage) {
                     PvImage *img = buffer->GetImage();
                     struct main_ui_info *ptr = (struct main_ui_info*)ptr_user;
-                    ptr->frame_info_q->push(0);
-                    ptr->img_q->push(cv::Mat(img->GetHeight(), img->GetWidth(), CV_8UC1, buffer->GetDataPointer()).clone());
+
+                    // Protect both queues with their respective mutexes
+                    if (ptr->frame_info_mutex) {
+                        QMutexLocker frame_locker(ptr->frame_info_mutex);
+                        ptr->frame_info_q->push(0);
+                    }
+
+                    if (ptr->img_mutex) {
+                        QMutexLocker img_locker(ptr->img_mutex);
+                        ptr->img_q->push(cv::Mat(img->GetHeight(), img->GetWidth(), CV_8UC1, buffer->GetDataPointer()).clone());
+                    }
 //                    cv::imwrite("../a.bmp", cv::Mat(1080, 1920, CV_8UC1, buffer->GetDataPointer()));
                 }
             }
@@ -473,20 +482,20 @@ char* ip_calc_helper(int ip)
     return result;
 }
 
-int EbusCam::ip_address(bool read, int *ip, int *gateway, int *nic_address)
+int EbusCam::ip_address(bool read, int idx, int *ip, int *gateway, int *nic_address)
 {
-    if (curr_idx >= gige_dev_list.size()) return -1;
+    if (idx >= gige_dev_list.size()) return -1;
     if (read) {
-        *ip = ip_calc_helper(gige_dev_list[curr_idx]->GetIPAddress().GetAscii());
-        *gateway = ip_calc_helper(gige_dev_list[curr_idx]->GetDefaultGateway().GetAscii());
-//        if (nic_address) *nic_address = ip_calc_helper(dynamic_cast<const PvNetworkAdapter*>(gige_dev_list[curr_idx]->GetInterface())->GetIPAddress(0).GetAscii());
+        *ip = ip_calc_helper(gige_dev_list[idx]->GetIPAddress().GetAscii());
+        *gateway = ip_calc_helper(gige_dev_list[idx]->GetDefaultGateway().GetAscii());
+//        if (nic_address) *nic_address = ip_calc_helper(dynamic_cast<const PvNetworkAdapter*>(gige_dev_list[idx]->GetInterface())->GetIPAddress(0).GetAscii());
         return 0;
     }
     else {
         char *ip_str = ip_calc_helper(*ip);
         char *subnet_mask_str = ip_calc_helper((255 << 24) + (255 << 16) + (255 << 8));
         char *gateway_str = ip_calc_helper(*gateway);
-        PvResult ret = PvDeviceGEV::SetIPConfiguration(gige_dev_list[curr_idx]->GetMACAddress(), ip_str, subnet_mask_str, gateway_str);
+        PvResult ret = PvDeviceGEV::SetIPConfiguration(gige_dev_list[idx]->GetMACAddress(), ip_str, subnet_mask_str, gateway_str);
         free(ip_str);
         free(subnet_mask_str);
         free(gateway_str);

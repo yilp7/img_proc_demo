@@ -1,5 +1,6 @@
 #include "visual/userpanel.h"
 #include "util/version.h"
+#include "automation/autoscan.h"
 
 //#define _DEBUG
 //#include "vld.h"
@@ -215,8 +216,22 @@ int main(int argc, char *argv[])
     SetUnhandledExceptionFilter(ExceptionFilter);
 #endif
 
+    // Parse command line arguments
+    QStringList args = a.arguments();
+    
+    // Create AutoScan controller
+    AutoScan autoScan;
+    autoScan.set_command_line_args(args);
+    
     UserPanel w;
+    w.set_auto_scan_controller(&autoScan);
+    
+    // Connect UserPanel initialization complete signal to AutoScan
+    QObject::connect(&w, &UserPanel::initialization_complete,
+                     &autoScan, &AutoScan::on_initialization_complete);
+    
     w.init();
     w.show();
+    
     return a.exec();
 }

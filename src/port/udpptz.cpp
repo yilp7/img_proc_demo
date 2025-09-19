@@ -54,6 +54,18 @@ UDPPTZ::~UDPPTZ()
     }
 }
 
+void UDPPTZ::set_target(QHostAddress target, quint16 port)
+{
+    target_ip = target;
+    target_port = port;
+}
+
+void UDPPTZ::set_listen(QHostAddress listen, quint16 port)
+{
+    local_ip = listen;
+    local_port = port;
+}
+
 bool UDPPTZ::connect_to_device()
 {
     if (connected) return false;
@@ -85,11 +97,11 @@ void UDPPTZ::disconnect_from_device()
 
     // Acquire mutex to ensure timer callbacks aren't running
     socket_mutex.lock();
-    
+
     // Now safe to stop timers - callbacks can't be executing
     timer_tx->stop();
     timer_rx->stop();
-    
+
     socket_mutex.unlock();  // Release before cleanup
 
     if (udp_socket) {
@@ -131,7 +143,7 @@ void UDPPTZ::transmit_data(qint32 op)
     }
 
     qint64 bytes_sent = udp_socket->writeDatagram(frame, target_ip, target_port);
-    
+
     if (bytes_sent == -1) {
         qDebug() << "Failed to send UDP datagram:" << udp_socket->errorString();
     }
@@ -162,13 +174,22 @@ void UDPPTZ::device_control(qint32 op, float val)
         transmit_data(MANUAL_SEARCH);
         break;
     case ANGLE_POSITION:
-        // val represents horizontal angle, vertical would need separate call
-        // Convert UI angle (0-360) to device angle (-180 to 180)
+        // UNUSED - should not be called directly through device_control
+        Q_UNUSED(val);
+        break;
+    case ANGLE_H:
+        // Set horizontal angle only
         if (val > 180.0f) {
             target_horizontal_angle = val - 360.0f;
         } else {
             target_horizontal_angle = val;
         }
+        current_operation = ANGLE_POSITION;
+        transmit_data(ANGLE_POSITION);
+        break;
+    case ANGLE_V:
+        // Set vertical angle only, clamp to -90 to 90 range
+        target_vertical_angle = std::max(-90.0f, std::min(90.0f, val));
         current_operation = ANGLE_POSITION;
         transmit_data(ANGLE_POSITION);
         break;
