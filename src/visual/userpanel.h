@@ -106,7 +106,7 @@ public:
     ~UserPanel();
 
     void init();
-    
+
     // Auto-scan support
     void set_command_line_args(const QStringList& args);
     void set_auto_scan_controller(class AutoScan* autoScan);
@@ -120,6 +120,14 @@ public:
 
     // generate 3d image through scan result
     static void paint_3d();
+
+    // 4-Camera System Methods
+    bool initialize_camera(int cam_idx, int device_idx);  // Initialize camera at index
+    bool start_camera(int cam_idx);                        // Start specific camera
+    bool stop_camera(int cam_idx);                         // Stop specific camera
+    bool get_camera_frame(int cam_idx, cv::Mat& frame);   // Get latest frame from camera queue
+    void enable_four_camera_mode(bool enable);             // Enable/disable 4-camera composite mode
+    bool is_four_camera_mode() const { return four_camera_mode; }
 
 public slots:
     // signaled by Titlebar button
@@ -259,6 +267,7 @@ private slots:
     void change_delay(int val);
     void change_gatewidth(int val);
     void change_focus_speed(int val);
+    void change_lens_address(int val);
 
     // TODO add pause function
     // process scan
@@ -406,7 +415,7 @@ protected:
 // control functions
 private:
     void data_exchange(bool read);
-    
+
 
     // shut the cam down
     int shut_down();
@@ -457,7 +466,7 @@ private:
 
     // read device config by config
     void read_gatewidth_lookup_table(QFile *fp);
-    
+
     // config sync functions
     void syncConfigToPreferences();
     void syncPreferencesToConfig();
@@ -512,7 +521,20 @@ private:
     QMutex          port_mutex;                 // port handle lock
     QMutex          display_mutex[3];           // display handle lock
     QMutex          frame_info_mutex;           // q_frame_info queue lock (shared across threads)
-    Cam*            curr_cam;                   // current camera
+    // 4-Camera Management
+    Cam*            cameras[4];                 // array of 4 camera pointers (cam-1 to cam-4)
+    std::queue<cv::Mat> camera_queues[4];       // camera-specific image queues
+    std::queue<int>     camera_frame_info[4];   // camera-specific frame info
+    QMutex          camera_mutexes[4];          // camera-specific mutexes
+    QMutex          camera_frame_mutexes[4];    // camera frame info mutexes
+    bool            camera_active[4];           // whether camera is active
+    struct main_ui_info cam_unions[4];          // camera callback structures
+    cv::Mat         composite_frame;            // Composite frame for 4-camera display
+    cv::Mat         camera_latest[4];           // Latest frame from each camera
+    int             composite_gap_size;         // Gap size between camera views in pixels
+    bool            four_camera_mode;           // Whether 4-camera composite mode is active
+
+    Cam*            curr_cam;                   // current camera (kept for compatibility)
     float           time_exposure_edit;
     float           gain_analog_edit;
     float           frame_rate_edit;
@@ -523,7 +545,7 @@ private:
     QString         current_video_filename;     // name of the imported video file (if not a stream)
     QString         output_filename;            // target output name when exporting video
     QString         temp_output_filename;       // temp save location of target output file
-    
+
     // TODO: implement by inheriting QThread
 //    TCUThread*    ptr_tcu;
 //    InclinThread* ptr_inc;

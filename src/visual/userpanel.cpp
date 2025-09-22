@@ -106,6 +106,10 @@ UserPanel::UserPanel(QWidget *parent) :
     simple_ui(false),
     calc_avg_option(5),
     trigger_by_software(false),
+    cameras{NULL, NULL, NULL, NULL},
+    camera_active{false, false, false, false},
+    composite_gap_size(5),
+    four_camera_mode(true),
     curr_cam(NULL),
     time_exposure_edit(95000),
 #if SIMPLE_UI
@@ -344,6 +348,25 @@ UserPanel::UserPanel(QWidget *parent) :
     ui->FOCUS_SPEED_SLIDER->setValue(31);
     connect(ui->FOCUS_SPEED_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_focus_speed(int)));
     ui->FOCUS_SPEED_EDIT->setText("31");
+
+    // Configure lens address combobox with hex values (no 0x prefix)
+    for (int i = 0; i <= 0x3F; i++) {
+        ui->LENS_ADDRESS_COMBO->addItem(QString::asprintf("%02X", i));
+    }
+    ui->LENS_ADDRESS_COMBO->setCurrentIndex(1);  // Set default to 01
+
+    // Make combobox editable to enable text alignment, then make it read-only
+    ui->LENS_ADDRESS_COMBO->setEditable(true);
+    ui->LENS_ADDRESS_COMBO->lineEdit()->setReadOnly(true);
+    ui->LENS_ADDRESS_COMBO->lineEdit()->setAlignment(Qt::AlignRight);
+
+    // Hide the dropdown arrow
+    ui->LENS_ADDRESS_COMBO->setStyleSheet(
+        "QComboBox { padding-right: 0px; }"
+        "QComboBox::drop-down { border: none; width: 0px; }"
+        "QComboBox::down-arrow { image: none; width: 0px; height: 0px; }");
+
+    connect(ui->LENS_ADDRESS_COMBO, SIGNAL(currentIndexChanged(int)), SLOT(change_lens_address(int)));
 
     ui->CONTINUE_SCAN_BUTTON->hide();
     ui->RESTART_SCAN_BUTTON->hide();
@@ -904,6 +927,7 @@ int UserPanel::grab_thread_process(int *idx) {
     grab_thread_state[thread_idx] = true;
     Display *disp;
     int _w = w[thread_idx], _h = h[thread_idx], _pixel_depth = pixel_depth[thread_idx];
+    qDebug() << _w << _h;
     bool updated;
     cv::Mat img_display, prev_img, prev_3d;
     cv::Mat seq[8], seq_sum, frame_a_sum, frame_b_sum;
@@ -968,7 +992,76 @@ int UserPanel::grab_thread_process(int *idx) {
             }
 
             // Safe check and access
-            if (q_img[thread_idx].empty()) {
+            // Check if we're in 4-camera mode and this is the main display
+            if (four_camera_mode && thread_idx == 0) {
+                // Composite frames inline from all 4 cameras
+                cv::Mat frames[4];
+                bool has_frames[4] = {false};
+                int active_count = 0;
+
+                // Collect frames from all camera queues
+                for (int i = 0; i < 4; i++) {
+                    if (camera_active[i]) {
+                        QMutexLocker cam_locker(&camera_mutexes[i]);
+                        if (!camera_queues[i].empty()) {
+                            frames[i] = camera_queues[i].front();
+                            camera_queues[i].pop();
+                            camera_latest[i] = frames[i].clone();
+                            has_frames[i] = true;
+                            active_count++;
+
+                            // Also pop frame info if available
+                            if (!camera_frame_info[i].empty()) {
+                                QMutexLocker frame_locker(&camera_frame_mutexes[i]);
+                                packets_lost += camera_frame_info[i].front();
+                                camera_frame_info[i].pop();
+                            }
+                        } else if (!camera_latest[i].empty()) {
+                            frames[i] = camera_latest[i];
+                            has_frames[i] = true;
+                        }
+                    }
+                }
+
+                // If no frames, continue
+                if (active_count == 0) {
+                    locker.unlock();
+                    QThread::msleep(10);
+                    continue;
+                }
+
+                // Create composite frame with dimensions from w[0] and h[0]
+                int type = frames[0].empty() ? CV_8UC1 : frames[0].type();
+                cv::Mat composite = cv::Mat::zeros(_h, _w, type);
+
+                // Stack frames vertically
+                int y_offset = 0;
+                for (int i = 0; i < 4; i++) {
+                    if (camera_active[i] && has_frames[i] && !frames[i].empty()) {
+                        int cam_h = frames[i].rows;
+                        int max_w = _w;  // Use full width
+
+                        // Resize width if needed
+                        cv::Mat resized;
+                        if (frames[i].cols != max_w) {
+                            cv::resize(frames[i], resized, cv::Size(max_w, cam_h));
+                        } else {
+                            resized = frames[i];
+                        }
+
+                        // Copy to composite if within bounds
+                        if (y_offset + cam_h <= _h) {
+                            cv::Rect roi(0, y_offset, max_w, cam_h);
+                            resized.copyTo(composite(roi));
+                        }
+                        y_offset += cam_h + 5;  // Add 5px gap
+                    }
+                }
+
+                img_mem[thread_idx] = composite;
+                updated = true;
+            }
+            else if (q_img[thread_idx].empty()) {
 #ifdef LVTONG
                 locker.unlock();
                 QThread::msleep(10);
@@ -1008,8 +1101,8 @@ int UserPanel::grab_thread_process(int *idx) {
 //        sr.upsample(img_mem[thread_idx].clone(), img_mem[thread_idx]);
 //        cv::resize(img_mem[thread_idx].clone(), img_mem[thread_idx], img_mem[thread_idx].size() * 2);
 
-        {
-            QMutexLocker processing_locker(&image_mutex[thread_idx]);
+        { //processing locker block
+        QMutexLocker processing_locker(&image_mutex[thread_idx]);
 //        qDebug () << QDateTime::currentDateTime().toString() << updated << img_mem.data;
 
         if (updated) {
@@ -1837,14 +1930,27 @@ int UserPanel::shut_down() {
 
     if (!q_img[0].empty()) std::queue<cv::Mat>().swap(q_img[0]);
 
-    if (curr_cam) {
-        int shutdown_result = curr_cam->shut_down();
-        if (shutdown_result != 0) {
-            qWarning("Camera shutdown failed with error code: %d", shutdown_result);
-            // Try to force cleanup even if shutdown failed
+    // Handle 4-camera mode shutdown
+    if (four_camera_mode) {
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i]) {
+                stop_camera(i);
+                cameras[i]->shut_down();
+                delete cameras[i];
+                cameras[i] = NULL;
+            }
         }
-        delete curr_cam;
-        curr_cam = NULL;
+    } else {
+        // Original single camera shutdown
+        if (curr_cam) {
+            int shutdown_result = curr_cam->shut_down();
+            if (shutdown_result != 0) {
+                qWarning("Camera shutdown failed with error code: %d", shutdown_result);
+                // Try to force cleanup even if shutdown failed
+            }
+            delete curr_cam;
+            curr_cam = NULL;
+        }
     }
 
     start_grabbing = false;
@@ -2193,13 +2299,119 @@ void UserPanel::on_ENUM_BUTTON_clicked()
 //    if (ui->TITLE->prog_settings->cameralink) curr_cam->cameralink = true;
     enable_controls(device_type = (curr_cam->search_for_devices() ?  (pref->cameralink ? 3 : (pref->ebus_cam ? 2 : 1)) : 0));
     update_dev_ip();
-    emit update_device_list(1, curr_cam->get_device_list());
+
+    // Print found devices for debugging (especially for 4-camera mode)
+    QStringList device_list = curr_cam->get_device_list();
+    if (!device_list.isEmpty()) {
+        qDebug() << "Found" << device_list.size() << "devices:";
+        for (int i = 0; i < device_list.size(); i++) {
+            qDebug() << "  Device" << i << ":" << device_list[i];
+        }
+    }
+
+    emit update_device_list(1, device_list);
 }
 
 void UserPanel::on_START_BUTTON_clicked()
 {
     if (device_on) return;
 
+    if (four_camera_mode) {
+        // 4-camera mode: Initialize and start all 4 cameras by name
+        int successful_cameras = 0;
+
+        // Check if devices were already enumerated (like single camera mode)
+        if (!curr_cam) {
+            QMessageBox::warning(this, "PROMPT", tr("Please enumerate devices first"));
+            return;
+        }
+
+        QStringList device_list = curr_cam->get_device_list();
+        if (device_list.isEmpty()) {
+            QMessageBox::warning(this, "PROMPT", tr("No devices found. Please enumerate devices first"));
+            return;
+        }
+
+        // Look for cameras named cam-1 through cam-4
+        const char* camera_names[] = {"cam-1", "cam-2", "cam-3", "cam-4"};
+
+        for (int i = 0; i < 4; i++) {
+            int device_idx = -1;
+
+            // Find the device index for this camera name
+            for (int j = 0; j < device_list.size(); j++) {
+                if (device_list[j].contains(camera_names[i])) {
+                    device_idx = j;
+                    qDebug() << "Matched" << camera_names[i] << "with device" << j << ":" << device_list[j];
+                    break;
+                }
+            }
+
+            if (device_idx == -1) {
+                QMessageBox::warning(this, "PROMPT",
+                    tr("Camera %1 not found").arg(camera_names[i]));
+                continue;
+            }
+
+            // Initialize camera with the found device index
+            if (!initialize_camera(i, device_idx)) {
+                QMessageBox::warning(this, "PROMPT",
+                    tr("Failed to initialize %1").arg(camera_names[i]));
+                continue;
+            }
+
+            successful_cameras++;
+        }
+
+        if (successful_cameras == 0) {
+            QMessageBox::warning(this, "PROMPT", tr("No cameras could be started"));
+            return;
+        } else if (successful_cameras < 4) {
+            QMessageBox::information(this, "PROMPT",
+                tr("%1 of 4 cameras started successfully").arg(successful_cameras));
+        }
+
+        device_on = true;
+        enable_controls(true);
+
+        // Apply settings to all cameras (like single camera mode)
+        on_SET_PARAMS_BUTTON_clicked();
+
+        // Set up gain slider (use first camera's settings)
+        if (cameras[0]) {
+            ui->GAIN_SLIDER->setMinimum(0);
+            ui->GAIN_SLIDER->setMaximum(cameras[0]->device_type == 1 ? 23 : 480);
+            ui->GAIN_SLIDER->setSingleStep(1);
+            ui->GAIN_SLIDER->setPageStep(4);
+            ui->GAIN_SLIDER->setValue(gain_analog_edit);
+            connect(ui->GAIN_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_gain(int)));
+        }
+
+        // Set trigger mode
+        on_TRIGGER_RADIO_clicked();
+
+        // Read back actual values from first active camera
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                cameras[i]->time_exposure(true, &time_exposure_edit);
+                cameras[i]->gain_analog(true, &gain_analog_edit);
+                cameras[i]->frame_rate(true, &frame_rate_edit);
+                break;  // Use first active camera's values for UI
+            }
+        }
+
+        ui->GAIN_SLIDER->setValue((int)gain_analog_edit);
+        ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)std::round(gain_analog_edit)));
+        ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
+        ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
+
+        // Set pixel format
+        pref->set_pixel_format(0);
+        emit device_connection_status_changed(0, QStringList());
+        return;
+    }
+
+    // Single camera mode (original code)
     if (!curr_cam) {
         QMessageBox::warning(this, "PROMPT", tr("No camera available"));
         return;
@@ -2263,7 +2475,17 @@ void UserPanel::on_CONTINUOUS_RADIO_clicked()
     ui->TRIGGER_RADIO->setChecked(false);
     ui->SOFTWARE_CHECK->setEnabled(false);
     trigger_mode_on = false;
-    curr_cam->trigger_mode(false, &trigger_mode_on);
+
+    if (four_camera_mode) {
+        // Apply to all cameras
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                cameras[i]->trigger_mode(false, &trigger_mode_on);
+            }
+        }
+    } else if (curr_cam) {
+        curr_cam->trigger_mode(false, &trigger_mode_on);
+    }
 
     ui->SOFTWARE_TRIGGER_BUTTON->setEnabled(false);
 }
@@ -2274,7 +2496,17 @@ void UserPanel::on_TRIGGER_RADIO_clicked()
     ui->TRIGGER_RADIO->setChecked(true);
     ui->SOFTWARE_CHECK->setEnabled(true);
     trigger_mode_on = true;
-    curr_cam->trigger_mode(false, &trigger_mode_on);
+
+    if (four_camera_mode) {
+        // Apply to all cameras
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                cameras[i]->trigger_mode(false, &trigger_mode_on);
+            }
+        }
+    } else if (curr_cam) {
+        curr_cam->trigger_mode(false, &trigger_mode_on);
+    }
 
     ui->SOFTWARE_TRIGGER_BUTTON->setEnabled(start_grabbing && trigger_by_software);
 }
@@ -2284,25 +2516,73 @@ void UserPanel::on_SOFTWARE_CHECK_stateChanged(int arg1)
 {
     trigger_by_software = arg1;
     trigger_source = arg1 ? 1 : 2;
-    curr_cam->trigger_source(false, &trigger_by_software);
+
+    if (four_camera_mode) {
+        // Apply to all cameras
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                cameras[i]->trigger_source(false, &trigger_by_software);
+            }
+        }
+    } else if (curr_cam) {
+        curr_cam->trigger_source(false, &trigger_by_software);
+    }
+
     ui->SOFTWARE_TRIGGER_BUTTON->setEnabled(start_grabbing && arg1);
 }
 
 void UserPanel::on_SOFTWARE_TRIGGER_BUTTON_clicked()
 {
-    if (!curr_cam || !device_on) {
-        qWarning("Cannot trigger: camera not initialized or device not on");
+    if (!device_on) {
+        qWarning("Cannot trigger: device not on");
         return;
     }
-    curr_cam->trigger_once();
+
+    if (four_camera_mode) {
+        // Trigger all active cameras
+        int triggered = 0;
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                cameras[i]->trigger_once();
+                triggered++;
+            }
+        }
+        if (triggered == 0) {
+            qWarning("Cannot trigger: no active cameras");
+        }
+    } else {
+        if (!curr_cam) {
+            qWarning("Cannot trigger: camera not initialized");
+            return;
+        }
+        curr_cam->trigger_once();
+    }
 }
 
 void UserPanel::on_START_GRABBING_BUTTON_clicked()
 {
 //    if (!device_on || start_grabbing || curr_cam == NULL) return;
-    if (!device_on || curr_cam == NULL) return;
+    if (!device_on) return;
 
-    static struct main_ui_info cam_union = {&q_frame_info, q_img + 0, &frame_info_mutex, &image_mutex[0]};
+    // In 4-camera mode, check if cameras are initialized
+    if (four_camera_mode) {
+        bool has_active_camera = false;
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                has_active_camera = true;
+                break;
+            }
+        }
+        if (!has_active_camera) {
+            QMessageBox::warning(this, "PROMPT", tr("No cameras initialized"));
+            return;
+        }
+    } else if (curr_cam == NULL) {
+        // Single camera mode check
+        return;
+    }
+
+    static struct main_ui_info cam_union = {&q_frame_info, q_img + 0, &frame_info_mutex, &image_mutex[0], 0};  // cam_index = 0 for single camera
     curr_cam->set_user_pointer(&cam_union);
 
     // TODO complete BayerGB process & display
@@ -2334,10 +2614,69 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
         display_thread_idx[0] = -1;
     }
 
-    // adjust display size according to frame size
-    curr_cam->frame_size(true, &w[0], &h[0]);
-    status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
-    qInfo("frame w: %d, h: %d", w[0], h[0]);
+    // Start camera grabbing
+    if (four_camera_mode) {
+        // For 4-camera mode, calculate composite dimensions FIRST
+        int max_width = 0;
+        int total_height = 0;
+        int camera_heights[4] = {0, 0, 0, 0};
+        int active_count = 0;
+
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                // Register callback FIRST so cam_idx is set properly
+                cameras[i]->set_user_pointer(&cam_unions[i]);
+
+                // THEN read frame size to initialize Mat objects with correct cam_idx
+                int cam_w, cam_h;
+                cameras[i]->frame_size(true, &cam_w, &cam_h);
+                qDebug() << "Camera" << i + 1 << "frame size:" << cam_w << "x" << cam_h;
+
+                // Track dimensions for vertical layout
+                if (cam_w > max_width) max_width = cam_w;
+                camera_heights[i] = cam_h;
+                total_height += cam_h;
+                active_count++;
+            }
+        }
+
+        // Check for dimension mismatches
+        bool dimension_warning = false;
+        for (int i = 1; i < 4; i++) {
+            if (camera_active[i] && camera_active[0]) {
+                int cam_w, cam_h;
+                cameras[i]->frame_size(true, &cam_w, &cam_h);
+                int cam0_w, cam0_h;
+                cameras[0]->frame_size(true, &cam0_w, &cam0_h);
+
+                if (cam_w != cam0_w || cam_h != cam0_h) {
+                    dimension_warning = true;
+                    break;
+                }
+            }
+        }
+
+        if (dimension_warning) {
+            qWarning() << "WARNING: Camera dimensions are not uniform!";
+            qWarning() << "  Using max width:" << max_width << "for vertical layout";
+        }
+
+        // Set composite display dimensions for vertical stacking
+        // Width = max width of all cameras
+        // Height = sum of all camera heights + gaps
+        w[0] = max_width;
+        h[0] = total_height + (active_count - 1) * 5;  // 5px gaps between cameras
+
+        status_bar->img_resolution->set_text(QString::asprintf("%d x %d (4-cam vertical)", w[0], h[0]));
+        qInfo("Composite frame w: %d, h: %d (max width: %d, total height: %d)",
+              w[0], h[0], max_width, total_height);
+    } else {
+        // Single camera mode - adjust display size according to frame size
+        curr_cam->frame_size(true, &w[0], &h[0]);
+        status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
+        qInfo("frame w: %d, h: %d", w[0], h[0]);
+    }
+
     //    QRect region = ui->SOURCE_DISPLAY->geometry();
     //    region.setHeight(ui->SOURCE_DISPLAY->width() * h / w);
     //    ui->SOURCE_DISPLAY->setGeometry(region);
@@ -2357,15 +2696,49 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
     }
     h_grab_thread[0]->start();
 
-    if (curr_cam->start_grabbing()) {
-        grab_image[0] = false;
-        if (h_grab_thread[0]) {
-            h_grab_thread[0]->quit();
-            h_grab_thread[0]->wait();
-            delete h_grab_thread[0];
-            h_grab_thread[0] = NULL;
+    // Continue with 4-camera mode setup
+    if (four_camera_mode) {
+
+        // Start grabbing on all active cameras (don't fail if some cameras can't start)
+        int cameras_started = 0;
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                if (cameras[i]->start_grabbing() == 0) {
+                    cameras_started++;
+                    qDebug() << "Started grabbing on camera" << i + 1;
+                } else {
+                    qWarning() << "Failed to start grabbing on camera" << i + 1;
+                    camera_active[i] = false;  // Mark as inactive if can't start
+                }
+            }
         }
-        return;
+
+        if (cameras_started == 0) {
+            // No cameras could start - this is a failure
+            grab_image[0] = false;
+            if (h_grab_thread[0]) {
+                h_grab_thread[0]->quit();
+                h_grab_thread[0]->wait();
+                delete h_grab_thread[0];
+                h_grab_thread[0] = NULL;
+            }
+            QMessageBox::warning(this, "PROMPT", tr("No cameras could start grabbing"));
+            return;
+        }
+
+        qInfo() << "Started grabbing on" << cameras_started << "cameras";
+    } else {
+        // Single camera mode
+        if (curr_cam->start_grabbing()) {
+            grab_image[0] = false;
+            if (h_grab_thread[0]) {
+                h_grab_thread[0]->quit();
+                h_grab_thread[0]->wait();
+                delete h_grab_thread[0];
+                h_grab_thread[0] = NULL;
+            }
+            return;
+        }
     }
     start_grabbing = true;
     ui->SOURCE_DISPLAY->is_grabbing = true;
@@ -2405,7 +2778,16 @@ void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
 //    if (device_type == -2) ui->ENUM_BUTTON->click(), video_input->stop(), video_surface->stop();
     if (device_type == -2) ui->ENUM_BUTTON->click();
 
-    curr_cam->stop_grabbing();
+    // Stop camera grabbing
+    if (four_camera_mode) {
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                cameras[i]->stop_grabbing();
+            }
+        }
+    } else {
+        curr_cam->stop_grabbing();
+    }
     display_thread_idx[0] = -1;
 }
 
@@ -2467,10 +2849,22 @@ void UserPanel::on_SET_PARAMS_BUTTON_clicked()
 //    time_exposure_edit = ptr_tcu->duty;
 //    frame_rate_edit = ptr_tcu->fps;
     if (device_on) {
-        curr_cam->time_exposure(false, &time_exposure_edit);
-        curr_cam->frame_rate(false, &frame_rate_edit);
-//        curr_cam->gain_analog(false, &gain_analog_edit);
-        change_gain(gain_analog_edit);
+        if (four_camera_mode) {
+            // Apply parameters to all 4 cameras
+            for (int i = 0; i < 4; i++) {
+                if (cameras[i] && camera_active[i]) {
+                    cameras[i]->time_exposure(false, &time_exposure_edit);
+                    cameras[i]->frame_rate(false, &frame_rate_edit);
+                    cameras[i]->gain_analog(false, &gain_analog_edit);
+                }
+            }
+        } else {
+            // Single camera mode
+            curr_cam->time_exposure(false, &time_exposure_edit);
+            curr_cam->frame_rate(false, &frame_rate_edit);
+//            curr_cam->gain_analog(false, &gain_analog_edit);
+            change_gain(gain_analog_edit);
+        }
     }
     ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)std::round(gain_analog_edit)));
     ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
@@ -2481,15 +2875,106 @@ void UserPanel::on_SET_PARAMS_BUTTON_clicked()
 
 void UserPanel::on_GET_PARAMS_BUTTON_clicked()
 {
-    curr_cam->trigger_mode(true, &trigger_mode_on);
-    trigger_mode_on ? on_TRIGGER_RADIO_clicked() : on_CONTINUOUS_RADIO_clicked();
-    curr_cam->trigger_source(true, &trigger_by_software);
-    trigger_source = trigger_by_software ? 1 : 2;
+    if (four_camera_mode) {
+        // 4-camera mode: Read from all cameras and check for differences
+        float exposure_values[4] = {0};
+        float gain_values[4] = {0};
+        float framerate_values[4] = {0};
+        bool trigger_values[4] = {false};
+        bool trigger_src_values[4] = {false};
+        int valid_cameras = 0;
 
-    curr_cam->time_exposure(true, &time_exposure_edit);
-    curr_cam->gain_analog(true, &gain_analog_edit);
-    curr_cam->frame_rate(true, &frame_rate_edit);
+        // Read parameters from all active cameras
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                cameras[i]->trigger_mode(true, &trigger_values[i]);
+                cameras[i]->trigger_source(true, &trigger_src_values[i]);
+                cameras[i]->time_exposure(true, &exposure_values[i]);
+                cameras[i]->gain_analog(true, &gain_values[i]);
+                cameras[i]->frame_rate(true, &framerate_values[i]);
+                valid_cameras++;
+            }
+        }
 
+        if (valid_cameras > 0) {
+            // Check for parameter differences and use last valid values
+            bool exposure_diff = false, gain_diff = false, framerate_diff = false;
+            bool trigger_diff = false, trigger_src_diff = false;
+
+            for (int i = 0; i < 4; i++) {
+                if (cameras[i] && camera_active[i]) {
+                    // Use last valid camera's values
+                    trigger_mode_on = trigger_values[i];
+                    trigger_by_software = trigger_src_values[i];
+                    time_exposure_edit = exposure_values[i];
+                    gain_analog_edit = gain_values[i];
+                    frame_rate_edit = framerate_values[i];
+
+                    // Check for differences with first camera
+                    if (i > 0 && cameras[0] && camera_active[0]) {
+                        if (std::abs(exposure_values[i] - exposure_values[0]) > 0.01) exposure_diff = true;
+                        if (std::abs(gain_values[i] - gain_values[0]) > 0.01) gain_diff = true;
+                        if (std::abs(framerate_values[i] - framerate_values[0]) > 0.01) framerate_diff = true;
+                        if (trigger_values[i] != trigger_values[0]) trigger_diff = true;
+                        if (trigger_src_values[i] != trigger_src_values[0]) trigger_src_diff = true;
+                    }
+                }
+            }
+
+            // Output debug warnings if parameters differ
+            if (exposure_diff || gain_diff || framerate_diff || trigger_diff || trigger_src_diff) {
+                qDebug() << "WARNING: Camera parameters are not uniform:";
+                if (exposure_diff) {
+                    qDebug() << "  Exposure times differ:";
+                    for (int i = 0; i < 4; i++) {
+                        if (cameras[i] && camera_active[i]) {
+                            qDebug() << "    Camera" << i+1 << ":" << exposure_values[i] << "µs";
+                        }
+                    }
+                }
+                if (gain_diff) {
+                    qDebug() << "  Gains differ:";
+                    for (int i = 0; i < 4; i++) {
+                        if (cameras[i] && camera_active[i]) {
+                            qDebug() << "    Camera" << i+1 << ":" << gain_values[i];
+                        }
+                    }
+                }
+                if (framerate_diff) {
+                    qDebug() << "  Frame rates differ:";
+                    for (int i = 0; i < 4; i++) {
+                        if (cameras[i] && camera_active[i]) {
+                            qDebug() << "    Camera" << i+1 << ":" << framerate_values[i] << "fps";
+                        }
+                    }
+                }
+                if (trigger_diff) {
+                    qDebug() << "  Trigger modes differ";
+                }
+                if (trigger_src_diff) {
+                    qDebug() << "  Trigger sources differ";
+                }
+                qDebug() << "  Using values from last active camera for display";
+            }
+        }
+
+        // Update UI based on trigger mode
+        trigger_mode_on ? on_TRIGGER_RADIO_clicked() : on_CONTINUOUS_RADIO_clicked();
+        trigger_source = trigger_by_software ? 1 : 2;
+
+    } else {
+        // Single camera mode - original code
+        curr_cam->trigger_mode(true, &trigger_mode_on);
+        trigger_mode_on ? on_TRIGGER_RADIO_clicked() : on_CONTINUOUS_RADIO_clicked();
+        curr_cam->trigger_source(true, &trigger_by_software);
+        trigger_source = trigger_by_software ? 1 : 2;
+
+        curr_cam->time_exposure(true, &time_exposure_edit);
+        curr_cam->gain_analog(true, &gain_analog_edit);
+        curr_cam->frame_rate(true, &frame_rate_edit);
+    }
+
+    // Update UI with the values (either from single camera or last checked in 4-camera mode)
     ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)std::round(gain_analog_edit)));
     ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
     ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
@@ -3139,6 +3624,7 @@ void UserPanel::switch_ui()
         ui->FOCUS_EDIT->hide();
         ui->GET_LENS_PARAM_BTN->hide();
         ui->AUTO_FOCUS_BTN->hide();
+        ui->LENS_ADDRESS_COMBO->hide();
         ui->FOCUS_SPEED_LABEL->show();
         ui->FOCUS_SPEED_SLIDER->move(ui->FOCUS_SPEED_SLIDER->pos() + QPoint(20, 10));
         ui->FOCUS_SPEED_EDIT->move(ui->FOCUS_SPEED_EDIT->pos() + QPoint(-26, 35));
@@ -3207,7 +3693,8 @@ void UserPanel::switch_ui()
         ui->ZOOM_EDIT->show();
         ui->FOCUS_EDIT->show();
         ui->GET_LENS_PARAM_BTN->show();
-        ui->AUTO_FOCUS_BTN->show();
+        ui->AUTO_FOCUS_BTN->hide();  // Keep auto button hidden
+        ui->LENS_ADDRESS_COMBO->show();
         ui->FOCUS_SPEED_LABEL->hide();
         ui->FOCUS_SPEED_SLIDER->move(ui->FOCUS_SPEED_SLIDER->pos() - QPoint(20, 10));
         ui->FOCUS_SPEED_EDIT->move(ui->FOCUS_SPEED_EDIT->pos() - QPoint(-26, 35));
@@ -3349,6 +3836,9 @@ void UserPanel::syncPreferencesToConfig()
     data.device.ebus = pref->ebus_cam;
     data.device.share_tcu_port = pref->share_port;
     data.device.ptz_type = pref->ptz_type;
+    for (int i = 0; i < 4; ++i) {
+        data.device.cam_to_gate[i] = pref->cam_to_gate[i];
+    }
 }
 
 void UserPanel::syncConfigToPreferences()
@@ -3414,6 +3904,9 @@ void UserPanel::syncConfigToPreferences()
     pref->ebus_cam = data.device.ebus;
     pref->share_port = data.device.share_tcu_port;
     pref->ptz_type = data.device.ptz_type;
+    for (int i = 0; i < 4; ++i) {
+        pref->cam_to_gate[i] = data.device.cam_to_gate[i];
+    }
 
     // Update UI comboboxes before data_exchange
     pref->ui->TCU_LIST->setCurrentIndex(data.tcu.type);
@@ -4372,18 +4865,49 @@ void UserPanel::change_mcp(int val)
 void UserPanel::change_gain(int val)
 {
     if (val < 0) val = 0;
-    switch (curr_cam->device_type) {
-    case 1:
-        if (val > 23) val = 23; break;
-    case 2:
-        if (val > 480) val = 480; break;
-    default:
-        break;
+
+    // Apply device type limits
+    if (four_camera_mode) {
+        // Use the first active camera's device type for limits
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i]) {
+                switch (cameras[i]->device_type) {
+                case 1:
+                    if (val > 23) val = 23; break;
+                case 2:
+                    if (val > 480) val = 480; break;
+                default:
+                    break;
+                }
+                break;  // Use first camera's type
+            }
+        }
+    } else if (curr_cam) {
+        switch (curr_cam->device_type) {
+        case 1:
+            if (val > 23) val = 23; break;
+        case 2:
+            if (val > 480) val = 480; break;
+        default:
+            break;
+        }
     }
 
     gain_analog_edit = val;
-    curr_cam->gain_analog(false, &gain_analog_edit);
-    curr_cam->gain_analog(true, &gain_analog_edit);
+
+    // Apply to all cameras in 4-camera mode
+    if (four_camera_mode) {
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                cameras[i]->gain_analog(false, &gain_analog_edit);
+                cameras[i]->gain_analog(true, &gain_analog_edit);
+            }
+        }
+    } else if (curr_cam) {
+        curr_cam->gain_analog(false, &gain_analog_edit);
+        curr_cam->gain_analog(true, &gain_analog_edit);
+    }
+
     // qDebug() << "gain set" << gain_analog_edit << (int)std::round(gain_analog_edit);
     ui->GAIN_EDIT->setText(QString::number((int)std::round(gain_analog_edit)));
     ui->GAIN_SLIDER->setValue((int)std::round(gain_analog_edit));
@@ -4449,6 +4973,13 @@ void UserPanel::change_focus_speed(int val)
 //     out_data[8] = (4 * (uint)val + 0xA3) & 0xFF;
 // //    if (multi_laser_lenses) communicate_display(temp_serial_port_id, QByteArray((char*)out_data, 9), 9, 0, false);
 //     if (multi_laser_lenses) ptr_lens->communicate_display(QByteArray((char*)out_data, 9), 9, 0, false);
+}
+
+void UserPanel::change_lens_address(int val)
+{
+    if (val < 0)  val = 0;
+    if (val > 63) val = 63;
+    p_lens->set_address(static_cast<uchar>(val));
 }
 
 void UserPanel::on_ZOOM_IN_BTN_released()
@@ -6422,11 +6953,35 @@ void UserPanel::on_FIRE_LASER_BTN_clicked()
 
 void UserPanel::on_IMG_REGION_BTN_clicked()
 {
+    Cam* target_cam = curr_cam;  // Default to curr_cam for single camera mode
+    int selected_cam_idx = 0;
+
+    // In 4-camera mode, find first active camera as initial target
+    if (four_camera_mode) {
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                target_cam = cameras[i];
+                selected_cam_idx = i;
+                break;
+            }
+        }
+        if (!target_cam) {
+            QMessageBox::warning(this, "PROMPT", tr("No active cameras available"));
+            return;
+        }
+    } else {
+        // Single camera mode - use curr_cam
+        if (!curr_cam) {
+            QMessageBox::warning(this, "PROMPT", tr("No camera available"));
+            return;
+        }
+    }
+
     int max_w = 0, max_h = 0, new_w = 0, new_h = 0, new_x = 0, new_y = 0;
     int inc_w = 1, inc_h = 1, inc_x = 1, inc_y = 1;
-    curr_cam->get_max_frame_size(&max_w, &max_h);
-    curr_cam->frame_size(true, &new_w, &new_h, &inc_w, &inc_h);
-    curr_cam->frame_offset(true, &new_x, &new_y, &inc_x, &inc_y);
+    target_cam->get_max_frame_size(&max_w, &max_h);
+    target_cam->frame_size(true, &new_w, &new_h, &inc_w, &inc_h);
+    target_cam->frame_offset(true, &new_x, &new_y, &inc_x, &inc_y);
     new_w = ui->SHAPE_INFO->pair.x();
     new_h = ui->SHAPE_INFO->pair.y();
     new_x += ui->START_COORD->pair.x();
@@ -6442,7 +6997,62 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
     QDialog image_region_dialog(this, Qt::FramelessWindowHint);
     QFormLayout form(&image_region_dialog);
     form.setRowWrapPolicy(QFormLayout::WrapAllRows);
-    form.addRow(new QLabel("Region select:", &image_region_dialog));
+
+    // Add title row - with camera selector in 4-camera mode
+    if (four_camera_mode) {
+        // Create a single widget containing both label and combobox
+        QWidget *titleWidget = new QWidget(&image_region_dialog);
+        titleWidget->setStyleSheet("background-color: transparent;");  // Match dialog background
+        QHBoxLayout *titleLayout = new QHBoxLayout(titleWidget);
+        titleLayout->setContentsMargins(0, 0, 0, 0);
+
+        QLabel *titleLabel = new QLabel("Region select:", titleWidget);
+        QComboBox *cam_selector = new QComboBox(titleWidget);
+        cam_selector->resize(80, 20);  // Match spinbox size for alignment
+        // Comprehensive stylesheet to completely remove drop-down arrow
+        cam_selector->setStyleSheet(
+            "QComboBox { padding-right: 0px; }"
+            "QComboBox::drop-down { border: none; width: 0px; }"
+            "QComboBox::down-arrow { image: none; width: 0px; height: 0px; }");
+
+        // Populate with active cameras
+        for (int i = 0; i < 4; i++) {
+            if (cameras[i] && camera_active[i]) {
+                cam_selector->addItem(QString("cam-%1").arg(i + 1), i);
+                if (i == selected_cam_idx) {
+                    cam_selector->setCurrentIndex(cam_selector->count() - 1);
+                }
+            }
+        }
+
+        // Handle camera selection change
+        connect(cam_selector, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            [this, &target_cam, &selected_cam_idx, &max_w, &max_h, &new_w, &new_h, &new_x, &new_y,
+             &inc_w, &inc_h, &inc_x, &inc_y, cam_selector](int index) {
+                if (index < 0) return;
+                int cam_idx = cam_selector->currentData().toInt();
+                if (cameras[cam_idx] && camera_active[cam_idx]) {
+                    target_cam = cameras[cam_idx];
+                    selected_cam_idx = cam_idx;
+                    // Refresh values for new camera
+                    target_cam->get_max_frame_size(&max_w, &max_h);
+                    target_cam->frame_size(true, &new_w, &new_h, &inc_w, &inc_h);
+                    target_cam->frame_offset(true, &new_x, &new_y, &inc_x, &inc_y);
+                    // Note: Spinboxes will need to be updated outside this lambda
+                }
+            });
+
+        titleLayout->addWidget(titleLabel);
+        titleLayout->addStretch();  // Push combobox to the right
+        titleLayout->addWidget(cam_selector);
+
+        // Add as a single widget so it won't be wrapped
+        form.addRow(titleWidget);
+    } else {
+        // Single camera mode - just the label
+        QLabel *titleLabel = new QLabel("Region select:", &image_region_dialog);
+        form.addRow(titleLabel);
+    }
 
     QLabel *width = new QLabel("Width (max " + QString::number(max_w) + "): ", &image_region_dialog);
     QSpinBox *width_spinbox = new QSpinBox(&image_region_dialog);
@@ -6529,12 +7139,38 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
         new_y = y_spinbox->value();
         bool was_playing = start_grabbing;
         if (was_playing) ui->STOP_GRABBING_BUTTON->click();
-        if (curr_cam) {
-            curr_cam->frame_size(false, &new_w, &new_h);
-            curr_cam->frame_offset(false, &new_x, &new_y);
+
+        // Apply ROI to the target camera (selected camera in 4-cam mode, curr_cam in single mode)
+        if (target_cam) {
+            target_cam->frame_size(false, &new_w, &new_h);
+            target_cam->frame_offset(false, &new_x, &new_y);
         }
-        if (device_on && curr_cam) curr_cam->frame_size(true, &w[0], &h[0]);
-        status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
+
+        // Update display dimensions
+        if (four_camera_mode) {
+            // In 4-camera mode, recalculate composite dimensions
+            if (device_on && cameras[selected_cam_idx]) {
+                // Recalculate composite frame size after ROI change
+                int max_width = 0;
+                int total_height = 0;
+                for (int i = 0; i < 4; i++) {
+                    if (cameras[i] && camera_active[i]) {
+                        int cam_w, cam_h;
+                        cameras[i]->frame_size(true, &cam_w, &cam_h);
+                        if (cam_w > max_width) max_width = cam_w;
+                        total_height += cam_h;
+                    }
+                }
+                w[0] = max_width;
+                h[0] = total_height + 3 * 5;  // Add gaps
+                status_bar->img_resolution->set_text(QString::asprintf("%d x %d (4-cam)", w[0], h[0]));
+            }
+        } else {
+            // Single camera mode - update as before
+            if (device_on && curr_cam) curr_cam->frame_size(true, &w[0], &h[0]);
+            status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
+        }
+
         QResizeEvent e(this->size(), this->size());
         resizeEvent(&e);
         if (was_playing) ui->START_GRABBING_BUTTON->click();
@@ -6600,6 +7236,139 @@ void UserPanel::set_command_line_args(const QStringList& args)
 void UserPanel::set_auto_scan_controller(AutoScan* autoScan)
 {
     m_auto_scan_controller = autoScan;
+}
+
+// ============================================================================
+// 4-Camera System Implementation
+// ============================================================================
+
+bool UserPanel::initialize_camera(int cam_idx, int device_idx)
+{
+    if (cam_idx < 0 || cam_idx >= 4) return false;
+
+    // Clean up existing camera if present
+    if (cameras[cam_idx]) {
+        stop_camera(cam_idx);
+        delete cameras[cam_idx];
+        cameras[cam_idx] = NULL;
+    }
+
+    // Create new camera instance based on settings
+#ifdef WIN32
+    if (pref && pref->ebus_cam) {
+        cameras[cam_idx] = new EbusCam;
+    } else {
+        cameras[cam_idx] = new MvCam;
+    }
+#else
+    cameras[cam_idx] = new MvCam;
+#endif
+
+    // NOTE: We don't call search_for_devices() here anymore
+    // The device lists are already populated from curr_cam's enumeration
+    // The static device lists in MvCam are shared across all instances
+
+    // Start the specific device
+    if (cameras[cam_idx]->start(device_idx) != 0) {
+        delete cameras[cam_idx];
+        cameras[cam_idx] = NULL;
+        return false;
+    }
+
+    // Initialize camera-specific callback structure
+    cam_unions[cam_idx].frame_info_q = &camera_frame_info[cam_idx];
+    cam_unions[cam_idx].img_q = &camera_queues[cam_idx];
+    cam_unions[cam_idx].frame_info_mutex = &camera_frame_mutexes[cam_idx];
+    cam_unions[cam_idx].img_mutex = &camera_mutexes[cam_idx];
+    cam_unions[cam_idx].cam_index = cam_idx;  // Set the camera index for array access
+
+    // NOTE: Don't call set_user_pointer() here - it will be called in START_GRABBING
+    // just like single camera mode, to avoid callbacks before Mat objects are initialized
+
+    camera_active[cam_idx] = true;
+    return true;
+}
+
+bool UserPanel::start_camera(int cam_idx)
+{
+    if (cam_idx < 0 || cam_idx >= 4) return false;
+    if (!cameras[cam_idx] || !camera_active[cam_idx]) return false;
+
+    return cameras[cam_idx]->start_grabbing() == 0;
+}
+
+bool UserPanel::stop_camera(int cam_idx)
+{
+    if (cam_idx < 0 || cam_idx >= 4) return false;
+    if (!cameras[cam_idx]) return false;
+
+    cameras[cam_idx]->stop_grabbing();
+    camera_active[cam_idx] = false;
+
+    // Clear the camera queue
+    QMutexLocker locker(&camera_mutexes[cam_idx]);
+    std::queue<cv::Mat>().swap(camera_queues[cam_idx]);
+    std::queue<int>().swap(camera_frame_info[cam_idx]);
+
+    return true;
+}
+
+bool UserPanel::get_camera_frame(int cam_idx, cv::Mat& frame)
+{
+    if (cam_idx < 0 || cam_idx >= 4) return false;
+    if (!camera_active[cam_idx]) return false;
+
+    QMutexLocker locker(&camera_mutexes[cam_idx]);
+    if (camera_queues[cam_idx].empty()) {
+        // No new frame, return last cached frame if available
+        if (!camera_latest[cam_idx].empty()) {
+            frame = camera_latest[cam_idx].clone();
+            return true;
+        }
+        return false;
+    }
+
+    // Get the latest frame and cache it
+    frame = camera_queues[cam_idx].front();
+    camera_latest[cam_idx] = frame.clone();
+    camera_queues[cam_idx].pop();
+
+    // Also pop frame info if available
+    if (!camera_frame_info[cam_idx].empty()) {
+        camera_frame_info[cam_idx].pop();
+    }
+
+    // Keep queue size manageable
+    while (camera_queues[cam_idx].size() > 2) {
+        camera_queues[cam_idx].pop();
+        if (!camera_frame_info[cam_idx].empty()) {
+            camera_frame_info[cam_idx].pop();
+        }
+    }
+
+    return true;
+}
+
+
+void UserPanel::enable_four_camera_mode(bool enable)
+{
+    four_camera_mode = enable;
+
+    if (enable) {
+        // Clear display 0 queue to start fresh
+        QMutexLocker locker(&image_mutex[0]);
+        std::queue<cv::Mat>().swap(q_img[0]);
+
+        // Make sure grab thread for display 0 is running
+        if (!grab_thread_state[0] && !h_grab_thread[0]) {
+            grab_image[0] = true;
+            h_grab_thread[0] = new GrabThread((void*)this, 0);
+            if (h_grab_thread[0]) {
+                h_grab_thread[0]->start();
+                grab_thread_state[0] = true;
+            }
+        }
+    }
 }
 
 

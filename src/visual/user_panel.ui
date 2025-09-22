@@ -2171,8 +2171,33 @@
       <property name="mouseTracking">
        <bool>false</bool>
       </property>
+      <property name="visible">
+       <bool>false</bool>
+      </property>
       <property name="text">
        <string>auto</string>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="LENS_ADDRESS_COMBO">
+      <property name="geometry">
+       <rect>
+        <x>180</x>
+        <y>67</y>
+        <width>27</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
+      </property>
+      <property name="editable">
+       <bool>false</bool>
+      </property>
+      <property name="maxVisibleItems">
+       <number>10</number>
       </property>
      </widget>
      <widget class="QPushButton" name="RADIUS_DEC_BTN">

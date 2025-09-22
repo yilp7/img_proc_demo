@@ -34,6 +34,7 @@ public:
     ~Lens();
 
     uint get(qint32 lens_param);
+    void set_address(uchar new_address);
 
 #if ENABLE_PORT_JSON
     nlohmann::json to_json() override;

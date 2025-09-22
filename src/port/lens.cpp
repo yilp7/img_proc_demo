@@ -35,6 +35,19 @@ uint Lens::get(qint32 lens_param)
     }
 }
 
+void Lens::set_address(uchar new_address)
+{
+    address = new_address;
+
+    // Regenerate query commands with new address
+    query[0] = generate_ba(new uchar[7]{0xFF, address, 0x00, 0x55, 0x00, 0x00, 0x00}, 7);
+    query[0][6] = checksum(query[0]);
+    query[1] = generate_ba(new uchar[7]{0xFF, address, 0x00, 0x56, 0x00, 0x00, 0x00}, 7);
+    query[1][6] = checksum(query[1]);
+    query[2] = generate_ba(new uchar[7]{0xFF, address, 0x00, 0x57, 0x00, 0x00, 0x00}, 7);
+    query[2][6] = checksum(query[2]);
+}
+
 #if ENABLE_PORT_JSON
 nlohmann::json Lens::to_json()
 {
