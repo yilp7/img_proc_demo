@@ -27,6 +27,12 @@ public:
         DELAY_A_PS    = 0x29,
         GW_B_PS       = 0x2A,
         DELAY_B_PS    = 0x2B,
+        DELAY_C       = 0x1C,
+        GATE_WIDTH_C  = 0x1D,
+        DELAY_D       = 0x20,
+        GATE_WIDTH_D  = 0x21,
+        DELAY_E       = 0x1B,
+        GATE_WIDTH_E  = 0x22,
 
         NO_PARAM      = 0xFF,
 
@@ -94,6 +100,8 @@ private:
     double laser_width;                // unit: ns
     double delay_a, delay_b;           // unit: ns
     double gate_width_a, gate_width_b; // unit: ns
+    double delay_c, delay_d;           // unit: ns
+    double gate_width_c, gate_width_d; // unit: ns
     double ccd_freq;                   // unit: frame/s
     double duty;                       // unit: μs
     uint   mcp;

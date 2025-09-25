@@ -83,6 +83,184 @@ void ImageIO::save_image_bmp(cv::Mat img, QString filename)
     }
 }
 
+void ImageIO::save_image_bmp(cv::Mat img, QString filename, QString note)
+{
+    // Write BMP and note in a single file operation
+    if (img.channels() == 3) cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
+
+    FILE *f = fopen(filename.toLocal8Bit().constData(), "wb");
+    if (f) {
+        // Write standard BMP header and data
+        static ushort signature = 'MB';
+        fwrite(&signature, 2, 1, f);
+        uint offset = (img.channels() == 1 ? 4 * (1 << img.channels() * 8) : 0) + 54;
+        uint file_size = img.total() * img.channels() + offset;
+        fwrite(&file_size, 4, 1, f);
+        static ushort reserved1 = 0, reserved2 = 0;
+        fwrite(&reserved1, 2, 1, f);
+        fwrite(&reserved2, 2, 1, f);
+        fwrite(&offset, 4, 1, f);
+        static uint dib_size = 40;
+        fwrite(&dib_size, 4, 1, f);
+        uint w = img.cols, h = img.rows;
+        fwrite(&w, 4, 1, f);
+        fwrite(&h, 4, 1, f);
+        static ushort planes = 1;
+        fwrite(&planes, 2, 1, f);
+        ushort bit_per_pixel = 8 * img.channels();
+        fwrite(&bit_per_pixel, 2, 1, f);
+        static uint compression = 0;
+        fwrite(&compression, 4, 1, f);
+        uint img_size = img.total() * img.channels();
+        fwrite(&img_size, 4, 1, f);
+        static uint pixels_in_meter_x = 0, pixels_in_meter_y = 0;
+        fwrite(&pixels_in_meter_x, 4, 1, f);
+        fwrite(&pixels_in_meter_y, 4, 1, f);
+        static uint colors_important = 0, colors_used = 0;
+        fwrite(&colors_important, 4, 1, f);
+        fwrite(&colors_used, 4, 1, f);
+
+        // Color table for grayscale images
+        static uchar empty = 0;
+        if (img.channels() == 1) {
+            for (int i = 0; i < 1 << img.channels() * 8; i++) {
+                fwrite(&i, 1, 1, f);     // r
+                fwrite(&i, 1, 1, f);     // g
+                fwrite(&i, 1, 1, f);     // b
+                fwrite(&empty, 1, 1, f); // null
+            }
+        }
+
+        // Write pixel data
+        static uint padding = 0;
+        int padding_size = (4 - img.step % 4) % 4;
+        for(int i = img.rows - 1; i >= 0; i--) {
+            fwrite(img.data + i * img.step, 1, img.step, f);
+            fwrite(&padding, 1, padding_size, f);
+        }
+
+        // If note is provided, append the custom block immediately
+        if (!note.isEmpty()) {
+            // Custom block format
+            const char magic[] = "NOTE";
+            fwrite(magic, 1, 4, f);
+
+            // Get current timestamp
+            uint64_t timestamp = QDateTime::currentDateTime().toMSecsSinceEpoch();
+
+            // Convert QString to UTF-8 bytes
+            QByteArray noteBytes = note.toUtf8();
+            uint32_t totalSize = sizeof(timestamp) + noteBytes.size();
+            fwrite(&totalSize, 4, 1, f);
+
+            // Write timestamp
+            fwrite(&timestamp, sizeof(timestamp), 1, f);
+
+            // Write the note content
+            fwrite(noteBytes.constData(), 1, noteBytes.size(), f);
+
+            // Write end marker
+            const char endMarker[] = "END\0";
+            fwrite(endMarker, 1, 4, f);
+        }
+
+        fclose(f);
+    }
+}
+
+void ImageIO::append_note_to_bmp(QString filename, QString note)
+{
+    // Open file in append binary mode
+    FILE *f = fopen(filename.toLocal8Bit().constData(), "ab");
+    if (f) {
+        // Custom block format:
+        // 1. Magic header "NOTE" (4 bytes)
+        // 2. Block size (uint32, 4 bytes) - total size of timestamp + note text
+        // 3. Timestamp (uint64, 8 bytes) - milliseconds since epoch
+        // 4. Note text (ASCII/UTF-8)
+        // 5. End marker "END\0" (4 bytes)
+
+        const char magic[] = "NOTE";
+        fwrite(magic, 1, 4, f);
+
+        // Get current timestamp (milliseconds since epoch)
+        uint64_t timestamp = QDateTime::currentDateTime().toMSecsSinceEpoch();
+
+        // Convert QString to UTF-8 bytes
+        QByteArray noteBytes = note.toUtf8();
+        uint32_t totalSize = sizeof(timestamp) + noteBytes.size();
+        fwrite(&totalSize, 4, 1, f);
+
+        // Write timestamp
+        fwrite(&timestamp, sizeof(timestamp), 1, f);
+
+        // Write the note content
+        fwrite(noteBytes.constData(), 1, noteBytes.size(), f);
+
+        // Write end marker
+        const char endMarker[] = "END\0";
+        fwrite(endMarker, 1, 4, f);
+
+        fclose(f);
+    }
+}
+
+QString ImageIO::read_note_from_bmp(QString filename)
+{
+    QString note;
+    FILE *f = fopen(filename.toLocal8Bit().constData(), "rb");
+    if (f) {
+        // First, we need to seek to the end of the standard BMP data
+        // BMP file structure tells us where pixel data ends
+
+        // Read BMP header to find where pixel data ends
+        fseek(f, 2, SEEK_SET);  // Skip signature
+        uint32_t fileSize;
+        fread(&fileSize, 4, 1, f);
+
+        fseek(f, 10, SEEK_SET); // Seek to offset field
+        uint32_t pixelOffset;
+        fread(&pixelOffset, 4, 1, f);
+
+        fseek(f, 34, SEEK_SET); // Seek to image size field
+        uint32_t imageSize;
+        fread(&imageSize, 4, 1, f);
+
+        // Calculate where our custom block should start
+        uint32_t customBlockOffset = pixelOffset + imageSize;
+
+        // Seek to custom block location
+        fseek(f, customBlockOffset, SEEK_SET);
+
+        // Check for magic header
+        char magic[5] = {0};
+        if (fread(magic, 1, 4, f) == 4 && memcmp(magic, "NOTE", 4) == 0) {
+            // Read total size
+            uint32_t totalSize;
+            if (fread(&totalSize, 4, 1, f) == 1 && totalSize > sizeof(uint64_t) && totalSize < 1000000) { // Sanity check
+                // Read timestamp
+                uint64_t timestamp;
+                if (fread(&timestamp, sizeof(timestamp), 1, f) == 1) {
+                    // Calculate note size
+                    uint32_t noteSize = totalSize - sizeof(timestamp);
+
+                    // Read note content
+                    QByteArray noteBytes(noteSize, 0);
+                    if (fread(noteBytes.data(), 1, noteSize, f) == noteSize) {
+                        // Format the output with timestamp
+                        QDateTime dt = QDateTime::fromMSecsSinceEpoch(timestamp);
+                        QString timestampStr = dt.toString("yyyy-MM-dd hh:mm:ss.zzz");
+                        note = QString("[%1] %2").arg(timestampStr).arg(QString::fromUtf8(noteBytes));
+                    }
+                }
+            }
+        }
+
+        fclose(f);
+    }
+    return note;
+}
+
 void ImageIO::save_image_tif(cv::Mat img, QString filename)
 {
     uint32_t w = img.cols, h = img.rows, channel = img.channels();

@@ -623,6 +623,37 @@ UserPanel::UserPanel(QWidget *parent) :
     ui->GATE_WIDTH_B_EDIT_P->hide();
     ui->DELAY_DIFF_GRP->hide();
     ui->GATE_WIDTH_DIFF_GRP->hide();
+    // Hide C/D groups initially (will be shown when switching to 4-camera mode)
+    ui->DELAY_C_GRP->hide();
+    ui->DELAY_D_GRP->hide();
+    ui->GATE_WIDTH_C_GRP->hide();
+    ui->GATE_WIDTH_D_GRP->hide();
+    // Hide C/D P widgets initially (matching A/B behavior)
+    ui->DELAY_C_EDIT_P->hide();
+    ui->DELAY_D_EDIT_P->hide();
+    ui->GATE_WIDTH_C_EDIT_P->hide();
+    ui->GATE_WIDTH_D_EDIT_P->hide();
+
+    // Initialize delay select combo box for 4-camera mode
+    ui->DELAY_SELECT_COMBO->addItem("A");
+    ui->DELAY_SELECT_COMBO->addItem("B");
+    ui->DELAY_SELECT_COMBO->addItem("C");
+    ui->DELAY_SELECT_COMBO->addItem("D");
+    ui->DELAY_SELECT_COMBO->setCurrentIndex(0);  // Default to A
+
+    // Make combobox editable to enable text alignment, then make it read-only
+    ui->DELAY_SELECT_COMBO->setEditable(true);
+    ui->DELAY_SELECT_COMBO->lineEdit()->setReadOnly(true);
+    ui->DELAY_SELECT_COMBO->lineEdit()->setAlignment(Qt::AlignCenter);
+
+    // Hide the dropdown arrow
+    ui->DELAY_SELECT_COMBO->setStyleSheet(
+        "QComboBox { padding-right: 0px; }"
+        "QComboBox::drop-down { border: none; width: 0px; }"
+        "QComboBox::down-arrow { image: none; width: 0px; height: 0px; }");
+
+    connect(ui->DELAY_SELECT_COMBO, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &UserPanel::on_delay_select_changed);
 
     // - write default params
     data_exchange(false);
@@ -815,6 +846,44 @@ void UserPanel::init()
 
     if (serial_port[0]->isOpen() && serial_port[3]->isOpen()) on_LASER_BTN_clicked();
 
+    // Set up delay selector UI based on initial four_camera_mode state
+    update_delay_selector_ui();
+
+    // Set 4-camera mode defaults if starting in that mode
+    if (four_camera_mode) {
+        // Set TCU type to 3 for 4-camera mode (remapped commands)
+        pref->ui->TCU_LIST->setCurrentIndex(3);
+
+        // Disable auto-PRF for 4-camera mode
+        if (pref->ui->AUTO_REP_FREQ_CHK->isChecked()) {
+            pref->ui->AUTO_REP_FREQ_CHK->click();
+        }
+
+        // Disable auto-PRF for 4-camera mode
+        if (pref->ui->AB_LOCK_CHK->isChecked()) {
+            pref->ui->AB_LOCK_CHK->click();
+        }
+        pref->ui->AB_LOCK_CHK->setEnabled(false);
+
+        // Set unit to Hz
+        pref->ui->HZ_LIST->setCurrentIndex(1);
+        hz_unit = 1; // Update the hz_unit variable to match
+
+        // Set frequency to 25 Hz (0.025 kHz internally)
+        rep_freq = 0.025;  // 25 Hz expressed in kHz for internal storage
+        emit send_double_tcu_msg(TCU::REPEATED_FREQ, rep_freq);
+        setup_hz(hz_unit);  // Update the frequency display to show "25" in Hz
+
+        // Set laser width to 1 microsecond (1000 nanoseconds)
+        laser_width = 1000;
+        update_laser_width();
+
+        // Ensure B, C, D gates use the same default values as A
+        // (TCU constructor already sets A, B, C, D to same defaults,
+        // but update functions may need to be called)
+        update_delay();
+        update_gate_width();
+    }
 }
 
 void UserPanel::data_exchange(bool read){
@@ -904,6 +973,23 @@ void UserPanel::data_exchange(bool read){
         ui->DELAY_B_EDIT_U->setText(QString::asprintf(  "%d", us));
         ui->DELAY_B_EDIT_N->setText(QString::asprintf("%03d", ns));
         ui->DELAY_B_EDIT_P->setText(QString::asprintf("%03d", ps));
+        // Initialize C and D fields
+        split_value_by_unit(p_tcu->get(TCU::DELAY_C), us, ns, ps, 1);
+        ui->DELAY_C_EDIT_U->setText(QString::asprintf(  "%d", us));
+        ui->DELAY_C_EDIT_N->setText(QString::asprintf("%03d", ns));
+        ui->DELAY_C_EDIT_P->setText(QString::asprintf("%03d", ps));
+        split_value_by_unit(p_tcu->get(TCU::GATE_WIDTH_C), us, ns, ps, 0);
+        ui->GATE_WIDTH_C_EDIT_U->setText(QString::asprintf(  "%d", us));
+        ui->GATE_WIDTH_C_EDIT_N->setText(QString::asprintf("%03d", ns));
+        ui->GATE_WIDTH_C_EDIT_P->setText(QString::asprintf("%03d", ps));
+        split_value_by_unit(p_tcu->get(TCU::DELAY_D), us, ns, ps, 1);
+        ui->DELAY_D_EDIT_U->setText(QString::asprintf(  "%d", us));
+        ui->DELAY_D_EDIT_N->setText(QString::asprintf("%03d", ns));
+        ui->DELAY_D_EDIT_P->setText(QString::asprintf("%03d", ps));
+        split_value_by_unit(p_tcu->get(TCU::GATE_WIDTH_D), us, ns, ps, 0);
+        ui->GATE_WIDTH_D_EDIT_U->setText(QString::asprintf(  "%d", us));
+        ui->GATE_WIDTH_D_EDIT_N->setText(QString::asprintf("%03d", ns));
+        ui->GATE_WIDTH_D_EDIT_P->setText(QString::asprintf("%03d", ps));
         ui->GATE_WIDTH_N_EDIT_N->setText(QString::asprintf("%d", int(std::round(p_tcu->get(TCU::GATE_WIDTH_N)))));
         ui->DELAY_N_EDIT_N->setText(QString::asprintf("%d", int(std::round(p_tcu->get(TCU::DELAY_N)))));
 //        ui->GATE_WIDTH_N->setText(QString::asprintf("%d", int(std::round(p_tcu->get(TCU::GATE_WIDTH_N)))));
@@ -993,7 +1079,10 @@ int UserPanel::grab_thread_process(int *idx) {
 
             // Safe check and access
             // Check if we're in 4-camera mode and this is the main display
-            if (four_camera_mode && thread_idx == 0) {
+            // Also check if cameras are actually active (not just displaying a dropped image)
+            bool any_camera_active = camera_active[0] || camera_active[1] || camera_active[2] || camera_active[3];
+
+            if (four_camera_mode && thread_idx == 0 && any_camera_active) {
                 // Composite frames inline from all 4 cameras
                 cv::Mat frames[4];
                 bool has_frames[4] = {false};
@@ -1558,14 +1647,38 @@ int UserPanel::grab_thread_process(int *idx) {
         cv::resize(modified_result[thread_idx], modified_result[thread_idx], cv::Size(ww, hh));
 
         // put info (dist, dov, time) as text on image
-        QString info_tcu = pref->custom_topleft_info ?
-                    pref->ui->CUSTOM_INFO_EDT->text() :
-                    base_unit == 2 ? QString::asprintf("DIST %05d m  DOV %04d m", (int)delay_dist, (int)depth_of_view) :
-                                     QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns));
+        QString info_tcu;
+        if (four_camera_mode) {
+            // In 4-camera mode, show camera labels instead of DIST/DOV
+            // For composite display (thread_idx == 0), we'll show labels for each camera
+            info_tcu = "";  // Will be handled differently below
+        } else {
+            // Single camera mode - original behavior
+            info_tcu = pref->custom_topleft_info ?
+                        pref->ui->CUSTOM_INFO_EDT->text() :
+                        base_unit == 2 ? QString::asprintf("DIST %05d m  DOV %04d m", (int)delay_dist, (int)depth_of_view) :
+                                         QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(delay_dist / dist_ns), (int)std::round(depth_of_view / dist_ns));
+        }
         QString info_time = QDateTime::currentDateTime().toString("hh:mm:ss:zzz");
         if (ui->INFO_CHECK->isChecked()) {
-            cv::putText(modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            if (four_camera_mode && thread_idx == 0) {
+                // For 4-camera composite, draw camera labels for each section
+                // Assuming the composite height is divided equally among 4 cameras
+                int cam_height = hh / 4;
+                for (int i = 0; i < 4; i++) {
+                    QString cam_label = QString::asprintf("cam-%d", i + 1);
+                    int y_pos = i * cam_height + 50 * weight;
+                    cv::putText(modified_result[thread_idx], cam_label.toLatin1().data(),
+                               cv::Point(10, y_pos), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    // Draw time for each camera section
+                    cv::putText(modified_result[thread_idx], info_time.toLatin1().data(),
+                               cv::Point(ww - 240 * weight, y_pos), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                }
+            } else if (!four_camera_mode) {
+                // Single camera mode - original behavior
+                cv::putText(modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+            }
 #ifdef LVTONG
             static int baseline = 0;
             if (pref->fishnet_recog) {
@@ -1692,8 +1805,22 @@ int UserPanel::grab_thread_process(int *idx) {
         if (updated && record_original[thread_idx]) {
             cv::Mat temp = img_mem[thread_idx].clone();
             if (pref->save_info) {
-                cv::putText(temp, info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                cv::putText(temp, info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                if (four_camera_mode && thread_idx == 0) {
+                    // For 4-camera composite in saved video
+                    int cam_height = hh / 4;
+                    for (int i = 0; i < 4; i++) {
+                        QString cam_label = QString::asprintf("cam-%d", i + 1);
+                        int y_pos = i * cam_height + 50 * weight;
+                        cv::putText(temp, cam_label.toLatin1().data(),
+                                   cv::Point(10, y_pos), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                        cv::putText(temp, info_time.toLatin1().data(),
+                                   cv::Point(ww - 240 * weight, y_pos), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    }
+                } else if (!four_camera_mode) {
+                    // Single camera mode
+                    cv::putText(temp, info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    cv::putText(temp, info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                }
             }
             if (is_color[thread_idx]) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
             // inc by 1 because main display uses two videowriter
@@ -1704,8 +1831,22 @@ int UserPanel::grab_thread_process(int *idx) {
             cv::Mat temp = modified_result[thread_idx].clone();
             if (!image_3d[thread_idx] && !ui->INFO_CHECK->isChecked()) {
                 if (pref->save_info) {
-                    cv::putText(modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                    cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    if (four_camera_mode && thread_idx == 0) {
+                        // For 4-camera composite in saved modified video
+                        int cam_height = hh / 4;
+                        for (int i = 0; i < 4; i++) {
+                            QString cam_label = QString::asprintf("cam-%d", i + 1);
+                            int y_pos = i * cam_height + 50 * weight;
+                            cv::putText(modified_result[thread_idx], cam_label.toLatin1().data(),
+                                       cv::Point(10, y_pos), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                            cv::putText(modified_result[thread_idx], info_time.toLatin1().data(),
+                                       cv::Point(ww - 240 * weight, y_pos), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                        }
+                    } else if (!four_camera_mode) {
+                        // Single camera mode
+                        cv::putText(modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                        cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    }
 #ifdef LVTONG
                     static int baseline = 0;
                     if (pref->fishnet_recog) {
@@ -2157,25 +2298,116 @@ void UserPanel::save_to_file(bool save_result, int idx) {
     cv::Mat result_image;
     if (pref->save_in_grayscale) cv::cvtColor(*temp, result_image, cv::COLOR_RGB2GRAY);
     else                         result_image = temp->clone();
+
+    // Prepare TCU data note for 4-camera mode BMP saves
+    QString tcu_note;
+    if (four_camera_mode && pref->img_format == 0) { // Only for BMP format
+        #if ENABLE_PORT_JSON
+        nlohmann::json tcu_json = p_tcu->to_json();
+        tcu_note = QString::fromStdString(tcu_json.dump());
+        #endif
+    }
+
     if (save_result) {
         QString dt = QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz");
         if (pref->split) {
-            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp"))) emit task_queue_full();
-            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp"))) emit task_queue_full();
-            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, result_image(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp"))) emit task_queue_full();
-            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp"))) emit task_queue_full();
+            // For split images, check if we need to include TCU data
+            if (four_camera_mode && pref->img_format == 0) {
+                // Include TCU data for 4-camera mode BMP files
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp", tcu_note))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp", tcu_note))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp", tcu_note))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp", tcu_note))) emit task_queue_full();
+            } else {
+                // No TCU data for single camera mode or non-BMP formats
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp"))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp"))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp"))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp"))) emit task_queue_full();
+            }
+            return; // Exit after handling split images
         }
         switch (pref->img_format){
-        case 0: if (!tp.append_task(std::bind(ImageIO::save_image_bmp, result_image, save_location + "/res_bmp/" + dt + ".bmp"))) emit task_queue_full(); break;
+        case 0:
+            if (four_camera_mode) {
+                // Use overloaded function with TCU note for 4-camera mode
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                    result_image, save_location + "/res_bmp/" + dt + ".bmp", tcu_note))) emit task_queue_full();
+            } else {
+                // Use original function for single camera mode
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                    result_image, save_location + "/res_bmp/" + dt + ".bmp"))) emit task_queue_full();
+            }
+            break;
         case 1: if (!tp.append_task(std::bind(ImageIO::save_image_jpg, result_image, save_location + "/res_bmp/" + dt + ".jpg"))) emit task_queue_full(); break;
         default: break;
         }
     } else {
+        QString dt = QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz");
+        if (pref->split) {
+            // Handle split for original images
+            if (four_camera_mode && pref->img_format == 0) {
+                // Include TCU data for 4-camera mode BMP files
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + "/ori_bmp/" + dt + "_0" + ".bmp", tcu_note))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + "/ori_bmp/" + dt + "_1" + ".bmp", tcu_note))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + "/ori_bmp/" + dt + "_2" + ".bmp", tcu_note))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + "/ori_bmp/" + dt + "_3" + ".bmp", tcu_note))) emit task_queue_full();
+            } else {
+                // No TCU data for single camera mode or non-BMP formats
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + "/ori_bmp/" + dt + "_0" + ".bmp"))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + "/ori_bmp/" + dt + "_1" + ".bmp"))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + "/ori_bmp/" + dt + "_2" + ".bmp"))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                    result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(),
+                    save_location + "/ori_bmp/" + dt + "_3" + ".bmp"))) emit task_queue_full();
+            }
+            return; // Exit after handling split images
+        }
         switch (pixel_depth[0]) {
         case  8:
             switch (pref->img_format){
-            case 0: if (!tp.append_task(std::bind(ImageIO::save_image_bmp, result_image, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
-            case 1: if (!tp.append_task(std::bind(ImageIO::save_image_jpg, result_image, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".jpg"))) emit task_queue_full(); break;
+            case 0:
+                if (four_camera_mode) {
+                    // Use overloaded function with TCU note for 4-camera mode
+                    if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                        result_image, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + ".bmp", tcu_note))) emit task_queue_full();
+                } else {
+                    // Use original function for single camera mode
+                    if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                        result_image, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + ".bmp"))) emit task_queue_full();
+                }
+                break;
+            case 1: if (!tp.append_task(std::bind(ImageIO::save_image_jpg, result_image, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + ".jpg"))) emit task_queue_full(); break;
             default: break;
             }
             break;
@@ -2183,8 +2415,8 @@ void UserPanel::save_to_file(bool save_result, int idx) {
         case 12:
         case 16:
             switch (pref->img_format){
-            case 0: if (!tp.append_task(std::bind(ImageIO::save_image_tif, result_image * (1 << (16 - pixel_depth[0])), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
-            case 1: if (!tp.append_task(std::bind(ImageIO::save_image_jpg, result_image * (1 << (16 - pixel_depth[0])), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".jpg"))) emit task_queue_full(); break;
+            case 0: if (!tp.append_task(std::bind(ImageIO::save_image_tif, result_image * (1 << (16 - pixel_depth[0])), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + ".tif"))) emit task_queue_full(); break;
+            case 1: if (!tp.append_task(std::bind(ImageIO::save_image_jpg, result_image * (1 << (16 - pixel_depth[0])), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + ".jpg"))) emit task_queue_full(); break;
             default: break;
             }
             break;
@@ -2204,7 +2436,19 @@ void UserPanel::save_scan_img(QString path, QString name) {
 //            t_ori.detach();
 //            tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
 //            tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", p_tcu->get(TCU::DELAY_A))) + ".bmp"));
-        tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), path + "/ori_bmp/" + name));
+        if (four_camera_mode) {
+            #if ENABLE_PORT_JSON
+            QString scan_tcu_note = QString::fromStdString(p_tcu->to_json().dump());
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                img_mem[0].clone(), path + "/ori_bmp/" + name, scan_tcu_note));
+            #else
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                img_mem[0].clone(), path + "/ori_bmp/" + name));
+            #endif
+        } else {
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                img_mem[0].clone(), path + "/ori_bmp/" + name));
+        }
 
     }
 //        dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
@@ -2216,11 +2460,37 @@ void UserPanel::save_scan_img(QString path, QString name) {
 //            t_res.detach();
 //            tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
 //            tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", p_tcu->get(TCU::DELAY_A))) + ".bmp"));
-        tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), path + "/res_bmp/" + name));
+        if (four_camera_mode) {
+            #if ENABLE_PORT_JSON
+            QString scan_tcu_note = QString::fromStdString(p_tcu->to_json().dump());
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                modified_result[0].clone(), path + "/res_bmp/" + name, scan_tcu_note));
+            #else
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                modified_result[0].clone(), path + "/res_bmp/" + name));
+            #endif
+        } else {
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                modified_result[0].clone(), path + "/res_bmp/" + name));
+        }
     }
 
 //    qDebug() << "####################" << thread_idx;
-    if (grab_image[1]) tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[1].clone(), path + "/alt_bmp/" + name));
+    if (grab_image[1]) {
+        if (four_camera_mode) {
+            #if ENABLE_PORT_JSON
+            QString scan_tcu_note = QString::fromStdString(p_tcu->to_json().dump());
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp),
+                img_mem[1].clone(), path + "/alt_bmp/" + name, scan_tcu_note));
+            #else
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                img_mem[1].clone(), path + "/alt_bmp/" + name));
+            #endif
+        } else {
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp),
+                img_mem[1].clone(), path + "/alt_bmp/" + name));
+        }
+    }
 }
 
 void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, int baud_rate) {
@@ -2667,7 +2937,7 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
         w[0] = max_width;
         h[0] = total_height + (active_count - 1) * 5;  // 5px gaps between cameras
 
-        status_bar->img_resolution->set_text(QString::asprintf("%d x %d (4-cam vertical)", w[0], h[0]));
+        status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
         qInfo("Composite frame w: %d, h: %d (max width: %d, total height: %d)",
               w[0], h[0], max_width, total_height);
     } else {
@@ -3302,8 +3572,18 @@ void UserPanel::set_tcu_type(int idx)
     if (idx == 2) update_tcu_param_pos(1, ui->LASER_WIDTH_UNIT_U, ui->LASER_WIDTH_EDIT_N, ui->LASER_WIDTH_UNIT_N, ui->LASER_WIDTH_EDIT_P);
     if (p_tcu->type() == 2) update_tcu_param_pos(-1, ui->LASER_WIDTH_UNIT_U, ui->LASER_WIDTH_EDIT_N, ui->LASER_WIDTH_UNIT_N, ui->LASER_WIDTH_EDIT_P);
 
-    if (p_tcu->type() == 0 && idx) diff = 1;
-    if (p_tcu->type() && idx == 0) diff = -1;
+    // In 4-camera mode, always use standard format (μs, ns)
+    // In single camera mode, follow original logic: type 0 uses standard, types 1,2 use decimal
+    if (four_camera_mode) {
+        // Force standard format for 4-camera mode
+        if (p_tcu->type() == 1 || p_tcu->type() == 2) {
+            diff = -1;  // Switch from decimal to standard format
+        }
+    } else {
+        // Original single camera mode logic
+        if (p_tcu->type() == 0 && idx) diff = 1;
+        if (p_tcu->type() && idx == 0) diff = -1;
+    }
     p_tcu->set_type(idx);
     ui->DELAY_A->resize(QSize(ui->DELAY_A->width() + 12 * diff, ui->DELAY_A->height()));
     ui->DELAY_B->resize(QSize(ui->DELAY_B->width() + 12 * diff, ui->DELAY_B->height()));
@@ -4271,6 +4551,54 @@ void UserPanel::update_tcu_params(qint32 tcu_param)
             ui->GATE_WIDTH_B_EDIT_P->setText(QString::asprintf("%03d", ps));
             ui->GW_SLIDER->setValue(depth_of_view);
             break;
+        case TCU::DELAY_A:
+            split_value_by_unit(p_tcu->get(TCU::DELAY_A), us, ns, ps, 1);
+            ui->DELAY_A_EDIT_U->setText(QString::asprintf(  "%d", us));
+            ui->DELAY_A_EDIT_N->setText(QString::asprintf("%03d", ns));
+            ui->DELAY_A_EDIT_P->setText(QString::asprintf("%03d", ps));
+            break;
+        case TCU::GATE_WIDTH_A:
+            split_value_by_unit(p_tcu->get(TCU::GATE_WIDTH_A), us, ns, ps, 0);
+            ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf(  "%d", us));
+            ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%03d", ns));
+            ui->GATE_WIDTH_A_EDIT_P->setText(QString::asprintf("%03d", ps));
+            break;
+        case TCU::DELAY_B:
+            split_value_by_unit(p_tcu->get(TCU::DELAY_B), us, ns, ps, 1);
+            ui->DELAY_B_EDIT_U->setText(QString::asprintf(  "%d", us));
+            ui->DELAY_B_EDIT_N->setText(QString::asprintf("%03d", ns));
+            ui->DELAY_B_EDIT_P->setText(QString::asprintf("%03d", ps));
+            break;
+        case TCU::GATE_WIDTH_B:
+            split_value_by_unit(p_tcu->get(TCU::GATE_WIDTH_B), us, ns, ps, 0);
+            ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf(  "%d", us));
+            ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%03d", ns));
+            ui->GATE_WIDTH_B_EDIT_P->setText(QString::asprintf("%03d", ps));
+            break;
+        case TCU::DELAY_C:
+            split_value_by_unit(p_tcu->get(TCU::DELAY_C), us, ns, ps, 1);
+            ui->DELAY_C_EDIT_U->setText(QString::asprintf(  "%d", us));
+            ui->DELAY_C_EDIT_N->setText(QString::asprintf("%03d", ns));
+            ui->DELAY_C_EDIT_P->setText(QString::asprintf("%03d", ps));
+            break;
+        case TCU::GATE_WIDTH_C:
+            split_value_by_unit(p_tcu->get(TCU::GATE_WIDTH_C), us, ns, ps, 0);
+            ui->GATE_WIDTH_C_EDIT_U->setText(QString::asprintf(  "%d", us));
+            ui->GATE_WIDTH_C_EDIT_N->setText(QString::asprintf("%03d", ns));
+            ui->GATE_WIDTH_C_EDIT_P->setText(QString::asprintf("%03d", ps));
+            break;
+        case TCU::DELAY_D:
+            split_value_by_unit(p_tcu->get(TCU::DELAY_D), us, ns, ps, 1);
+            ui->DELAY_D_EDIT_U->setText(QString::asprintf(  "%d", us));
+            ui->DELAY_D_EDIT_N->setText(QString::asprintf("%03d", ns));
+            ui->DELAY_D_EDIT_P->setText(QString::asprintf("%03d", ps));
+            break;
+        case TCU::GATE_WIDTH_D:
+            split_value_by_unit(p_tcu->get(TCU::GATE_WIDTH_D), us, ns, ps, 0);
+            ui->GATE_WIDTH_D_EDIT_U->setText(QString::asprintf(  "%d", us));
+            ui->GATE_WIDTH_D_EDIT_N->setText(QString::asprintf("%03d", ns));
+            ui->GATE_WIDTH_D_EDIT_P->setText(QString::asprintf("%03d", ps));
+            break;
         case TCU::NO_PARAM:
             update_tcu_params(TCU::LASER_USR);
             update_tcu_params(TCU::EST_DIST);
@@ -4917,14 +5245,62 @@ void UserPanel::change_delay(int val)
 {
     if (abs(delay_dist - val) < 1) return;
     delay_dist = val;
-    update_delay();
+
+    // In 4-camera mode, update the selected delay based on combo box selection
+    if (four_camera_mode) {
+        int selected = ui->DELAY_SELECT_COMBO->currentIndex();
+        double delay_ns = delay_dist / dist_ns;
+        switch (selected) {
+            case 0:  // A
+                emit send_double_tcu_msg(TCU::DELAY_A, delay_ns);
+                break;
+            case 1:  // B
+                emit send_double_tcu_msg(TCU::DELAY_B, delay_ns);
+                break;
+            case 2:  // C
+                emit send_double_tcu_msg(TCU::DELAY_C, delay_ns);
+                break;
+            case 3:  // D
+                emit send_double_tcu_msg(TCU::DELAY_D, delay_ns);
+                break;
+        }
+        // Update distance display in 4-camera mode
+        ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
+    } else {
+        // Normal mode - update delay A through EST_DIST as before
+        update_delay();
+    }
 }
 
 void UserPanel::change_gatewidth(int val)
 {
     if (abs(depth_of_view - val) < 1) return;
     depth_of_view = val;
-    update_gate_width();
+
+    // In 4-camera mode, update the gate width based on delay combo box selection
+    if (four_camera_mode) {
+        int selected = ui->DELAY_SELECT_COMBO->currentIndex();
+        double gw_ns = depth_of_view / dist_ns;
+        switch (selected) {
+            case 0:  // A
+                emit send_double_tcu_msg(TCU::GATE_WIDTH_A, gw_ns);
+                break;
+            case 1:  // B
+                emit send_double_tcu_msg(TCU::GATE_WIDTH_B, gw_ns);
+                break;
+            case 2:  // C
+                emit send_double_tcu_msg(TCU::GATE_WIDTH_C, gw_ns);
+                break;
+            case 3:  // D
+                emit send_double_tcu_msg(TCU::GATE_WIDTH_D, gw_ns);
+                break;
+        }
+        // Update gate width display in 4-camera mode
+        ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view));
+    } else {
+        // Normal mode - update gate width A through EST_DOV as before
+        update_gate_width();
+    }
 }
 
 void UserPanel::change_focus_speed(int val)
@@ -5063,6 +5439,34 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
                 update_laser_width();
                 if (simple_ui) ;
             }
+            else if (edit == ui->DELAY_C_EDIT_U) {
+                double temp_delay_c = edit->text().toInt() * 1000 + ui->DELAY_C_EDIT_N->text().toInt() + ui->DELAY_C_EDIT_P->text().toInt() / 1000.;
+                emit send_double_tcu_msg(TCU::DELAY_C, temp_delay_c);
+            }
+            else if (edit == ui->DELAY_C_EDIT_N) {
+                double temp_delay_c;
+                if (edit->text().toInt() > 999) temp_delay_c = edit->text().toInt() + ui->DELAY_C_EDIT_P->text().toInt() / 1000.;
+                else temp_delay_c = edit->text().toInt() + ui->DELAY_C_EDIT_U->text().toInt() * 1000 + ui->DELAY_C_EDIT_P->text().toInt() / 1000.;
+                emit send_double_tcu_msg(TCU::DELAY_C, temp_delay_c);
+            }
+            else if (edit == ui->DELAY_C_EDIT_P) {
+                double temp_delay_c = edit->text().toInt() / 1000. + ui->DELAY_C_EDIT_U->text().toInt() * 1000 + ui->DELAY_C_EDIT_N->text().toInt();
+                emit send_double_tcu_msg(TCU::DELAY_C, temp_delay_c);
+            }
+            else if (edit == ui->DELAY_D_EDIT_U) {
+                double temp_delay_d = edit->text().toInt() * 1000 + ui->DELAY_D_EDIT_N->text().toInt() + ui->DELAY_D_EDIT_P->text().toInt() / 1000.;
+                emit send_double_tcu_msg(TCU::DELAY_D, temp_delay_d);
+            }
+            else if (edit == ui->DELAY_D_EDIT_N) {
+                double temp_delay_d;
+                if (edit->text().toInt() > 999) temp_delay_d = edit->text().toInt() + ui->DELAY_D_EDIT_P->text().toInt() / 1000.;
+                else temp_delay_d = edit->text().toInt() + ui->DELAY_D_EDIT_U->text().toInt() * 1000 + ui->DELAY_D_EDIT_P->text().toInt() / 1000.;
+                emit send_double_tcu_msg(TCU::DELAY_D, temp_delay_d);
+            }
+            else if (edit == ui->DELAY_D_EDIT_P) {
+                double temp_delay_d = edit->text().toInt() / 1000. + ui->DELAY_D_EDIT_U->text().toInt() * 1000 + ui->DELAY_D_EDIT_N->text().toInt();
+                emit send_double_tcu_msg(TCU::DELAY_D, temp_delay_d);
+            }
             else if (edit == ui->GATE_WIDTH_A_EDIT_U) {
                 depth_of_view = (edit->text().toInt() * 1000 + ui->GATE_WIDTH_A_EDIT_N->text().toInt() + ui->GATE_WIDTH_A_EDIT_P->text().toInt() / 1000.) * dist_ns;
                 update_gate_width();
@@ -5106,6 +5510,34 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
                     else temp_gw_b = edit->text().toInt() + ui->GATE_WIDTH_B_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_B_EDIT_P->text().toInt() / 1000. - p_tcu->get(TCU::GATE_WIDTH_N);
                     emit send_double_tcu_msg(TCU::GATE_WIDTH_B, temp_gw_b);
                 }
+            }
+            else if (edit == ui->GATE_WIDTH_C_EDIT_U) {
+                double temp_gw_c = edit->text().toInt() * 1000 + ui->GATE_WIDTH_C_EDIT_N->text().toInt() + ui->GATE_WIDTH_C_EDIT_P->text().toInt() / 1000.;
+                emit send_double_tcu_msg(TCU::GATE_WIDTH_C, temp_gw_c);
+            }
+            else if (edit == ui->GATE_WIDTH_C_EDIT_N) {
+                double temp_gw_c;
+                if (edit->text().toInt() > 999) temp_gw_c = edit->text().toInt() + ui->GATE_WIDTH_C_EDIT_P->text().toInt() / 1000.;
+                else temp_gw_c = edit->text().toInt() + ui->GATE_WIDTH_C_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_C_EDIT_P->text().toInt() / 1000.;
+                emit send_double_tcu_msg(TCU::GATE_WIDTH_C, temp_gw_c);
+            }
+            else if (edit == ui->GATE_WIDTH_C_EDIT_P) {
+                double temp_gw_c = edit->text().toInt() / 1000. + ui->GATE_WIDTH_C_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_C_EDIT_N->text().toInt();
+                emit send_double_tcu_msg(TCU::GATE_WIDTH_C, temp_gw_c);
+            }
+            else if (edit == ui->GATE_WIDTH_D_EDIT_U) {
+                double temp_gw_d = edit->text().toInt() * 1000 + ui->GATE_WIDTH_D_EDIT_N->text().toInt() + ui->GATE_WIDTH_D_EDIT_P->text().toInt() / 1000.;
+                emit send_double_tcu_msg(TCU::GATE_WIDTH_D, temp_gw_d);
+            }
+            else if (edit == ui->GATE_WIDTH_D_EDIT_N) {
+                double temp_gw_d;
+                if (edit->text().toInt() > 999) temp_gw_d = edit->text().toInt() + ui->GATE_WIDTH_D_EDIT_P->text().toInt() / 1000.;
+                else temp_gw_d = edit->text().toInt() + ui->GATE_WIDTH_D_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_D_EDIT_P->text().toInt() / 1000.;
+                emit send_double_tcu_msg(TCU::GATE_WIDTH_D, temp_gw_d);
+            }
+            else if (edit == ui->GATE_WIDTH_D_EDIT_P) {
+                double temp_gw_d = edit->text().toInt() / 1000. + ui->GATE_WIDTH_D_EDIT_U->text().toInt() * 1000 + ui->GATE_WIDTH_D_EDIT_N->text().toInt();
+                emit send_double_tcu_msg(TCU::GATE_WIDTH_D, temp_gw_d);
             }
             else if (edit == ui->LASER_WIDTH_EDIT_P) {
                 laser_width = edit->text().toInt() / 1000. + ui->LASER_WIDTH_EDIT_U->text().toInt() * 1000 + ui->LASER_WIDTH_EDIT_N->text().toInt();
@@ -5250,36 +5682,157 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
         // 100m => 667ns, 10m => 67ns
         case Qt::Key_W:
             delay_dist += stepping * 5 * dist_ns;
-            update_delay();
+            if (four_camera_mode) {
+                if (delay_dist < 0) delay_dist = 0;
+                if (delay_dist > pref->max_dist) delay_dist = pref->max_dist;
+                int selected = ui->DELAY_SELECT_COMBO->currentIndex();
+                double delay_ns = delay_dist / dist_ns;
+                switch (selected) {
+                    case 0: emit send_double_tcu_msg(TCU::DELAY_A, delay_ns); break;
+                    case 1: emit send_double_tcu_msg(TCU::DELAY_B, delay_ns); break;
+                    case 2: emit send_double_tcu_msg(TCU::DELAY_C, delay_ns); break;
+                    case 3: emit send_double_tcu_msg(TCU::DELAY_D, delay_ns); break;
+                }
+                ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
+                ui->DELAY_SLIDER->setValue(delay_dist);
+                ui->DELAY_SLIDER->setValue(delay_dist);
+            } else {
+                update_delay();
+            }
             break;
         case Qt::Key_S:
             delay_dist -= stepping * 5 * dist_ns;
-            update_delay();
+            if (four_camera_mode) {
+                if (delay_dist < 0) delay_dist = 0;
+                if (delay_dist > pref->max_dist) delay_dist = pref->max_dist;
+                int selected = ui->DELAY_SELECT_COMBO->currentIndex();
+                double delay_ns = delay_dist / dist_ns;
+                switch (selected) {
+                    case 0: emit send_double_tcu_msg(TCU::DELAY_A, delay_ns); break;
+                    case 1: emit send_double_tcu_msg(TCU::DELAY_B, delay_ns); break;
+                    case 2: emit send_double_tcu_msg(TCU::DELAY_C, delay_ns); break;
+                    case 3: emit send_double_tcu_msg(TCU::DELAY_D, delay_ns); break;
+                }
+                ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
+                ui->DELAY_SLIDER->setValue(delay_dist);
+            } else {
+                update_delay();
+            }
             break;
         case Qt::Key_D:
             delay_dist += stepping * dist_ns;
-            update_delay();
+            if (four_camera_mode) {
+                if (delay_dist < 0) delay_dist = 0;
+                if (delay_dist > pref->max_dist) delay_dist = pref->max_dist;
+                int selected = ui->DELAY_SELECT_COMBO->currentIndex();
+                double delay_ns = delay_dist / dist_ns;
+                switch (selected) {
+                    case 0: emit send_double_tcu_msg(TCU::DELAY_A, delay_ns); break;
+                    case 1: emit send_double_tcu_msg(TCU::DELAY_B, delay_ns); break;
+                    case 2: emit send_double_tcu_msg(TCU::DELAY_C, delay_ns); break;
+                    case 3: emit send_double_tcu_msg(TCU::DELAY_D, delay_ns); break;
+                }
+                ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
+                ui->DELAY_SLIDER->setValue(delay_dist);
+            } else {
+                update_delay();
+            }
             break;
         case Qt::Key_A:
             delay_dist -= stepping * dist_ns;
-            update_delay();
+            if (four_camera_mode) {
+                if (delay_dist < 0) delay_dist = 0;
+                if (delay_dist > pref->max_dist) delay_dist = pref->max_dist;
+                int selected = ui->DELAY_SELECT_COMBO->currentIndex();
+                double delay_ns = delay_dist / dist_ns;
+                switch (selected) {
+                    case 0: emit send_double_tcu_msg(TCU::DELAY_A, delay_ns); break;
+                    case 1: emit send_double_tcu_msg(TCU::DELAY_B, delay_ns); break;
+                    case 2: emit send_double_tcu_msg(TCU::DELAY_C, delay_ns); break;
+                    case 3: emit send_double_tcu_msg(TCU::DELAY_D, delay_ns); break;
+                }
+                ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
+                ui->DELAY_SLIDER->setValue(delay_dist);
+            } else {
+                update_delay();
+            }
             break;
         // 50m => 333ns, 5m => 33ns
         case Qt::Key_I:
             depth_of_view += stepping * 5 * dist_ns;
-            update_gate_width();
+            if (four_camera_mode) {
+                if (depth_of_view < 0) depth_of_view = 0;
+                if (depth_of_view > pref->max_dov) depth_of_view = pref->max_dov;
+                int selected = ui->DELAY_SELECT_COMBO->currentIndex();
+                double gw_ns = depth_of_view / dist_ns;
+                switch (selected) {
+                    case 0: emit send_double_tcu_msg(TCU::GATE_WIDTH_A, gw_ns); break;
+                    case 1: emit send_double_tcu_msg(TCU::GATE_WIDTH_B, gw_ns); break;
+                    case 2: emit send_double_tcu_msg(TCU::GATE_WIDTH_C, gw_ns); break;
+                    case 3: emit send_double_tcu_msg(TCU::GATE_WIDTH_D, gw_ns); break;
+                }
+                ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view));
+                ui->GW_SLIDER->setValue(depth_of_view);
+            } else {
+                update_gate_width();
+            }
             break;
         case Qt::Key_K:
             depth_of_view -= stepping * 5 * dist_ns;
-            update_gate_width();
+            if (four_camera_mode) {
+                if (depth_of_view < 0) depth_of_view = 0;
+                if (depth_of_view > pref->max_dov) depth_of_view = pref->max_dov;
+                int selected = ui->DELAY_SELECT_COMBO->currentIndex();
+                double gw_ns = depth_of_view / dist_ns;
+                switch (selected) {
+                    case 0: emit send_double_tcu_msg(TCU::GATE_WIDTH_A, gw_ns); break;
+                    case 1: emit send_double_tcu_msg(TCU::GATE_WIDTH_B, gw_ns); break;
+                    case 2: emit send_double_tcu_msg(TCU::GATE_WIDTH_C, gw_ns); break;
+                    case 3: emit send_double_tcu_msg(TCU::GATE_WIDTH_D, gw_ns); break;
+                }
+                ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view));
+                ui->GW_SLIDER->setValue(depth_of_view);
+            } else {
+                update_gate_width();
+            }
             break;
         case Qt::Key_L:
             depth_of_view += stepping * dist_ns;
-            update_gate_width();
+            if (four_camera_mode) {
+                if (depth_of_view < 0) depth_of_view = 0;
+                if (depth_of_view > pref->max_dov) depth_of_view = pref->max_dov;
+                int selected = ui->DELAY_SELECT_COMBO->currentIndex();
+                double gw_ns = depth_of_view / dist_ns;
+                switch (selected) {
+                    case 0: emit send_double_tcu_msg(TCU::GATE_WIDTH_A, gw_ns); break;
+                    case 1: emit send_double_tcu_msg(TCU::GATE_WIDTH_B, gw_ns); break;
+                    case 2: emit send_double_tcu_msg(TCU::GATE_WIDTH_C, gw_ns); break;
+                    case 3: emit send_double_tcu_msg(TCU::GATE_WIDTH_D, gw_ns); break;
+                }
+                ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view));
+                ui->GW_SLIDER->setValue(depth_of_view);
+            } else {
+                update_gate_width();
+            }
             break;
         case Qt::Key_J:
             depth_of_view -= stepping * dist_ns;
-            update_gate_width();
+            if (four_camera_mode) {
+                if (depth_of_view < 0) depth_of_view = 0;
+                if (depth_of_view > pref->max_dov) depth_of_view = pref->max_dov;
+                int selected = ui->DELAY_SELECT_COMBO->currentIndex();
+                double gw_ns = depth_of_view / dist_ns;
+                switch (selected) {
+                    case 0: emit send_double_tcu_msg(TCU::GATE_WIDTH_A, gw_ns); break;
+                    case 1: emit send_double_tcu_msg(TCU::GATE_WIDTH_B, gw_ns); break;
+                    case 2: emit send_double_tcu_msg(TCU::GATE_WIDTH_C, gw_ns); break;
+                    case 3: emit send_double_tcu_msg(TCU::GATE_WIDTH_D, gw_ns); break;
+                }
+                ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view));
+                ui->GW_SLIDER->setValue(depth_of_view);
+            } else {
+                update_gate_width();
+            }
             break;
         default: break;
         }
@@ -5948,6 +6501,7 @@ inline void UserPanel::split_value_by_unit(float val, uint &us, uint &ns, uint &
     {
     case 0:
     case 1:
+    case 3:  // Type 3 (4-camera mode) uses same logic as types 0 and 1
     {
         us = uint(val + 0.001) / 1000;
         ns = uint(val + 0.001) % 1000;
@@ -6982,12 +7536,12 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
     target_cam->get_max_frame_size(&max_w, &max_h);
     target_cam->frame_size(true, &new_w, &new_h, &inc_w, &inc_h);
     target_cam->frame_offset(true, &new_x, &new_y, &inc_x, &inc_y);
-    new_w = ui->SHAPE_INFO->pair.x();
-    new_h = ui->SHAPE_INFO->pair.y();
-    new_x += ui->START_COORD->pair.x();
-    new_y += ui->START_COORD->pair.y();
-    if (new_w == 0) new_w = max_w;
-    if (new_h == 0) new_h = max_h;
+//    new_w = ui->SHAPE_INFO->pair.x();
+//    new_h = ui->SHAPE_INFO->pair.y();
+//    new_x += ui->START_COORD->pair.x();
+//    new_y += ui->START_COORD->pair.y();
+//    if (new_w == 0) new_w = max_w;
+//    if (new_h == 0) new_h = max_h;
 
     new_w = (new_w + inc_w / 2) / inc_w; new_w *= inc_w;
     new_h = (new_h + inc_h / 2) / inc_h; new_h *= inc_h;
@@ -7163,7 +7717,7 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
                 }
                 w[0] = max_width;
                 h[0] = total_height + 3 * 5;  // Add gaps
-                status_bar->img_resolution->set_text(QString::asprintf("%d x %d (4-cam)", w[0], h[0]));
+                status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
             }
         } else {
             // Single camera mode - update as before
@@ -7189,20 +7743,72 @@ void UserPanel::on_SENSOR_TAPS_BTN_clicked()
 
 void UserPanel::on_SWITCH_TCU_UI_BTN_clicked()
 {
-    static int show_diff = 1;
-    if (show_diff) {
-        ui->DELAY_B_GRP->hide();
-        ui->GATE_WIDTH_B_GRP->hide();
-        ui->DELAY_DIFF_GRP->show();
-        ui->GATE_WIDTH_DIFF_GRP->show();
+    static bool show_alternate = false;  // Tracks the switch button state
+    show_alternate = !show_alternate;
+
+    if (four_camera_mode) {
+        // 4-camera mode: toggle between A/B and C/D
+        if (show_alternate) {
+            // Show C/D (for cameras 3&4), hide A/B
+            ui->DELAY_A_GRP->hide();
+            ui->DELAY_B_GRP->hide();
+            ui->GATE_WIDTH_A_GRP->hide();
+            ui->GATE_WIDTH_B_GRP->hide();
+            // Show C/D groups
+            ui->DELAY_C_GRP->show();
+            ui->DELAY_D_GRP->show();
+            ui->GATE_WIDTH_C_GRP->show();
+            ui->GATE_WIDTH_D_GRP->show();
+            // Hide diff groups (not used in 4-cam mode)
+            ui->DELAY_DIFF_GRP->hide();
+            ui->GATE_WIDTH_DIFF_GRP->hide();
+
+            // Disable AB lock when in C/D mode
+            if (p_tcu->get(TCU::AB_LOCK)) {
+                emit send_uint_tcu_msg(TCU::AB_LOCK, 0);
+            }
+        }
+        else {
+            // Show A/B (for cameras 1&2), hide C/D
+            ui->DELAY_A_GRP->show();
+            ui->DELAY_B_GRP->show();
+            ui->GATE_WIDTH_A_GRP->show();
+            ui->GATE_WIDTH_B_GRP->show();
+            // Hide C/D groups
+            ui->DELAY_C_GRP->hide();
+            ui->DELAY_D_GRP->hide();
+            ui->GATE_WIDTH_C_GRP->hide();
+            ui->GATE_WIDTH_D_GRP->hide();
+            // Hide diff groups (not used in 4-cam mode)
+            ui->DELAY_DIFF_GRP->hide();
+            ui->GATE_WIDTH_DIFF_GRP->hide();
+        }
     }
     else {
-        ui->DELAY_B_GRP->show();
-        ui->GATE_WIDTH_B_GRP->show();
-        ui->DELAY_DIFF_GRP->hide();
-        ui->GATE_WIDTH_DIFF_GRP->hide();
+        // Single camera mode: toggle between A/B and delay_n/gw_diff
+        if (show_alternate) {
+            // Show delay_n/gw_diff, hide B
+            ui->DELAY_B_GRP->hide();
+            ui->GATE_WIDTH_B_GRP->hide();
+            ui->DELAY_DIFF_GRP->show();
+            ui->GATE_WIDTH_DIFF_GRP->show();
+        }
+        else {
+            // Show A/B, hide delay_n/gw_diff
+            ui->DELAY_B_GRP->show();
+            ui->GATE_WIDTH_B_GRP->show();
+            ui->DELAY_DIFF_GRP->hide();
+            ui->GATE_WIDTH_DIFF_GRP->hide();
+        }
+        // A group is always visible in single camera mode
+        ui->DELAY_A_GRP->show();
+        ui->GATE_WIDTH_A_GRP->show();
+        // C/D groups always hidden in single camera mode
+        ui->DELAY_C_GRP->hide();
+        ui->DELAY_D_GRP->hide();
+        ui->GATE_WIDTH_C_GRP->hide();
+        ui->GATE_WIDTH_D_GRP->hide();
     }
-    show_diff ^= 1;
 }
 
 void UserPanel::on_SIMPLE_LASER_CHK_clicked()
@@ -7213,6 +7819,42 @@ void UserPanel::on_SIMPLE_LASER_CHK_clicked()
 #else //LVTONG
     pref->ui->LASER_CHK_1->click();
 #endif
+}
+
+void UserPanel::on_delay_select_changed(int index)
+{
+    // Update slider value and displays based on selected delay
+    double selected_delay_ns = 0;
+    double selected_gw_ns = 0;
+
+    switch (index) {
+        case 0:  // A
+            selected_delay_ns = p_tcu->get(TCU::DELAY_A);
+            selected_gw_ns = p_tcu->get(TCU::GATE_WIDTH_A);
+            break;
+        case 1:  // B
+            selected_delay_ns = p_tcu->get(TCU::DELAY_B);
+            selected_gw_ns = p_tcu->get(TCU::GATE_WIDTH_B);
+            break;
+        case 2:  // C
+            selected_delay_ns = p_tcu->get(TCU::DELAY_C);
+            selected_gw_ns = p_tcu->get(TCU::GATE_WIDTH_C);
+            break;
+        case 3:  // D
+            selected_delay_ns = p_tcu->get(TCU::DELAY_D);
+            selected_gw_ns = p_tcu->get(TCU::GATE_WIDTH_D);
+            break;
+    }
+
+    // Update delay distance and slider
+    delay_dist = selected_delay_ns * dist_ns;
+    ui->DELAY_SLIDER->setValue(delay_dist);
+    ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
+
+    // Update depth of view display and slider
+    depth_of_view = selected_gw_ns * dist_ns;
+    ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view));
+    ui->GW_SLIDER->setValue(depth_of_view);
 }
 
 void UserPanel::on_AUTO_MCP_CHK_clicked()
@@ -7350,11 +7992,31 @@ bool UserPanel::get_camera_frame(int cam_idx, cv::Mat& frame)
 }
 
 
+void UserPanel::update_delay_selector_ui()
+{
+    if (four_camera_mode) {
+        // Show delay select combo and adjust slider position/width for 4-camera mode
+        ui->DELAY_SELECT_COMBO->show();
+        ui->DELAY_SLIDER->setGeometry(55, 163, 136, 20);  // Move right and make shorter (30+20+5 gap = 55 start)
+    } else {
+        // Hide delay select combo and restore slider to normal position/width
+        ui->DELAY_SELECT_COMBO->hide();
+        ui->DELAY_SLIDER->setGeometry(30, 163, 161, 20);  // Restore original position and width
+        ui->DELAY_SELECT_COMBO->setCurrentIndex(0);  // Reset to A
+    }
+}
+
 void UserPanel::enable_four_camera_mode(bool enable)
 {
     four_camera_mode = enable;
 
+    // Update UI elements based on new mode
+    update_delay_selector_ui();
+
     if (enable) {
+        // Set TCU type to 3 for 4-camera mode (remapped commands)
+        p_tcu->set_type(3);
+
         // Clear display 0 queue to start fresh
         QMutexLocker locker(&image_mutex[0]);
         std::queue<cv::Mat>().swap(q_img[0]);
@@ -7368,6 +8030,9 @@ void UserPanel::enable_four_camera_mode(bool enable)
                 grab_thread_state[0] = true;
             }
         }
+    } else {
+        // Restore default TCU type when exiting 4-camera mode
+        p_tcu->set_type(0);  // or whatever the default type should be
     }
 }
 

@@ -10,6 +10,10 @@ TCU::TCU(int index, int tcu_type) :
     delay_b(100),
     gate_width_a(40),
     gate_width_b(40),
+    delay_c(100),
+    delay_d(100),
+    gate_width_c(40),
+    gate_width_d(40),
     ccd_freq(10),
     duty(5000),
     mcp(5),
@@ -62,6 +66,10 @@ double TCU::get(qint32 tcu_param)
             }
         case DELAY_B:       return delay_b;
         case GATE_WIDTH_B:  return gate_width_b;
+        case DELAY_C:       return delay_c;
+        case GATE_WIDTH_C:  return gate_width_c;
+        case DELAY_D:       return delay_d;
+        case GATE_WIDTH_D:  return gate_width_d;
         case CCD_FREQ:      return ccd_freq;
         case DUTY:          return duty;
         case MCP:           return mcp;
@@ -88,20 +96,37 @@ void TCU::set_type(uint type) { tcu_type.store(type); }
 #if ENABLE_PORT_JSON
 nlohmann::json TCU::to_json()
 {
-    return nlohmann::json{
-        {"type",        tcu_type.load()},
-        {"PRF",         rep_freq},
-        {"laser_width", laser_width},
-        {"delay_a",     delay_a},
-        {"gw_a",        gate_width_a},
-        {"delay_b",     delay_b},
-        {"gw_b",        gate_width_b},
-        {"ccd_freq",    ccd_freq},
-        {"duty",        duty},
-        {"mcp",         mcp},
-        {"delay_n",     delay_n},
-        {"gw_n",        gate_width_n},
+    // Helper lambda to format double with .001 precision
+    auto format_double = [](double value) -> std::string {
+        char buffer[32];
+        std::sprintf(buffer, "%.3f", value);
+        return std::string(buffer);
     };
+
+    nlohmann::json j = {
+        {"type",        tcu_type.load()},
+        {"PRF",         format_double(rep_freq)},
+        {"laser_width", format_double(laser_width)},
+        {"delay_a",     format_double(delay_a)},
+        {"gw_a",        format_double(gate_width_a)},
+        {"delay_b",     format_double(delay_b)},
+        {"gw_b",        format_double(gate_width_b)},
+        {"ccd_freq",    format_double(ccd_freq)},
+        {"duty",        format_double(duty)},
+        {"mcp",         format_double(mcp)},
+        {"delay_n",     format_double(delay_n)},
+        {"gw_n",        format_double(gate_width_n)},
+    };
+
+    // Include C and D parameters for 4-camera mode (type 3)
+    if (tcu_type.load() == 3) {
+        j["delay_c"] = format_double(delay_c);
+        j["gw_c"] = format_double(gate_width_c);
+        j["delay_d"] = format_double(delay_d);
+        j["gw_d"] = format_double(gate_width_d);
+    }
+
+    return j;
 }
 #endif
 
@@ -176,16 +201,21 @@ void TCU::set_user_param(qint32 tcu_param, double val)
         case 0: clock_cycle = 8; break;
         case 1: clock_cycle = 4; break;
         case 2: clock_cycle = 4; break;
+        case 3: clock_cycle = 8; break;  // Type 3: 4-camera mode
         default: break;
     }
 
     switch (tcu_param) {
         case REPEATED_FREQ: rep_freq = val;     set_tcu_param(tcu_param, (1e6 / clock_cycle) / rep_freq); break;
         case LASER_WIDTH  : laser_width = val;  set_tcu_param(tcu_param, tcu_type.load() == 0 ? laser_width / 8 : laser_width); break;
-        case DELAY_A:       delay_a = val;      set_tcu_param(tcu_param, delay_a); break;
-        case GATE_WIDTH_A:  gate_width_a = val; set_tcu_param(tcu_param, gate_width_a); break;
-        case DELAY_B:       delay_b = val;      set_tcu_param(tcu_param, delay_b); emit tcu_param_updated(EST_DIST); break;
-        case GATE_WIDTH_B:  gate_width_b = val; set_tcu_param(tcu_param, gate_width_b); emit tcu_param_updated(EST_DOV); break;
+        case DELAY_A:       delay_a = val;      set_tcu_param(tcu_param, delay_a); emit tcu_param_updated(DELAY_A); break;
+        case GATE_WIDTH_A:  gate_width_a = val; set_tcu_param(tcu_param, gate_width_a); emit tcu_param_updated(GATE_WIDTH_A); break;
+        case DELAY_B:       delay_b = val;      set_tcu_param(tcu_param, delay_b); emit tcu_param_updated(DELAY_B); emit tcu_param_updated(EST_DIST); break;
+        case GATE_WIDTH_B:  gate_width_b = val; set_tcu_param(tcu_param, gate_width_b); emit tcu_param_updated(GATE_WIDTH_B); emit tcu_param_updated(EST_DOV); break;
+        case DELAY_C:       delay_c = val;      set_tcu_param(tcu_param, delay_c); emit tcu_param_updated(DELAY_C); break;
+        case GATE_WIDTH_C:  gate_width_c = val; set_tcu_param(tcu_param, gate_width_c); emit tcu_param_updated(GATE_WIDTH_C); break;
+        case DELAY_D:       delay_d = val;      set_tcu_param(tcu_param, delay_d); emit tcu_param_updated(DELAY_D); break;
+        case GATE_WIDTH_D:  gate_width_d = val; set_tcu_param(tcu_param, gate_width_d); emit tcu_param_updated(GATE_WIDTH_D); break;
         case CCD_FREQ:      ccd_freq = val;     set_tcu_param(tcu_param, (1e9 / clock_cycle) / ccd_freq); break;
         case DUTY:          duty = val;         set_tcu_param(tcu_param, duty * 1e3 / clock_cycle); break;
         case DELAY_N:       delay_n = val;                                     break;
@@ -290,7 +320,7 @@ void TCU::load_from_json(const nlohmann::json &j)
     std::cout << j << std::endl;
     std::cout.flush();
     cout_mutex.unlock();
-    
+
     try {
         if (j.contains("type") && j["type"].is_number())
             set_user_param(TCU_TYPE, j["type"].get<uint>());
@@ -316,11 +346,21 @@ void TCU::load_from_json(const nlohmann::json &j)
             set_user_param(DELAY_N, j["delay_n"].get<double>());
         if (j.contains("gw_n") && j["gw_n"].is_number())
             set_user_param(GATE_WIDTH_N, j["gw_n"].get<double>());
+
+        // Load C and D parameters for 4-camera mode
+        if (j.contains("delay_c") && j["delay_c"].is_number())
+            set_user_param(DELAY_C, j["delay_c"].get<double>());
+        if (j.contains("gw_c") && j["gw_c"].is_number())
+            set_user_param(GATE_WIDTH_C, j["gw_c"].get<double>());
+        if (j.contains("delay_d") && j["delay_d"].is_number())
+            set_user_param(DELAY_D, j["delay_d"].get<double>());
+        if (j.contains("gw_d") && j["gw_d"].is_number())
+            set_user_param(GATE_WIDTH_D, j["gw_d"].get<double>());
     }
     catch (const nlohmann::json::exception& e) {
         qWarning("JSON parsing error in TCU configuration: %s", e.what());
     }
-    
+
     delay_dist = delay_a * dist_ns;
     depth_of_view = gate_width_a * dist_ns;
     emit tcu_param_updated(NO_PARAM);
@@ -384,6 +424,34 @@ void TCU::set_tcu_param(qint32 tcu_param, double val)
                     decimal_part = std::round((val - integer_part * 4 + 0.001) * 1000 / step);
                     gate_width_b = integer_part * 4 + decimal_part * step / 1000.;
                     break;
+                case DELAY_C:
+                    param_ps = DELAY_A_PS;  // C uses A's PS register
+                    step = ps_step[0];
+                    integer_part = int(val + 0.001) / 4;
+                    decimal_part = std::round((val - integer_part * 4 + 0.001) * 1000 / step);
+                    delay_c = integer_part * 4 + decimal_part * step / 1000.;
+                    break;
+                case DELAY_D:
+                    param_ps = DELAY_B_PS;  // D uses B's PS register
+                    step = ps_step[1];
+                    integer_part = int(val + 0.001) / 4;
+                    decimal_part = std::round((val - integer_part * 4 + 0.001) * 1000 / step);
+                    delay_d = integer_part * 4 + decimal_part * step / 1000.;
+                    break;
+                case GATE_WIDTH_C:
+                    param_ps = GW_A_PS;  // C uses A's PS register
+                    step = ps_step[2];
+                    integer_part = int(val + 0.001) / 4;
+                    decimal_part = std::round((val - integer_part * 4 + 0.001) * 1000 / step);
+                    gate_width_c = integer_part * 4 + decimal_part * step / 1000.;
+                    break;
+                case GATE_WIDTH_D:
+                    param_ps = GW_B_PS;  // D uses B's PS register
+                    step = ps_step[3];
+                    integer_part = int(val + 0.001) / 4;
+                    decimal_part = std::round((val - integer_part * 4 + 0.001) * 1000 / step);
+                    gate_width_d = integer_part * 4 + decimal_part * step / 1000.;
+                    break;
                 default:
                     integer_part = int(val);
                     decimal_part = 0;
@@ -443,6 +511,30 @@ void TCU::set_tcu_param(qint32 tcu_param, double val)
                 decimal_part = std::round((val - integer_part + 0.001) * 1000 / 14.9);
                 gate_width_b = integer_part + decimal_part * 14.9 / 1000.;
                 break;
+            case DELAY_C:
+                param_ps = DELAY_A_PS;  // C uses A's PS register
+                integer_part = int(val + 0.001);
+                decimal_part = std::round((val - integer_part + 0.001) * 1000 / 11.23);
+                delay_c = integer_part + decimal_part * 11.23 / 1000.;
+                break;
+            case DELAY_D:
+                param_ps = DELAY_B_PS;  // D uses B's PS register
+                integer_part = int(val + 0.001);
+                decimal_part = std::round((val - integer_part + 0.001) * 1000 / 11.23);
+                delay_d = integer_part + decimal_part * 11.23 / 1000.;
+                break;
+            case GATE_WIDTH_C:
+                param_ps = GW_A_PS;  // C uses A's PS register
+                integer_part = int(val + 0.001);
+                decimal_part = std::round((val - integer_part + 0.001) * 1000 / 14.9);
+                gate_width_c = integer_part + decimal_part * 14.9 / 1000.;
+                break;
+            case GATE_WIDTH_D:
+                param_ps = GW_B_PS;  // D uses B's PS register
+                integer_part = int(val + 0.001);
+                decimal_part = std::round((val - integer_part + 0.001) * 1000 / 14.9);
+                gate_width_d = integer_part + decimal_part * 14.9 / 1000.;
+                break;
             default:
                 integer_part = int(val);
                 decimal_part = 0;
@@ -474,6 +566,25 @@ void TCU::set_tcu_param(qint32 tcu_param, double val)
 
                 communicate(out_2, 7, 40);
             }
+            break;
+        }
+        case 3:
+        {
+            // Type 3: 4-camera mode - uses updated command values for C/D
+            integer_part = std::round(val);
+            decimal_part = 0;
+
+            QByteArray out(7, 0x00);
+            out[0] = 0x88;
+            out[1] = tcu_param;
+            out[6] = 0x99;
+
+            out[5] = integer_part & 0xFF; integer_part >>= 8;
+            out[4] = integer_part & 0xFF; integer_part >>= 8;
+            out[3] = integer_part & 0xFF; integer_part >>= 8;
+            out[2] = integer_part & 0xFF;
+
+            communicate(out, 1, 10);
             break;
         }
         default: break;

@@ -348,6 +348,7 @@ private slots:
     void on_SWITCH_TCU_UI_BTN_clicked();
     void on_SIMPLE_LASER_CHK_clicked();
     void on_AUTO_MCP_CHK_clicked();
+    void on_delay_select_changed(int index);
 
     void on_PSEUDOCOLOR_CHK_stateChanged(int arg1);
 
@@ -415,7 +416,7 @@ protected:
 // control functions
 private:
     void data_exchange(bool read);
-
+    void update_delay_selector_ui();  // Update delay selector combo and slider based on four_camera_mode
 
     // shut the cam down
     int shut_down();
