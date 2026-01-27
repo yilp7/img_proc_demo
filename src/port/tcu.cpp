@@ -212,10 +212,10 @@ void TCU::set_user_param(qint32 tcu_param, double val)
         case GATE_WIDTH_A:  gate_width_a = val; set_tcu_param(tcu_param, gate_width_a); emit tcu_param_updated(GATE_WIDTH_A); break;
         case DELAY_B:       delay_b = val;      set_tcu_param(tcu_param, delay_b); emit tcu_param_updated(DELAY_B); emit tcu_param_updated(EST_DIST); break;
         case GATE_WIDTH_B:  gate_width_b = val; set_tcu_param(tcu_param, gate_width_b); emit tcu_param_updated(GATE_WIDTH_B); emit tcu_param_updated(EST_DOV); break;
-        case DELAY_C:       delay_c = val;      set_tcu_param(tcu_param, delay_c); emit tcu_param_updated(DELAY_C); break;
-        case GATE_WIDTH_C:  gate_width_c = val; set_tcu_param(tcu_param, gate_width_c); emit tcu_param_updated(GATE_WIDTH_C); break;
-        case DELAY_D:       delay_d = val;      set_tcu_param(tcu_param, delay_d); emit tcu_param_updated(DELAY_D); break;
-        case GATE_WIDTH_D:  gate_width_d = val; set_tcu_param(tcu_param, gate_width_d); emit tcu_param_updated(GATE_WIDTH_D); break;
+        case DELAY_C:       delay_c = val;      set_tcu_param(tcu_param, tcu_type.load() == 3 ? delay_c / 8 : delay_c ); emit tcu_param_updated(DELAY_C); break;
+        case GATE_WIDTH_C:  gate_width_c = val; set_tcu_param(tcu_param, tcu_type.load() == 3 ? gate_width_c / 8 : gate_width_c); emit tcu_param_updated(GATE_WIDTH_C); break;
+        case DELAY_D:       delay_d = val;      set_tcu_param(tcu_param, tcu_type.load() == 3 ? delay_d / 8 : delay_d); emit tcu_param_updated(DELAY_D); break;
+        case GATE_WIDTH_D:  gate_width_d = val; set_tcu_param(tcu_param, tcu_type.load() == 3 ? gate_width_d / 8 : gate_width_d); emit tcu_param_updated(GATE_WIDTH_D); break;
         case CCD_FREQ:      ccd_freq = val;     set_tcu_param(tcu_param, (1e9 / clock_cycle) / ccd_freq); break;
         case DUTY:          duty = val;         set_tcu_param(tcu_param, duty * 1e3 / clock_cycle); break;
         case DELAY_N:       delay_n = val;                                     break;

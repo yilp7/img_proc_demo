@@ -8,10 +8,12 @@
 class MvCam : public Cam {
 private:
     void* dev_handle;
+    int cam_idx;  // Camera index (0-3) for accessing static arrays
 
 public:
-    MV_CC_DEVICE_INFO_LIST gige_dev_list;
-    MV_CC_DEVICE_INFO_LIST usb3_dev_list;
+    // Static device lists - enumerated once, shared by all instances
+    static MV_CC_DEVICE_INFO_LIST gige_dev_list;
+    static MV_CC_DEVICE_INFO_LIST usb3_dev_list;
 
 public:
     MvCam();

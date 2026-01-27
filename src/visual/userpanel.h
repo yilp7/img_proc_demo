@@ -305,6 +305,7 @@ private slots:
     void on_MISC_OPTION_1_currentIndexChanged(int index);
     void on_MISC_OPTION_2_currentIndexChanged(int index);
     void on_MISC_OPTION_3_currentIndexChanged(int index);
+    void on_ENERGY_LEVEL_COMBO_currentIndexChanged(int index);
 
     // choose how mouse works in DISPLAY
     // TODO add a new exclusive button group
@@ -393,6 +394,7 @@ signals:
     void send_lens_msg(qint32 lens_param, uint val = 0);
     void set_lens_pos(qint32 lens_param, uint val);
     void send_laser_msg(QString msg);
+    void send_laser_param_msg(qint32 laser_param, uint value);  // For both ON/OFF (0/1) and energy levels
     void send_ptz_msg(qint32 ptz_param, double val = 0);
 
 #ifdef LVTONG
@@ -412,6 +414,7 @@ protected:
     void dragEnterEvent(QDragEnterEvent *event);
     void dropEvent(QDropEvent *event);
     void showEvent(QShowEvent *event);
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
 // control functions
 private:
@@ -482,6 +485,8 @@ private:
     // static image display (drag & drop)
     void start_static_display(int width, int height, bool is_color, int display_idx = 0, int pixel_depth = 8, int device_type = -1);
     bool load_image_file(QString filename, bool init);
+    void apply_image_enhancement(cv::Mat& img);  // Apply selected enhancement to single image
+    cv::Mat apply_3d_reconstruction_per_camera(int cam_idx, const cv::Mat& current_frame, bool is_frame_a);  // Apply 3D reconstruction per camera
     int load_video_file(QString filename, bool format_gray = false, void (*process_frame)(cv::Mat &frame, void *ptr) = NULL,
                         void *ptr = NULL, int display_idx = 0, bool display = true);
 
@@ -534,6 +539,15 @@ private:
     cv::Mat         camera_latest[4];           // Latest frame from each camera
     int             composite_gap_size;         // Gap size between camera views in pixels
     bool            four_camera_mode;           // Whether 4-camera composite mode is active
+    bool            camera_has_new_frame[4];    // Track which cameras have new frames since last sync
+    bool            fully_synchronized_frame;   // True when all active cameras have new frames
+
+    // Per-camera 3D reconstruction storage (for 4-camera mode)
+    cv::Mat         camera_prev_img[4];         // Previous frame for each camera
+    cv::Mat         camera_frame_a_sum[4];      // Frame A accumulator per camera
+    cv::Mat         camera_frame_b_sum[4];      // Frame B accumulator per camera
+    cv::Mat         camera_3d_result[4];        // 3D result per camera
+    bool            camera_3d_initialized[4];   // Track initialization per camera
 
     Cam*            curr_cam;                   // current camera (kept for compatibility)
     float           time_exposure_edit;

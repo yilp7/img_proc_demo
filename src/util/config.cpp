@@ -327,6 +327,13 @@ nlohmann::json Config::device_settings_to_json(const DeviceSettings &settings) c
     obj["ebus"] = settings.ebus;
     obj["share_tcu_port"] = settings.share_tcu_port;
     obj["ptz_type"] = settings.ptz_type;
+
+    nlohmann::json cam_gates = nlohmann::json::array();
+    for (int i = 0; i < 4; ++i) {
+        cam_gates.push_back(settings.cam_to_gate[i]);
+    }
+    obj["cam_to_gate"] = cam_gates;
+
     return obj;
 }
 
@@ -348,6 +355,18 @@ Config::DeviceSettings Config::device_settings_from_json(const nlohmann::json &o
     if (obj.contains("ptz_type") && obj["ptz_type"].is_number()) {
         settings.ptz_type = obj["ptz_type"].get<int>();
     }
+
+    // Load cam_to_gate array
+    if (obj.contains("cam_to_gate") && obj["cam_to_gate"].is_array()) {
+        const auto& cam_gates = obj["cam_to_gate"];
+        size_t count = std::min(cam_gates.size(), size_t(4));
+        for (size_t i = 0; i < count; ++i) {
+            if (cam_gates[i].is_number()) {
+                settings.cam_to_gate[i] = cam_gates[i].get<int>();
+            }
+        }
+    }
+
     return settings;
 }
 

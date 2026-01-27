@@ -99,6 +99,8 @@ public:
     bool             ebus_cam;
     int              ptz_type;  // 0: pelco-p, 1: usbcan, 2: udp-scw370
     bool             cameralink;
+    int              cam_to_gate[4];  // TCU gate mapping (0=none, 1=A, 2=B, 3=C, 4=D)
+    bool             cam_process_enable[4];  // Enable/disable image processing and saving per camera
 
     // 2 serial comm.
     int              port_idx;

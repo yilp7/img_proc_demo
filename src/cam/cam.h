@@ -49,6 +49,7 @@ struct main_ui_info {
     std::queue<cv::Mat> *img_q;
     QMutex *frame_info_mutex;  // Mutex to protect frame_info_q
     QMutex *img_mutex;          // Mutex to protect img_q
+    int cam_index;              // Camera index (0-3) for accessing static arrays
 };
 #endif
 #endif // CAM_H

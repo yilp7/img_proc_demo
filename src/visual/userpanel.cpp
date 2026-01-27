@@ -228,6 +228,15 @@ UserPanel::UserPanel(QWidget *parent) :
     q_fps_calc.set_display_label(ui->STATUS->result_cam_fps);
     q_fps_calc.start();
 
+    // Initialize 4-camera mode tracking variables
+    four_camera_mode = true;
+    fully_synchronized_frame = false;
+    for (int i = 0; i < 4; i++) {
+        camera_has_new_frame[i] = false;
+        camera_active[i] = false;
+        camera_3d_initialized[i] = false;  // Initialize 3D storage flags
+    }
+
     dist_ns = c * 1e-9 / 2;
 
     QFont temp_f(consolas);
@@ -874,6 +883,17 @@ void UserPanel::init()
         emit send_double_tcu_msg(TCU::REPEATED_FREQ, rep_freq);
         setup_hz(hz_unit);  // Update the frequency display to show "25" in Hz
 
+        // Show FIRE_LASER button (disabled initially) and hide DIST_BTN in 4-camera mode
+        ui->FIRE_LASER_BTN->show();
+        ui->FIRE_LASER_BTN->setEnabled(false);  // Disabled until LASER_BTN is clicked
+        ui->DIST_BTN->hide();
+
+        // Show energy level combo box and hide current line edit in 4-camera mode
+        ui->ENERGY_LEVEL_COMBO->show();
+        ui->ENERGY_LEVEL_COMBO->setEnabled(false);  // Disabled until LASER_BTN is clicked
+        ui->ENERGY_LEVEL_COMBO->installEventFilter(this);  // Disable wheel events for this combobox
+        ui->CURRENT_EDIT->hide();
+
         // Set laser width to 1 microsecond (1000 nanoseconds)
         laser_width = 1000;
         update_laser_width();
@@ -883,6 +903,12 @@ void UserPanel::init()
         // but update functions may need to be called)
         update_delay();
         update_gate_width();
+    }
+    else {
+        // Normal mode: ensure ENERGY_LEVEL_COMBO is hidden and CURRENT_EDIT is visible
+        ui->ENERGY_LEVEL_COMBO->hide();
+        ui->ENERGY_LEVEL_COMBO->installEventFilter(this);  // Install filter even when hidden
+        ui->CURRENT_EDIT->show();
     }
 }
 
@@ -1045,6 +1071,9 @@ int UserPanel::grab_thread_process(int *idx) {
 
     cv::dnn::Net net = cv::dnn::readNet(model_name.toLatin1().constData());
 #endif
+    // Declare outside the mutex scope so it's available throughout the loop
+    bool processing_4cam_composite = false;
+
     while (grab_image[thread_idx]) {
         disp = displays[*idx];
 
@@ -1082,11 +1111,16 @@ int UserPanel::grab_thread_process(int *idx) {
             // Also check if cameras are actually active (not just displaying a dropped image)
             bool any_camera_active = camera_active[0] || camera_active[1] || camera_active[2] || camera_active[3];
 
+            // Reset flag at the beginning of each iteration
+            processing_4cam_composite = false;  // Track if we just processed 4-camera composite
+
             if (four_camera_mode && thread_idx == 0 && any_camera_active) {
+                processing_4cam_composite = true;  // Mark that we're processing composite
                 // Composite frames inline from all 4 cameras
                 cv::Mat frames[4];
                 bool has_frames[4] = {false};
                 int active_count = 0;
+                int new_frame_count = 0;  // Count cameras with NEW frames
 
                 // Collect frames from all camera queues
                 for (int i = 0; i < 4; i++) {
@@ -1097,6 +1131,8 @@ int UserPanel::grab_thread_process(int *idx) {
                             camera_queues[i].pop();
                             camera_latest[i] = frames[i].clone();
                             has_frames[i] = true;
+                            camera_has_new_frame[i] = true;  // Mark as having NEW frame
+                            new_frame_count++;
                             active_count++;
 
                             // Also pop frame info if available
@@ -1108,6 +1144,7 @@ int UserPanel::grab_thread_process(int *idx) {
                         } else if (!camera_latest[i].empty()) {
                             frames[i] = camera_latest[i];
                             has_frames[i] = true;
+                            // DON'T set camera_has_new_frame[i] - using cached frame
                         }
                     }
                 }
@@ -1119,27 +1156,90 @@ int UserPanel::grab_thread_process(int *idx) {
                     continue;
                 }
 
-                // Create composite frame with dimensions from w[0] and h[0]
-                int type = frames[0].empty() ? CV_8UC1 : frames[0].type();
-                cv::Mat composite = cv::Mat::zeros(_h, _w, type);
+                // Find maximum dimensions among all active cameras
+                int max_cam_width = 0;
+                int max_cam_height = 0;
+                int active_cam_count = 0;
+                int total_cam_height = 0;  // Track total height needed for enabled cameras
+                for (int i = 0; i < 4; i++) {
+                    if (camera_active[i] && has_frames[i] && !frames[i].empty() && pref->cam_process_enable[i]) {
+                        max_cam_width = std::max(max_cam_width, frames[i].cols);
+                        max_cam_height = std::max(max_cam_height, frames[i].rows);
+                        total_cam_height += frames[i].rows;  // Add this camera's height
+                        active_cam_count++;
+                    }
+                }
 
-                // Stack frames vertically
+                // If no cameras are enabled in preferences, skip composite creation
+                if (active_cam_count == 0) {
+                    locker.unlock();
+                    QThread::msleep(10);
+                    continue;
+                }
+
+                // Create composite frame with dimensions to include averaged frame
+                int composite_width = _w;
+                // If 3D mode is enabled, add extra width for depth visualization
+                if (ui->IMG_3D_CHECK->isChecked() && !is_color[0]) {
+                    composite_width = _w + 104;  // 3D adds 104 pixels for color bar
+                }
+                // Calculate correct height: all enabled camera heights + gaps between them + averaged frame
+                // Height = total camera heights + gaps between cameras + gap before averaged + averaged frame height
+                // Note: gaps = (active_cam_count - 1) between cameras + 1 before averaged frame = active_cam_count total
+                int composite_height = total_cam_height + (active_cam_count * 5) + max_cam_height;
+                int type = frames[0].empty() ? CV_8UC1 : frames[0].type();
+                // Initialize composite with white background for better visual separation
+                cv::Mat composite(composite_height, composite_width, type,
+                                 type == CV_8UC3 ? cv::Scalar(255, 255, 255) : cv::Scalar(255));
+
+                // Prepare for averaging - collect processed frames
+                std::vector<cv::Mat> processed_frames;
+                processed_frames.reserve(4);
+
+                // Stack frames vertically and track positions for labeling
+                std::vector<std::pair<int, int>> camera_positions;  // Store camera index and y position
                 int y_offset = 0;
                 for (int i = 0; i < 4; i++) {
                     if (camera_active[i] && has_frames[i] && !frames[i].empty()) {
+                        // Only process and include if camera is enabled in preferences
+                        if (!pref->cam_process_enable[i]) {
+                            continue;  // Skip disabled cameras
+                        }
+
+                        // Store position for labeling
+                        camera_positions.push_back({i, y_offset});
+
                         int cam_h = frames[i].rows;
                         int max_w = _w;  // Use full width
 
-                        // Resize width if needed
-                        cv::Mat resized;
-                        if (frames[i].cols != max_w) {
-                            cv::resize(frames[i], resized, cv::Size(max_w, cam_h));
-                        } else {
-                            resized = frames[i];
+                        // Apply 3D reconstruction per-camera if enabled, otherwise enhancement
+                        cv::Mat processed = frames[i].clone();
+                        if (ui->IMG_3D_CHECK->isChecked() && !is_color[0]) {
+                            // Apply 3D reconstruction using shared frame_a_3d state
+                            processed = apply_3d_reconstruction_per_camera(i, frames[i], frame_a_3d);
+                            // 3D result has extra width for depth visualization
+                            if (!processed.empty() && processed.cols > frames[i].cols) {
+                                // Adjust for 3D extra width if present
+                                max_w = processed.cols;
+                            }
+                        } else if (ui->IMG_ENHANCE_CHECK->isChecked()) {
+                            // Apply enhancement only if not doing 3D
+                            apply_image_enhancement(processed);
                         }
 
+                        // Resize width if needed
+                        cv::Mat resized;
+                        if (processed.cols != max_w) {
+                            cv::resize(processed, resized, cv::Size(max_w, cam_h));
+                        } else {
+                            resized = processed;
+                        }
+
+                        // Store processed frame for averaging
+                        processed_frames.push_back(processed.clone());
+
                         // Copy to composite if within bounds
-                        if (y_offset + cam_h <= _h) {
+                        if (y_offset + cam_h <= composite_height) {
                             cv::Rect roi(0, y_offset, max_w, cam_h);
                             resized.copyTo(composite(roi));
                         }
@@ -1147,8 +1247,121 @@ int UserPanel::grab_thread_process(int *idx) {
                     }
                 }
 
+                // Track averaged frame position for labeling
+                int averaged_frame_y_position = y_offset;
+
+                // Create averaged frame if there are active cameras
+                if (active_cam_count > 0 && !processed_frames.empty()) {
+                    // Create accumulator for averaging (use 16-bit to avoid overflow)
+                    cv::Mat accumulator = cv::Mat::zeros(max_cam_height, max_cam_width,
+                                                         type == CV_8UC3 ? CV_16UC3 : CV_16UC1);
+
+                    // Add each frame to accumulator, centered if needed
+                    for (const auto& proc_frame : processed_frames) {
+                        // If frame averaging is enabled, we need to handle it differently
+                        cv::Mat frame_to_add = proc_frame;
+
+                        // Remove extra 3D width if present for centering calculation
+                        int frame_width = proc_frame.cols;
+                        int frame_height = proc_frame.rows;
+                        if (ui->IMG_3D_CHECK->isChecked() && !is_color[0] && frame_width > max_cam_width) {
+                            frame_width = max_cam_width;  // Use original width for centering
+                        }
+
+                        // Calculate centering offsets
+                        int x_offset = (max_cam_width - frame_width) / 2;
+                        int y_offset_avg = (max_cam_height - frame_height) / 2;
+
+                        // Create a centered version in a canvas of max size
+                        cv::Mat centered = cv::Mat::zeros(max_cam_height, max_cam_width, proc_frame.type());
+                        cv::Rect center_roi(x_offset, y_offset_avg,
+                                           std::min(proc_frame.cols, max_cam_width - x_offset),
+                                           frame_height);
+
+                        // For 3D mode, just take the image part (not the color bar)
+                        if (ui->IMG_3D_CHECK->isChecked() && !is_color[0] && proc_frame.cols > max_cam_width) {
+                            cv::Rect img_part(0, 0, max_cam_width, frame_height);
+                            proc_frame(img_part).copyTo(centered(center_roi));
+                        } else {
+                            proc_frame.copyTo(centered(center_roi));
+                        }
+
+                        // Convert to 16-bit and add to accumulator
+                        cv::Mat centered_16;
+                        centered.convertTo(centered_16, type == CV_8UC3 ? CV_16UC3 : CV_16UC1);
+                        accumulator += centered_16;
+                    }
+
+                    // Convert back to 8-bit with averaging
+                    cv::Mat averaged_frame;
+                    accumulator.convertTo(averaged_frame, type, 1.0 / active_cam_count);
+
+                    // Apply 3D reconstruction or enhancement to the averaged frame
+                    cv::Mat processed_avg = averaged_frame.clone();
+                    if (ui->IMG_3D_CHECK->isChecked() && !is_color[0]) {
+                        // For averaged frame 3D, use a special index (e.g., 4) or process directly
+                        // We'll use the first camera's 3D parameters as reference
+                        processed_avg = apply_3d_reconstruction_per_camera(0, averaged_frame, frame_a_3d);
+                    } else if (ui->IMG_ENHANCE_CHECK->isChecked()) {
+                        apply_image_enhancement(processed_avg);
+                    }
+
+                    // Copy averaged frame to composite
+                    if (y_offset + max_cam_height <= composite_height) {
+                        int avg_width = processed_avg.cols;
+                        cv::Rect avg_roi(0, y_offset, avg_width, max_cam_height);
+
+                        // Resize if needed to fit composite width
+                        if (avg_width != composite_width && ui->IMG_3D_CHECK->isChecked() && !is_color[0]) {
+                            // For 3D mode, use the full width including color bar
+                            processed_avg.copyTo(composite(avg_roi));
+                        } else {
+                            cv::Mat resized_avg;
+                            if (processed_avg.cols != _w) {
+                                cv::resize(processed_avg, resized_avg, cv::Size(_w, max_cam_height));
+                            } else {
+                                resized_avg = processed_avg;
+                            }
+                            resized_avg.copyTo(composite(cv::Rect(0, y_offset, resized_avg.cols, max_cam_height)));
+                        }
+                    }
+                }
+
                 img_mem[thread_idx] = composite;
-                updated = true;
+
+                // Check if all active cameras have contributed new frames
+                fully_synchronized_frame = false;
+                if (new_frame_count > 0) {
+                    int expected_cameras = 0;
+                    int synchronized_cameras = 0;
+                    for (int i = 0; i < 4; i++) {
+                        if (camera_active[i] && pref->cam_process_enable[i]) {
+                            expected_cameras++;
+                            if (camera_has_new_frame[i]) {
+                                synchronized_cameras++;
+                            }
+                        }
+                    }
+
+                    // All expected cameras have new frames
+                    if (synchronized_cameras == expected_cameras && expected_cameras > 0) {
+                        fully_synchronized_frame = true;
+                        q_fps_calc.add_to_q();  // Only count synchronized frames for FPS
+
+                        // Toggle frame A/B for 3D reconstruction in 4-camera mode
+                        if (ui->IMG_3D_CHECK->isChecked() && !is_color[0]) {
+                            frame_a_3d ^= 1;
+                        }
+
+                        // Reset flags for next sync cycle
+                        for (int i = 0; i < 4; i++) {
+                            camera_has_new_frame[i] = false;
+                        }
+                    }
+                }
+
+                // Set updated only when we have synchronized frames (like single camera mode)
+                updated = fully_synchronized_frame;
             }
             else if (q_img[thread_idx].empty()) {
 #ifdef LVTONG
@@ -1381,8 +1594,8 @@ int UserPanel::grab_thread_process(int *idx) {
 
         if (pref->split) ImageProc::split_img(modified_result[thread_idx], modified_result[thread_idx]);
 
-        // process 3d image construction from ABN frames
-        if (ui->IMG_3D_CHECK->isChecked() && thread_idx == 0 && !is_color[thread_idx]) {
+        // process 3d image construction from ABN frames (SINGLE CAMERA MODE ONLY)
+        if (ui->IMG_3D_CHECK->isChecked() && thread_idx == 0 && !is_color[thread_idx] && !four_camera_mode) {
             ww = _w + 104;
             hh = _h;
             double dist_min = 0, dist_max = 0;
@@ -1450,7 +1663,8 @@ int UserPanel::grab_thread_process(int *idx) {
         else {
             ww = _w;
             hh = _h;
-            if (ui->IMG_ENHANCE_CHECK->isChecked()) {
+            // Skip global enhancement only if we just processed 4-camera composite (already applied per-camera)
+            if (ui->IMG_ENHANCE_CHECK->isChecked() && !processing_4cam_composite) {
                 switch (ui->ENHANCE_OPTIONS->currentIndex()) {
                 // histogram
                 case 1: {
@@ -1662,17 +1876,37 @@ int UserPanel::grab_thread_process(int *idx) {
         QString info_time = QDateTime::currentDateTime().toString("hh:mm:ss:zzz");
         if (ui->INFO_CHECK->isChecked()) {
             if (four_camera_mode && thread_idx == 0) {
-                // For 4-camera composite, draw camera labels for each section
-                // Assuming the composite height is divided equally among 4 cameras
-                int cam_height = hh / 4;
+                // For 4-camera composite, draw labels based on actual enabled cameras
+                // Count enabled cameras and calculate positions
+                int enabled_count = 0;
+                std::vector<int> enabled_cameras;
                 for (int i = 0; i < 4; i++) {
-                    QString cam_label = QString::asprintf("cam-%d", i + 1);
-                    int y_pos = i * cam_height + 50 * weight;
-                    cv::putText(modified_result[thread_idx], cam_label.toLatin1().data(),
-                               cv::Point(10, y_pos), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-                    // Draw time for each camera section
-                    cv::putText(modified_result[thread_idx], info_time.toLatin1().data(),
-                               cv::Point(ww - 240 * weight, y_pos), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    if (camera_active[i] && pref->cam_process_enable[i]) {
+                        enabled_cameras.push_back(i);
+                        enabled_count++;
+                    }
+                }
+
+                if (enabled_count > 0) {
+                    // Each camera section height (excluding gaps)
+                    int section_height = (hh - (enabled_count * 5)) / (enabled_count + 1);  // +1 for averaged frame
+
+                    // Draw labels for each enabled camera
+                    for (size_t idx = 0; idx < enabled_cameras.size(); idx++) {
+                        QString cam_label = QString::asprintf("cam-%d", enabled_cameras[idx] + 1);
+                        int y_pos = (int)idx * (section_height + 5) + 50 * weight;  // Account for gaps
+                        cv::putText(modified_result[thread_idx], cam_label.toLatin1().data(),
+                                   cv::Point(10, y_pos), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                        // Draw time for each camera section
+                        cv::putText(modified_result[thread_idx], info_time.toLatin1().data(),
+                                   cv::Point(ww - 240 * weight, y_pos), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                    }
+
+                    // Draw label for averaged frame
+                    QString avg_label = "averaged";
+                    int avg_y_pos = enabled_count * (section_height + 5) + 50 * weight;
+                    cv::putText(modified_result[thread_idx], avg_label.toLatin1().data(),
+                               cv::Point(10, avg_y_pos), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 }
             } else if (!four_camera_mode) {
                 // Single camera mode - original behavior
@@ -2202,7 +2436,7 @@ void UserPanel::init_control_port()
     connect(this, SIGNAL(set_lens_pos(qint32, uint)), p_lens, SLOT(set_pos_temp(qint32, uint)), Qt::QueuedConnection);
 
     connect(ui->LASER_COM_EDIT, &QLineEdit::returnPressed, this, [this]() {
-        p_laser->emit connect_to_serial(ui->LASER_COM_EDIT->text());
+        p_laser->emit connect_to_serial(ui->LASER_COM_EDIT->text(), QSerialPort::Baud115200);
         QString port_text = ui->LASER_COM_EDIT->text();
 #ifdef WIN32
         config->get_data().com_laser.port = port_text.isEmpty() ? "" : "COM" + port_text;
@@ -2213,6 +2447,7 @@ void UserPanel::init_control_port()
     });
     connect(p_laser, &ControlPort::port_status_updated, this, [this]() { update_port_status(p_laser, ui->LASER_COM); });
     connect(this, SIGNAL(send_laser_msg(QString)), p_laser, SLOT(laser_control(QString)), Qt::QueuedConnection);
+    connect(this, SIGNAL(send_laser_param_msg(qint32, uint)), p_laser, SLOT(laser_control_slot(qint32, uint)), Qt::QueuedConnection);
 //    connect(p_laser, &ControlPort::port_io, this, &UserPanel::append_data, Qt::QueuedConnection);
 
     connect(ui->PTZ_COM_EDIT, &QLineEdit::returnPressed, this, [this]() {
@@ -5917,6 +6152,20 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
     }
 }
 
+bool UserPanel::eventFilter(QObject *obj, QEvent *event)
+{
+    // Only block wheel events for the ENERGY_LEVEL_COMBO
+    // This prevents accidental value changes when scrolling
+    if (obj == ui->ENERGY_LEVEL_COMBO && event->type() == QEvent::Wheel) {
+        // Block the wheel event only for this specific combobox
+        return true;
+    }
+
+    // Pass all other events through to the default handler
+    // This ensures other comboboxes and widgets work normally
+    return QMainWindow::eventFilter(obj, event);
+}
+
 void UserPanel::resizeEvent(QResizeEvent *event)
 {
     int ww, hh;
@@ -6555,6 +6804,175 @@ void UserPanel::rotate(int angle)
 //    return std::round(std::modf(val + 0.001, &ONE) * 1000 / ptr_tcu->ps_step[idx]) * ptr_tcu->ps_step[idx];
 //}
 
+void UserPanel::apply_image_enhancement(cv::Mat& img)
+{
+    if (!ui->IMG_ENHANCE_CHECK->isChecked() || img.empty()) {
+        return;
+    }
+
+    switch (ui->ENHANCE_OPTIONS->currentIndex()) {
+    // histogram
+    case 1:
+        ImageProc::hist_equalization(img, img);
+        break;
+    // laplace
+    case 2: {
+        cv::Mat kernel = (cv::Mat_<float>(3, 3) << 0, -1, 0, 0, 5, 0, 0, -1, 0);
+        cv::filter2D(img, img, CV_8U, kernel);
+        break;
+    }
+    // SP-5
+    case 3:
+        ImageProc::plateau_equl_hist(img, img, 4);
+        break;
+    // accumulative
+    case 4:
+        ImageProc::accumulative_enhance(img, img, pref->accu_base);
+        break;
+    // sigmoid
+    case 5:
+        ImageProc::guided_image_filter(img, img, 60, 0.01, 1);
+        break;
+    // adaptive
+    case 6:
+        ImageProc::adaptive_enhance(img, img, 0, pref->low_in, 0, pref->high_out, pref->gamma);
+        break;
+    // dehaze_enh
+    case 7:
+        img = ~img;
+        ImageProc::haze_removal(img, img, 7, pref->dehaze_pct, pref->low_out, pref->sky_tolerance, 0.01);
+        img = ~img;
+        break;
+    // DCP
+    case 8:
+        ImageProc::haze_removal(img, img, 7, pref->dehaze_pct, pref->low_out, pref->sky_tolerance, 0.01);
+        break;
+    // AINDANE
+    case 9:
+        ImageProc::aindane(img, img);
+        break;
+    default:
+        break;
+    }
+}
+
+cv::Mat UserPanel::apply_3d_reconstruction_per_camera(int cam_idx, const cv::Mat& current_frame, bool is_frame_a)
+{
+    // Initialize per-camera storage if needed
+    if (!camera_3d_initialized[cam_idx]) {
+        camera_prev_img[cam_idx] = current_frame.clone();
+        int type = current_frame.channels() == 3 ? CV_16UC3 : CV_16UC1;
+        camera_frame_a_sum[cam_idx] = cv::Mat::zeros(current_frame.size(), type);
+        camera_frame_b_sum[cam_idx] = cv::Mat::zeros(current_frame.size(), type);
+        camera_3d_initialized[cam_idx] = true;
+        return current_frame; // Return original on first frame
+    }
+
+    cv::Mat result;
+    double dist_min = 0, dist_max = 0;
+
+    if (ui->FRAME_AVG_CHECK->isChecked()) {
+        // Update frame accumulators based on GLOBAL frame_a_3d
+        cv::Mat current_16u;
+        int type = current_frame.channels() == 3 ? CV_16UC3 : CV_16UC1;
+        current_frame.convertTo(current_16u, type);
+
+        // Accumulate frames - decrement old and add new
+        static cv::Mat cam_seq[4][8];  // 8 frames per camera for averaging
+        static int cam_seq_idx[4] = {0, 0, 0, 0};
+
+        if (cam_seq[cam_idx][0].empty()) {
+            for (auto& m: cam_seq[cam_idx]) {
+                m = cv::Mat::zeros(current_frame.size(), type);
+            }
+        }
+
+        // Update accumulator
+        if (is_frame_a) {
+            camera_frame_a_sum[cam_idx] -= cam_seq[cam_idx][cam_seq_idx[cam_idx]];
+            current_16u.copyTo(cam_seq[cam_idx][cam_seq_idx[cam_idx]]);
+            camera_frame_a_sum[cam_idx] += cam_seq[cam_idx][cam_seq_idx[cam_idx]];
+        } else {
+            camera_frame_b_sum[cam_idx] -= cam_seq[cam_idx][cam_seq_idx[cam_idx]];
+            current_16u.copyTo(cam_seq[cam_idx][cam_seq_idx[cam_idx]]);
+            camera_frame_b_sum[cam_idx] += cam_seq[cam_idx][cam_seq_idx[cam_idx]];
+        }
+        cam_seq_idx[cam_idx] = (cam_seq_idx[cam_idx] + 1) & 7;
+
+        // Create averaged frames
+        cv::Mat frame_a_avg, frame_b_avg;
+        int pixel_depth = current_frame.depth() == CV_16U ? 16 : 8;
+        camera_frame_a_sum[cam_idx].convertTo(frame_a_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
+        camera_frame_b_sum[cam_idx].convertTo(frame_b_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
+
+        // Convert to grayscale if needed for 3D processing
+        if (frame_a_avg.channels() == 3) {
+            cv::cvtColor(frame_a_avg, frame_a_avg, cv::COLOR_BGR2GRAY);
+            cv::cvtColor(frame_b_avg, frame_b_avg, cv::COLOR_BGR2GRAY);
+        }
+
+        // Apply 3D reconstruction
+        cv::Mat dist_mat;
+#ifdef LVTONG
+        ImageProc::gated3D_v2(
+            is_frame_a ? frame_b_avg : frame_a_avg,  // Use opposite frames for depth
+            is_frame_a ? frame_a_avg : frame_b_avg,
+            result,
+            pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - p_tcu->get(TCU::OFFSET_DELAY) * dist_ns) / dist_ns,
+            pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - p_tcu->get(TCU::OFFSET_GW) * dist_ns) / dist_ns,
+            pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d
+        );
+#else
+        ImageProc::gated3D_v2(
+            is_frame_a ? frame_b_avg : frame_a_avg,  // Use opposite frames for depth
+            is_frame_a ? frame_a_avg : frame_b_avg,
+            result,
+            pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - p_tcu->get(TCU::OFFSET_DELAY) * dist_ns) / dist_ns,
+            pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - p_tcu->get(TCU::OFFSET_GW) * dist_ns) / dist_ns,
+            pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, &dist_mat, &dist_min, &dist_max
+        );
+#endif
+    } else {
+        // Non-averaged 3D reconstruction
+        cv::Mat curr_gray = current_frame.clone();
+        cv::Mat prev_gray = camera_prev_img[cam_idx].clone();
+
+        // Convert to grayscale if needed
+        if (curr_gray.channels() == 3) {
+            cv::cvtColor(curr_gray, curr_gray, cv::COLOR_BGR2GRAY);
+        }
+        if (prev_gray.channels() == 3) {
+            cv::cvtColor(prev_gray, prev_gray, cv::COLOR_BGR2GRAY);
+        }
+
+#ifdef LVTONG
+        ImageProc::gated3D_v2(
+            is_frame_a ? prev_gray : curr_gray,
+            is_frame_a ? curr_gray : prev_gray,
+            result,
+            pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - p_tcu->get(TCU::OFFSET_DELAY) * dist_ns) / dist_ns,
+            pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - p_tcu->get(TCU::OFFSET_GW) * dist_ns) / dist_ns,
+            pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d
+        );
+#else
+        ImageProc::gated3D_v2(
+            is_frame_a ? prev_gray : curr_gray,
+            is_frame_a ? curr_gray : prev_gray,
+            result,
+            pref->custom_3d_param ? pref->ui->CUSTOM_3D_DELAY_EDT->text().toFloat() : (delay_dist - p_tcu->get(TCU::OFFSET_DELAY) * dist_ns) / dist_ns,
+            pref->custom_3d_param ? pref->ui->CUSTOM_3D_GW_EDT->text().toFloat() : (depth_of_view - p_tcu->get(TCU::OFFSET_GW) * dist_ns) / dist_ns,
+            pref->colormap, pref->lower_3d_thresh, pref->upper_3d_thresh, pref->truncate_3d, nullptr, nullptr, nullptr
+        );
+#endif
+        camera_prev_img[cam_idx] = current_frame.clone();
+    }
+
+    // Store result for this camera
+    camera_3d_result[cam_idx] = result;
+
+    return result;
+}
+
 void UserPanel::start_static_display(int width, int height, bool is_color, int display_idx, int pixel_depth, int device_type)
 {
     int select_display_thread = display_thread_idx[display_idx];
@@ -6849,25 +7267,26 @@ void UserPanel::laser_preset_reached()
 void UserPanel::on_LASER_BTN_clicked()
 {
 #ifdef LVTONG
+    // Original LVTONG behavior
     if (ui->LASER_BTN->text() == tr("ON")) {
         ui->LASER_BTN->setEnabled(false);
-//        ptr_tcu->communicate_display(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
+//            ptr_tcu->communicate_display(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
         p_tcu->emit send_data(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 0, 0);
         QTimer::singleShot(4000, this, SLOT(start_laser()));
     }
     else {
-//        if (serial_port[3] && serial_port[3]->isOpen()) {
-//            serial_port[3]->write("OFF\r", 4);
-//            serial_port[3]->waitForBytesWritten(100);
-//            QThread::msleep(100);
-//            serial_port[3]->readAll();
-//        }
-//        ptr_laser->communicate_display(QByteArray("OFF\r"), 4, 0, true, false);
-//        p_laser->emit send_data(QByteArray("OFF\r"), 0, 0);
-//        emit send_laser_msg("OFF\r");
-//        qDebug() << QString("OFF\r");
+//            if (serial_port[3] && serial_port[3]->isOpen()) {
+//                serial_port[3]->write("OFF\r", 4);
+//                serial_port[3]->waitForBytesWritten(100);
+//                QThread::msleep(100);
+//                serial_port[3]->readAll();
+//            }
+//            ptr_laser->communicate_display(QByteArray("OFF\r"), 4, 0, true, false);
+//            p_laser->emit send_data(QByteArray("OFF\r"), 0, 0);
+//            emit send_laser_msg("OFF\r");
+//            qDebug() << QString("OFF\r");
         if (ui->FIRE_LASER_BTN->text() == tr("STOP")) ui->FIRE_LASER_BTN->click();
-//        ptr_tcu->communicate_display(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 7, 0, false);
+//            ptr_tcu->communicate_display(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 7, 0, false);
         p_tcu->send_data(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 0, 0);
 
         ui->LASER_BTN->setText(tr("ON"));
@@ -6876,8 +7295,48 @@ void UserPanel::on_LASER_BTN_clicked()
         ui->SIMPLE_LASER_CHK->setEnabled(false);
     }
 #else
-    pref->ui->LASER_ENABLE_CHK->click();
-    ui->LASER_BTN->setText(ui->LASER_BTN->text() == tr("ON") ? tr("OFF") : tr("ON"));
+    // In 4-camera mode, LASER_BTN toggles SYSTEM and TRIGGER
+    if (four_camera_mode) {
+        if (ui->LASER_BTN->text() == tr("ON")) {
+            // Turn system ON
+            emit send_laser_param_msg(Laser::SYSTEM, 1);
+            QThread::msleep(50);  // Small delay between commands
+
+            // Send TRIGGER ON
+            emit send_laser_param_msg(Laser::TRIGGER, 1);
+
+            // Update button text and enable controls
+            ui->LASER_BTN->setText(tr("OFF"));
+            ui->FIRE_LASER_BTN->setEnabled(true);
+            ui->CURRENT_EDIT->setEnabled(!four_camera_mode);
+            ui->ENERGY_LEVEL_COMBO->setEnabled(four_camera_mode);
+            ui->SIMPLE_LASER_CHK->setEnabled(true);
+        }
+        else {
+            // Turn system OFF - first turn laser off if it's on
+            if (ui->FIRE_LASER_BTN->text() == tr("STOP")) {
+                // Laser is currently ON, turn it OFF first
+                emit send_laser_param_msg(Laser::LASER, 0);
+                ui->FIRE_LASER_BTN->setText(tr("FIRE"));
+                QThread::msleep(50);
+            }
+
+            // Send SYSTEM OFF
+            emit send_laser_param_msg(Laser::SYSTEM, 0);
+
+            // Update button text and disable controls
+            ui->LASER_BTN->setText(tr("ON"));
+            ui->FIRE_LASER_BTN->setEnabled(false);
+            ui->CURRENT_EDIT->setEnabled(false);
+            ui->ENERGY_LEVEL_COMBO->setEnabled(false);
+            ui->SIMPLE_LASER_CHK->setEnabled(false);
+        }
+    }
+    else {
+        // Original non-4-camera mode behavior
+        pref->ui->LASER_ENABLE_CHK->click();
+        ui->LASER_BTN->setText(ui->LASER_BTN->text() == tr("ON") ? tr("OFF") : tr("ON"));
+    }
 #endif
 }
 
@@ -6954,6 +7413,14 @@ void UserPanel::on_MISC_OPTION_3_currentIndexChanged(int index)
     alt_display_option = index + 1;
     ui->MISC_DISPLAY->setCurrentIndex(alt_display_option);
     ui->MISC_RADIO_3->setChecked(true);
+}
+
+void UserPanel::on_ENERGY_LEVEL_COMBO_currentIndexChanged(int index)
+{
+    // In 4-camera mode, send the selected energy level to the laser
+    if (four_camera_mode) {
+        emit send_laser_param_msg(Laser::SET_ENERGY, index);
+    }
 }
 #if 0
 void UserPanel::on_COM_DATA_RADIO_clicked()
@@ -7435,9 +7902,19 @@ void UserPanel::on_DUAL_LIGHT_BTN_clicked()
 
 void UserPanel::on_RESET_3D_BTN_clicked()
 {
-    frame_a_3d ^= 1;
-//    for (cv::Mat &m: frame_a_sum) m = 0;
-//    for (cv::Mat &m: frame_b_sum) m = 0;
+    frame_a_3d ^= 1;  // Toggle global frame A/B state
+
+    if (four_camera_mode) {
+        // Clear accumulators for all cameras in 4-camera mode
+        for (int i = 0; i < 4; i++) {
+            if (camera_3d_initialized[i]) {
+                int type = camera_frame_a_sum[i].type();
+                camera_frame_a_sum[i] = cv::Mat::zeros(camera_frame_a_sum[i].size(), type);
+                camera_frame_b_sum[i] = cv::Mat::zeros(camera_frame_b_sum[i].size(), type);
+            }
+        }
+    }
+    // Single camera mode uses its own frame_a_sum and frame_b_sum which are handled elsewhere
 }
 
 void UserPanel::display_fishnet_result(int result)
@@ -7453,50 +7930,62 @@ void UserPanel::display_fishnet_result(int result)
 void UserPanel::on_FIRE_LASER_BTN_clicked()
 {
     if (ui->FIRE_LASER_BTN->text() == tr("FIRE")) {
-//        serial_port[3]->write("MODE:STBY 0\r", 12);
-//        serial_port[3]->waitForBytesWritten(100);
-//        QThread::msleep(100);
-//        serial_port[3]->readAll();
-//        ptr_laser->communicate_display(QByteArray("MODE:STBY 0\r"), 12, 0, true, false);
-//        ptr_laser->send_data(PortData{QByteArray("MODE:STBY 0\r"), 12, 0, true, false});
-//        p_laser->emit send_data(QByteArray("MODE:STBY 0\r"), 0, 100);
-//        emit send_laser_msg("MODE:STBY 0\r");
-//        qDebug() << QString("MODE:STBY 0\r");
+        // In 4-camera mode, use new laser control for LASER ON
+        if (four_camera_mode) {
+            emit send_laser_param_msg(Laser::LASER, 1);
+        } else {
+            // Original behavior for non-4-camera mode
+//            serial_port[3]->write("MODE:STBY 0\r", 12);
+//            serial_port[3]->waitForBytesWritten(100);
+//            QThread::msleep(100);
+//            serial_port[3]->readAll();
+//            ptr_laser->communicate_display(QByteArray("MODE:STBY 0\r"), 12, 0, true, false);
+//            ptr_laser->send_data(PortData{QByteArray("MODE:STBY 0\r"), 12, 0, true, false});
+//            p_laser->emit send_data(QByteArray("MODE:STBY 0\r"), 0, 100);
+//            emit send_laser_msg("MODE:STBY 0\r");
+//            qDebug() << QString("MODE:STBY 0\r");
 
-//        serial_port[3]->write("ON\r", 3);
-//        serial_port[3]->waitForBytesWritten(100);
-//        QThread::msleep(100);
-//        serial_port[3]->readAll();
-//        ptr_laser->communicate_display(QByteArray("ON\r"), 3, 0, true, false);
-//        ptr_laser->send_data(PortData{QByteArray("ON\r"), 3, 0, true, false});
-//        p_laser->emit send_data(QByteArray("ON\r"), 0, 100);
-        emit send_laser_msg("ON\r");
-        qDebug() << QString("ON\r");
+//            serial_port[3]->write("ON\r", 3);
+//            serial_port[3]->waitForBytesWritten(100);
+//            QThread::msleep(100);
+//            serial_port[3]->readAll();
+//            ptr_laser->communicate_display(QByteArray("ON\r"), 3, 0, true, false);
+//            ptr_laser->send_data(PortData{QByteArray("ON\r"), 3, 0, true, false});
+//            p_laser->emit send_data(QByteArray("ON\r"), 0, 100);
+            emit send_laser_msg("ON\r");
+            qDebug() << QString("ON\r");
+        }
 
         if (!pref->ui->LASER_ENABLE_CHK->isChecked()) pref->ui->LASER_ENABLE_CHK->click();
 
         ui->FIRE_LASER_BTN->setText(tr("STOP"));
         ui->SIMPLE_LASER_CHK->setChecked(true);
     } else {
-//        serial_port[3]->write("OFF\r", 4);
-//        serial_port[3]->waitForBytesWritten(100);
-//        QThread::msleep(100);
-//        serial_port[3]->readAll();
-//        ptr_laser->communicate_display(QByteArray("OFF\r"), 4, 0, true, false);
-//        ptr_laser->send_data(PortData{QByteArray("OFF\r"), 4, 0, true, false});
-//        p_laser->emit send_data(QByteArray("OFF\r"), 0, 100);
-        emit send_laser_msg("OFF\r");
-        qDebug() << QString("OFF\r");
+        // In 4-camera mode, use new laser control for LASER OFF
+        if (four_camera_mode) {
+            emit send_laser_param_msg(Laser::LASER, 0);
+        } else {
+            // Original behavior for non-4-camera mode
+//            serial_port[3]->write("OFF\r", 4);
+//            serial_port[3]->waitForBytesWritten(100);
+//            QThread::msleep(100);
+//            serial_port[3]->readAll();
+//            ptr_laser->communicate_display(QByteArray("OFF\r"), 4, 0, true, false);
+//            ptr_laser->send_data(PortData{QByteArray("OFF\r"), 4, 0, true, false});
+//            p_laser->emit send_data(QByteArray("OFF\r"), 0, 100);
+            emit send_laser_msg("OFF\r");
+            qDebug() << QString("OFF\r");
 
-//        serial_port[3]->write("MODE:STBY 1\r", 12);
-//        serial_port[3]->waitForBytesWritten(100);
-//        QThread::msleep(100);
-//        serial_port[3]->readAll();
-//        ptr_laser->communicate_display(QByteArray("MODE:STBY 1\r"), 12, 0, true, false);
-//        ptr_laser->send_data(PortData{QByteArray("MODE:STBY 1\r"), 12, 0, true, false});
-//        p_laser->emit send_data(QByteArray("MODE:STBY 1\r"), 0, 100);
-//        emit send_laser_msg("MODE:STBY 1\r");
-//        qDebug() << QString("MODE:STBY 1\r");
+//            serial_port[3]->write("MODE:STBY 1\r", 12);
+//            serial_port[3]->waitForBytesWritten(100);
+//            QThread::msleep(100);
+//            serial_port[3]->readAll();
+//            ptr_laser->communicate_display(QByteArray("MODE:STBY 1\r"), 12, 0, true, false);
+//            ptr_laser->send_data(PortData{QByteArray("MODE:STBY 1\r"), 12, 0, true, false});
+//            p_laser->emit send_data(QByteArray("MODE:STBY 1\r"), 0, 100);
+//            emit send_laser_msg("MODE:STBY 1\r");
+//            qDebug() << QString("MODE:STBY 1\r");
+        }
 
         if (pref->ui->LASER_ENABLE_CHK->isChecked()) pref->ui->LASER_ENABLE_CHK->click();
 
@@ -7552,6 +8041,9 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
     QFormLayout form(&image_region_dialog);
     form.setRowWrapPolicy(QFormLayout::WrapAllRows);
 
+    // Declare camera selector outside to access later
+    QComboBox *cam_selector = nullptr;
+
     // Add title row - with camera selector in 4-camera mode
     if (four_camera_mode) {
         // Create a single widget containing both label and combobox
@@ -7561,7 +8053,7 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
         titleLayout->setContentsMargins(0, 0, 0, 0);
 
         QLabel *titleLabel = new QLabel("Region select:", titleWidget);
-        QComboBox *cam_selector = new QComboBox(titleWidget);
+        cam_selector = new QComboBox(titleWidget);
         cam_selector->resize(80, 20);  // Match spinbox size for alignment
         // Comprehensive stylesheet to completely remove drop-down arrow
         cam_selector->setStyleSheet(
@@ -7578,23 +8070,6 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
                 }
             }
         }
-
-        // Handle camera selection change
-        connect(cam_selector, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            [this, &target_cam, &selected_cam_idx, &max_w, &max_h, &new_w, &new_h, &new_x, &new_y,
-             &inc_w, &inc_h, &inc_x, &inc_y, cam_selector](int index) {
-                if (index < 0) return;
-                int cam_idx = cam_selector->currentData().toInt();
-                if (cameras[cam_idx] && camera_active[cam_idx]) {
-                    target_cam = cameras[cam_idx];
-                    selected_cam_idx = cam_idx;
-                    // Refresh values for new camera
-                    target_cam->get_max_frame_size(&max_w, &max_h);
-                    target_cam->frame_size(true, &new_w, &new_h, &inc_w, &inc_h);
-                    target_cam->frame_offset(true, &new_x, &new_y, &inc_x, &inc_y);
-                    // Note: Spinboxes will need to be updated outside this lambda
-                }
-            });
 
         titleLayout->addWidget(titleLabel);
         titleLayout->addStretch();  // Push combobox to the right
@@ -7632,7 +8107,7 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
     x_spinbox->setValue(new_x);
     form.addRow(offset_x, x_spinbox);
     connect(width_spinbox, &QSpinBox::editingFinished, x_spinbox,
-        [max_w, &offset_x, width_spinbox, x_spinbox]() {
+        [&max_w, &offset_x, width_spinbox, x_spinbox]() {
             x_spinbox->setMaximum(max_w - width_spinbox->value());
             offset_x->setText("Offset X (max " + QString::number(max_w - width_spinbox->value())  + "): ");
         });
@@ -7644,8 +8119,50 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
     y_spinbox->setSingleStep(inc_y);
     y_spinbox->setValue(new_y);
     form.addRow(offset_y, y_spinbox);
+
+    // Connect camera selector to update spinboxes when camera changes (in 4-camera mode)
+    if (four_camera_mode && cam_selector) {
+        connect(cam_selector, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            [this, &target_cam, &selected_cam_idx, &max_w, &max_h, &new_w, &new_h, &new_x, &new_y,
+             &inc_w, &inc_h, &inc_x, &inc_y, cam_selector, width, height, offset_x, offset_y,
+             width_spinbox, height_spinbox, x_spinbox, y_spinbox](int index) {
+                if (index < 0) return;
+                int cam_idx = cam_selector->currentData().toInt();
+                if (this->cameras[cam_idx] && this->camera_active[cam_idx]) {
+                    target_cam = this->cameras[cam_idx];
+                    selected_cam_idx = cam_idx;
+                    // Refresh values for new camera
+                    target_cam->get_max_frame_size(&max_w, &max_h);
+                    target_cam->frame_size(true, &new_w, &new_h, &inc_w, &inc_h);
+                    target_cam->frame_offset(true, &new_x, &new_y, &inc_x, &inc_y);
+
+                    // Update labels
+                    width->setText("Width (max " + QString::number(max_w) + "): ");
+                    height->setText("Height (max " + QString::number(max_h) + "): ");
+                    offset_x->setText("Offset X (max " + QString::number(max_w - new_w) + "): ");
+                    offset_y->setText("Offset Y (max " + QString::number(max_h - new_h) + "): ");
+
+                    // Update spinboxes
+                    width_spinbox->setRange(0, max_w);
+                    width_spinbox->setSingleStep(inc_w);
+                    width_spinbox->setValue(new_w);
+
+                    height_spinbox->setRange(0, max_h);
+                    height_spinbox->setSingleStep(inc_h);
+                    height_spinbox->setValue(new_h);
+
+                    x_spinbox->setRange(0, max_w - new_w);
+                    x_spinbox->setSingleStep(inc_x);
+                    x_spinbox->setValue(new_x);
+
+                    y_spinbox->setRange(0, max_h - new_h);
+                    y_spinbox->setSingleStep(inc_y);
+                    y_spinbox->setValue(new_y);
+                }
+            });
+    }
     connect(height_spinbox, &QSpinBox::editingFinished, y_spinbox,
-        [max_h, &offset_y, height_spinbox, y_spinbox]() {
+        [&max_h, &offset_y, height_spinbox, y_spinbox]() {
             y_spinbox->setMaximum(max_h - height_spinbox->value());
             offset_y->setText("Offset Y (max " + QString::number(max_h - height_spinbox->value()) + "): ");
         });
@@ -8013,6 +8530,10 @@ void UserPanel::enable_four_camera_mode(bool enable)
     // Update UI elements based on new mode
     update_delay_selector_ui();
 
+    // Switch between LineEdit and ComboBox for laser energy control
+    ui->CURRENT_EDIT->setVisible(!enable);
+    ui->ENERGY_LEVEL_COMBO->setVisible(enable);
+
     if (enable) {
         // Set TCU type to 3 for 4-camera mode (remapped commands)
         p_tcu->set_type(3);
@@ -8020,6 +8541,21 @@ void UserPanel::enable_four_camera_mode(bool enable)
         // Clear display 0 queue to start fresh
         QMutexLocker locker(&image_mutex[0]);
         std::queue<cv::Mat>().swap(q_img[0]);
+
+        // Clear FPS queue when switching modes to avoid mixing measurements
+        q_fps_calc.empty_q();
+
+        // Initialize synchronization tracking for 4-camera mode
+        fully_synchronized_frame = false;
+        for (int i = 0; i < 4; i++) {
+            camera_has_new_frame[i] = false;
+            // Reset 3D reconstruction state for each camera
+            camera_3d_initialized[i] = false;
+            camera_prev_img[i].release();
+            camera_frame_a_sum[i].release();
+            camera_frame_b_sum[i].release();
+            camera_3d_result[i].release();
+        }
 
         // Make sure grab thread for display 0 is running
         if (!grab_thread_state[0] && !h_grab_thread[0]) {
@@ -8033,6 +8569,21 @@ void UserPanel::enable_four_camera_mode(bool enable)
     } else {
         // Restore default TCU type when exiting 4-camera mode
         p_tcu->set_type(0);  // or whatever the default type should be
+
+        // Clear FPS queue when switching modes to avoid mixing measurements
+        q_fps_calc.empty_q();
+
+        // Reset synchronization tracking when exiting 4-camera mode
+        fully_synchronized_frame = false;
+        for (int i = 0; i < 4; i++) {
+            camera_has_new_frame[i] = false;
+            // Clear 3D reconstruction state
+            camera_3d_initialized[i] = false;
+            camera_prev_img[i].release();
+            camera_frame_a_sum[i].release();
+            camera_frame_b_sum[i].release();
+            camera_3d_result[i].release();
+        }
     }
 }
 

@@ -1,13 +1,19 @@
 #include "mvcam.h"
 
-cv::Mat mv_img;
-cv::Mat bayer_temp;
+// Static arrays for each camera instance (up to 4 cameras)
+static cv::Mat mv_img[4];
+static cv::Mat bayer_temp[4];
+
+// Static device lists - shared across all MvCam instances
+MV_CC_DEVICE_INFO_LIST MvCam::gige_dev_list = {0};
+MV_CC_DEVICE_INFO_LIST MvCam::usb3_dev_list = {0};
 
 MvCam::MvCam()
 {
     device_type = 1;
     dev_handle = NULL;
     curr_idx = 0;
+    cam_idx = 0;  // Default to 0, will be set properly via set_user_pointer
 }
 MvCam::~MvCam() {if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;}
 
@@ -58,6 +64,11 @@ int MvCam::shut_down()
 
 int MvCam::set_user_pointer(void *user)
 {
+    // Extract camera index from the user data structure
+    struct main_ui_info *info = (struct main_ui_info*)user;
+    if (info) {
+        cam_idx = info->cam_index;
+    }
     return MV_CC_RegisterImageCallBackEx(dev_handle, frame_cb, user);
 }
 
@@ -97,19 +108,19 @@ void MvCam::frame_size(bool read, int *w, int *h, int *inc_w, int *inc_h)
     MV_CC_GetPixelFormat(dev_handle, &temp);
     switch (temp.nCurValue) {
     case PixelType_Gvsp_RGB8_Packed:
-        mv_img = cv::Mat(*h, *w, CV_8UC3);
+        mv_img[cam_idx] = cv::Mat(*h, *w, CV_8UC3);
         break;
     case PixelType_Gvsp_Mono8:
-        mv_img = cv::Mat(*h, *w, CV_8UC1);
+        mv_img[cam_idx] = cv::Mat(*h, *w, CV_8UC1);
         break;
     case PixelType_Gvsp_Mono10:
     case PixelType_Gvsp_Mono12:
     case PixelType_Gvsp_Mono10_Packed:
     case PixelType_Gvsp_Mono12_Packed:
-        mv_img = cv::Mat(*h, *w, CV_16UC1);
+        mv_img[cam_idx] = cv::Mat(*h, *w, CV_16UC1);
         break;
     default:
-        mv_img = 0;
+        mv_img[cam_idx] = cv::Mat();
         break;
     }
 }
@@ -225,17 +236,17 @@ int MvCam::pixel_type(bool read, int *val)
         switch (*val) {
         case PixelType_Gvsp_BayerRG8:
         case PixelType_Gvsp_RGB8_Packed:
-            bayer_temp = cv::Mat(mv_img.rows, mv_img.cols, CV_8UC1);
-            mv_img = cv::Mat(mv_img.rows, mv_img.cols, CV_8UC3);
+            bayer_temp[cam_idx] = cv::Mat(mv_img[cam_idx].rows, mv_img[cam_idx].cols, CV_8UC1);
+            mv_img[cam_idx] = cv::Mat(mv_img[cam_idx].rows, mv_img[cam_idx].cols, CV_8UC3);
             break;
         case PixelType_Gvsp_Mono8:
-            mv_img = cv::Mat(mv_img.rows, mv_img.cols, CV_8UC1);
+            mv_img[cam_idx] = cv::Mat(mv_img[cam_idx].rows, mv_img[cam_idx].cols, CV_8UC1);
             break;
         case PixelType_Gvsp_Mono10:
         case PixelType_Gvsp_Mono12:
         case PixelType_Gvsp_Mono10_Packed:
         case PixelType_Gvsp_Mono12_Packed:
-            mv_img = cv::Mat(mv_img.rows, mv_img.cols, CV_16UC1);
+            mv_img[cam_idx] = cv::Mat(mv_img[cam_idx].rows, mv_img[cam_idx].cols, CV_16UC1);
             break;
         default: break;
         }
@@ -286,29 +297,34 @@ void MvCam::binning(bool read, int *val)
 
 void MvCam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void *user_data)
 {
-//    static cv::Mat mv_img(frame_info->nHeight, frame_info->nWidth, CV_8UC1);
-//    mv_img.data = data;
+    struct main_ui_info *ptr = (struct main_ui_info*)user_data;
+    if (!ptr) return;
+
+    // Get the camera index to access the correct array element
+    int idx = ptr->cam_index;
+    if (idx < 0 || idx >= 4) return;  // Safety check
+
+    // Use the pre-allocated static arrays indexed by camera
     switch (frame_info->enPixelType) {
     case PixelType_Gvsp_Mono8:
     case PixelType_Gvsp_Mono10:
     case PixelType_Gvsp_Mono12:
     case PixelType_Gvsp_RGB8_Packed:
-        memcpy(mv_img.data, data, frame_info->nFrameLen);
+        memcpy(mv_img[idx].data, data, frame_info->nFrameLen);
         break;
     case PixelType_Gvsp_Mono10_Packed:
     case PixelType_Gvsp_Mono12_Packed:
         break;
     case PixelType_Gvsp_BayerRG8:
-        memcpy(bayer_temp.data, data, frame_info->nFrameLen);
-        cv::cvtColor(bayer_temp, mv_img, cv::COLOR_BayerRG2RGB);
+        memcpy(bayer_temp[idx].data, data, frame_info->nFrameLen);
+        cv::cvtColor(bayer_temp[idx], mv_img[idx], cv::COLOR_BayerRG2RGB);
+        break;
     default:
-        mv_img = 0;
+        mv_img[idx] = cv::Mat();
         break;
     }
 
-//    ImageIO::save_image_bmp(mv_img, "imgs/" + QDateTime::currentDateTime().toString("hhMMss.zzz") + ".bmp");
-
-    struct main_ui_info *ptr = (struct main_ui_info*)user_data;
+//    ImageIO::save_image_bmp(mv_img[idx], "imgs/" + QDateTime::currentDateTime().toString("hhMMss.zzz") + ".bmp");
 
     // Protect both queues with their respective mutexes
     if (ptr->frame_info_mutex) {
@@ -318,7 +334,7 @@ void MvCam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void
 
     if (ptr->img_mutex) {
         QMutexLocker img_locker(ptr->img_mutex);
-        ptr->img_q->push(mv_img.clone());
+        ptr->img_q->push(mv_img[idx].clone());
     }
-//    cv::imwrite("../mv.bmp", mv_img);
+//    cv::imwrite("../mv.bmp", mv_img[idx]);
 }

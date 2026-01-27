@@ -12,6 +12,8 @@ Preferences::Preferences(QWidget *parent) :
     ebus_cam(false),
     ptz_type(0),
     cameralink(false),
+    cam_to_gate{1, 2, 3, 4},  // Default: cam-1->A, cam-2->B, cam-3->C, cam-4->D
+    cam_process_enable{true, true, true, true},  // Default: all cameras enabled
     port_idx(0),
     share_port(false),
     use_tcp(false),
@@ -116,6 +118,109 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->PTZ_TYPE_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
             [this](int index){ ptz_type = index; });
     connect(ui->CAMERALINK_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ cameralink = arg1; emit search_for_devices(); });
+
+    // TCU Gate Mapping setup
+    ui->GATE_1_COMBO->addItem("");
+    ui->GATE_1_COMBO->addItem("A");
+    ui->GATE_1_COMBO->addItem("B");
+    ui->GATE_1_COMBO->addItem("C");
+    ui->GATE_1_COMBO->addItem("D");
+    ui->GATE_1_COMBO->setCurrentIndex(cam_to_gate[0]);
+    ui->GATE_1_COMBO->installEventFilter(this);
+
+    ui->GATE_2_COMBO->addItem("");
+    ui->GATE_2_COMBO->addItem("A");
+    ui->GATE_2_COMBO->addItem("B");
+    ui->GATE_2_COMBO->addItem("C");
+    ui->GATE_2_COMBO->addItem("D");
+    ui->GATE_2_COMBO->setCurrentIndex(cam_to_gate[1]);
+    ui->GATE_2_COMBO->installEventFilter(this);
+
+    ui->GATE_3_COMBO->addItem("");
+    ui->GATE_3_COMBO->addItem("A");
+    ui->GATE_3_COMBO->addItem("B");
+    ui->GATE_3_COMBO->addItem("C");
+    ui->GATE_3_COMBO->addItem("D");
+    ui->GATE_3_COMBO->setCurrentIndex(cam_to_gate[2]);
+    ui->GATE_3_COMBO->installEventFilter(this);
+
+    ui->GATE_4_COMBO->addItem("");
+    ui->GATE_4_COMBO->addItem("A");
+    ui->GATE_4_COMBO->addItem("B");
+    ui->GATE_4_COMBO->addItem("C");
+    ui->GATE_4_COMBO->addItem("D");
+    ui->GATE_4_COMBO->setCurrentIndex(cam_to_gate[3]);
+    ui->GATE_4_COMBO->installEventFilter(this);
+
+    // Connect camera enable checkboxes
+    connect(ui->CAM_1_ENABLE_CHK, &QCheckBox::toggled, [this](bool checked) { cam_process_enable[0] = checked; });
+    connect(ui->CAM_2_ENABLE_CHK, &QCheckBox::toggled, [this](bool checked) { cam_process_enable[1] = checked; });
+    connect(ui->CAM_3_ENABLE_CHK, &QCheckBox::toggled, [this](bool checked) { cam_process_enable[2] = checked; });
+    connect(ui->CAM_4_ENABLE_CHK, &QCheckBox::toggled, [this](bool checked) { cam_process_enable[3] = checked; });
+
+    // Connect all gate combos for mutual exclusion
+    auto update_gate_options = [this]() {
+        QComboBox* gate_combos[4] = {ui->GATE_1_COMBO, ui->GATE_2_COMBO, ui->GATE_3_COMBO, ui->GATE_4_COMBO};
+
+        // Get current selections
+        int selections[4];
+        for (int i = 0; i < 4; i++) {
+            QString current = gate_combos[i]->currentText();
+            if (current.isEmpty()) {
+                selections[i] = 0;
+            } else {
+                selections[i] = current[0].toLatin1() - 'A' + 1;  // Convert A->1, B->2, etc.
+            }
+        }
+
+        // Update each combo box
+        for (int i = 0; i < 4; i++) {
+            int current_sel = selections[i];
+            gate_combos[i]->blockSignals(true);
+            gate_combos[i]->clear();
+            gate_combos[i]->addItem("");  // Empty option
+
+            // Add available gates
+            for (int gate = 1; gate <= 4; gate++) {
+                bool available = true;
+                for (int j = 0; j < 4; j++) {
+                    if (i != j && selections[j] == gate) {
+                        available = false;
+                        break;
+                    }
+                }
+                if (available) {
+                    gate_combos[i]->addItem(QString(char('A' + gate - 1)));
+                }
+            }
+
+            // Restore selection
+            if (current_sel == 0) {
+                gate_combos[i]->setCurrentIndex(0);
+            } else {
+                int idx = gate_combos[i]->findText(QString(char('A' + current_sel - 1)));
+                if (idx >= 0) {
+                    gate_combos[i]->setCurrentIndex(idx);
+                } else {
+                    gate_combos[i]->setCurrentIndex(0);
+                }
+            }
+            gate_combos[i]->blockSignals(false);
+
+            // Update stored value
+            cam_to_gate[i] = gate_combos[i]->currentIndex() == 0 ? 0 :
+                            (gate_combos[i]->currentText()[0].toLatin1() - 'A' + 1);
+        }
+    };
+
+    connect(ui->GATE_1_COMBO, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            this, update_gate_options);
+    connect(ui->GATE_2_COMBO, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            this, update_gate_options);
+    connect(ui->GATE_3_COMBO, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            this, update_gate_options);
+    connect(ui->GATE_4_COMBO, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            this, update_gate_options);
 //![1]
 
 //[2] set up ui for serial comm.
@@ -191,6 +296,7 @@ Preferences::Preferences(QWidget *parent) :
 //    ui->TCU_LIST->addItem("#3 50ps step");
     ui->TCU_LIST->addItem("40ps step");
     ui->TCU_LIST->addItem("10ps step");
+    ui->TCU_LIST->addItem("4-gate");
     ui->TCU_LIST->installEventFilter(this);
     connect(ui->TCU_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
             [this](int index){
@@ -474,6 +580,17 @@ void Preferences::data_exchange(bool read)
         laser_on |= ui->LASER_CHK_2->isChecked() << 1;
         laser_on |= ui->LASER_CHK_3->isChecked() << 2;
         laser_on |= ui->LASER_CHK_4->isChecked() << 3;
+
+        // Read TCU gate mapping
+        QComboBox* gate_combos[4] = {ui->GATE_1_COMBO, ui->GATE_2_COMBO, ui->GATE_3_COMBO, ui->GATE_4_COMBO};
+        for (int i = 0; i < 4; i++) {
+            QString text = gate_combos[i]->currentText();
+            if (text.isEmpty()) {
+                cam_to_gate[i] = 0;
+            } else {
+                cam_to_gate[i] = text[0].toLatin1() - 'A' + 1;  // A->1, B->2, C->3, D->4
+            }
+        }
     }
     else {
         ui->GAMMA_EDIT->setText(QString::number(gamma, 'f', 2));
@@ -506,6 +623,23 @@ void Preferences::data_exchange(bool read)
         ui->LASER_CHK_2->setChecked(laser_on & 0b0010);
         ui->LASER_CHK_3->setChecked(laser_on & 0b0100);
         ui->LASER_CHK_4->setChecked(laser_on & 0b1000);
+
+        // Write TCU gate mapping
+        QComboBox* gate_combos[4] = {ui->GATE_1_COMBO, ui->GATE_2_COMBO, ui->GATE_3_COMBO, ui->GATE_4_COMBO};
+        for (int i = 0; i < 4; i++) {
+            gate_combos[i]->blockSignals(true);
+            if (cam_to_gate[i] == 0) {
+                gate_combos[i]->setCurrentIndex(0);  // Empty
+            } else {
+                int idx = gate_combos[i]->findText(QString(char('A' + cam_to_gate[i] - 1)));
+                if (idx >= 0) {
+                    gate_combos[i]->setCurrentIndex(idx);
+                } else {
+                    gate_combos[i]->setCurrentIndex(0);
+                }
+            }
+            gate_combos[i]->blockSignals(false);
+        }
     }
 }
 

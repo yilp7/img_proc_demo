@@ -60,6 +60,7 @@ public:
         bool ebus = false;
         bool share_tcu_port = false;
         int ptz_type = 0;
+        int cam_to_gate[4] = {1, 2, 3, 4};  // Camera to TCU gate mapping (0=none, 1=A, 2=B, 3=C, 4=D)
     };
 
     struct ConfigData {

@@ -510,22 +510,22 @@
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>0</y>
+      <y>-1312</y>
       <width>324</width>
-      <height>1620</height>
+      <height>1650</height>
      </rect>
     </property>
     <property name="minimumSize">
      <size>
       <width>320</width>
-      <height>1620</height>
+      <height>1650</height>
      </size>
     </property>
     <widget class="Line" name="SEP_1">
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>310</y>
+       <y>380</y>
        <width>271</width>
        <height>20</height>
       </rect>
@@ -538,7 +538,7 @@
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>560</y>
+       <y>610</y>
        <width>271</width>
        <height>20</height>
       </rect>
@@ -551,7 +551,7 @@
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>1120</y>
+       <y>1130</y>
        <width>271</width>
        <height>20</height>
       </rect>
@@ -579,7 +579,7 @@
        <x>20</x>
        <y>10</y>
        <width>291</width>
-       <height>301</height>
+       <height>381</height>
       </rect>
      </property>
      <property name="frameShape">
@@ -803,12 +803,181 @@
        </rect>
       </property>
      </widget>
+     <widget class="QLabel" name="TCU_GATE_LABEL">
+      <property name="geometry">
+       <rect>
+        <x>40</x>
+        <y>295</y>
+        <width>120</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>TCU Gate Mapping</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="CAM_1_LABEL">
+      <property name="geometry">
+       <rect>
+        <x>40</x>
+        <y>320</y>
+        <width>40</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>cam-1:</string>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="GATE_1_COMBO">
+      <property name="geometry">
+       <rect>
+        <x>85</x>
+        <y>318</y>
+        <width>32</width>
+        <height>21</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="CAM_1_ENABLE_CHK">
+      <property name="geometry">
+       <rect>
+        <x>120</x>
+        <y>318</y>
+        <width>21</width>
+        <height>21</height>
+       </rect>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+     </widget>
+     <widget class="QLabel" name="CAM_2_LABEL">
+      <property name="geometry">
+       <rect>
+        <x>160</x>
+        <y>320</y>
+        <width>40</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>cam-2:</string>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="GATE_2_COMBO">
+      <property name="geometry">
+       <rect>
+        <x>205</x>
+        <y>318</y>
+        <width>32</width>
+        <height>21</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="CAM_2_ENABLE_CHK">
+      <property name="geometry">
+       <rect>
+        <x>240</x>
+        <y>318</y>
+        <width>21</width>
+        <height>21</height>
+       </rect>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+     </widget>
+     <widget class="QLabel" name="CAM_3_LABEL">
+      <property name="geometry">
+       <rect>
+        <x>40</x>
+        <y>345</y>
+        <width>40</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>cam-3:</string>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="GATE_3_COMBO">
+      <property name="geometry">
+       <rect>
+        <x>85</x>
+        <y>343</y>
+        <width>32</width>
+        <height>21</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="CAM_3_ENABLE_CHK">
+      <property name="geometry">
+       <rect>
+        <x>120</x>
+        <y>343</y>
+        <width>21</width>
+        <height>21</height>
+       </rect>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+     </widget>
+     <widget class="QLabel" name="CAM_4_LABEL">
+      <property name="geometry">
+       <rect>
+        <x>160</x>
+        <y>345</y>
+        <width>40</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>cam-4:</string>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="GATE_4_COMBO">
+      <property name="geometry">
+       <rect>
+        <x>205</x>
+        <y>343</y>
+        <width>32</width>
+        <height>21</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="CAM_4_ENABLE_CHK">
+      <property name="geometry">
+       <rect>
+        <x>240</x>
+        <y>343</y>
+        <width>21</width>
+        <height>21</height>
+       </rect>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+     </widget>
     </widget>
     <widget class="QFrame" name="SERIAL_PORTS_GRP">
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>330</y>
+       <y>390</y>
        <width>291</width>
        <height>231</height>
       </rect>
@@ -980,7 +1149,7 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>580</y>
+       <y>620</y>
        <width>291</width>
        <height>361</height>
       </rect>
@@ -2071,7 +2240,7 @@
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>940</y>
+       <y>970</y>
        <width>271</width>
        <height>20</height>
       </rect>
@@ -2084,7 +2253,7 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>960</y>
+       <y>980</y>
        <width>291</width>
        <height>161</height>
       </rect>
