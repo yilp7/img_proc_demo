@@ -1,6 +1,7 @@
 #include "visual/userpanel.h"
 #include "util/version.h"
-#include "automation/autoscan.h"
+// NOTE: AutoScan feature temporarily disabled - classes exist but integration incomplete
+// #include "automation/autoscan.h"
 
 //#define _DEBUG
 //#include "vld.h"
@@ -218,18 +219,26 @@ int main(int argc, char *argv[])
 
     // Parse command line arguments
     QStringList args = a.arguments();
-    
-    // Create AutoScan controller
+
+    // NOTE: AutoScan feature temporarily disabled - uncomment when ready to implement
+    // AutoScan integration requires handler methods in UserPanel:
+    // - handle_camera_initialization()
+    // - handle_scan_preset_application()
+    // - handle_scan_start()
+    /*
     AutoScan autoScan;
     autoScan.set_command_line_args(args);
-    
+    */
+
     UserPanel w;
-    w.set_auto_scan_controller(&autoScan);
-    
+    // w.set_auto_scan_controller(&autoScan);
+
+    /*
     // Connect UserPanel initialization complete signal to AutoScan
     QObject::connect(&w, &UserPanel::initialization_complete,
                      &autoScan, &AutoScan::on_initialization_complete);
-    
+    */
+
     w.init();
     w.show();
     

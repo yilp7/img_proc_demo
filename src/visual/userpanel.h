@@ -25,7 +25,8 @@
 #include "visual/presetpanel.h"
 #include "visual/serialserver.h"
 #include "util/config.h"
-#include "automation/autoscan.h"
+// NOTE: AutoScan feature temporarily disabled
+// #include "automation/autoscan.h"
 
 #include "port/tcu.h"
 #include "port/lens.h"
@@ -106,10 +107,11 @@ public:
     ~UserPanel();
 
     void init();
-    
-    // Auto-scan support
-    void set_command_line_args(const QStringList& args);
-    void set_auto_scan_controller(class AutoScan* autoScan);
+
+    // NOTE: AutoScan feature temporarily disabled
+    // Auto-scan support - uncomment when handler methods are implemented
+    // void set_command_line_args(const QStringList& args);
+    // void set_auto_scan_controller(class AutoScan* autoScan);
 
     int grab_thread_process(int *display_idx);
     void swap_grab_thread_display(int display_idx1, int display_idx2);
@@ -353,8 +355,9 @@ signals:
     // pause / continue scan
     void update_scan(bool show);
 
-    // signal that initialization is complete
-    void initialization_complete();
+    // NOTE: AutoScan feature temporarily disabled
+    // Signal that initialization is complete (for AutoScan integration)
+    // void initialization_complete();
 
     // queue update_delay, mcp in thread
     void update_delay_in_thread();
@@ -678,9 +681,10 @@ private:
     // TODO move to addons
     PluginInterface*        pluginInterface;            // for ir with visible light
 
-    // Auto-scan support
-    QStringList             m_command_line_args;
-    class AutoScan*         m_auto_scan_controller;
+    // NOTE: AutoScan feature temporarily disabled
+    // Auto-scan support - uncomment when handler methods are implemented
+    // QStringList             m_command_line_args;
+    // class AutoScan*         m_auto_scan_controller;
 
 };
 #endif // USERPANEL_H

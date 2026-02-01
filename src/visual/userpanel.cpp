@@ -187,8 +187,9 @@ UserPanel::UserPanel(QWidget *parent) :
     ptz_speed(32),
     angle_h(0),
     angle_v(0),
-    alt_ctrl_grp(NULL),
-    m_auto_scan_controller(nullptr)
+    alt_ctrl_grp(NULL)
+    // NOTE: AutoScan feature temporarily disabled
+    // m_auto_scan_controller(nullptr)
 {
     ui->setupUi(this);
 
@@ -1895,8 +1896,9 @@ void UserPanel::enable_controls(bool cam_rdy) {
     ui->INFO_CHECK->setEnabled(start_grabbing);
     ui->CENTER_CHECK->setEnabled(start_grabbing);
 
-    // Signal that initialization is complete
-    emit initialization_complete();
+    // NOTE: AutoScan feature temporarily disabled
+    // Signal that initialization is complete (for AutoScan integration)
+    // emit initialization_complete();
 }
 
 void UserPanel::init_control_port()
@@ -6591,7 +6593,9 @@ void UserPanel::on_PSEUDOCOLOR_CHK_stateChanged(int arg1)
     image_mutex[0].unlock();
 }
 
-// Auto-scan support methods
+// NOTE: AutoScan feature temporarily disabled
+// Auto-scan support methods - uncomment when handler methods are implemented
+/*
 void UserPanel::set_command_line_args(const QStringList& args)
 {
     m_command_line_args = args;
@@ -6601,5 +6605,6 @@ void UserPanel::set_auto_scan_controller(AutoScan* autoScan)
 {
     m_auto_scan_controller = autoScan;
 }
+*/
 
 
