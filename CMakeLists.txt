@@ -34,6 +34,8 @@ if(WIN32)
     set(OpenCV_DIR "${SDK_DIR}/opencv")
     set(FFmpeg_DIR "${SDK_DIR}/ffmpeg")
     set(GCAN_DIR "${SDK_DIR}/GCAN")
+    # YOLO/ONNX Runtime configuration (using SDK)
+    set(ONNXRUNTIME_DIR "${SDK_DIR}/onnxruntime-gpu")
 else()
     set(OpenCV_DIR "/opt/OpenCV4.8.0")
     set(FFmpeg_DIR "/opt/FFmpeg5.1.3")
@@ -84,6 +86,7 @@ if(WIN32)
     include_directories(${EIGEN_DIR}/include)
     include_directories(${JSON_DIR}/include)
     include_directories(${GCAN_DIR}/include)
+    include_directories(${ONNXRUNTIME_DIR}/include/win)
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         link_directories(${Hik_SDK_DIR}/lib/x64)
@@ -97,6 +100,7 @@ if(WIN32)
         endif()
         link_directories(${eBUS_DIR}/lib)
         link_directories(${GCAN_DIR}/lib)
+        link_directories(${ONNXRUNTIME_DIR}/lib/x64)
     else()
         link_directories(${Hik_SDK_DIR}/lib/x86)
         link_directories(${HQV_DIR}/lib)
@@ -200,6 +204,11 @@ set(SOURCE_FILES
     src/automation/scanpreset.cpp
     src/automation/autoscan.h
     src/automation/autoscan.cpp
+    src/yolo/yolo_detector.h
+    src/yolo/yolo_detector.cpp
+    src/yolo/inference.h
+    src/yolo/inference.cpp
+    src/yolo/yolo_app_config.h
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss
@@ -288,7 +297,7 @@ if(WIN32)
         opencv_imgcodecs454
         opencv_imgproc454
         opencv_videoio454
-#        opencv_dnn454
+        opencv_dnn454
 #        opencv_dnn_superres454
         # ffmpeg
         avcodec
@@ -307,6 +316,8 @@ if(WIN32)
         Bcrypt
         # gcan
         ECanVci64
+        # onnx runtime for yolo
+        onnxruntime
     )
     if(BUILD_STATIC)
         string(LENGTH ${QT_DIR} LEN_QT_DIR)
@@ -398,19 +409,19 @@ if (DISTANCE_3D_VIEW)
 endif(DISTANCE_3D_VIEW)
 target_link_libraries(GLI_params ${PROJECT_LIBS})
 
-add_executable(LvTong WIN32 ${TRANSLATE} ${SOURCE_FILES})
-target_compile_definitions(LvTong PRIVATE LVTONG=1)
-if(USING_CAMERALINK)
-    target_compile_definitions(LvTong PRIVATE USING_CAMERALINK=1)
-endif()
-qt5_use_modules(LvTong Widgets SerialPort Network)
-if (DISTANCE_3D_VIEW)
-    qt5_use_modules(LvTong DataVisualization)
-    target_compile_definitions(LvTong PRIVATE DISTANCE_3D_VIEW=1)
-endif(DISTANCE_3D_VIEW)
-if(WIN32)
-    target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn454)
-else()
-    target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn)
-endif()
-target_link_libraries(LvTong ${PROJECT_LIBS})
+#add_executable(LvTong WIN32 ${TRANSLATE} ${SOURCE_FILES})
+#target_compile_definitions(LvTong PRIVATE LVTONG=1)
+#if(USING_CAMERALINK)
+#    target_compile_definitions(LvTong PRIVATE USING_CAMERALINK=1)
+#endif()
+#qt5_use_modules(LvTong Widgets SerialPort Network)
+#if (DISTANCE_3D_VIEW)
+#    qt5_use_modules(LvTong DataVisualization)
+#    target_compile_definitions(LvTong PRIVATE DISTANCE_3D_VIEW=1)
+#endif(DISTANCE_3D_VIEW)
+#if(WIN32)
+#    target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn454)
+#else()
+#    target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn)
+#endif()
+#target_link_libraries(LvTong ${PROJECT_LIBS})

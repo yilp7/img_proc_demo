@@ -90,6 +90,11 @@ bool Config::load_from_file(const QString &filepath)
         m_data.device = device_settings_from_json(root["device"]);
     }
 
+    // Load YOLO settings
+    if (root.contains("yolo") && root["yolo"].is_object()) {
+        m_data.yolo = yolo_settings_from_json(root["yolo"]);
+    }
+
     emit config_loaded();
     return true;
 }
@@ -122,6 +127,9 @@ bool Config::save_to_file(const QString &filepath) const
     
     // Save device settings
     root["device"] = device_settings_to_json(m_data.device);
+
+    // Save YOLO settings
+    root["yolo"] = yolo_settings_to_json(m_data.yolo);
 
     std::ofstream file(filepath.toStdString());
     if (!file.is_open()) {
@@ -347,6 +355,26 @@ Config::DeviceSettings Config::device_settings_from_json(const nlohmann::json &o
     }
     if (obj.contains("ptz_type") && obj["ptz_type"].is_number()) {
         settings.ptz_type = obj["ptz_type"].get<int>();
+    }
+    return settings;
+}
+
+nlohmann::json Config::yolo_settings_to_json(const YoloSettings &settings) const
+{
+    nlohmann::json obj;
+    obj["enabled"] = settings.enabled;
+    obj["config_path"] = settings.config_path.toStdString();
+    return obj;
+}
+
+Config::YoloSettings Config::yolo_settings_from_json(const nlohmann::json &obj) const
+{
+    YoloSettings settings;
+    if (obj.contains("enabled") && obj["enabled"].is_boolean()) {
+        settings.enabled = obj["enabled"].get<bool>();
+    }
+    if (obj.contains("config_path") && obj["config_path"].is_string()) {
+        settings.config_path = QString::fromStdString(obj["config_path"].get<std::string>());
     }
     return settings;
 }

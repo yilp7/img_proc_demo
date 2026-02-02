@@ -690,6 +690,9 @@ void UserPanel::init()
         }
     }
 
+    // Initialize YOLO runtime flag from config
+    m_yolo_enabled = config->get_data().yolo.enabled;
+
     // - set startup focus
     ui->ENUM_BUTTON->click();
     (ui->START_BUTTON->isEnabled() ? ui->START_BUTTON : ui->ENUM_BUTTON)->setFocus();
@@ -936,6 +939,24 @@ int UserPanel::grab_thread_process(int *idx) {
 
     cv::dnn::Net net = cv::dnn::readNet(model_name.toLatin1().constData());
 #endif
+
+    // Initialize YOLO detector for this thread
+    YoloDetector* yolo = nullptr;
+    if (config->get_data().yolo.enabled) {
+        QMutexLocker locker(&m_yolo_init_mutex);
+        if (!m_yolo_detector[thread_idx]) {
+            m_yolo_detector[thread_idx] = new YoloDetector();
+            QString cfg_path = QCoreApplication::applicationDirPath() + "/"
+                             + config->get_data().yolo.config_path;
+            if (!m_yolo_detector[thread_idx]->initialize(cfg_path)) {
+                qWarning() << "Failed to init YOLO for thread" << thread_idx;
+                delete m_yolo_detector[thread_idx];
+                m_yolo_detector[thread_idx] = nullptr;
+            }
+        }
+        yolo = m_yolo_detector[thread_idx];
+    }
+
     while (grab_image[thread_idx]) {
         disp = displays[*idx];
 
@@ -1074,6 +1095,19 @@ int UserPanel::grab_thread_process(int *idx) {
 //                qDebug() << "low" << thresh;
             }
         }
+
+        // YOLO detection on original image
+        std::vector<YoloResult> yolo_results;
+        if (m_yolo_enabled && yolo && yolo->isInitialized() && updated) {
+            cv::Mat det_input;
+            if (img_mem[thread_idx].channels() == 1) {
+                cv::cvtColor(img_mem[thread_idx], det_input, cv::COLOR_GRAY2BGR);
+            } else {
+                det_input = img_mem[thread_idx];
+            }
+            yolo->run(det_input, yolo_results);
+        }
+
 /*
         // tenengrad (sobel) auto-focus
         cv::Sobel(img_mem, sobel, CV_16U, 1, 1);
@@ -1424,6 +1458,11 @@ int UserPanel::grab_thread_process(int *idx) {
             cv::Mat temp_mask = modified_result[thread_idx], result_3d;
             cv::applyColorMap(modified_result[thread_idx], result_3d, pref->colormap);
             result_3d.copyTo(modified_result[thread_idx], temp_mask);
+        }
+
+        // Draw YOLO detection boxes on display image
+        if (!yolo_results.empty()) {
+            draw_yolo_boxes(modified_result[thread_idx], yolo_results);
         }
 
         // display the gray-value histogram of the current grayscale image, or the distance histogram of the current 3D image
@@ -6607,4 +6646,56 @@ void UserPanel::set_auto_scan_controller(AutoScan* autoScan)
 }
 */
 
+void UserPanel::draw_yolo_boxes(cv::Mat& image, const std::vector<YoloResult>& results)
+{
+    if (image.empty() || results.empty()) {
+        return;
+    }
+
+    // Ensure image is 3-channel for colored boxes
+    cv::Mat draw_image;
+    if (image.channels() == 1) {
+        cv::cvtColor(image, draw_image, cv::COLOR_GRAY2BGR);
+    } else {
+        draw_image = image;
+    }
+
+    for (const auto& det : results) {
+        // Use green color for detection boxes
+        cv::Scalar color(0, 255, 0);
+
+        // Draw bounding box
+        cv::rectangle(draw_image, det.box, color, 2);
+
+        // Prepare label text
+        std::string label;
+        if (m_yolo_detector[0] && det.classId < static_cast<int>(m_yolo_detector[0]->getClassNames().size())) {
+            label = m_yolo_detector[0]->getClassNames()[det.classId];
+        } else {
+            label = "class_" + std::to_string(det.classId);
+        }
+        label += ": " + std::to_string(static_cast<int>(det.confidence * 100)) + "%";
+
+        // Calculate text size for background rectangle
+        int baseline = 0;
+        cv::Size text_size = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseline);
+
+        // Draw background rectangle for text
+        cv::rectangle(draw_image,
+                     cv::Point(det.box.x, det.box.y - text_size.height - 5),
+                     cv::Point(det.box.x + text_size.width, det.box.y),
+                     color, -1);
+
+        // Draw label text
+        cv::putText(draw_image, label,
+                   cv::Point(det.box.x, det.box.y - 5),
+                   cv::FONT_HERSHEY_SIMPLEX, 0.5,
+                   cv::Scalar(0, 0, 0), 1);
+    }
+
+    // Copy back if we converted
+    if (image.channels() == 1) {
+        cv::cvtColor(draw_image, image, cv::COLOR_BGR2GRAY);
+    }
+}
 

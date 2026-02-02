@@ -62,6 +62,11 @@ public:
         int ptz_type = 0;
     };
 
+    struct YoloSettings {
+        bool enabled = false;
+        QString config_path = "yolo_config.ini";  // relative to default.json dir
+    };
+
     struct ConfigData {
         QString version;
         ComSettings com_tcu;
@@ -74,6 +79,7 @@ public:
         CameraSettings camera;
         TCUSettings tcu;
         DeviceSettings device;
+        YoloSettings yolo;
 
         ConfigData() {
             version = QString("%1.%2.%3.%4")
@@ -121,6 +127,9 @@ private:
 
     nlohmann::json device_settings_to_json(const DeviceSettings &settings) const;
     DeviceSettings device_settings_from_json(const nlohmann::json &obj) const;
+
+    nlohmann::json yolo_settings_to_json(const YoloSettings &settings) const;
+    YoloSettings yolo_settings_from_json(const nlohmann::json &obj) const;
 
 signals:
     void config_loaded();

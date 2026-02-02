@@ -41,6 +41,7 @@
 #include "thread/controlportthread.h"
 #include "util/threadpool.h"
 #include "plugins/plugininterface.h"
+#include "yolo/yolo_detector.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class UserPanel; }
@@ -685,6 +686,17 @@ private:
     // Auto-scan support - uncomment when handler methods are implemented
     // QStringList             m_command_line_args;
     // class AutoScan*         m_auto_scan_controller;
+
+    // YOLO Detection
+    YoloDetector*           m_yolo_detector[3] = {nullptr, nullptr, nullptr};
+    QMutex                  m_yolo_init_mutex;
+    bool                    m_yolo_enabled = false;  // Runtime flag to enable/disable YOLO
+    void draw_yolo_boxes(cv::Mat& image, const std::vector<YoloResult>& results);
+
+public:
+    // YOLO control methods
+    void set_yolo_enabled(bool enabled) { m_yolo_enabled = enabled; }
+    bool is_yolo_enabled() const { return m_yolo_enabled; }
 
 };
 #endif // USERPANEL_H
