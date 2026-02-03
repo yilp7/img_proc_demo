@@ -470,7 +470,7 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // set up display info (left bottom corner)
     QStringList alt_options_str;
-    alt_options_str << "DATA" << "HIST" << "PTZ" << "ALT" << "ADDON";
+    alt_options_str << "DATA" << "HIST" << "PTZ" << "ALT" << "ADDON" << "HY" << "YOLO";
 //    alt_options_str << "ADDON" << "ALT" << "PTZ" << "HIST" << "DATA";
     ui->MISC_OPTION_1->addItems(alt_options_str);
     ui->MISC_OPTION_2->addItems(alt_options_str);
@@ -690,8 +690,24 @@ void UserPanel::init()
         }
     }
 
-    // Initialize YOLO runtime flag from config
-    m_yolo_enabled = config->get_data().yolo.enabled;
+    // Initialize YOLO comboboxes from config
+    ui->MAIN_MODEL_LIST->setCurrentIndex(config->get_data().yolo.main_display_model);
+    ui->ALT1_MODEL_LIST->setCurrentIndex(config->get_data().yolo.alt1_display_model);
+    ui->ALT2_MODEL_LIST->setCurrentIndex(config->get_data().yolo.alt2_display_model);
+
+    // Connect YOLO combobox signals
+    connect(ui->MAIN_MODEL_LIST, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        config->get_data().yolo.main_display_model = index;
+//        config->auto_save();
+    });
+    connect(ui->ALT1_MODEL_LIST, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        config->get_data().yolo.alt1_display_model = index;
+//        config->auto_save();
+    });
+    connect(ui->ALT2_MODEL_LIST, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        config->get_data().yolo.alt2_display_model = index;
+//        config->auto_save();
+    });
 
     // - set startup focus
     ui->ENUM_BUTTON->click();
@@ -940,22 +956,8 @@ int UserPanel::grab_thread_process(int *idx) {
     cv::dnn::Net net = cv::dnn::readNet(model_name.toLatin1().constData());
 #endif
 
-    // Initialize YOLO detector for this thread
+    // YOLO detector pointer (initialized dynamically in the loop below)
     YoloDetector* yolo = nullptr;
-    if (config->get_data().yolo.enabled) {
-        QMutexLocker locker(&m_yolo_init_mutex);
-        if (!m_yolo_detector[thread_idx]) {
-            m_yolo_detector[thread_idx] = new YoloDetector();
-            QString cfg_path = QCoreApplication::applicationDirPath() + "/"
-                             + config->get_data().yolo.config_path;
-            if (!m_yolo_detector[thread_idx]->initialize(cfg_path)) {
-                qWarning() << "Failed to init YOLO for thread" << thread_idx;
-                delete m_yolo_detector[thread_idx];
-                m_yolo_detector[thread_idx] = nullptr;
-            }
-        }
-        yolo = m_yolo_detector[thread_idx];
-    }
 
     while (grab_image[thread_idx]) {
         disp = displays[*idx];
@@ -1096,9 +1098,68 @@ int UserPanel::grab_thread_process(int *idx) {
             }
         }
 
+        // Check if YOLO model selection has changed and update detector if needed
+        int current_model_selection = 0;
+        if (thread_idx == 0) {
+            current_model_selection = config->get_data().yolo.main_display_model;
+        } else if (thread_idx == 1) {
+            current_model_selection = config->get_data().yolo.alt1_display_model;
+        } else if (thread_idx == 2) {
+            current_model_selection = config->get_data().yolo.alt2_display_model;
+        }
+
+        // If model changed, reinitialize
+        if (current_model_selection != m_yolo_last_model[thread_idx]) {
+            QMutexLocker locker(&m_yolo_init_mutex);
+
+            // Delete old detector
+            if (m_yolo_detector[thread_idx]) {
+                qDebug() << "YOLO model changed for thread" << thread_idx << "- reinitializing";
+                delete m_yolo_detector[thread_idx];
+                m_yolo_detector[thread_idx] = nullptr;
+                yolo = nullptr;
+            }
+
+            // Create new detector if selection is not None
+            if (current_model_selection > 0) {
+                m_yolo_detector[thread_idx] = new YoloDetector();
+                QString app_dir = QCoreApplication::applicationDirPath() + "/";
+                QString cfg_path = app_dir + config->get_data().yolo.config_path;
+
+                QString model_path, classes_file;
+                switch (current_model_selection) {
+                    case 1:  // Visible Light
+                        model_path = app_dir + config->get_data().yolo.visible_model_path;
+                        classes_file = app_dir + config->get_data().yolo.visible_classes_file;
+                        break;
+                    case 2:  // Thermal
+                        model_path = app_dir + config->get_data().yolo.thermal_model_path;
+                        classes_file = app_dir + config->get_data().yolo.thermal_classes_file;
+                        break;
+                    case 3:  // Gated
+                        model_path = app_dir + config->get_data().yolo.gated_model_path;
+                        classes_file = app_dir + config->get_data().yolo.gated_classes_file;
+                        break;
+                }
+
+                if (!model_path.isEmpty() && m_yolo_detector[thread_idx]->initialize(cfg_path, model_path, classes_file)) {
+                    yolo = m_yolo_detector[thread_idx];
+                    qDebug() << "YOLO detector reloaded for thread" << thread_idx << "with model" << current_model_selection;
+                } else {
+                    qWarning() << "Failed to reload YOLO for thread" << thread_idx << "- will not retry";
+                    delete m_yolo_detector[thread_idx];
+                    m_yolo_detector[thread_idx] = nullptr;
+                    yolo = nullptr;
+                }
+            }
+
+            // Always update tracking to prevent continuous retry
+            m_yolo_last_model[thread_idx] = current_model_selection;
+        }
+
         // YOLO detection on original image
         std::vector<YoloResult> yolo_results;
-        if (m_yolo_enabled && yolo && yolo->isInitialized() && updated) {
+        if (yolo && yolo->isInitialized() && updated) {
             cv::Mat det_input;
             if (img_mem[thread_idx].channels() == 1) {
                 cv::cvtColor(img_mem[thread_idx], det_input, cv::COLOR_GRAY2BGR);
@@ -2092,16 +2153,32 @@ void UserPanel::save_to_file(bool save_result, int idx) {
     cv::Mat result_image;
     if (pref->save_in_grayscale) cv::cvtColor(*temp, result_image, cv::COLOR_RGB2GRAY);
     else                         result_image = temp->clone();
+
     if (save_result) {
         QString dt = QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz");
         if (pref->split) {
-            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp"))) emit task_queue_full();
-            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp"))) emit task_queue_full();
-            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, result_image(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp"))) emit task_queue_full();
-            if (!tp.append_task(std::bind(ImageIO::save_image_bmp, result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp"))) emit task_queue_full();
+            if (pref->integrate_info) {
+                QString tcu_note = QString::fromStdString(p_tcu->to_json().dump());
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp", tcu_note))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp", tcu_note))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp", tcu_note))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp", tcu_note))) emit task_queue_full();
+            } else {
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp"))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp"))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp"))) emit task_queue_full();
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp"))) emit task_queue_full();
+            }
         }
         switch (pref->img_format){
-        case 0: if (!tp.append_task(std::bind(ImageIO::save_image_bmp, result_image, save_location + "/res_bmp/" + dt + ".bmp"))) emit task_queue_full(); break;
+        case 0:
+            if (pref->integrate_info) {
+                QString tcu_note = QString::fromStdString(p_tcu->to_json().dump());
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image, save_location + "/res_bmp/" + dt + ".bmp", tcu_note))) emit task_queue_full();
+            } else {
+                if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image, save_location + "/res_bmp/" + dt + ".bmp"))) emit task_queue_full();
+            }
+            break;
         case 1: if (!tp.append_task(std::bind(ImageIO::save_image_jpg, result_image, save_location + "/res_bmp/" + dt + ".jpg"))) emit task_queue_full(); break;
         default: break;
         }
@@ -2109,7 +2186,14 @@ void UserPanel::save_to_file(bool save_result, int idx) {
         switch (pixel_depth[0]) {
         case  8:
             switch (pref->img_format){
-            case 0: if (!tp.append_task(std::bind(ImageIO::save_image_bmp, result_image, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full(); break;
+            case 0:
+                if (pref->integrate_info) {
+                    QString tcu_note = QString::fromStdString(p_tcu->to_json().dump());
+                    if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", tcu_note))) emit task_queue_full();
+                } else {
+                    if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
+                }
+                break;
             case 1: if (!tp.append_task(std::bind(ImageIO::save_image_jpg, result_image, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".jpg"))) emit task_queue_full(); break;
             default: break;
             }
@@ -2134,13 +2218,18 @@ void UserPanel::save_scan_img(QString path, QString name) {
 //        cv::imwrite(temp.toLatin1().data(), img_mem);
 //        QFile::rename(temp, dest);
 //        if (ui->TITLE->prog_settings->save_scan_ori) QPixmap::fromImage(QImage(img_mem.data, img_mem.cols, img_mem.rows, img_mem.step, QImage::Format_Indexed8)).save(save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp", "BMP");
+
     if (scan_config->capture_scan_ori) {
 //            std::thread t_ori(save_image_bmp, img_mem, save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%dns", delay_a_n + delay_a_u * 1000)) + ".bmp");
 //            t_ori.detach();
 //            tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
 //            tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", p_tcu->get(TCU::DELAY_A))) + ".bmp"));
-        tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), path + "/ori_bmp/" + name));
-
+        if (pref->integrate_info) {
+            QString tcu_note = QString::fromStdString(p_tcu->to_json().dump());
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), img_mem[0].clone(), path + "/ori_bmp/" + name, tcu_note));
+        } else {
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), img_mem[0].clone(), path + "/ori_bmp/" + name));
+        }
     }
 //        dest = QString(save_location + "/" + scan_name + "/res_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
 //        cv::imwrite(temp.toLatin1().data(), modified_result);
@@ -2151,11 +2240,23 @@ void UserPanel::save_scan_img(QString path, QString name) {
 //            t_res.detach();
 //            tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
 //            tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", p_tcu->get(TCU::DELAY_A))) + ".bmp"));
-        tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), path + "/res_bmp/" + name));
+        if (pref->integrate_info) {
+            QString tcu_note = QString::fromStdString(p_tcu->to_json().dump());
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), modified_result[0].clone(), path + "/res_bmp/" + name, tcu_note));
+        } else {
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), modified_result[0].clone(), path + "/res_bmp/" + name));
+        }
     }
 
 //    qDebug() << "####################" << thread_idx;
-    if (grab_image[1]) tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[1].clone(), path + "/alt_bmp/" + name));
+    if (grab_image[1]) {
+        if (pref->integrate_info) {
+            QString tcu_note = QString::fromStdString(p_tcu->to_json().dump());
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), img_mem[1].clone(), path + "/alt_bmp/" + name, tcu_note));
+        } else {
+            tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), img_mem[1].clone(), path + "/alt_bmp/" + name));
+        }
+    }
 }
 
 void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, int baud_rate) {
@@ -6137,7 +6238,7 @@ void UserPanel::ptz_button_pressed(int id) {
         break;
     case 2: // udp-scw370
         {
-            float velocity = ui->PTZ_SPEED_SLIDER->value() / 4.0f; // 1-64 slider -> 0.25-16 deg/s
+            float velocity = ui->PTZ_SPEED_SLIDER->value() / 2.0f; // 1-64 slider -> 0.5-32 deg/s
             switch (id) {
             case 0: // UP_LEFT
                 p_udpptz->set_velocities(-velocity, velocity); // left, up
@@ -6191,9 +6292,9 @@ void UserPanel::ptz_button_released(int id) {
     case 0: emit send_ptz_msg(PTZ::STOP); break;
     case 1: p_usbcan->emit control(USBCAN::STOP, 0); break;
     case 2:
-//        p_udpptz->set_velocities(0, 0);
-//        p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
-        p_udpptz->emit transmit_data(UDPPTZ::STANDBY);
+        p_udpptz->set_velocities(0, 0);
+        p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
+//        p_udpptz->emit transmit_data(UDPPTZ::STANDBY);
         break;
     }
 }

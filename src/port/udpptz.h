@@ -8,6 +8,8 @@ class UDPPTZ : public QObject
     Q_OBJECT
 public:
     enum OPERATION {
+        // PTZ operations
+        STOP            = 0x00,
         STANDBY         = 0x01,
         RETURN_ZERO     = 0x02,
         SCAN            = 0x03,
@@ -15,6 +17,41 @@ public:
         ANGLE_POSITION  = 0x07,
         ANGLE_H         = 0x08,
         ANGLE_V         = 0x09,
+
+        // Visible light operations
+        VL_DEFOG_ON     = 0x23,
+        VL_DEFOG_OFF    = 0x24,
+        VL_ZOOM_IN      = 0x25,
+        VL_ZOOM_OUT     = 0x26,
+        VL_FOCUS_FAR    = 0x27,
+        VL_FOCUS_NEAR   = 0x28,
+
+        // Laser ranging
+        LASER_ON        = 0x2D,
+        LASER_OFF       = 0x2E,
+
+        // Video tracking gates
+        TRACK_GATE_128  = 0x30,
+        TRACK_GATE_64   = 0x31,
+        TRACK_GATE_32   = 0x32,
+
+        // Video source switching
+        SWITCH_VL       = 0x33,
+        SWITCH_IR       = 0x34,
+        OSD_FULL        = 0x35,
+        OSD_HALF        = 0x36,
+        OSD_HIDE        = 0x37,
+
+        // Infrared operations
+        IR_ZOOM_IN      = 0x41,
+        IR_ZOOM_OUT     = 0x42,
+        IR_FOCUS_FAR    = 0x43,
+        IR_FOCUS_NEAR   = 0x44,
+        IR_POWER_ON     = 0x47,
+        IR_POWER_OFF    = 0x48,
+        IR_AUTO_FOCUS   = 0x49,
+        IR_WHITE_HOT    = 0x87,
+        IR_BLACK_HOT    = 0x88,
     };
 
     explicit UDPPTZ();
@@ -50,6 +87,7 @@ signals:
     void connection_status_changed(bool connected);
 
 private:
+//    QByteArray create_command_frame(qint32 op, float horizontal = 0, float vertical = 0, float scan_range = 326.39);
     QByteArray create_command_frame(qint32 op, float horizontal = 0, float vertical = 0, float scan_range = 0);
     uchar calculate_checksum(const QByteArray &data);
     void parse_status_frame(const QByteArray &data);

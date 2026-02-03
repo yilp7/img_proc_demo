@@ -2174,7 +2174,7 @@
      </widget>
      <widget class="QCheckBox" name="INTEGRATE_INFO_CHK">
       <property name="enabled">
-       <bool>false</bool>
+       <bool>true</bool>
       </property>
       <property name="geometry">
        <rect>
@@ -2186,6 +2186,9 @@
       </property>
       <property name="text">
        <string>Integrate info in file</string>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
       </property>
      </widget>
      <widget class="QComboBox" name="IMG_FORMAT_LST">

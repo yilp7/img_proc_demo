@@ -34,6 +34,7 @@ Preferences::Preferences(QWidget *parent) :
     custom_topleft_info(false),
     save_in_grayscale(false),
     consecutive_capture(true),
+    integrate_info(true),
     img_format(0),
     accu_base(1),
     gamma(1.2),
@@ -339,6 +340,8 @@ Preferences::Preferences(QWidget *parent) :
             [this](int arg1){ custom_topleft_info = arg1; ui->CUSTOM_INFO_EDT->setEnabled(arg1); });
     connect(ui->GRAYSCALE_CHK, &QCheckBox::stateChanged, this,
             [this](int arg1){ save_in_grayscale = arg1; });
+    connect(ui->INTEGRATE_INFO_CHK, &QCheckBox::stateChanged, this,
+            [this](int arg1){ integrate_info = arg1; });
     ui->IMG_FORMAT_LST->addItem("bmp/tiff");
     ui->IMG_FORMAT_LST->addItem("jpg");
     ui->IMG_FORMAT_LST->setCurrentIndex(0);

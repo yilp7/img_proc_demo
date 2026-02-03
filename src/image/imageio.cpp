@@ -83,6 +83,91 @@ void ImageIO::save_image_bmp(cv::Mat img, QString filename)
     }
 }
 
+void ImageIO::save_image_bmp(cv::Mat img, QString filename, QString note)
+{
+    // Write BMP and note in a single file operation
+    if (img.channels() == 3) cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
+
+    FILE *f = fopen(filename.toLocal8Bit().constData(), "wb");
+    if (f) {
+        // Write standard BMP header and data
+        static ushort signature = 'MB';
+        fwrite(&signature, 2, 1, f);
+        uint offset = (img.channels() == 1 ? 4 * (1 << img.channels() * 8) : 0) + 54;
+        uint file_size = img.total() * img.channels() + offset;
+        fwrite(&file_size, 4, 1, f);
+        static ushort reserved1 = 0, reserved2 = 0;
+        fwrite(&reserved1, 2, 1, f);
+        fwrite(&reserved2, 2, 1, f);
+        fwrite(&offset, 4, 1, f);
+        static uint dib_size = 40;
+        fwrite(&dib_size, 4, 1, f);
+        uint w = img.cols, h = img.rows;
+        fwrite(&w, 4, 1, f);
+        fwrite(&h, 4, 1, f);
+        static ushort planes = 1;
+        fwrite(&planes, 2, 1, f);
+        ushort bit_per_pixel = 8 * img.channels();
+        fwrite(&bit_per_pixel, 2, 1, f);
+        static uint compression = 0;
+        fwrite(&compression, 4, 1, f);
+        uint img_size = img.total() * img.channels();
+        fwrite(&img_size, 4, 1, f);
+        static uint pixels_in_meter_x = 0, pixels_in_meter_y = 0;
+        fwrite(&pixels_in_meter_x, 4, 1, f);
+        fwrite(&pixels_in_meter_y, 4, 1, f);
+        static uint colors_important = 0, colors_used = 0;
+        fwrite(&colors_important, 4, 1, f);
+        fwrite(&colors_used, 4, 1, f);
+
+        // Color table for grayscale images
+        static uchar empty = 0;
+        if (img.channels() == 1) {
+            for (int i = 0; i < 1 << img.channels() * 8; i++) {
+                fwrite(&i, 1, 1, f);     // r
+                fwrite(&i, 1, 1, f);     // g
+                fwrite(&i, 1, 1, f);     // b
+                fwrite(&empty, 1, 1, f); // null
+            }
+        }
+
+        // Write pixel data
+        static uint padding = 0;
+        int padding_size = (4 - img.step % 4) % 4;
+        for(int i = img.rows - 1; i >= 0; i--) {
+            fwrite(img.data + i * img.step, 1, img.step, f);
+            fwrite(&padding, 1, padding_size, f);
+        }
+
+        // If note is provided, append the custom block immediately
+        if (!note.isEmpty()) {
+            // Custom block format
+            const char magic[] = "NOTE";
+            fwrite(magic, 1, 4, f);
+
+            // Get current timestamp
+            uint64_t timestamp = QDateTime::currentDateTime().toMSecsSinceEpoch();
+
+            // Convert QString to UTF-8 bytes
+            QByteArray noteBytes = note.toUtf8();
+            uint32_t totalSize = sizeof(timestamp) + noteBytes.size();
+            fwrite(&totalSize, 4, 1, f);
+
+            // Write timestamp
+            fwrite(&timestamp, sizeof(timestamp), 1, f);
+
+            // Write the note content
+            fwrite(noteBytes.constData(), 1, noteBytes.size(), f);
+
+            // Write end marker
+            const char endMarker[] = "END\0";
+            fwrite(endMarker, 1, 4, f);
+        }
+
+        fclose(f);
+    }
+}
+
 void ImageIO::save_image_tif(cv::Mat img, QString filename)
 {
     uint32_t w = img.cols, h = img.rows, channel = img.channels();

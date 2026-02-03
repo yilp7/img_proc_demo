@@ -9,6 +9,7 @@ public:
     ImageIO();
 
     static void save_image_bmp(cv::Mat img, QString filename);
+    static void save_image_bmp(cv::Mat img, QString filename, QString note);
     static void save_image_tif(cv::Mat img, QString filename);
     static bool load_image_tif(cv::Mat &img, QString filename);
     static void save_image_jpg(cv::Mat img, QString filename);

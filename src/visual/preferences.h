@@ -128,6 +128,7 @@ public:
     bool             custom_topleft_info;
     bool             save_in_grayscale;
     bool             consecutive_capture;
+    bool             integrate_info; // Save TCU params as BMP note
     int              img_format; // 0: bmp/tiff, 1: jpg
 
     // 5 img proc
