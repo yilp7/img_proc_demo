@@ -18,23 +18,18 @@ YoloDetector::~YoloDetector()
     }
 }
 
-bool YoloDetector::initialize(const QString& config_ini_path)
+bool YoloDetector::initialize(const QString& config_ini_path, const QString& model_path, const QString& classes_file)
 {
     if (m_initialized) {
         return true;
     }
 
-    // Load AppConfig from INI file
+    // Load AppConfig from INI file (general parameters only)
     AppConfig app_config;
     if (!app_config.loadFromFile(config_ini_path.toStdString())) {
         qWarning() << "YoloDetector: Failed to load config from" << config_ini_path;
         return false;
     }
-
-    // Resolve paths relative to config file directory
-    QDir config_dir = QFileInfo(config_ini_path).absoluteDir();
-    QString model_path = config_dir.filePath(QString::fromStdString(app_config.modelPath));
-    QString classes_path = config_dir.filePath(QString::fromStdString(app_config.classesFile));
 
     // Check if model file exists
     if (!QFileInfo::exists(model_path)) {
@@ -43,8 +38,8 @@ bool YoloDetector::initialize(const QString& config_ini_path)
     }
 
     // Load class names
-    if (!loadClassNames(classes_path.toStdString())) {
-        qWarning() << "YoloDetector: Failed to load class names from" << classes_path;
+    if (!loadClassNames(classes_file.toStdString())) {
+        qWarning() << "YoloDetector: Failed to load class names from" << classes_file;
         // Continue without class names - not fatal
     }
 

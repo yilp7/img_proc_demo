@@ -138,6 +138,37 @@ void UDPPTZ::transmit_data(qint32 op)
     case ANGLE_POSITION:
         frame = create_command_frame(ANGLE_POSITION, target_horizontal_angle, target_vertical_angle);
         break;
+
+    // VID_PAGE operations (simple commands, no parameters)
+    case STOP:
+    case VL_DEFOG_ON:
+    case VL_DEFOG_OFF:
+    case VL_ZOOM_IN:
+    case VL_ZOOM_OUT:
+    case VL_FOCUS_FAR:
+    case VL_FOCUS_NEAR:
+    case LASER_ON:
+    case LASER_OFF:
+    case SWITCH_VL:
+    case SWITCH_IR:
+    case OSD_FULL:
+    case OSD_HALF:
+    case OSD_HIDE:
+    case IR_ZOOM_IN:
+    case IR_ZOOM_OUT:
+    case IR_FOCUS_FAR:
+    case IR_FOCUS_NEAR:
+    case IR_POWER_ON:
+    case IR_POWER_OFF:
+    case IR_AUTO_FOCUS:
+    case IR_WHITE_HOT:
+    case IR_BLACK_HOT:
+    case TRACK_GATE_128:
+    case TRACK_GATE_64:
+    case TRACK_GATE_32:
+        frame = create_command_frame(op);
+        break;
+
     default:
         return;
     }

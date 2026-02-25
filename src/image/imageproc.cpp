@@ -803,3 +803,350 @@ void ImageProc::dark_channel(cv::Mat &src, cv::Mat &dark, cv::Mat &inter, int r)
         }
     }
 }
+
+// ============================================================
+//  ECC temporal denoising - static helpers
+// ============================================================
+
+static std::vector<cv::Mat> ecc_buildPyramid(const cv::Mat& img, int levels)
+{
+    std::vector<cv::Mat> pyr(levels);
+    pyr[0] = img;
+    cv::Mat current = img;
+    for (int i = 1; i < levels; ++i) {
+        cv::pyrDown(current, pyr[i]);
+        current = pyr[i];
+    }
+    std::reverse(pyr.begin(), pyr.end());
+    return pyr;
+}
+
+static inline void ecc_insertionSort(float* buf, int N)
+{
+    for (int i = 1; i < N; ++i) {
+        float key = buf[i];
+        int j = i - 1;
+        while (j >= 0 && buf[j] > key) {
+            buf[j + 1] = buf[j];
+            --j;
+        }
+        buf[j + 1] = key;
+    }
+}
+
+static inline float ecc_medianOfSorted(const float* buf, int N)
+{
+    return (N & 1) ? buf[N / 2] : 0.5f * (buf[N / 2 - 1] + buf[N / 2]);
+}
+
+// Map warp_mode index to OpenCV enum
+static int ecc_cv_warp(int mode)
+{
+    const int m[] = { cv::MOTION_TRANSLATION, cv::MOTION_EUCLIDEAN,
+                      cv::MOTION_AFFINE, cv::MOTION_HOMOGRAPHY };
+    return (mode >= 0 && mode < 4) ? m[mode] : cv::MOTION_AFFINE;
+}
+
+static cv::Mat ecc_scaleUpWarp(const cv::Mat& warp, double scale, int warp_mode = 2)
+{
+    cv::Mat out = warp.clone();
+    out.at<float>(0, 2) *= (float)scale;
+    out.at<float>(1, 2) *= (float)scale;
+    if (warp_mode == 3) { // homography
+        out.at<float>(2, 0) /= (float)scale;
+        out.at<float>(2, 1) /= (float)scale;
+    }
+    return out;
+}
+
+static cv::Mat ecc_composeWarp(const cv::Mat& W1, const cv::Mat& W2, int warp_mode = 2)
+{
+    if (warp_mode == 3) { // homography: native 3x3
+        cv::Mat A1 = cv::Mat::eye(3, 3, CV_32F);
+        cv::Mat A2 = cv::Mat::eye(3, 3, CV_32F);
+        W1.copyTo(A1); W2.copyTo(A2);
+        cv::Mat R = A1 * A2;
+        return R.clone();
+    }
+    cv::Mat A1 = cv::Mat::eye(3, 3, CV_32F);
+    cv::Mat A2 = cv::Mat::eye(3, 3, CV_32F);
+    W1.copyTo(A1(cv::Rect(0, 0, 3, 2)));
+    W2.copyTo(A2(cv::Rect(0, 0, 3, 2)));
+    cv::Mat R = A1 * A2;
+    return R(cv::Rect(0, 0, 3, 2)).clone();
+}
+
+static cv::Mat ecc_composeFromChain(
+    const std::deque<cv::Mat>& warps,
+    const std::deque<cv::Mat>& warps_inv,
+    int refLocal, int movLocal,
+    int warp_mode = 2)
+{
+    cv::Mat W = (warp_mode == 3) ? cv::Mat::eye(3, 3, CV_32F)
+                                 : cv::Mat::eye(2, 3, CV_32F);
+
+    if (movLocal > refLocal) {
+        for (int k = movLocal - 1; k >= refLocal; --k)
+            W = ecc_composeWarp(W, warps[k], warp_mode);
+    } else if (movLocal < refLocal) {
+        for (int k = movLocal; k < refLocal; ++k)
+            W = ecc_composeWarp(W, warps_inv[k], warp_mode);
+    }
+
+    return W;
+}
+
+static void ecc_pixelMedianAndMAD(const std::vector<cv::Mat>& stack,
+                                   cv::Mat& outMedian, cv::Mat& outMAD)
+{
+    int N = (int)stack.size();
+    int rows = stack[0].rows, cols = stack[0].cols;
+    outMedian.create(rows, cols, CV_32F);
+    outMAD.create(rows, cols, CV_32F);
+
+    cv::parallel_for_(cv::Range(0, rows), [&](const cv::Range& range) {
+        std::vector<float> buf(N);
+        std::vector<float> absBuf(N);
+
+        for (int r = range.start; r < range.end; ++r) {
+            std::vector<const float*> rowPtrs(N);
+            for (int k = 0; k < N; ++k)
+                rowPtrs[k] = stack[k].ptr<float>(r);
+            float* medRow = outMedian.ptr<float>(r);
+            float* madRow = outMAD.ptr<float>(r);
+
+            for (int c = 0; c < cols; ++c) {
+                for (int k = 0; k < N; ++k)
+                    buf[k] = rowPtrs[k][c];
+                ecc_insertionSort(buf.data(), N);
+                float med = ecc_medianOfSorted(buf.data(), N);
+                medRow[c] = med;
+
+                for (int k = 0; k < N; ++k)
+                    absBuf[k] = std::abs(rowPtrs[k][c] - med);
+                ecc_insertionSort(absBuf.data(), N);
+                madRow[c] = ecc_medianOfSorted(absBuf.data(), N);
+            }
+        }
+    });
+}
+
+static cv::Mat ecc_robustStackFusion(const std::vector<cv::Mat>& stack, int fusion_method = 2)
+{
+    int N = (int)stack.size();
+    if (N == 0) return cv::Mat();
+    if (N == 1) return stack[0].clone();
+
+    std::vector<cv::Mat> fstack(N);
+    for (int k = 0; k < N; ++k) {
+        if (stack[k].type() == CV_32F)
+            fstack[k] = stack[k];
+        else
+            stack[k].convertTo(fstack[k], CV_32F);
+    }
+
+    if (fusion_method == 0) { // mean
+        cv::Mat sum = cv::Mat::zeros(fstack[0].rows, fstack[0].cols, CV_32F);
+        for (int k = 0; k < N; ++k) sum += fstack[k];
+        return sum / (float)N;
+    }
+    if (fusion_method == 1) { // median
+        cv::Mat med, mad;
+        ecc_pixelMedianAndMAD(fstack, med, mad);
+        return med;
+    }
+
+    // fusion_method == 2: median_then_trimmed_mean
+    cv::Mat med, mad;
+    ecc_pixelMedianAndMAD(fstack, med, mad);
+
+    const float epsVal = 1e-12f;
+    const float t = 2.5f;
+
+    cv::Mat sigma = 1.4826f * mad + epsVal;
+    cv::Mat r_abs, thresh, mask, maskF, fallback, w;
+    cv::Mat num = cv::Mat::zeros(med.rows, med.cols, CV_32F);
+    cv::Mat den = cv::Mat::zeros(med.rows, med.cols, CV_32F);
+
+    thresh = t * sigma;
+
+    for (int k = 0; k < N; ++k) {
+        cv::absdiff(fstack[k], med, r_abs);
+        cv::compare(r_abs, thresh, mask, cv::CMP_LE);
+        mask.convertTo(maskF, CV_32F, 1.0 / 255.0);
+
+        r_abs.copyTo(fallback);
+        fallback += epsVal;
+        cv::divide(thresh, fallback, fallback);
+
+        maskF.convertTo(w, CV_32F, -1.0, 1.0);   // w = 1 - maskF
+        cv::multiply(w, fallback, w);              // w = (1 - maskF) * fallback
+        cv::add(w, maskF, w);                      // w = maskF + (1 - maskF) * fallback
+
+        num += w.mul(fstack[k]);
+        den += w;
+    }
+    den += epsVal;
+    cv::divide(num, den, num);
+    return num;
+}
+
+// ============================================================
+//  ImageProc::ecc_register_consecutive
+// ============================================================
+double ImageProc::ecc_register_consecutive(
+    cv::Mat &prev, cv::Mat &curr,
+    cv::Mat &warp_out, cv::Mat &warp_inv_out,
+    cv::Mat &init_warp,
+    int levels, int max_iter, double eps,
+    bool half_res_reg,
+    int warp_mode)
+{
+    const int cvWarp = ecc_cv_warp(warp_mode);
+    const bool is_homography = (warp_mode == 3);
+
+    cv::Mat prevIn = prev, currIn = curr;
+    if (half_res_reg) {
+        cv::pyrDown(prev, prevIn);
+        cv::pyrDown(curr, currIn);
+    }
+
+    std::vector<cv::Mat> prevPyr = ecc_buildPyramid(prevIn, levels);
+    std::vector<cv::Mat> currPyr = ecc_buildPyramid(currIn, levels);
+
+    cv::Mat W = init_warp.empty()
+        ? (is_homography ? cv::Mat::eye(3, 3, CV_32F) : cv::Mat::eye(2, 3, CV_32F))
+        : init_warp.clone();
+
+    // Scale initWarp down to coarsest working resolution
+    int totalDownscales = (half_res_reg ? 1 : 0) + (levels - 1);
+    if (!init_warp.empty()) {
+        for (int s = 0; s < totalDownscales; ++s)
+            W = ecc_scaleUpWarp(W, 0.5, warp_mode);
+    }
+
+    double cc = 0, bestCC = 0;
+
+    for (int L = 0; L < levels; ++L) {
+        cv::Mat prevL, currL;
+        cv::GaussianBlur(prevPyr[L], prevL, cv::Size(0, 0), 1.0);
+        cv::GaussianBlur(currPyr[L], currL, cv::Size(0, 0), 1.0);
+
+        cv::TermCriteria tc(cv::TermCriteria::EPS |
+                            cv::TermCriteria::COUNT, max_iter, eps);
+
+        cv::Mat W_save = W.clone();
+        try {
+            cc = cv::findTransformECC(prevL, currL, W, cvWarp, tc);
+            if (cc > bestCC) bestCC = cc;
+        } catch (...) {
+            W = W_save;
+        }
+
+        if (L < levels - 1)
+            W = ecc_scaleUpWarp(W, 2.0, warp_mode);
+    }
+
+    // Scale warp back to full resolution
+    if (half_res_reg)
+        W = ecc_scaleUpWarp(W, 2.0, warp_mode);
+
+    warp_out = W;
+
+    // Compute inverse
+    if (is_homography) {
+        cv::invert(W, warp_inv_out);
+    } else {
+        cv::Mat A = cv::Mat::eye(3, 3, CV_32F);
+        W.copyTo(A(cv::Rect(0, 0, 3, 2)));
+        cv::Mat Ainv;
+        cv::invert(A, Ainv);
+        warp_inv_out = Ainv(cv::Rect(0, 0, 3, 2)).clone();
+    }
+
+    return bestCC;
+}
+
+// ============================================================
+//  ImageProc::temporal_denoise_fuse
+// ============================================================
+void ImageProc::temporal_denoise_fuse(
+    std::deque<cv::Mat> &buf,
+    std::deque<cv::Mat> &warps,
+    std::deque<cv::Mat> &warps_inv,
+    int target_idx, int backward, int forward,
+    cv::Mat &result,
+    bool half_res_fusion,
+    int warp_mode,
+    int fusion_method)
+{
+    int bufSize = (int)buf.size();
+    if (bufSize == 0) return;
+
+    int left  = std::max(0, target_idx - backward);
+    int right = std::min(bufSize - 1, target_idx + forward);
+
+    const cv::Mat& refFull = buf[target_idx];
+
+    // Prepare reference (optionally at half resolution)
+    cv::Mat ref;
+    cv::Size dstSize;
+    if (half_res_fusion) {
+        cv::pyrDown(refFull, ref);
+        dstSize = ref.size();
+    } else {
+        ref = refFull;
+        dstSize = refFull.size();
+    }
+
+    std::vector<cv::Mat> stack;
+    stack.push_back(ref);
+
+    for (int j = left; j <= right; ++j) {
+        if (j == target_idx) continue;
+
+        // Compose warp from target -> j via chain (full-res coordinates)
+        cv::Mat W = ecc_composeFromChain(warps, warps_inv, target_idx, j, warp_mode);
+
+        // Scale warp to half-res if needed
+        if (half_res_fusion)
+            W = ecc_scaleUpWarp(W, 0.5, warp_mode);
+
+        // Source image (optionally downsampled)
+        cv::Mat src;
+        if (half_res_fusion)
+            cv::pyrDown(buf[j], src);
+        else
+            src = buf[j];
+
+        // Apply warp
+        cv::Mat aligned;
+        if (warp_mode == 3) { // homography
+            cv::warpPerspective(src, aligned, W,
+                                dstSize,
+                                cv::INTER_LINEAR | cv::WARP_INVERSE_MAP,
+                                cv::BORDER_REFLECT);
+        } else {
+            cv::warpAffine(src, aligned, W,
+                            dstSize,
+                            cv::INTER_LINEAR | cv::WARP_INVERSE_MAP,
+                            cv::BORDER_REFLECT);
+        }
+
+        stack.push_back(aligned);
+    }
+
+    // Fuse
+    cv::Mat fusedF = ecc_robustStackFusion(stack, fusion_method);
+    cv::threshold(fusedF, fusedF, 255.0, 255.0, cv::THRESH_TRUNC);
+    cv::threshold(fusedF, fusedF, 0, 0, cv::THRESH_TOZERO);
+
+    // Upscale back to full resolution
+    if (half_res_fusion) {
+        cv::Mat upscaled;
+        cv::pyrUp(fusedF, upscaled, refFull.size());
+        fusedF = upscaled;
+    }
+
+    fusedF.convertTo(result, CV_8U);
+}

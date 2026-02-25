@@ -27,6 +27,11 @@ bool ScanPreset::load_from_file(const QString& filepath)
     QByteArray data = file.readAll();
     file.close();
 
+    if (data.isEmpty()) {
+        set_error(QString("File is empty: %1").arg(filepath));
+        return false;
+    }
+
     try {
         nlohmann::json json = nlohmann::json::parse(data.toStdString());
 

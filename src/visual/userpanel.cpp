@@ -293,7 +293,7 @@ UserPanel::UserPanel(QWidget *parent) :
     enhance_options->addItem(tr("AINDANE"));
     enhance_options->setCurrentIndex(0);
     calc_avg_options->addItem("a");
-    calc_avg_options->addItem("b");
+    calc_avg_options->addItem("ECC");
     calc_avg_options->setCurrentIndex(0);
 
     // - set-up COMs
@@ -445,6 +445,28 @@ UserPanel::UserPanel(QWidget *parent) :
     ptz_grp->addButton(ui->DOWN_RIGHT_BTN, 8);
     connect(ptz_grp, SIGNAL(buttonPressed(int)), this, SLOT(ptz_button_pressed(int)));
     connect(ptz_grp, SIGNAL(buttonReleased(int)), this, SLOT(ptz_button_released(int)));
+
+    // VID_PAGE camera control buttons
+    vid_camera_grp = new QButtonGroup(this);
+    vid_camera_grp->addButton(ui->VL_ZOOM_OUT_BTN, UDPPTZ::VL_ZOOM_OUT);
+    vid_camera_grp->addButton(ui->VL_ZOOM_IN_BTN, UDPPTZ::VL_ZOOM_IN);
+    vid_camera_grp->addButton(ui->VL_FOCUS_FAR_BTN, UDPPTZ::VL_FOCUS_FAR);
+    vid_camera_grp->addButton(ui->VL_FOCUS_NEAR_BTN, UDPPTZ::VL_FOCUS_NEAR);
+    vid_camera_grp->addButton(ui->IR_ZOOM_OUT_BTN, UDPPTZ::IR_ZOOM_OUT);
+    vid_camera_grp->addButton(ui->IR_ZOOM_IN_BTN, UDPPTZ::IR_ZOOM_IN);
+    vid_camera_grp->addButton(ui->IR_FOCUS_FAR_BTN, UDPPTZ::IR_FOCUS_FAR);
+    vid_camera_grp->addButton(ui->IR_FOCUS_NEAR_BTN, UDPPTZ::IR_FOCUS_NEAR);
+    connect(vid_camera_grp, SIGNAL(buttonPressed(int)), this, SLOT(vid_camera_pressed(int)));
+    connect(vid_camera_grp, SIGNAL(buttonReleased(int)), this, SLOT(vid_camera_released()));
+
+    // VID_PAGE toggle buttons
+    connect(ui->VL_DEFOG_BTN, &QPushButton::toggled, this, &UserPanel::vid_defog_toggled);
+    connect(ui->IR_POWER_BTN, &QPushButton::toggled, this, &UserPanel::vid_ir_power_toggled);
+    connect(ui->IR_AUTO_FOCUS_BTN, &QPushButton::clicked, this, &UserPanel::vid_ir_auto_focus_clicked);
+    connect(ui->LDM_BTN, &QPushButton::toggled, this, &UserPanel::vid_ldm_toggled);
+    connect(ui->VIDEO_SOURCE_BTN, &QPushButton::toggled, this, &UserPanel::vid_video_source_toggled);
+    connect(ui->OSD_BTN, &QPushButton::toggled, this, &UserPanel::vid_osd_toggled);
+
     ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
     pref->ui->REFRESH_AVAILABLE_PORTS_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
     ui->SWITCH_TCU_UI_BTN->setIcon(QIcon(":/tools/" + QString(app_theme ? "light" : "dark") + "/switch"));
@@ -470,14 +492,14 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // set up display info (left bottom corner)
     QStringList alt_options_str;
-    alt_options_str << "DATA" << "HIST" << "PTZ" << "ALT" << "ADDON" << "HY" << "YOLO";
+    alt_options_str << "DATA" << "HIST" << "PTZ" << "ALT" << "ADDON" << "VID" << "YOLO";
 //    alt_options_str << "ADDON" << "ALT" << "PTZ" << "HIST" << "DATA";
     ui->MISC_OPTION_1->addItems(alt_options_str);
     ui->MISC_OPTION_2->addItems(alt_options_str);
     ui->MISC_OPTION_3->addItems(alt_options_str);
     ui->MISC_OPTION_1->setCurrentIndex(0);
     ui->MISC_OPTION_2->setCurrentIndex(2);
-    ui->MISC_OPTION_3->setCurrentIndex(3);
+    ui->MISC_OPTION_3->setCurrentIndex(5);
 //    for (int i = 0; i < ui->MISC_OPTION_1->count(); i++) ui->MISC_OPTION_1->setItemData(i, Qt::AlignCenter, Qt::TextAlignmentRole);
 //    for (int i = 0; i < ui->MISC_OPTION_2->count(); i++) ui->MISC_OPTION_1->setItemData(i, Qt::AlignCenter, Qt::TextAlignmentRole);
 //    for (int i = 0; i < ui->MISC_OPTION_3->count(); i++) ui->MISC_OPTION_1->setItemData(i, Qt::AlignCenter, Qt::TextAlignmentRole);
@@ -689,6 +711,9 @@ void UserPanel::init()
             syncConfigToPreferences();
         }
     }
+
+    // Set default PTZ type to udp-scw
+    pref->ui->PTZ_TYPE_LIST->setCurrentIndex(2);
 
     // Initialize YOLO comboboxes from config
     ui->MAIN_MODEL_LIST->setCurrentIndex(config->get_data().yolo.main_display_model);
@@ -928,6 +953,11 @@ int UserPanel::grab_thread_process(int *idx) {
     cv::Mat img_display, prev_img, prev_3d;
     cv::Mat seq[8], seq_sum, frame_a_sum, frame_b_sum;
     int seq_idx = 0;
+    // ECC temporal denoising state
+    std::deque<cv::Mat> fusion_buf;
+    std::deque<cv::Mat> fusion_warps, fusion_warps_inv;
+    cv::Mat fusion_last_warp;
+    int prev_ecc_warp_mode = -1;
     uint hist[256];
     cv::Mat hist_mat, dist_mat;
 //    ProgSettings *settings = ui->TITLE->prog_settings;
@@ -1260,27 +1290,95 @@ int UserPanel::grab_thread_process(int *idx) {
         if (frame_a_sum.empty()) frame_a_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
         if (frame_b_sum.empty()) frame_b_sum = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
         if (ui->FRAME_AVG_CHECK->isChecked()) {
+            int avg_mode = ui->FRAME_AVG_OPTIONS->currentIndex();
+
+            // A/B running sums maintained for 3D reconstruction regardless of mode
+            static bool frame_a = true;
             if (updated) {
-//                calc_avg_option = ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
                 if (seq[7].empty()) for (auto& m: seq) m = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
 
                 seq_sum -= seq[(seq_idx + 4) & 7];
-//                seq_sum -= seq[seq_idx];
-                static bool frame_a = true;
                 if (frame_a) frame_a_sum -= seq[seq_idx];
                 else         frame_b_sum -= seq[seq_idx];
                 img_mem[thread_idx].convertTo(seq[seq_idx], CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
                 seq_sum += seq[seq_idx];
                 if (frame_a) frame_a_sum += seq[seq_idx];
                 else         frame_b_sum += seq[seq_idx];
-//                for(int i = 0; i < calc_avg_option; i++) seq_sum += seq[i];
 
-//                seq_idx = (seq_idx + 1) % calc_avg_option;
                 seq_idx = (seq_idx + 1) & 7;
                 frame_a ^= 1;
             }
-//            seq_sum.convertTo(modified_result, CV_8U, 1. / (calc_avg_option * (1 << (pixel_depth - 8))));
-            seq_sum.convertTo(modified_result[thread_idx], CV_MAKETYPE(CV_8U, is_color[thread_idx] ? 3 : 1), 1. / (4 * (1 << (_pixel_depth - 8))));
+
+            if (avg_mode == 0) {
+                // --- option "a": display from 4-frame running sum ---
+                seq_sum.convertTo(modified_result[thread_idx], CV_MAKETYPE(CV_8U, is_color[thread_idx] ? 3 : 1), 1. / (4 * (1 << (_pixel_depth - 8))));
+            }
+            else {
+                // --- option "ECC": display from temporal denoising ---
+                if (updated) {
+                    // clear state on warp mode change (matrix shape mismatch)
+                    if (pref->ecc_warp_mode != prev_ecc_warp_mode) {
+                        fusion_buf.clear(); fusion_warps.clear(); fusion_warps_inv.clear();
+                        fusion_last_warp.release();
+                        prev_ecc_warp_mode = pref->ecc_warp_mode;
+                    }
+
+                    // convert current frame to grayscale CV_32F [0,255]
+                    cv::Mat gray;
+                    if (is_color[thread_idx]) {
+                        cv::Mat tmp;
+                        img_mem[thread_idx].convertTo(tmp, CV_MAKETYPE(CV_8U, 3), 1. / (1 << (_pixel_depth - 8)));
+                        cv::cvtColor(tmp, gray, cv::COLOR_BGR2GRAY);
+                        gray.convertTo(gray, CV_32F);
+                    } else {
+                        img_mem[thread_idx].convertTo(gray, CV_32F, 255.0 / ((1 << _pixel_depth) - 1));
+                    }
+
+                    // register with previous frame
+                    if (!fusion_buf.empty()) {
+                        cv::Mat warp, warp_inv;
+                        ImageProc::ecc_register_consecutive(
+                            fusion_buf.back(), gray,
+                            warp, warp_inv,
+                            fusion_last_warp,
+                            pref->ecc_levels, pref->ecc_max_iter, pref->ecc_eps,
+                            pref->ecc_half_res_reg,
+                            pref->ecc_warp_mode);
+                        fusion_warps.push_back(warp);
+                        fusion_warps_inv.push_back(warp_inv);
+                        fusion_last_warp = warp.clone();
+                    }
+
+                    // compute effective forward
+                    int ecc_fwd = (pref->ecc_window_mode == 1) ? pref->ecc_backward
+                                : (pref->ecc_window_mode == 2) ? pref->ecc_forward : 0;
+
+                    // push frame to buffer
+                    fusion_buf.push_back(gray);
+                    int max_buf = pref->ecc_backward + 1 + ecc_fwd;
+                    while ((int)fusion_buf.size() > max_buf) {
+                        fusion_buf.pop_front();
+                        if (!fusion_warps.empty()) fusion_warps.pop_front();
+                        if (!fusion_warps_inv.empty()) fusion_warps_inv.pop_front();
+                    }
+
+                    // fuse when we have enough frames
+                    int min_frames = (ecc_fwd > 0) ? pref->ecc_backward + 1 + ecc_fwd : 2;
+                    if ((int)fusion_buf.size() >= min_frames) {
+                        int target = (int)fusion_buf.size() - 1 - ecc_fwd;
+                        ImageProc::temporal_denoise_fuse(
+                            fusion_buf, fusion_warps, fusion_warps_inv,
+                            target, pref->ecc_backward, ecc_fwd,
+                            modified_result[thread_idx],
+                            pref->ecc_half_res_fuse,
+                            pref->ecc_warp_mode,
+                            pref->ecc_fusion_method);
+                    } else {
+                        int show_idx = std::max(0, (int)fusion_buf.size() - 1 - ecc_fwd);
+                        fusion_buf[show_idx].convertTo(modified_result[thread_idx], CV_8U);
+                    }
+                }
+            }
         }
         else {
             if (!seq_sum.empty()) {
@@ -1289,6 +1387,12 @@ int UserPanel::grab_thread_process(int *idx) {
                 frame_a_sum.release();
                 frame_b_sum.release();
                 seq_idx = 0;
+            }
+            if (!fusion_buf.empty()) {
+                fusion_buf.clear();
+                fusion_warps.clear();
+                fusion_warps_inv.clear();
+                fusion_last_warp.release();
             }
             img_mem[thread_idx].convertTo(modified_result[thread_idx], CV_MAKETYPE(CV_8U, is_color[thread_idx] ? 3 : 1), 1. / (1 << (_pixel_depth - 8)));
         }
@@ -3222,7 +3326,7 @@ void UserPanel::update_ptz_status()
         connected = p_usbcan->is_connected();
         is_network = false;
         break;
-    case 2: // udp-scw370 - treat as network connection when connected
+    case 2: // udp-scw - treat as network connection when connected
         connected = p_udpptz->is_connected();
         is_network = true;
         break;
@@ -3237,6 +3341,10 @@ void UserPanel::update_ptz_status()
 
 void UserPanel::set_distance_set(int id)
 {
+    // FIXME: aliasing parameter application temporary banned
+    Q_UNUSED(id);
+    return;
+
     aliasing_mode = true;
     struct AliasingData temp = aliasing->retrieve_data(id);
     aliasing_level = temp.num_period;
@@ -3245,7 +3353,7 @@ void UserPanel::set_distance_set(int id)
 //    setup_hz(hz_unit);
     if (pref->ui->AUTO_REP_FREQ_CHK->isChecked()) pref->ui->AUTO_REP_FREQ_CHK->click();
 //    ptr_tcu->delay_dist = temp.distance;
-    emit send_double_tcu_msg(TCU::EST_DIST, temp.rep_freq);
+    emit send_double_tcu_msg(TCU::EST_DIST, temp.distance);
     update_delay();
 }
 
@@ -4937,11 +5045,10 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
 #endif //DISTANCE_3D_VIEW
             break;
         case Qt::Key_A:
-            // FIXME: aliasing function temporary banned
-            // aliasing->show_ui();
+            aliasing->show_ui();
             break;
         case Qt::Key_D:
-            // aliasing->update_distance(delay_dist);
+            aliasing->update_distance(delay_dist);
             break;
         case Qt::Key_P:
             preset->show_ui();
@@ -6236,7 +6343,7 @@ void UserPanel::ptz_button_pressed(int id) {
         default: break;
         }
         break;
-    case 2: // udp-scw370
+    case 2: // udp-scw
         {
             float velocity = ui->PTZ_SPEED_SLIDER->value() / 2.0f; // 1-64 slider -> 0.5-32 deg/s
             switch (id) {
@@ -6297,6 +6404,91 @@ void UserPanel::ptz_button_released(int id) {
 //        p_udpptz->emit transmit_data(UDPPTZ::STANDBY);
         break;
     }
+}
+
+// VID_PAGE camera control implementations
+void UserPanel::vid_camera_pressed(int operation) {
+    if (!p_udpptz || !p_udpptz->is_connected()) return;
+
+    // Change button text to "x" when pressed
+    QPushButton* btn = qobject_cast<QPushButton*>(vid_camera_grp->button(operation));
+    if (btn) {
+        btn->setText("x");
+    }
+
+    p_udpptz->emit transmit_data(operation);
+}
+
+void UserPanel::vid_camera_released() {
+    if (!p_udpptz || !p_udpptz->is_connected()) return;
+
+    // Restore button text when released
+    ui->VL_ZOOM_OUT_BTN->setText("-");
+    ui->VL_ZOOM_IN_BTN->setText("+");
+    ui->VL_FOCUS_FAR_BTN->setText("-");
+    ui->VL_FOCUS_NEAR_BTN->setText("+");
+    ui->IR_ZOOM_OUT_BTN->setText("-");
+    ui->IR_ZOOM_IN_BTN->setText("+");
+    ui->IR_FOCUS_FAR_BTN->setText("-");
+    ui->IR_FOCUS_NEAR_BTN->setText("+");
+
+    p_udpptz->emit transmit_data(UDPPTZ::STOP);
+}
+
+void UserPanel::vid_defog_toggled(bool checked) {
+    if (!p_udpptz || !p_udpptz->is_connected()) return;
+    p_udpptz->emit transmit_data(checked ? UDPPTZ::VL_DEFOG_ON : UDPPTZ::VL_DEFOG_OFF);
+    // Update button style
+    ui->VL_DEFOG_BTN->setStyleSheet(checked ? "background-color: #5B8C5B;" : "");
+}
+
+void UserPanel::vid_ir_power_toggled(bool checked) {
+    if (!p_udpptz || !p_udpptz->is_connected()) return;
+
+    // Confirm before powering off IR
+    if (!checked) {
+        QMessageBox::StandardButton reply = QMessageBox::question(
+            this, "Confirm", "Power off IR?",
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (reply != QMessageBox::Yes) {
+            ui->IR_POWER_BTN->blockSignals(true);
+            ui->IR_POWER_BTN->setChecked(true);
+            ui->IR_POWER_BTN->blockSignals(false);
+            return;
+        }
+    }
+
+    p_udpptz->emit transmit_data(checked ? UDPPTZ::IR_POWER_ON : UDPPTZ::IR_POWER_OFF);
+    // Update button style
+    ui->IR_POWER_BTN->setStyleSheet(checked ? "background-color: #5B8C5B;" : "");
+}
+
+void UserPanel::vid_ir_auto_focus_clicked() {
+    if (!p_udpptz || !p_udpptz->is_connected()) return;
+    p_udpptz->emit transmit_data(UDPPTZ::IR_AUTO_FOCUS);
+}
+
+void UserPanel::vid_ldm_toggled(bool checked) {
+    if (!p_udpptz || !p_udpptz->is_connected()) return;
+    p_udpptz->emit transmit_data(checked ? UDPPTZ::LASER_ON : UDPPTZ::LASER_OFF);
+    // Update button style and text
+    ui->LDM_BTN->setStyleSheet(checked ? "background-color: #5B8C5B;" : "");
+//    ui->LDM_BTN->setText(checked ? "LDM\nON" : "LDM");
+}
+
+void UserPanel::vid_video_source_toggled(bool checked) {
+    if (!p_udpptz || !p_udpptz->is_connected()) return;
+    p_udpptz->emit transmit_data(checked ? UDPPTZ::SWITCH_IR : UDPPTZ::SWITCH_VL);
+    // Update button text to show current state and next action
+    ui->VIDEO_SOURCE_BTN->setText(checked ? "Switch to VL" : "Switch to IR");
+}
+
+void UserPanel::vid_osd_toggled(bool checked) {
+    if (!p_udpptz || !p_udpptz->is_connected()) return;
+    p_udpptz->emit transmit_data(checked ? UDPPTZ::OSD_FULL : UDPPTZ::OSD_HIDE);
+    // Update button style and text
+    ui->OSD_BTN->setStyleSheet(checked ? "background-color: #5B8C5B;" : "");
+//    ui->OSD_BTN->setText(checked ? "OSD\nON" : "OSD");
 }
 
 void UserPanel::on_PTZ_SPEED_SLIDER_valueChanged(int value)

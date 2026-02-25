@@ -54,7 +54,17 @@ Preferences::Preferences(QWidget *parent) :
     custom_3d_gate_width(0),
     model_idx(0),
     fishnet_recog(false),
-    fishnet_thresh(0.99)
+    fishnet_thresh(0.99),
+    ecc_window_mode(0),
+    ecc_warp_mode(2),
+    ecc_fusion_method(2),
+    ecc_backward(20),
+    ecc_forward(0),
+    ecc_levels(1),
+    ecc_max_iter(8),
+    ecc_eps(0.001),
+    ecc_half_res_reg(true),
+    ecc_half_res_fuse(false)
 {
     ui->setupUi(this);
 
@@ -112,7 +122,7 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->EBUS_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ ebus_cam = arg1; emit search_for_devices(); });
     ui->PTZ_TYPE_LIST->addItem("pelco-p");
     ui->PTZ_TYPE_LIST->addItem("usbcan");
-    ui->PTZ_TYPE_LIST->addItem("udp-scw370");
+    ui->PTZ_TYPE_LIST->addItem("udp-scw");
     ui->PTZ_TYPE_LIST->installEventFilter(this);
     connect(ui->PTZ_TYPE_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
             [this](int index){ ptz_type = index; });
@@ -403,6 +413,24 @@ Preferences::Preferences(QWidget *parent) :
     ui->FISHNET_THRESH_EDIT->hide();
 #endif
     //![5]
+
+    // ECC combo boxes
+    ui->ECC_WINDOW_MODE_LIST->addItem("backward");
+    ui->ECC_WINDOW_MODE_LIST->addItem("balanced");
+    ui->ECC_WINDOW_MODE_LIST->addItem("custom");
+    ui->ECC_WINDOW_MODE_LIST->installEventFilter(this);
+
+    ui->ECC_WARP_MODE_LIST->addItem("translate");
+    ui->ECC_WARP_MODE_LIST->addItem("euclidean");
+    ui->ECC_WARP_MODE_LIST->addItem("affine");
+    ui->ECC_WARP_MODE_LIST->addItem("homography");
+    ui->ECC_WARP_MODE_LIST->installEventFilter(this);
+
+    ui->ECC_FUSION_MODE_LIST->addItem("mean");
+    ui->ECC_FUSION_MODE_LIST->addItem("median");
+    ui->ECC_FUSION_MODE_LIST->addItem("med+trim_mean");
+    ui->ECC_FUSION_MODE_LIST->installEventFilter(this);
+
     data_exchange(false);
 }
 
@@ -437,6 +465,19 @@ void Preferences::data_exchange(bool read)
         fishnet_recog = ui->FISHNET_RECOG_CHK->isChecked();
         fishnet_thresh = ui->FISHNET_THRESH_EDIT->text().toFloat();
 #endif
+
+        ecc_window_mode = ui->ECC_WINDOW_MODE_LIST->currentIndex();
+        ecc_warp_mode = ui->ECC_WARP_MODE_LIST->currentIndex();
+        ecc_fusion_method = ui->ECC_FUSION_MODE_LIST->currentIndex();
+        ecc_backward = ui->ECC_BACKWARD_EDIT->text().toInt();
+        ecc_forward = ui->ECC_FORWARD_EDIT->text().toInt();
+        if (ecc_window_mode == 0) ecc_forward = 0;
+        else if (ecc_window_mode == 1) ecc_forward = ecc_backward;
+        ecc_levels = ui->ECC_LEVELS_EDIT->text().toInt();
+        ecc_max_iter = ui->ECC_MAXITER_EDIT->text().toInt();
+        ecc_eps = ui->ECC_EPS_EDIT->text().toDouble();
+        ecc_half_res_reg = ui->ECC_HALF_REG_CHK->isChecked();
+        ecc_half_res_fuse = ui->ECC_HALF_FUSE_CHK->isChecked();
 
         auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
         ab_lock = ui->AB_LOCK_CHK->isChecked();
@@ -498,6 +539,17 @@ void Preferences::data_exchange(bool read)
         ui->FISHNET_RECOG_CHK->setChecked(fishnet_recog);
         ui->FISHNET_THRESH_EDIT->setText(QString::number(fishnet_thresh, 'f', 2));
 #endif
+
+        ui->ECC_WINDOW_MODE_LIST->setCurrentIndex(ecc_window_mode);
+        ui->ECC_WARP_MODE_LIST->setCurrentIndex(ecc_warp_mode);
+        ui->ECC_FUSION_MODE_LIST->setCurrentIndex(ecc_fusion_method);
+        ui->ECC_BACKWARD_EDIT->setText(QString::number(ecc_backward));
+        ui->ECC_FORWARD_EDIT->setText(QString::number(ecc_forward));
+        ui->ECC_LEVELS_EDIT->setText(QString::number(ecc_levels));
+        ui->ECC_MAXITER_EDIT->setText(QString::number(ecc_max_iter));
+        ui->ECC_EPS_EDIT->setText(QString::number(ecc_eps, 'f', 4));
+        ui->ECC_HALF_REG_CHK->setChecked(ecc_half_res_reg);
+        ui->ECC_HALF_FUSE_CHK->setChecked(ecc_half_res_fuse);
 
         ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
         ui->AB_LOCK_CHK->setChecked(ab_lock);

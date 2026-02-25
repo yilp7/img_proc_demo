@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(GLI_user_panel LANGUAGES CXX VERSION 0.10.1.0)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.10.2.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -35,7 +35,7 @@ if(WIN32)
     set(FFmpeg_DIR "${SDK_DIR}/ffmpeg")
     set(GCAN_DIR "${SDK_DIR}/GCAN")
     # YOLO/ONNX Runtime configuration (using SDK)
-    set(ONNXRUNTIME_DIR "${SDK_DIR}/onnxruntime-gpu")
+    set(ONNXRUNTIME_DIR "${SDK_DIR}/onnxruntime")
 else()
     set(OpenCV_DIR "/opt/OpenCV4.8.0")
     set(FFmpeg_DIR "/opt/FFmpeg5.1.3")
@@ -297,6 +297,7 @@ if(WIN32)
         opencv_imgcodecs454
         opencv_imgproc454
         opencv_videoio454
+        opencv_video454
         opencv_dnn454
 #        opencv_dnn_superres454
         # ffmpeg
@@ -369,6 +370,7 @@ elseif(UNIX)
         opencv_imgcodecs
         opencv_imgproc
         opencv_videoio
+        opencv_video
         # pthread
         pthread
     )
@@ -392,9 +394,9 @@ endif()
 
 add_library(ImgProc STATIC src/image/imageproc.h src/image/imageproc.cpp)
 if(WIN32)
-    target_link_libraries(ImgProc opencv_core454 opencv_imgcodecs454 opencv_imgproc454)
+    target_link_libraries(ImgProc opencv_core454 opencv_imgcodecs454 opencv_imgproc454 opencv_video454)
 else()
-    target_link_libraries(ImgProc opencv_core opencv_imgcodecs opencv_imgproc)
+    target_link_libraries(ImgProc opencv_core opencv_imgcodecs opencv_imgproc opencv_video)
 endif()
 
 add_executable(GLI_params WIN32 ${TRANSLATE} ${SOURCE_FILES})

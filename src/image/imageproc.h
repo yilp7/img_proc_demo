@@ -3,6 +3,7 @@
 
 #include <opencv2/opencv.hpp>
 #include <vector>
+#include <deque>
 #include <algorithm>
 #include <numeric>
 
@@ -26,6 +27,27 @@ public:
 
     // smooth
     static void guided_image_filter(cv::Mat &img, cv::Mat &guidance, int r, float eps, int fast = 3);
+
+    // ECC temporal denoising
+    // warp_mode: 0=translation, 1=euclidean, 2=affine, 3=homography
+    // fusion_method: 0=mean, 1=median, 2=median_then_trimmed_mean
+    static double ecc_register_consecutive(
+        cv::Mat &prev, cv::Mat &curr,
+        cv::Mat &warp_out, cv::Mat &warp_inv_out,
+        cv::Mat &init_warp,
+        int levels = 1, int max_iter = 8, double eps = 0.001,
+        bool half_res_reg = true,
+        int warp_mode = 2);
+
+    static void temporal_denoise_fuse(
+        std::deque<cv::Mat> &buf,
+        std::deque<cv::Mat> &warps,
+        std::deque<cv::Mat> &warps_inv,
+        int target_idx, int backward, int forward,
+        cv::Mat &result,
+        bool half_res_fusion = false,
+        int warp_mode = 2,
+        int fusion_method = 2);
 
     // 3D
     static void gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw, double *range, double range_thresh);

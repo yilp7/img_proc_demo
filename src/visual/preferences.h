@@ -97,7 +97,7 @@ public:
     int              pixel_type;
     bool             split;
     bool             ebus_cam;
-    int              ptz_type;  // 0: pelco-p, 1: usbcan, 2: udp-scw370
+    int              ptz_type;  // 0: pelco-p, 1: usbcan, 2: udp-scw
     bool             cameralink;
 
     // 2 serial comm.
@@ -151,6 +151,18 @@ public:
     int              model_idx;
     bool             fishnet_recog;
     float            fishnet_thresh;
+
+    // ECC temporal denoising
+    int              ecc_window_mode;  // 0=backward, 1=balanced, 2=custom
+    int              ecc_warp_mode;    // 0=translation, 1=euclidean, 2=affine, 3=homography
+    int              ecc_fusion_method;// 0=mean, 1=median, 2=med+trim_mean
+    int              ecc_backward;
+    int              ecc_forward;
+    int              ecc_levels;
+    int              ecc_max_iter;
+    double           ecc_eps;
+    bool             ecc_half_res_reg;
+    bool             ecc_half_res_fuse;
 
 };
 

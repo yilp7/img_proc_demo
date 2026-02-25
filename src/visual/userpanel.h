@@ -187,6 +187,16 @@ public slots:
     // ui switching
     void switch_ui();
 
+    // VID_PAGE camera control (UDP PTZ)
+    void vid_camera_pressed(int operation);
+    void vid_camera_released();
+    void vid_defog_toggled(bool checked);
+    void vid_ir_power_toggled(bool checked);
+    void vid_ir_auto_focus_clicked();
+    void vid_ldm_toggled(bool checked);
+    void vid_video_source_toggled(bool checked);
+    void vid_osd_toggled(bool checked);
+
 private slots:
     // on clicking enum btn: enumerate devices
     void on_ENUM_BUTTON_clicked();
@@ -669,6 +679,7 @@ private:
     ThreadPool              tp;
 
     QButtonGroup*           ptz_grp;                    // ptz button group
+    QButtonGroup*           vid_camera_grp;             // VID_PAGE camera control button group
     int                     ptz_speed;
     float                   angle_h;
     float                   angle_v;
@@ -690,13 +701,10 @@ private:
     // YOLO Detection
     YoloDetector*           m_yolo_detector[3] = {nullptr, nullptr, nullptr};
     QMutex                  m_yolo_init_mutex;
-    bool                    m_yolo_enabled = false;  // Runtime flag to enable/disable YOLO
+    int                     m_yolo_last_model[3] = {-1, -1, -1};  // Track loaded model for each thread
     void draw_yolo_boxes(cv::Mat& image, const std::vector<YoloResult>& results);
 
 public:
-    // YOLO control methods
-    void set_yolo_enabled(bool enabled) { m_yolo_enabled = enabled; }
-    bool is_yolo_enabled() const { return m_yolo_enabled; }
 
 };
 #endif // USERPANEL_H

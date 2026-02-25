@@ -23,11 +23,13 @@ public:
     ~YoloDetector();
 
     /**
-     * @brief Initialize the detector from a config.ini file
-     * @param config_ini_path Path to the yolov8 config.ini file
+     * @brief Initialize the detector
+     * @param config_ini_path Path to the yolov8 config.ini file (general parameters)
+     * @param model_path Path to the ONNX model file
+     * @param classes_file Path to the classes.txt file
      * @return true if initialization successful
      */
-    bool initialize(const QString& config_ini_path);
+    bool initialize(const QString& config_ini_path, const QString& model_path, const QString& classes_file);
 
     /**
      * @brief Check if detector is initialized and ready

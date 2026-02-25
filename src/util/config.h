@@ -63,8 +63,24 @@ public:
     };
 
     struct YoloSettings {
-        bool enabled = false;
         QString config_path = "yolo_config.ini";  // relative to default.json dir
+
+        // Model selection for each display (0=None, 1=Visible Light, 2=Thermal, 3=Gated)
+        int main_display_model = 0;
+        int alt1_display_model = 0;
+        int alt2_display_model = 0;
+
+        // Visible light model
+        QString visible_model_path = "models/VL.onnx";
+        QString visible_classes_file = "models/VL.txt";
+
+        // Thermal model
+        QString thermal_model_path = "models/THERMAL.onnx";
+        QString thermal_classes_file = "models/THERMAL.txt";
+
+        // Gated imaging model
+        QString gated_model_path = "models/GATED.onnx";
+        QString gated_classes_file = "models/GATED.txt";
     };
 
     struct ConfigData {

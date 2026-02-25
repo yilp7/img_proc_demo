@@ -362,20 +362,60 @@ Config::DeviceSettings Config::device_settings_from_json(const nlohmann::json &o
 nlohmann::json Config::yolo_settings_to_json(const YoloSettings &settings) const
 {
     nlohmann::json obj;
-    obj["enabled"] = settings.enabled;
     obj["config_path"] = settings.config_path.toStdString();
+
+    // Note: Model selection for each display (main_display_model, alt1_display_model, alt2_display_model)
+    // are NOT saved to default.json - they are runtime-only settings
+
+    // Visible light model
+    obj["visible_model_path"] = settings.visible_model_path.toStdString();
+    obj["visible_classes_file"] = settings.visible_classes_file.toStdString();
+
+    // Thermal model
+    obj["thermal_model_path"] = settings.thermal_model_path.toStdString();
+    obj["thermal_classes_file"] = settings.thermal_classes_file.toStdString();
+
+    // Gated imaging model
+    obj["gated_model_path"] = settings.gated_model_path.toStdString();
+    obj["gated_classes_file"] = settings.gated_classes_file.toStdString();
+
     return obj;
 }
 
 Config::YoloSettings Config::yolo_settings_from_json(const nlohmann::json &obj) const
 {
     YoloSettings settings;
-    if (obj.contains("enabled") && obj["enabled"].is_boolean()) {
-        settings.enabled = obj["enabled"].get<bool>();
-    }
     if (obj.contains("config_path") && obj["config_path"].is_string()) {
         settings.config_path = QString::fromStdString(obj["config_path"].get<std::string>());
     }
+
+    // Note: Model selection fields (main_display_model, alt1_display_model, alt2_display_model)
+    // are NOT loaded from JSON - they always default to 0 (None) on startup
+
+    // Visible light model
+    if (obj.contains("visible_model_path") && obj["visible_model_path"].is_string()) {
+        settings.visible_model_path = QString::fromStdString(obj["visible_model_path"].get<std::string>());
+    }
+    if (obj.contains("visible_classes_file") && obj["visible_classes_file"].is_string()) {
+        settings.visible_classes_file = QString::fromStdString(obj["visible_classes_file"].get<std::string>());
+    }
+
+    // Thermal model
+    if (obj.contains("thermal_model_path") && obj["thermal_model_path"].is_string()) {
+        settings.thermal_model_path = QString::fromStdString(obj["thermal_model_path"].get<std::string>());
+    }
+    if (obj.contains("thermal_classes_file") && obj["thermal_classes_file"].is_string()) {
+        settings.thermal_classes_file = QString::fromStdString(obj["thermal_classes_file"].get<std::string>());
+    }
+
+    // Gated imaging model
+    if (obj.contains("gated_model_path") && obj["gated_model_path"].is_string()) {
+        settings.gated_model_path = QString::fromStdString(obj["gated_model_path"].get<std::string>());
+    }
+    if (obj.contains("gated_classes_file") && obj["gated_classes_file"].is_string()) {
+        settings.gated_classes_file = QString::fromStdString(obj["gated_classes_file"].get<std::string>());
+    }
+
     return settings;
 }
 

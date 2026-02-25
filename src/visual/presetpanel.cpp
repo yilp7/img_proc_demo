@@ -84,16 +84,19 @@ PresetPanel::PresetPanel(QWidget *parent):
 #endif
     std::ifstream f("user_presets.json");
     presets = nlohmann::json::array();
-    try
+    if (f.is_open() && f.peek() != std::ifstream::traits_type::eof())
     {
-        nlohmann::json presets_in_file = nlohmann::json::parse(f);
-        if (presets_in_file.contains("num")) total = presets_in_file["num"];
-        if (presets_in_file.contains("presets")) presets = presets_in_file["presets"];
-    }
-    catch (nlohmann::json::parse_error& ex)
-    {
-        std::cerr << ex.what() << " at byte " << ex.byte << std::endl;
-        std::cerr.flush();
+        try
+        {
+            nlohmann::json presets_in_file = nlohmann::json::parse(f);
+            if (presets_in_file.contains("num")) total = presets_in_file["num"];
+            if (presets_in_file.contains("presets")) presets = presets_in_file["presets"];
+        }
+        catch (nlohmann::json::parse_error& ex)
+        {
+            std::cerr << "Failed to parse user_presets.json: " << ex.what() << " at byte " << ex.byte << std::endl;
+            std::cerr.flush();
+        }
     }
 
 //    presets.resize(presets.size() + 1);
