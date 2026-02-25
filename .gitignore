@@ -1,0 +1,45 @@
+# Build directories
+build-*/
+build/
+
+# Qt Creator user-specific files
+CMakeLists.txt.user
+CMakeLists.txt.user.*
+*.pro.user
+*.pro.user.*
+
+# Compiled outputs
+*.o
+*.obj
+*.exe
+*.dll
+*.lib
+*.a
+*.so
+*.dylib
+*.pdb
+*.ilk
+*.exp
+
+# Qt generated
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+*.qm
+
+# IDE
+.vs/
+.vscode/
+*.swp
+*~
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Misc
+nul
+
+# debug/future features
+others/
