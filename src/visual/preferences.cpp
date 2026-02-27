@@ -672,8 +672,6 @@ void Preferences::keyPressEvent(QKeyEvent *event)
         else                               data_exchange(true);
         if (edit) this->focusWidget()->clearFocus();
         data_exchange(false);
-    case Qt::Key_S:
-        if (event->modifiers() == Qt::AltModifier) this->accept();
         break;
     default: break;
     }

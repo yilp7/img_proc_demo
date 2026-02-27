@@ -287,7 +287,7 @@ void TitleBar::setup(QObject *ptr)
     settings_menu->setFont(monaco);
     QAction *pref = new QAction("-- preferences", this);
     settings_menu->addAction(pref);
-    pref->setShortcut(QKeySequence(Qt::ALT + Qt::Key_S));
+    // pref->setShortcut(QKeySequence(Qt::ALT + Qt::Key_S));
 /*
     connect(pref, SIGNAL(triggered()), prog_settings, SLOT(show()));
     connect(pref, SIGNAL(triggered()), prog_settings, SLOT(raise()));
@@ -338,7 +338,7 @@ void TitleBar::setup(QObject *ptr)
     settings_menu->addAction("<< load pref.",   signal_receiver, SLOT(prompt_for_config_file())/*, QKeySequence(Qt::ALT + Qt::Key_R)*/);
     // TODO congigure serial number should be exclusive to ICMOS only
     settings_menu->addAction("## config s.n.",  signal_receiver, SLOT(prompt_for_serial_file())/*, QKeySequence(Qt::ALT + Qt::Key_C)*/);
-    settings_menu->addAction("=> export video", signal_receiver, SLOT(export_current_video()), QKeySequence(Qt::ALT + Qt::SHIFT + Qt::Key_S));
+    settings_menu->addAction("=> export video", signal_receiver, SLOT(export_current_video())/*, QKeySequence(Qt::ALT + Qt::SHIFT + Qt::Key_S)*/);
     settings->setMenu(settings_menu);
 
     capture = new TitleButton("", this);

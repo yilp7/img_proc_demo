@@ -14,6 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(BUILD_STATIC 0)
 set(USING_CAMERALINK 0)
 set(DISTANCE_3D_VIEW 0)
+option(ENABLE_YOLO "Enable YOLO detection with ONNX Runtime" OFF)
 
 add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
@@ -34,8 +35,10 @@ if(WIN32)
     set(OpenCV_DIR "${SDK_DIR}/opencv")
     set(FFmpeg_DIR "${SDK_DIR}/ffmpeg")
     set(GCAN_DIR "${SDK_DIR}/GCAN")
-    # YOLO/ONNX Runtime configuration (using SDK)
-    set(ONNXRUNTIME_DIR "${SDK_DIR}/onnxruntime")
+    if(ENABLE_YOLO)
+        # YOLO/ONNX Runtime configuration (using SDK)
+        set(ONNXRUNTIME_DIR "${SDK_DIR}/onnxruntime")
+    endif()
 else()
     set(OpenCV_DIR "/opt/OpenCV4.8.0")
     set(FFmpeg_DIR "/opt/FFmpeg5.1.3")
@@ -86,7 +89,9 @@ if(WIN32)
     include_directories(${EIGEN_DIR}/include)
     include_directories(${JSON_DIR}/include)
     include_directories(${GCAN_DIR}/include)
-    include_directories(${ONNXRUNTIME_DIR}/include/win)
+    if(ENABLE_YOLO)
+        include_directories(${ONNXRUNTIME_DIR}/include/win)
+    endif()
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         link_directories(${Hik_SDK_DIR}/lib/x64)
@@ -100,7 +105,9 @@ if(WIN32)
         endif()
         link_directories(${eBUS_DIR}/lib)
         link_directories(${GCAN_DIR}/lib)
-        link_directories(${ONNXRUNTIME_DIR}/lib/x64)
+        if(ENABLE_YOLO)
+            link_directories(${ONNXRUNTIME_DIR}/lib/x64)
+        endif()
     else()
         link_directories(${Hik_SDK_DIR}/lib/x86)
         link_directories(${HQV_DIR}/lib)
@@ -204,11 +211,11 @@ set(SOURCE_FILES
     src/automation/scanpreset.cpp
     src/automation/autoscan.h
     src/automation/autoscan.cpp
-    src/yolo/yolo_detector.h
-    src/yolo/yolo_detector.cpp
-    src/yolo/inference.h
-    src/yolo/inference.cpp
-    src/yolo/yolo_app_config.h
+#    src/yolo/yolo_detector.h
+#    src/yolo/yolo_detector.cpp
+#    src/yolo/inference.h
+#    src/yolo/inference.cpp
+#    src/yolo/yolo_app_config.h
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss
@@ -249,6 +256,17 @@ if(USING_CAMERALINK)
         src/cam/euresyscam.cpp
     )
 endif(USING_CAMERALINK)
+
+if(ENABLE_YOLO)
+    set(SOURCE_FILES
+        ${SOURCE_FILES}
+        src/yolo/yolo_detector.h
+        src/yolo/yolo_detector.cpp
+        src/yolo/inference.h
+        src/yolo/inference.cpp
+        src/yolo/yolo_app_config.h
+    )
+endif()
 
 set(PROJECT_LIBS
     Qt${QT_VERSION_MAJOR}::Core
@@ -317,8 +335,8 @@ if(WIN32)
         Bcrypt
         # gcan
         ECanVci64
-        # onnx runtime for yolo
-        onnxruntime
+#        # onnx runtime for yolo
+#        onnxruntime
     )
     if(BUILD_STATIC)
         string(LENGTH ${QT_DIR} LEN_QT_DIR)
@@ -409,6 +427,10 @@ if (DISTANCE_3D_VIEW)
     qt5_use_modules(GLI_params DataVisualization)
     target_compile_definitions(GLI_params PRIVATE DISTANCE_3D_VIEW=1)
 endif(DISTANCE_3D_VIEW)
+if(ENABLE_YOLO)
+    target_compile_definitions(GLI_params PRIVATE ENABLE_YOLO=1)
+    target_link_libraries(GLI_params onnxruntime)
+endif()
 target_link_libraries(GLI_params ${PROJECT_LIBS})
 
 #add_executable(LvTong WIN32 ${TRANSLATE} ${SOURCE_FILES})

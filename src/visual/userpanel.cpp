@@ -715,6 +715,7 @@ void UserPanel::init()
     // Set default PTZ type to udp-scw
     pref->ui->PTZ_TYPE_LIST->setCurrentIndex(2);
 
+#ifdef ENABLE_YOLO
     // Initialize YOLO comboboxes from config
     ui->MAIN_MODEL_LIST->setCurrentIndex(config->get_data().yolo.main_display_model);
     ui->ALT1_MODEL_LIST->setCurrentIndex(config->get_data().yolo.alt1_display_model);
@@ -733,6 +734,7 @@ void UserPanel::init()
         config->get_data().yolo.alt2_display_model = index;
 //        config->auto_save();
     });
+#endif
 
     // - set startup focus
     ui->ENUM_BUTTON->click();
@@ -837,6 +839,73 @@ void UserPanel::init()
 
     if (serial_port[0]->isOpen() && serial_port[3]->isOpen()) on_LASER_BTN_clicked();
 
+    // --- Temporary GUI layout: simplified demo view ---
+    // 1. Hide title bar buttons (keep lang, theme, min, max, exit)
+    ui->TITLE->url->hide();
+    ui->TITLE->settings->hide();
+    ui->TITLE->capture->hide();
+    ui->TITLE->cls->hide();
+
+    // 2. Rework LASER_STATIC: hide original contents, rename to TCU
+    ui->CURRENT_EDIT->hide();
+    ui->IRIS_OPEN_BTN->hide();
+    ui->IRIS_CLOSE_BTN->hide();
+    ui->LASER_ZOOM_LABEL->hide();
+    ui->LASER_BTN->hide();
+    ui->DISTANCE->hide();
+    ui->DIST_BTN->hide();
+    ui->FIRE_LASER_BTN->hide();
+    ui->LASER_STATIC->setTitle("TCU");
+    ui->LASER_STATIC->setGeometry(10, 370, 190, 85);
+
+    // 3. Reparent PRF and MCP controls into LASER_STATIC (LEFT)
+    ui->PRF_GRP->setParent(ui->LASER_STATIC);
+    ui->PRF_GRP->setGeometry(10, 15, 91, 41);
+    ui->PRF_GRP->show();
+
+    // MCP label + edit on the same row as PRF (right side), slider full width below
+    ui->MCP->setParent(ui->LASER_STATIC);
+    ui->MCP->setGeometry(140, 21, 30, 14);
+    ui->MCP->show();
+
+    ui->MCP_EDIT->setParent(ui->LASER_STATIC);
+    ui->MCP_EDIT->setGeometry(140, 35, 40, 20);
+    ui->MCP_EDIT->show();
+
+    ui->MCP_SLIDER->setParent(ui->LASER_STATIC);
+    ui->MCP_SLIDER->setGeometry(10, 60, 170, 16);
+    ui->MCP_SLIDER->show();
+
+    ui->MCP_GRP->hide();
+
+    // 4. Hide MISC_DISPLAY_GRP, move IMG_SAVE_STATIC to LEFT panel
+    ui->MISC_DISPLAY_GRP->hide();
+    ui->IMG_SAVE_STATIC->setParent(ui->LEFT);
+    ui->IMG_SAVE_STATIC->setGeometry(10, 465, 190, 85);
+    // Reposition child widgets to fit 190px width (originally 220px)
+    ui->FILE_PATH_EDIT->setGeometry(10, 15, 150, 20);
+    ui->FILE_PATH_BROWSE->setGeometry(160, 15, 20, 20);
+    ui->CAPTURE_LABEL->setGeometry(10, 40, 80, 14);
+    ui->RECORD_LABEL->setGeometry(100, 40, 80, 14);
+    ui->SAVE_BMP_BUTTON->setGeometry(10, 55, 40, 20);
+    ui->SAVE_RESULT_BUTTON->setGeometry(50, 55, 40, 20);
+    ui->SAVE_AVI_BUTTON->setGeometry(100, 55, 40, 20);
+    ui->SAVE_FINAL_BUTTON->setGeometry(140, 55, 40, 20);
+    ui->IMG_SAVE_STATIC->show();
+
+    // 5. Hide all RIGHT panel groupboxes
+    ui->TCU_STATIC->hide();
+    ui->LENS_STATIC->hide();
+    ui->IMG_PROC_STATIC->hide();
+    ui->SCAN_GRP->hide();
+
+    // 6. Collapse RIGHT panel, MID will expand via resizeEvent
+    ui->RIGHT->setFixedWidth(0);
+    ui->RIGHT->hide();
+
+    QResizeEvent e(this->size(), this->size());
+    resizeEvent(&e);
+    // --- End temporary GUI layout ---
 }
 
 void UserPanel::data_exchange(bool read){
@@ -986,8 +1055,10 @@ int UserPanel::grab_thread_process(int *idx) {
     cv::dnn::Net net = cv::dnn::readNet(model_name.toLatin1().constData());
 #endif
 
+#ifdef ENABLE_YOLO
     // YOLO detector pointer (initialized dynamically in the loop below)
     YoloDetector* yolo = nullptr;
+#endif
 
     while (grab_image[thread_idx]) {
         disp = displays[*idx];
@@ -1128,6 +1199,7 @@ int UserPanel::grab_thread_process(int *idx) {
             }
         }
 
+#ifdef ENABLE_YOLO
         // Check if YOLO model selection has changed and update detector if needed
         int current_model_selection = 0;
         if (thread_idx == 0) {
@@ -1198,6 +1270,7 @@ int UserPanel::grab_thread_process(int *idx) {
             }
             yolo->run(det_input, yolo_results);
         }
+#endif
 
 /*
         // tenengrad (sobel) auto-focus
@@ -1625,10 +1698,12 @@ int UserPanel::grab_thread_process(int *idx) {
             result_3d.copyTo(modified_result[thread_idx], temp_mask);
         }
 
+#ifdef ENABLE_YOLO
         // Draw YOLO detection boxes on display image
         if (!yolo_results.empty()) {
             draw_yolo_boxes(modified_result[thread_idx], yolo_results);
         }
+#endif
 
         // display the gray-value histogram of the current grayscale image, or the distance histogram of the current 3D image
         if (alt_display_option == 2) {
@@ -4966,115 +5041,6 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             }
             this->focusWidget()->clearFocus();
             break;
-        // 100m => 667ns, 10m => 67ns
-        case Qt::Key_W:
-            delay_dist += stepping * 5 * dist_ns;
-            update_delay();
-            break;
-        case Qt::Key_S:
-            delay_dist -= stepping * 5 * dist_ns;
-            update_delay();
-            break;
-        case Qt::Key_D:
-            delay_dist += stepping * dist_ns;
-            update_delay();
-            break;
-        case Qt::Key_A:
-            delay_dist -= stepping * dist_ns;
-            update_delay();
-            break;
-        // 50m => 333ns, 5m => 33ns
-        case Qt::Key_I:
-            depth_of_view += stepping * 5 * dist_ns;
-            update_gate_width();
-            break;
-        case Qt::Key_K:
-            depth_of_view -= stepping * 5 * dist_ns;
-            update_gate_width();
-            break;
-        case Qt::Key_L:
-            depth_of_view += stepping * dist_ns;
-            update_gate_width();
-            break;
-        case Qt::Key_J:
-            depth_of_view -= stepping * dist_ns;
-            update_gate_width();
-            break;
-        default: break;
-        }
-        break;
-    case Qt::AltModifier:
-        switch (event->key()) {
-        case Qt::Key_0:
-            secondary_display->show(); break;
-        case Qt::Key_1:
-            fw_display[0]->show(); break;
-        case Qt::Key_2:
-            fw_display[1]->show(); break;
-        case Qt::Key_3:
-        case Qt::Key_4:
-//            goto_laser_preset(1 << (event->key() - Qt::Key_1));
-            break;
-        case Qt::Key_S:
-//            ui->TITLE->prog_settings->show();
-//            ui->TITLE->prog_settings->raise();
-            pref->show();
-            pref->raise();
-            break;
-        case Qt::Key_Q:
-//            std::accumulate(use_tcp, use_tcp + 5, 0) ? disconnect_from_serial_server_tcp() : connect_to_serial_server_tcp();
-//            (ptr_tcu->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ||
-//            (ptr_lens->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ||
-//            (ptr_laser->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ||
-//            (ptr_ptz->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ?
-//                disconnect_from_serial_server_tcp() : connect_to_serial_server_tcp();
-            (p_tcu->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ||
-            (p_lens->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ||
-            (p_laser->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ||
-            (p_ptz->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ?
-                disconnect_from_serial_server_tcp() : connect_to_serial_server_tcp();
-            break;
-        case Qt::Key_L:
-            laser_settings->show();
-            laser_settings->raise();
-            break;
-        case Qt::Key_V:
-#ifdef DISTANCE_3D_VIEW
-            view_3d->show();
-            view_3d->raise();
-#endif //DISTANCE_3D_VIEW
-            break;
-        case Qt::Key_A:
-            aliasing->show_ui();
-            break;
-        case Qt::Key_D:
-            aliasing->update_distance(delay_dist);
-            break;
-        case Qt::Key_P:
-            preset->show_ui();
-            break;
-        default: break;
-        }
-        break;
-    case Qt::ControlModifier:
-        switch (event->key()) {
-        case Qt::Key_1:
-        case Qt::Key_2:
-        case Qt::Key_3:
-        case Qt::Key_4:
-            transparent_transmission_file(event->key() - Qt::Key_1);
-            break;
-        default:break;
-        }
-        break;
-    case Qt::ControlModifier + Qt::ShiftModifier:
-        switch (event->key()) {
-        case Qt::Key_C:
-            QApplication::clipboard()->setPixmap(ui->SOURCE_DISPLAY->grab());
-            break;
-        case Qt::Key_D:
-            switch_ui();
-            break;
         default: break;
         }
         break;
@@ -6939,6 +6905,7 @@ void UserPanel::set_auto_scan_controller(AutoScan* autoScan)
 }
 */
 
+#ifdef ENABLE_YOLO
 void UserPanel::draw_yolo_boxes(cv::Mat& image, const std::vector<YoloResult>& results)
 {
     if (image.empty() || results.empty()) {
@@ -6991,4 +6958,5 @@ void UserPanel::draw_yolo_boxes(cv::Mat& image, const std::vector<YoloResult>& r
         cv::cvtColor(draw_image, image, cv::COLOR_BGR2GRAY);
     }
 }
+#endif
 

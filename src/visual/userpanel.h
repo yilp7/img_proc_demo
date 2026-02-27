@@ -41,7 +41,9 @@
 #include "thread/controlportthread.h"
 #include "util/threadpool.h"
 #include "plugins/plugininterface.h"
+#ifdef ENABLE_YOLO
 #include "yolo/yolo_detector.h"
+#endif
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class UserPanel; }
@@ -698,11 +700,13 @@ private:
     // QStringList             m_command_line_args;
     // class AutoScan*         m_auto_scan_controller;
 
+#ifdef ENABLE_YOLO
     // YOLO Detection
     YoloDetector*           m_yolo_detector[3] = {nullptr, nullptr, nullptr};
     QMutex                  m_yolo_init_mutex;
     int                     m_yolo_last_model[3] = {-1, -1, -1};  // Track loaded model for each thread
     void draw_yolo_boxes(cv::Mat& image, const std::vector<YoloResult>& results);
+#endif
 
 public:
 
