@@ -43,5 +43,5 @@ nul
 linguist.txt
 
 # debug/future features
-others/
+others/*
 !others/refactor/
