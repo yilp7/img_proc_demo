@@ -29,7 +29,8 @@ TCU::TCU(int index, int tcu_type) :
     use_gw_lut(false),
     gw_lut{0}
 {
-    query = generate_ba(new uchar[7]{0x88, 0x15, 0x00, 0x00, 0x00, 0x00, 0x99}, 7);
+    uchar q[] = {0x88, 0x15, 0x00, 0x00, 0x00, 0x00, 0x99};
+    query = QByteArray((char*)q, 7);
 }
 
 TCU::~TCU()
@@ -54,7 +55,7 @@ double TCU::get(qint32 tcu_param)
             case 2:  return delay_b;
             default: return delay_a;
             }
-        case GATE_WIDTH_A:  return gate_width_a;
+        case GATE_WIDTH_A:
             switch (tcu_type)
             {
             case 2:  return gate_width_b;

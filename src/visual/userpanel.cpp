@@ -2,9 +2,9 @@
 #include "ui_user_panel.h"
 #include "ui_preferences.h"
 
-GrabThread::GrabThread(void *info, int idx)
+GrabThread::GrabThread(UserPanel *panel, int idx)
 {
-    p_info = info;
+    m_panel = panel;
     _display_idx = idx;
 }
 
@@ -23,7 +23,7 @@ void GrabThread::display_idx(bool read, int &idx)
 void GrabThread::run()
 {
     // qDebug() << "image acquisition" << QThread::currentThread();
-    ((UserPanel*)p_info)->grab_thread_process(&_display_idx);
+    m_panel->grab_thread_process(&_display_idx);
 }
 
 TimedQueue::TimedQueue(double time) : QThread(), _quit(false), expiration_time(time), fps_status(NULL) {}
@@ -2595,7 +2595,7 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
 
     grab_image[0] = true;
 
-    h_grab_thread[0] = new GrabThread((void*)this, 0);
+    h_grab_thread[0] = new GrabThread(this, 0);
     if (h_grab_thread[0] == NULL) {
         grab_image[0] = false;
         QMessageBox::warning(this, "PROMPT", tr("Create thread fail"));
@@ -5755,7 +5755,7 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
     }
 
     grab_image[display_idx] = true;
-    h_grab_thread[display_idx] = new GrabThread((void*)this, display_idx);
+    h_grab_thread[display_idx] = new GrabThread(this, display_idx);
     if (h_grab_thread[display_idx] == NULL) {
         grab_image[display_idx] = false;
         QMessageBox::warning(this, "PROMPT", tr("Cannot display image"));

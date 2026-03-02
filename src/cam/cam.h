@@ -13,7 +13,7 @@ public:
 
 public:
     Cam() {};
-    ~Cam() {};
+    virtual ~Cam() {};
 
     virtual int search_for_devices() = 0;
 

@@ -47,10 +47,12 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class UserPanel; }
 QT_END_NAMESPACE
 
+class UserPanel;
+
 class GrabThread : public QThread {
     Q_OBJECT
 public:
-    GrabThread(void *info, int idx);
+    GrabThread(UserPanel *panel, int idx);
     ~GrabThread();
 
     void display_idx(bool read, int &idx);
@@ -59,7 +61,7 @@ protected:
     void run();
 
 private:
-    void *p_info;
+    UserPanel *m_panel;
     int  _display_idx;
 
 signals:

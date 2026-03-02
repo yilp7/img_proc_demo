@@ -85,7 +85,7 @@ private:
 private:
     // 0: default, head(88) cmd(00) data(MM NN PP QQ) tail(99)
     // 1: step-40ps, head(88) cmd(00) data(MM NN PP QQ) tail(99), ps cmd step by 40ps (max 100)
-    // 1: step-10ps, head(88) cmd(00) data(MM NN PP QQ) tail(99), ps cmd step by 10ps (max 100)
+    // 2: step-10ps, head(88) cmd(00) data(MM NN PP QQ) tail(99), ps cmd step by 10ps (max 100)
     std::atomic<uint> tcu_type;
     bool   scan_mode; // 0: default, 1: scan
 

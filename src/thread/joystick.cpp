@@ -1,6 +1,6 @@
 #include "joystick.h"
 
-JoystickThread::JoystickThread(void *info) : QThread(),
+JoystickThread::JoystickThread(UserPanel *panel) : QThread(),
     t(NULL),
     curr_btn(0),
     prev_btn(0),
@@ -12,7 +12,7 @@ JoystickThread::JoystickThread(void *info) : QThread(),
     r(0),
     pressed{false}
 {
-    p_info = info;
+    m_panel = panel;
 #ifdef WIN32
     joy = (JOYINFOEX*)malloc(sizeof(JOYINFOEX));
     joy->dwSize = sizeof(JOYINFOEX);

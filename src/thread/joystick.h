@@ -8,11 +8,13 @@
 #include <QThread>
 #include <QTimer>
 
+class UserPanel;
+
 class JoystickThread : public QThread
 {
     Q_OBJECT
 public:
-    JoystickThread(void *info);
+    JoystickThread(UserPanel *panel);
     ~JoystickThread();
 
     enum BUTTON {
@@ -59,7 +61,7 @@ signals:
     void pos_ur(int u, int r);
 
 private:
-    void          *p_info;
+    UserPanel     *m_panel;
     QTimer        *t;
 #ifdef WIN32
     JOYINFOEX     *joy;
