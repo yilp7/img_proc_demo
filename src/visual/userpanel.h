@@ -34,6 +34,7 @@
 #include "port/usbcan.h"
 #include "port/udpptz.h"
 
+#include "widgets/mywidget.h"
 #include "thread/joystick.h"
 #include "thread/controlportthread.h"
 #include "util/threadpool.h"

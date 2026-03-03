@@ -1,59 +1,10 @@
 #ifndef MYWIDGET_H
 #define MYWIDGET_H
 
-//#include "progsettings.h"
-#include "visual/preferences.h"
-#include "visual/scanconfig.h"
-#include "util/util.h"
-
-class Display : public QLabel
-{
-    Q_OBJECT
-public:
-    explicit Display(QWidget *parent = 0);
-
-public:
-    void update_roi(QPoint pos);
-
-public slots:
-    void clear();
-
-protected:
-    // @override
-    void mousePressEvent(QMouseEvent *event);
-    void mouseMoveEvent(QMouseEvent *event);
-    void mouseReleaseEvent(QMouseEvent *event);
-    void wheelEvent(QWheelEvent *event);
-    void mouseDoubleClickEvent(QMouseEvent *event);
-
-signals:
-    void set_pixmap(const QPixmap& pm);
-    // idx: 0: curr_pos, 1: start_pos, 2: shape_size, 3: ptz_target
-    void updated_pos(int idx, QPoint pos);
-    void curr_pos(QPoint pos);
-    void start_pos(QPoint pos);
-    void shape_size(QPoint size);
-    void ptz_target(QPoint pos);
-    void add_roi(cv::Point p1, cv::Point p2);
-    void clear_roi();
-
-public:
-    QPoint    lefttop;
-    QPoint    center;
-    QPoint    prev_pos; // start position of mouse when image is dragged
-    QPoint    ori_pos;  // start position of roi when image is dragged
-    bool      is_grabbing;
-    int       mode; // 0: zoom mode, 1: selection mode, 2: ptz mode
-    int       curr_scale;
-    float     scale[5];
-    cv::Rect  display_region;
-    cv::Point selection_v1;
-    cv::Point selection_v2;
-
-    bool     pressed;
-
-    QRect    reserved_geometry;
-};
+#include "display.h"
+#include "titlebar.h"
+#include "statusbar.h"
+#include "floatingwindow.h"
 
 class Ruler : public QLabel
 {
@@ -73,70 +24,6 @@ public:
     int    interval;
     QLabel *valueLabel;
     QLabel *handleLabel;
-
-};
-
-class InfoLabel : public QLabel
-{
-    Q_OBJECT
-public:
-    explicit InfoLabel(QWidget *parent);
-
-};
-
-class TitleButton : public QPushButton
-{
-    Q_OBJECT
-public:
-    explicit TitleButton(QString icon, QWidget *parent);
-
-protected:
-    void mouseMoveEvent(QMouseEvent *event);
-
-};
-
-class TitleBar : public QFrame
-{
-    Q_OBJECT
-public:
-    explicit TitleBar(QWidget *parent = 0);
-    void setup(QObject *ptr);
-
-public slots:
-    void process_maximize();
-
-protected:
-    // @override
-    void resizeEvent(QResizeEvent *event);
-    void mousePressEvent(QMouseEvent *event);
-    void mouseMoveEvent(QMouseEvent *event);
-    void mouseReleaseEvent(QMouseEvent *event);
-    void mouseDoubleClickEvent(QMouseEvent *event);
-
-public:
-    InfoLabel*   icon;
-    InfoLabel*   title;
-    TitleButton* url;
-    TitleButton* settings;
-    TitleButton* capture;
-    TitleButton* cls;
-    TitleButton* lang;
-    TitleButton* theme;
-    TitleButton* min;
-    TitleButton* max;
-    TitleButton* exit;
-
-    bool         is_maximized;
-    QPoint       prev_pos;
-    QRect        normal_stat;
-
-    bool         pressed;
-
-    QObject      *signal_receiver;
-
-//    ProgSettings *prog_settings;
-    Preferences  *preferences;
-    ScanConfig   *scan_config;
 
 };
 
@@ -202,84 +89,6 @@ signals:
 private:
     int idx;
     int pos_y;
-};
-
-class StatusIcon : public QFrame
-{
-    Q_OBJECT
-public:
-    enum STATUS {
-        NONE          = 0,
-        NOT_CONNECTED = 1,
-        DISCONNECTED  = 2,
-        RECONNECTING  = 3,
-        CONNECTED     = 4,
-    };
-    explicit StatusIcon(QWidget *parent);
-
-    void setup(QPixmap img);
-    void setup(QString str);
-
-    void update_status(StatusIcon::STATUS status);
-
-signals:
-    void set_pixmap(QPixmap status_block_image);
-    void change_status(QPixmap status_dot_image);
-    void set_text(QString status_block_text);
-
-private:
-    const QPixmap get_status_dot(StatusIcon::STATUS status);
-
-    QLabel* status_block;
-    QLabel* status_dot;
-    STATUS  status;
-};
-
-class StatusBar : public QFrame
-{
-    Q_OBJECT
-public:
-    explicit StatusBar(QWidget *parent);
-
-public:
-    StatusIcon* cam_status;
-    StatusIcon* tcu_status;
-    StatusIcon* lens_status;
-    StatusIcon* laser_status;
-    StatusIcon* ptz_status;
-    StatusIcon* img_pixel_depth;
-    StatusIcon* img_resolution;
-    StatusIcon* packet_lost;
-    StatusIcon* result_cam_fps;
-};
-
-class FloatingWindow : public QWidget
-{
-    Q_OBJECT
-public:
-    explicit FloatingWindow();
-
-    Display* get_display_widget();
-    void resize_display(int width, int height);
-
-protected:
-    //@override
-    void mousePressEvent(QMouseEvent *event);
-    void mouseMoveEvent(QMouseEvent *event);
-    void mouseReleaseEvent(QMouseEvent *event);
-    void resizeEvent(QResizeEvent *event);
-
-public:
-    // ui-control
-    bool            pressed;
-    QPoint          prev_pos;
-    QElapsedTimer   timer_mouse;
-
-private:
-    Display* disp;
-    QFrame*  frame;
-
-    int      w, h;
 };
 
 class MiscSelection : public QComboBox

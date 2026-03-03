@@ -2,7 +2,9 @@
 #define CONTROLPORTTHREAD_H
 
 #include "util/util.h"
-#include "widgets/mywidget.h"
+#include "widgets/statusbar.h"
+
+class ScanConfig;
 
 struct PortData {
     QByteArray write;

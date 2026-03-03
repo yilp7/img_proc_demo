@@ -147,6 +147,14 @@ set(SOURCE_FILES
     src/util/threadpool.cpp
     src/util/config.h
     src/util/config.cpp
+    src/widgets/display.h
+    src/widgets/display.cpp
+    src/widgets/titlebar.h
+    src/widgets/titlebar.cpp
+    src/widgets/statusbar.h
+    src/widgets/statusbar.cpp
+    src/widgets/floatingwindow.h
+    src/widgets/floatingwindow.cpp
     src/widgets/mywidget.h
     src/widgets/mywidget.cpp
     src/visual/userpanel.h
