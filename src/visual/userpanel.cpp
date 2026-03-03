@@ -79,12 +79,6 @@ void TimedQueue::run()
         mtx.unlock();
         et.restart();
 #endif
-#if 0
-        QThread::msleep(5);
-        if (q.empty()) { continue; }
-        while (q.size() > 10) q.pop();
-        fps_status->set_text(QString::number(q.size() ? ((q.size() - 1) / diff_timespec(q.front(), q.back())) * 1000 : 0.f, 'f', 2));
-#endif
     }
 }
 
@@ -188,8 +182,6 @@ UserPanel::UserPanel(QWidget *parent) :
     angle_h(0),
     angle_v(0),
     alt_ctrl_grp(NULL)
-    // NOTE: AutoScan feature temporarily disabled
-    // m_auto_scan_controller(nullptr)
 {
     ui->setupUi(this);
 
@@ -242,18 +234,7 @@ UserPanel::UserPanel(QWidget *parent) :
 //    SerialServer *s = new SerialServer();
 //    s->show();
 
-#if ENABLE_USER_DEFAULT // DEPRECATED: user_default language loading replaced by JSON config
-    FILE *f = fopen("user_default", "rb");
-    if (f) {
-        uchar use_zh;
-        fseek(f, 4, SEEK_SET);
-        fread(&use_zh, 1, 1, f);
-        fclose(f);
-        if (use_zh) switch_language();
-    }
-#else
     // Language will be set from JSON config during auto-load
-#endif
     // initialization
     // - default save path
     save_location += QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
@@ -820,19 +801,8 @@ void UserPanel::init()
 #endif //USING_CAMERALINK
     ui->SENSOR_TAPS_BTN->hide();
 
-    uchar com[5] = {0};
-#if ENABLE_USER_DEFAULT // DEPRECATED: user_default COM port loading replaced by JSON config
-    f = fopen("user_default", "rb");
-    if (f) {
-        fseek(f, 5, SEEK_SET);
-        fread(com, 1, 5, f);
-        fclose(f);
-    }
-#else
     // COM ports will be loaded from JSON config during auto-load
-    uchar default_com[5] = {1, 2, 3, 4, 5}; // Default COM port numbers
-    memcpy(com, default_com, 5);
-#endif
+    uchar com[5] = {1, 2, 3, 4, 5};
     for (int i = 0; i < 5; i++) com_edit[i]->emit returnPressed();
 
     if (serial_port[0]->isOpen() && serial_port[3]->isOpen()) on_LASER_BTN_clicked();
@@ -968,8 +938,7 @@ int UserPanel::grab_thread_process(int *idx) {
     prev_3d = cv::Mat(_h, _w, CV_8UC3);
     prev_img = cv::Mat(_h, _w, CV_MAKETYPE(_pixel_depth == 8 ? CV_8U : CV_16U, is_color[thread_idx] ? 3 : 1));
     user_mask[thread_idx] = cv::Mat::zeros(_h, _w, CV_8UC1);
-    static int packets_lost;
-    packets_lost = 0;
+    int packets_lost = 0;
 //    double *range = (double*)calloc(w * h, sizeof(double));
 #ifdef LVTONG
     pref->ui->MODEL_LIST->setEnabled(false);
@@ -988,6 +957,11 @@ int UserPanel::grab_thread_process(int *idx) {
 
     // YOLO detector pointer (initialized dynamically in the loop below)
     YoloDetector* yolo = nullptr;
+
+    // variables that persist across loop iterations (per-thread, not static)
+    bool frame_a = true;
+    cv::Mat scan_temp;
+    QString scan_save_path_a, scan_save_path;
 
     while (grab_image[thread_idx]) {
         disp = displays[*idx];
@@ -1215,7 +1189,7 @@ int UserPanel::grab_thread_process(int *idx) {
 */
 #ifdef LVTONG
         double is_net = 0;
-        static double min, max;
+        double min, max;
         if (pref->fishnet_recog) {
             switch (pref->model_idx) {
             case 0:
@@ -1293,7 +1267,7 @@ int UserPanel::grab_thread_process(int *idx) {
             int avg_mode = ui->FRAME_AVG_OPTIONS->currentIndex();
 
             // A/B running sums maintained for 3D reconstruction regardless of mode
-            static bool frame_a = true;
+            // frame_a declared before while loop
             if (updated) {
                 if (seq[7].empty()) for (auto& m: seq) m = cv::Mat::zeros(_h, _w, CV_MAKETYPE(CV_16U, is_color[thread_idx] ? 3 : 1));
 
@@ -1409,7 +1383,7 @@ int UserPanel::grab_thread_process(int *idx) {
             if (updated) {
                 // TODO try to reduce if statements
                 if (ui->FRAME_AVG_CHECK->isChecked()) {
-                    static cv::Mat frame_a_avg, frame_b_avg;
+                    cv::Mat frame_a_avg, frame_b_avg;
                     frame_a_sum.convertTo(frame_a_avg, _pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
                     frame_b_sum.convertTo(frame_b_avg, _pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
 //                    if (is_color[thread_idx]) {
@@ -1679,7 +1653,7 @@ int UserPanel::grab_thread_process(int *idx) {
             cv::putText(modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
 #ifdef LVTONG
-            static int baseline = 0;
+            int baseline = 0;
             if (pref->fishnet_recog) {
 //                cv::putText(modified_result[display_idx], "FISHNET", cv::Point(ww - 40 - cv::getTextSize("FISHNET", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result[thread_idx], is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
@@ -1727,11 +1701,11 @@ int UserPanel::grab_thread_process(int *idx) {
 //        qDebug() << "--------------------" << thread_idx;
         // process scan
         if (thread_idx ==0 && scan && updated) {
-            static cv::Mat temp;
+            cv::Mat &temp = scan_temp;
             scan_img_count -= 1;
             if (scan_img_count < 0) scan_img_count = 0;
 
-            static QString scan_save_path_a, scan_save_path;
+            // scan_save_path_a, scan_save_path declared before while loop
             int save_img_num = scan_config->num_single_pos;
 //            if (thread_idx == 1) qDebug() << "##--##" << scan_img_count << save_img_num;
             if (scan_img_count > 0 && scan_img_count <= save_img_num) {
@@ -1819,7 +1793,7 @@ int UserPanel::grab_thread_process(int *idx) {
                     cv::putText(modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                     cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
 #ifdef LVTONG
-                    static int baseline = 0;
+                    int baseline = 0;
                     if (pref->fishnet_recog) {
 //                        cv::putText(modified_result[display_idx], "FISHNET", cv::Point(ww - 40 - cv::getTextSize("FISHNET", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                         cv::putText(modified_result[thread_idx], is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pref->fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
@@ -1942,16 +1916,8 @@ void UserPanel::set_theme()
 
     laser_settings->set_theme();
 
-#if ENABLE_USER_DEFAULT // DEPRECATED: user_default theme saving replaced by JSON config
-    FILE *f = fopen("user_default", "rb+");
-    if (!f) return;
-    fseek(f, 3, SEEK_SET);
-    fwrite(&app_theme, 1, 1, f);
-    fclose(f);
-#else
     config->get_data().ui.dark_theme = (app_theme == 0);
     config->auto_save();
-#endif
 }
 
 void UserPanel::stop_image_writing()
@@ -2001,16 +1967,8 @@ void UserPanel::switch_language()
         ui->RADIUS_DEC_BTN->setText("-");
     }
 
-#if ENABLE_USER_DEFAULT // DEPRECATED: user_default language saving replaced by JSON config
-    FILE *f = fopen("user_default", "rb+");
-    if (!f) return;
-    fseek(f, 4, SEEK_SET);
-    fwrite(&lang, 1, 1, f);
-    fclose(f);
-#else
     config->get_data().ui.english = (lang == 0);
     config->auto_save();
-#endif
 }
 
 void UserPanel::closeEvent(QCloseEvent *event)
@@ -2100,9 +2058,6 @@ void UserPanel::enable_controls(bool cam_rdy) {
     ui->INFO_CHECK->setEnabled(start_grabbing);
     ui->CENTER_CHECK->setEnabled(start_grabbing);
 
-    // NOTE: AutoScan feature temporarily disabled
-    // Signal that initialization is complete (for AutoScan integration)
-    // emit initialization_complete();
 }
 
 void UserPanel::init_control_port()
@@ -2406,16 +2361,7 @@ void UserPanel::setup_serial_port(QSerialPort **port, int id, QString port_num, 
         com_label[id]->setStyleSheet("color: #CD5C5C;");
     }
 
-#if ENABLE_USER_DEFAULT // DEPRECATED: user_default COM port saving replaced by JSON config
-    FILE *f = fopen("user_default", "rb+");
-    if (!f) return;
-    uchar port_num_uchar = port_num.toUInt() & 0xFF;
-    fseek(f, id, SEEK_SET);
-    fwrite(&port_num_uchar, 1, 1, f);
-    fclose(f);
-#else
     // COM port changes will be saved to JSON config when user saves configuration
-#endif
 }
 
 void UserPanel::on_ENUM_BUTTON_clicked()
@@ -2883,19 +2829,6 @@ void UserPanel::set_tcu_as_shared_port(bool share)
 
 void UserPanel::com_write_data(int com_idx, QByteArray data)
 {
-#if 0
-//    communicate_display(com_idx, data, data.length(), 0, true);
-    ControlPortThread *temp_port = NULL;
-    switch (com_idx) {
-    case 0: temp_port = ptr_tcu; break;
-    case 1: temp_port = ptr_lens; break;
-//    case 2: temp_port = ptr_laser; break;
-    case 3: temp_port = ptr_ptz; break;
-    default: break;
-    }
-//    if (temp_port) temp_port->communicate_display(data, data.length(), 0, true);
-    if (temp_port) temp_port->send_data(PortData{data, data.length(), 0, true, false});
-#endif
     ControlPort *temp = nullptr;
     switch (com_idx)
     {
@@ -6119,31 +6052,6 @@ void UserPanel::on_MISC_OPTION_3_currentIndexChanged(int index)
     ui->MISC_DISPLAY->setCurrentIndex(alt_display_option);
     ui->MISC_RADIO_3->setChecked(true);
 }
-#if 0
-void UserPanel::on_COM_DATA_RADIO_clicked()
-{
-    display_option = 0;
-    ui->DATA_EXCHANGE->show();
-    ui->PLUGIN_DISPLAY_1->hide();
-    ui->PTZ_GRP->hide();
-}
-
-void UserPanel::on_PTZ_RADIO_clicked()
-{
-    display_option = 2;
-    ui->DATA_EXCHANGE->hide();
-    ui->PLUGIN_DISPLAY_1->hide();
-    ui->PTZ_GRP->show();
-}
-
-void UserPanel::on_PLUGIN_RADIO_clicked()
-{
-    display_option = 3;
-    ui->DATA_EXCHANGE->hide();
-    ui->PLUGIN_DISPLAY_1->show();
-    ui->PTZ_GRP->hide();
-}
-#endif
 void UserPanel::screenshot()
 {
 //    image_mutex[0].lock();
@@ -6273,29 +6181,6 @@ void UserPanel::send_ctrl_cmd(uchar dir)
 }
 
 void UserPanel::ptz_button_pressed(int id) {
-//    qDebug("%dp", id);
-#if 0
-    switch(id){
-    case 0: send_ctrl_cmd(0x08); send_ctrl_cmd(0x04); break;
-    case 1: send_ctrl_cmd(0x08);                      break;
-    case 2: send_ctrl_cmd(0x08); send_ctrl_cmd(0x02); break;
-    case 3: send_ctrl_cmd(0x04);                      break;
-    case 4: {
-        if (QMessageBox::warning(this, "PTZ", "Initialize?", QMessageBox::StandardButton::Ok | QMessageBox::StandardButton::Cancel) == QMessageBox::StandardButton::Ok) {
-            uchar buffer_out[7] = {0xFF, 0x01, 0x00, 0x07, 0x00, 0x77, 0x7F};
-            ptr_ptz->communicate_display(QByteArray((char*)buffer_out, 7), 7, 1, false);
-        }
-        break;
-    }
-    case 5: send_ctrl_cmd(0x02);                      break;
-    case 6: send_ctrl_cmd(0x10); send_ctrl_cmd(0x04); break;
-    case 7: send_ctrl_cmd(0x10);                      break;
-    case 8: send_ctrl_cmd(0x10); send_ctrl_cmd(0x02); break;
-    default:                                          break;
-    }
-#endif
-//    ptr_ptz->ptz_control(static_cast<PTZThread::PARAMS>(id + 1));
-
     if (id == 4) if (QMessageBox::warning(nullptr, "PTZ", tr("Initialize?"), QMessageBox::StandardButton::Ok | QMessageBox::StandardButton::Cancel) != QMessageBox::StandardButton::Ok) return;
 
     switch (pref->ptz_type) {
@@ -6509,70 +6394,12 @@ void UserPanel::on_PTZ_SPEED_EDIT_editingFinished()
 
 void UserPanel::on_GET_ANGLE_BTN_clicked()
 {
-#if 0
-    uchar buffer_out[7] = {0};
-    buffer_out[0] = 0xFF;
-    buffer_out[1] = 0x01;
-    buffer_out[2] = 0x00;
-    buffer_out[3] = 0x51;
-    buffer_out[4] = 0x00;
-    buffer_out[5] = 0x00;
-    buffer_out[6] = 0x52;
-    QByteArray read = ptr_ptz->communicate_display(QByteArray((char*)buffer_out, 7), 7, 7, true);
-    angle_h = (((uchar)read[4] << 8) + (uchar)read[5]) / 100.0;
-    ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", angle_h));
-
-    QThread::msleep(30);
-
-    buffer_out[3] = 0x53;
-    buffer_out[6] = 0x54;
-    read = ptr_ptz->communicate_display(QByteArray((char*)buffer_out, 7), 7, 7, true);
-    angle_v = (((uchar)read[4] << 8) + (uchar)read[5]) / 100.0;
-    ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", angle_v > 40 ? angle_v - 360 : angle_v));
-#endif
-//    ptr_ptz->ptz_control(PTZThread::ANGLE_H, &angle_h);
-//    ptr_ptz->ptz_control(PTZThread::ANGLE_V, &angle_v);
     emit send_ptz_msg(PTZ::ANGLE_H);
     emit send_ptz_msg(PTZ::ANGLE_V);
 }
 
 void UserPanel::set_ptz_angle()
 {
-#if 0
-    static int angle = 0, sum = 0;
-    static uchar buffer_out[7] = {0};
-
-    angle_h += 360 * (int)((-angle_h) / 360);
-    if (angle_h < 0) angle_h += 360;
-    angle = angle_h * 100;
-    buffer_out[0] = 0xFF;
-    buffer_out[1] = 0x01;
-    buffer_out[2] = 0x00;
-    buffer_out[3] = 0x4B;
-    buffer_out[4] = (angle >> 8) & 0xFF;
-    buffer_out[5] = angle & 0xFF;
-    sum = 0;
-    for (int i = 1; i < 6; i++) sum += buffer_out[i];
-    buffer_out[6] = sum & 0xFF;
-    ptr_ptz->communicate_display(QByteArray((char*)buffer_out, 7), 7, 0, false);
-    ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", angle_h));
-
-    if (angle_v >  40) angle_v =  40;
-    if (angle_v < -40) angle_v = -40;
-    angle = angle_v * 100;
-    if (angle < 0) angle += 36000;
-    buffer_out[3] = 0x4D;
-    buffer_out[4] = (angle >> 8) & 0xFF;
-    buffer_out[5] = angle & 0xFF;
-    sum = 0;
-    for (int i = 1; i < 6; i++) sum += buffer_out[i];
-    buffer_out[6] = sum & 0xFF;
-    ptr_ptz->communicate_display(QByteArray((char*)buffer_out, 7), 7, 0, false);
-    ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", angle_v));
-#endif
-//    ptr_ptz->ptz_control(PTZThread::SET_H, &angle_h);
-//    ptr_ptz->ptz_control(PTZThread::SET_V, &angle_v);
-
     switch (pref->ptz_type) {
     case 0:
         emit send_ptz_msg(PTZ::SET_H, angle_h);
@@ -6924,20 +6751,6 @@ void UserPanel::on_PSEUDOCOLOR_CHK_stateChanged(int arg1)
     pseudocolor[0] = arg1;
     image_mutex[0].unlock();
 }
-
-// NOTE: AutoScan feature temporarily disabled
-// Auto-scan support methods - uncomment when handler methods are implemented
-/*
-void UserPanel::set_command_line_args(const QStringList& args)
-{
-    m_command_line_args = args;
-}
-
-void UserPanel::set_auto_scan_controller(AutoScan* autoScan)
-{
-    m_auto_scan_controller = autoScan;
-}
-*/
 
 void UserPanel::draw_yolo_boxes(cv::Mat& image, const std::vector<YoloResult>& results)
 {

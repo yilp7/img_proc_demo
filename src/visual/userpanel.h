@@ -25,9 +25,6 @@
 #include "visual/presetpanel.h"
 #include "visual/serialserver.h"
 #include "util/config.h"
-// NOTE: AutoScan feature temporarily disabled
-// #include "automation/autoscan.h"
-
 #include "port/tcu.h"
 #include "port/lens.h"
 #include "port/laser.h"
@@ -110,11 +107,6 @@ public:
     ~UserPanel();
 
     void init();
-
-    // NOTE: AutoScan feature temporarily disabled
-    // Auto-scan support - uncomment when handler methods are implemented
-    // void set_command_line_args(const QStringList& args);
-    // void set_auto_scan_controller(class AutoScan* autoScan);
 
     int grab_thread_process(int *display_idx);
     void swap_grab_thread_display(int display_idx1, int display_idx2);
@@ -298,12 +290,6 @@ private slots:
 
     // hide left parameter bar
     void on_HIDE_BTN_clicked();
-#if 0
-    // change misc. display
-    void on_COM_DATA_RADIO_clicked();
-    void on_PTZ_RADIO_clicked();
-    void on_PLUGIN_RADIO_clicked();
-#endif
     // change alt display content
     void on_MISC_RADIO_1_clicked();
     void on_MISC_RADIO_2_clicked();
@@ -367,10 +353,6 @@ signals:
 
     // pause / continue scan
     void update_scan(bool show);
-
-    // NOTE: AutoScan feature temporarily disabled
-    // Signal that initialization is complete (for AutoScan integration)
-    // void initialization_complete();
 
     // queue update_delay, mcp in thread
     void update_delay_in_thread();
@@ -540,13 +522,7 @@ private:
     QString         output_filename;            // target output name when exporting video
     QString         temp_output_filename;       // temp save location of target output file
     
-    // TODO: implement by inheriting QThread
-//    TCUThread*    ptr_tcu;
-//    InclinThread* ptr_inc;
-//    LensThread*   ptr_lens;
-//    LaserThread*  ptr_laser;
-//    PTZThread*    ptr_ptz;
-    // implemented thriugh moveToThread
+    // implemented through moveToThread
     TCU     *p_tcu;
     Lens    *p_lens;
     Laser   *p_laser;
@@ -694,11 +670,6 @@ private:
     // TEMP ONLY
     // TODO move to addons
     PluginInterface*        pluginInterface;            // for ir with visible light
-
-    // NOTE: AutoScan feature temporarily disabled
-    // Auto-scan support - uncomment when handler methods are implemented
-    // QStringList             m_command_line_args;
-    // class AutoScan*         m_auto_scan_controller;
 
     // YOLO Detection
     YoloDetector*           m_yolo_detector[3] = {nullptr, nullptr, nullptr};

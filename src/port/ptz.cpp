@@ -117,16 +117,16 @@ int PTZ::ptz_control(qint32 ptz_param, double val)
     QByteArray command;
     switch(ptz_param)
     {
-        case STOP:       { uchar buf[] = {0xFF, address, 0x00, 0x00, 0x00,      0x00,      0x00}; command = QByteArray((char*)buf, 7); goto chksm; }
-        case UP_LEFT:    { uchar buf[] = {0xFF, address, 0x00, 0x0C, ptz_speed, ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); goto chksm; }
-        case UP:         { uchar buf[] = {0xFF, address, 0x00, 0x08, 0x00,      ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); goto chksm; }
-        case UP_RIGHT:   { uchar buf[] = {0xFF, address, 0x00, 0x0A, ptz_speed, ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); goto chksm; }
-        case LEFT:       { uchar buf[] = {0xFF, address, 0x00, 0x04, ptz_speed, 0x00,      0x00}; command = QByteArray((char*)buf, 7); goto chksm; }
-        case SELF_CHECK: { uchar buf[] = {0xFF, address, 0x00, 0x07, 0x00,      0x77,      0x00}; command = QByteArray((char*)buf, 7); goto chksm; }
-        case RIGHT:      { uchar buf[] = {0xFF, address, 0x00, 0x02, ptz_speed, 0x00,      0x00}; command = QByteArray((char*)buf, 7); goto chksm; }
-        case DOWN_LEFT:  { uchar buf[] = {0xFF, address, 0x00, 0x14, ptz_speed, ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); goto chksm; }
-        case DOWN:       { uchar buf[] = {0xFF, address, 0x00, 0x10, 0x00,      ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); goto chksm; }
-        case DOWN_RIGHT: { uchar buf[] = {0xFF, address, 0x00, 0x12, ptz_speed, ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); goto chksm; }
+        case STOP:       { uchar buf[] = {0xFF, address, 0x00, 0x00, 0x00,      0x00,      0x00}; command = QByteArray((char*)buf, 7); break; }
+        case UP_LEFT:    { uchar buf[] = {0xFF, address, 0x00, 0x0C, ptz_speed, ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); break; }
+        case UP:         { uchar buf[] = {0xFF, address, 0x00, 0x08, 0x00,      ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); break; }
+        case UP_RIGHT:   { uchar buf[] = {0xFF, address, 0x00, 0x0A, ptz_speed, ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); break; }
+        case LEFT:       { uchar buf[] = {0xFF, address, 0x00, 0x04, ptz_speed, 0x00,      0x00}; command = QByteArray((char*)buf, 7); break; }
+        case SELF_CHECK: { uchar buf[] = {0xFF, address, 0x00, 0x07, 0x00,      0x77,      0x00}; command = QByteArray((char*)buf, 7); break; }
+        case RIGHT:      { uchar buf[] = {0xFF, address, 0x00, 0x02, ptz_speed, 0x00,      0x00}; command = QByteArray((char*)buf, 7); break; }
+        case DOWN_LEFT:  { uchar buf[] = {0xFF, address, 0x00, 0x14, ptz_speed, ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); break; }
+        case DOWN:       { uchar buf[] = {0xFF, address, 0x00, 0x10, 0x00,      ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); break; }
+        case DOWN_RIGHT: { uchar buf[] = {0xFF, address, 0x00, 0x12, ptz_speed, ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); break; }
         case ANGLE_H:
         case ANGLE_V:
         {
@@ -173,9 +173,7 @@ int PTZ::ptz_control(qint32 ptz_param, double val)
         case ADDRESS: address = val; return 0;
         default: return -11111;
     }
-chksm:
     command[6] = checksum(command);
-send:
     switch (ptz_param)
     {
         case ANGLE_H:

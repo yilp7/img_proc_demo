@@ -155,22 +155,6 @@ int Lens::lens_control(qint32 lens_param, uint val)
         }
         case STEPPING:
         {
-#if 0
-            lens_speed = val;
-            uchar out_data[9] = {0};
-            out_data[0] = 0xB0;
-            out_data[1] = 0x01;
-            out_data[2] = 0xA0;
-            out_data[3] = 0x01;
-            out_data[4] = lens_speed;
-            out_data[5] = lens_speed;
-            out_data[6] = lens_speed;
-            out_data[7] = lens_speed;
-            out_data[8] = (4 * uint(lens_speed) + 0xA2) & 0xFF;
-
-            command = QByteArray((char*)out_data, 9);
-            goto send;
-#endif
             lens_speed = std::min(std::max((uchar)val, uchar(0x01)), uchar(0x3F)); return 0;
         }
         case ADDRESS: address = val; return 0;

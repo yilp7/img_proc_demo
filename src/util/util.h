@@ -1,7 +1,6 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#define ENABLE_USER_DEFAULT 0  // DEPRECATED: Replaced by JSON config system
 #define ENABLE_PORT_JSON    1
 #define SIMPLE_UI           0
 

@@ -172,20 +172,6 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->TCP_SERVER_CHK, &QCheckBox::stateChanged, this,
             [this](int arg1){ emit set_tcp_status(ui->COM_LIST->currentIndex(), arg1); });
 
-#if ENABLE_USER_DEFAULT // DEPRECATED: user_default TCP server IP saving replaced by JSON config
-    connect(ui->TCP_SERVER_IP_EDIT, &QLineEdit::returnPressed, this,
-            [this]() {
-                FILE *f = fopen("user_default", "rb+");
-                if (!f) return;
-                uint server_ip = 0;
-
-                for (QString ip_sub : ui->TCP_SERVER_IP_EDIT->text().split('.')) server_ip <<= 8, server_ip += ip_sub.toUInt();
-
-                fseek(f, 10, SEEK_SET);
-                fwrite(&server_ip, 4, 1, f);
-                fclose(f);
-            });
-#endif
     connect(ui->SHARE_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ share_port = arg1; emit share_tcu_port(arg1); });
 
 //    QFont temp = QFont(consolas);
@@ -242,63 +228,17 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->DELAY_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
                 emit delay_offset_changed(delay_offset * dist_ns);
-#if ENABLE_USER_DEFAULT // DEPRECATED: user_default offset saving replaced by JSON config
-                FILE *f = fopen("user_default", "rb+");
-                if (!f) return;
-                int delay_offset_int = std::round(delay_offset);
-                fseek(f, 14, SEEK_SET);
-                fwrite(&delay_offset_int, 4, 1, f);
-                fclose(f);
-#endif
     });
     connect(ui->MAX_DOV_EDT, &QLineEdit::editingFinished, this, [this](){ emit max_dov_changed(max_dov); });
     connect(ui->GATE_WIDTH_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
                 emit gate_width_offset_changed(gate_width_offset * dist_ns);
-#if ENABLE_USER_DEFAULT // DEPRECATED: user_default offset saving replaced by JSON config
-                FILE *f = fopen("user_default", "rb+");
-                if (!f) return;
-                int gate_width_offset_int = std::round(gate_width_offset);
-                fseek(f, 18, SEEK_SET);
-                fwrite(&gate_width_offset_int, 4, 1, f);
-                fclose(f);
-#endif
     });
     connect(ui->MAX_LASER_EDT, &QLineEdit::editingFinished, this, [this](){ emit max_laser_changed(max_laser_width); });
     connect(ui->LASER_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
                 emit laser_offset_changed(laser_width_offset);
-#if ENABLE_USER_DEFAULT // DEPRECATED: user_default offset saving replaced by JSON config
-                FILE *f = fopen("user_default", "rb+");
-                if (!f) return;
-                int laser_offset_int = std::round(laser_width_offset);
-                fseek(f, 22, SEEK_SET);
-                fwrite(&laser_offset_int, 4, 1, f);
-                fclose(f);
-#endif
     });
-#if ENABLE_USER_DEFAULT // DEPRECATED: user_default loading replaced by JSON config
-    FILE *f = fopen("user_default", "rb");
-    if (f) {
-        uint server_ip;
-        fseek(f, 10, SEEK_SET);
-        fread(&server_ip, 4, 1, f);
-        if (server_ip)
-        {
-            QString ip;
-            while (server_ip) ip = QString::number(server_ip & 0xFF) + "." + ip, server_ip >>= 8;
-            ui->TCP_SERVER_IP_EDIT->setText(ip.left(ip.length() - 1));
-        }
-        int delay_offset_int, gate_width_offset_int, laser_offset_int;
-        fread(&delay_offset_int, 4, 1, f);
-        emit delay_offset_changed((delay_offset = delay_offset_int) * dist_ns);
-        fread(&gate_width_offset_int, 4, 1, f);
-        emit gate_width_offset_changed((gate_width_offset = gate_width_offset_int) * dist_ns);
-        fread(&laser_offset_int, 4, 1, f);
-        emit laser_offset_changed(laser_width_offset = laser_offset_int);
-        fclose(f);
-    }
-#endif
 
     ui->PS_CONFIG_GRP->hide();
     ui->TCU_PS_CONFIG_LIST->addItem("GW_A");

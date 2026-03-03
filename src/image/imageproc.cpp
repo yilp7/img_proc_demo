@@ -623,24 +623,12 @@ void ImageProc::aindane(cv::Mat &src, cv::Mat &res, std::vector<int> sigma)
     static cv::Mat I;
     if (src.channels() != 1) cv::cvtColor(src, I, cv::COLOR_RGB2GRAY); // Eq. 1
     else I = src.clone();
-#if 1
     static uint hist[256];
     memset(hist, 0, 256 * sizeof(uint));
     for (int i = 0; i < h; i++) for (int j = 0; j < w; j++) hist[(src.data + i * src.step)[j]]++;
     uint count = 0, limit = src.total() * 0.1, L = 0;
     for (; L < 256 && count <= limit; L++) count += hist[L];
     float z = L >= 150 ? 1 : (L <= 50 ? 0 : (L - 50) / 100.);
-#endif
-#if 0
-    static int histsize = 256;
-    static float range[] = { 0, 256 };
-    const float* histRanges = { range };
-    cv::Mat hist;
-    cv::calcHist(&I, 1, 0, cv::Mat(), hist, 1, &histsize, &histRanges, true, false);
-    uint count = 0, limit = src.total() * 0.1, L = 0;
-    for (; L < 256 && count <= limit; L++) count += hist.at<int>(L);
-    float z = L >= 150 ? 1 : (L <= 50 ? 0 : (L - 50) / 100.);
-#endif
     cv::Mat mean, stddev;
     cv::meanStdDev(I, mean, stddev);
     float sig = stddev.at<double>(0, 0);

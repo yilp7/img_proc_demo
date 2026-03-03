@@ -1,7 +1,5 @@
 #include "visual/userpanel.h"
 #include "util/version.h"
-// NOTE: AutoScan feature temporarily disabled - classes exist but integration incomplete
-// #include "automation/autoscan.h"
 
 //#define _DEBUG
 //#include "vld.h"
@@ -113,39 +111,6 @@ int main(int argc, char *argv[])
 //    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
 //    qDebug() << QTextCodec::availableCodecs();
 
-#if ENABLE_USER_DEFAULT
-    const uint user_file_length = 26;
-    uchar INIT[user_file_length] = {VER_MAJOR, VER_MINOR, VER_PATCH, 0};
-    QFile user_file("user_default");
-    QDataStream user_file_binary;
-    bool reset_user_file = !user_file.exists();
-    if (user_file.exists()) {
-        user_file.open(QIODevice::ReadOnly);
-        // v0.6.2: version(uchar) * 4 + com(uchar) * 5 + offset(uint) * 3 + theme(uchar) + language(uchar) = 23
-        // v0.7.1: version(uchar) * 4 + com(uchar) * 5 + offset(uint) * 3 + theme(uchar) + language(uchar) = 23
-        //         (optional) preset heading(uchar) * 4 + preset count(uchar) + preset(name size 64 + data size 72) * count;
-        // v0.8.1: version(uchar) * 3 + theme(uchar) + language(uchar) +
-        //         com(uchar) * 5 + server(uint) + offset(uint) * 3 = 26
-        reset_user_file |= bool(user_file.size() - user_file_length);
-        user_file_binary.setDevice(&user_file);
-        uchar ver[3];
-        user_file_binary.readRawData((char*)ver, 3);
-        reset_user_file |= bool(ver[0] + ver[1] + ver[2] - VER_MAJOR - VER_MINOR - VER_PATCH);
-        user_file.close();
-    }
-    if (reset_user_file) {
-        user_file.open(QIODevice::WriteOnly);
-        user_file_binary.setDevice(&user_file);
-        user_file_binary.writeRawData((char*)INIT, user_file_length);
-        user_file.close();
-    }
-
-#ifdef WIN32
-    int attr = GetFileAttributes("user_default");
-    if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) SetFileAttributes("user_default", attr | FILE_ATTRIBUTE_HIDDEN);
-#endif
-#endif // ENABLE_USER_DEFAULT - DEPRECATED
-
     QApplication a(argc, argv);
 
 //    QPixmap pixmap("screen.png");
@@ -189,18 +154,9 @@ int main(int argc, char *argv[])
     cursor_light_resize_md = QCursor(QPixmap(":/cursor/light/resize_md").scaled(16, 16));
     cursor_light_resize_sd = QCursor(QPixmap(":/cursor/light/resize_sd").scaled(16, 16));
 
-#if ENABLE_USER_DEFAULT // DEPRECATED: user_default theme loading replaced by JSON config
-    FILE *f = fopen("user_default", "rb");
-    if (f) {
-        fseek(f, 3, SEEK_SET);
-        fread(&app_theme, 1, 1, f);
-        fclose(f);
-    }
-#else
     // Theme will be loaded from JSON config in UserPanel initialization
     // Default to dark theme
     app_theme = 0;
-#endif
 
     a.setStyleSheet(app_theme ? theme_light : theme_dark);
     cursor_curr_pointer   = app_theme ? cursor_light_pointer   : cursor_dark_pointer;
@@ -217,27 +173,7 @@ int main(int argc, char *argv[])
     SetUnhandledExceptionFilter(ExceptionFilter);
 #endif
 
-    // Parse command line arguments
-    QStringList args = a.arguments();
-
-    // NOTE: AutoScan feature temporarily disabled - uncomment when ready to implement
-    // AutoScan integration requires handler methods in UserPanel:
-    // - handle_camera_initialization()
-    // - handle_scan_preset_application()
-    // - handle_scan_start()
-    /*
-    AutoScan autoScan;
-    autoScan.set_command_line_args(args);
-    */
-
     UserPanel w;
-    // w.set_auto_scan_controller(&autoScan);
-
-    /*
-    // Connect UserPanel initialization complete signal to AutoScan
-    QObject::connect(&w, &UserPanel::initialization_complete,
-                     &autoScan, &AutoScan::on_initialization_complete);
-    */
 
     w.init();
     w.show();
