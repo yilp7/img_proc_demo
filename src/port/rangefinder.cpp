@@ -50,25 +50,31 @@ int RangeFinder::rf_control(qint32 rf_param, uint val)
     case 0:
         switch (rf_param) {
         case SERIAL:
-            command = generate_ba(new uchar[6]{0x5A, 0x0D, 0x02, 0x0D, 0x0D, 0x00}, 6);
+        {
+            uchar buf[] = {0x5A, 0x0D, 0x02, 0x0D, 0x0D, 0x00};
+            command = QByteArray((char*)buf, 6);
             goto send;
+        }
         case FREQ_SET:
         {
             freq = val;
             uint param = 1e6 / freq - 1;
-            command = generate_ba(new uchar[6]{0x5A, 0x0B, 0x02, uchar(param & 0xFF), uchar((param >> 8) & 0xFF), 0x00}, 6);
+            uchar buf[] = {0x5A, 0x0B, 0x02, uchar(param & 0xFF), uchar((param >> 8) & 0xFF), 0x00};
+            command = QByteArray((char*)buf, 6);
             goto send;
         }
         case FREQ_GET:
         {
-            command = generate_ba(new uchar[6]{0x5A, 0x1B, 0x02, 0x1B, 0x1B, 0x00}, 6);
+            uchar buf[] = {0x5A, 0x1B, 0x02, 0x1B, 0x1B, 0x00};
+            command = QByteArray((char*)buf, 6);
             goto send;
         }
         case BAUDRATE:
         {
             baudrate = val;
             uint param = val / 100;
-            command = generate_ba(new uchar[6]{0x5A, 0x06, 0x02, uchar(param & 0xFF), uchar((param >> 8) & 0xFF), 0x00}, 6);
+            uchar buf[] = {0x5A, 0x06, 0x02, uchar(param & 0xFF), uchar((param >> 8) & 0xFF), 0x00};
+            command = QByteArray((char*)buf, 6);
             goto send;
         }
         case NO_PARAM: goto read;

@@ -1,6 +1,7 @@
 #include "userpanel.h"
 #include "ui_user_panel.h"
 #include "ui_preferences.h"
+#include "util/constants.h"
 
 GrabThread::GrabThread(UserPanel *panel, int idx)
 {
@@ -128,7 +129,7 @@ UserPanel::UserPanel(QWidget *parent) :
     laser_width(40),
     delay_dist(15),
     depth_of_view(6),
-    mcp_max(255),
+    mcp_max(MAX_MCP_8BIT),
     aliasing_mode(false),
     aliasing_level(0),
     focus_direction(0),
@@ -176,7 +177,7 @@ UserPanel::UserPanel(QWidget *parent) :
     lens_adjust_ongoing(0),
     ptz_adjust_ongoing(0),
     lang(0),
-    tp(40),
+    tp(THREAD_POOL_SIZE),
     ptz_grp(NULL),
     ptz_speed(32),
     angle_h(0),
@@ -934,7 +935,7 @@ int UserPanel::grab_thread_process(int *idx) {
     QImage stream;
     cv::Mat sobel;
     int ww, hh, scan_img_count = -1;
-    float weight = _h / 1024.0; // font scale & thickness
+    float weight = _h / FONT_SCALE_DIVISOR; // font scale & thickness
     prev_3d = cv::Mat(_h, _w, CV_8UC3);
     prev_img = cv::Mat(_h, _w, CV_MAKETYPE(_pixel_depth == 8 ? CV_8U : CV_16U, is_color[thread_idx] ? 3 : 1));
     user_mask[thread_idx] = cv::Mat::zeros(_h, _w, CV_8UC1);
@@ -970,7 +971,7 @@ int UserPanel::grab_thread_process(int *idx) {
             QMutexLocker locker(&image_mutex[thread_idx]);
 
             // Limit queue size safely
-            while (q_img[thread_idx].size() > 5) {
+            while (q_img[thread_idx].size() > MAX_QUEUE_SIZE) {
                 q_img[thread_idx].pop();
                 // Only pop frame info if it exists and device expects it
                 if (device_type == 1) {
@@ -999,7 +1000,7 @@ int UserPanel::grab_thread_process(int *idx) {
             if (q_img[thread_idx].empty()) {
 #ifdef LVTONG
                 locker.unlock();
-                QThread::msleep(10);
+                QThread::msleep(QUEUE_EMPTY_SLEEP_MS);
                 continue;
 #else
 //                if (device_type == -2) continue;
@@ -1089,7 +1090,7 @@ int UserPanel::grab_thread_process(int *idx) {
 
             // mcp self-adaptive
             if (pref->auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
-                int thresh_num = img_mem[thread_idx].total() / 200, thresh = (1 << pixel_depth[thread_idx]) - 1;
+                int thresh_num = img_mem[thread_idx].total() / AUTO_MCP_DIVISOR, thresh = (1 << pixel_depth[thread_idx]) - 1;
                 while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
 //                if (thresh > (1 << pixel_depth[thread_idx]) * 0.94) emit update_mcp_in_thread(ptr_tcu->mcp - sqrt(thresh - (1 << pixel_depth[thread_idx]) * 0.94));
                 if (thresh > (1 << pixel_depth[thread_idx]) * 0.94) emit update_mcp_in_thread(p_tcu->get(TCU::MCP) - sqrt(thresh - (1 << pixel_depth[thread_idx]) * 0.94));
@@ -3011,9 +3012,9 @@ void UserPanel::set_tcu_type(int idx)
     if (diff) update_tcu_param_pos(diff, ui->GATE_WIDTH_B_UNIT_U, ui->GATE_WIDTH_B_EDIT_N, ui->GATE_WIDTH_B_UNIT_N, ui->GATE_WIDTH_B_EDIT_P);
 
     switch (idx) {
-    case 0: mcp_max = 255; break;
-    case 1: mcp_max = 4095; break;
-    case 2: mcp_max = 4095; break;
+    case 0: mcp_max = MAX_MCP_8BIT; break;
+    case 1: mcp_max = MAX_MCP_12BIT; break;
+    case 2: mcp_max = MAX_MCP_12BIT; break;
     default: break;
     }
     ui->MCP_SLIDER->setMaximum(mcp_max);
@@ -3860,7 +3861,7 @@ void UserPanel::update_laser_width()
 {
 #ifndef LVTONG
     static QElapsedTimer t;
-    if (t.elapsed() < 40) return;
+    if (t.elapsed() < THROTTLE_MS) return;
     t.start();
 #endif
     if (laser_width < 0) laser_width = 0;
@@ -3875,7 +3876,7 @@ void UserPanel::update_delay()
 {
 //    qDebug() << sender();
     static QElapsedTimer t;
-    if (t.isValid() && t.elapsed() < 40) return;
+    if (t.isValid() && t.elapsed() < THROTTLE_MS) return;
     t.restart();
 
     // REPEATED FREQUENCY
@@ -3902,7 +3903,7 @@ void UserPanel::update_delay()
 void UserPanel::update_gate_width() {
 #ifndef LVTONG
     static QElapsedTimer t;
-    if (t.isValid() && t.elapsed() < 40) return;
+    if (t.isValid() && t.elapsed() < THROTTLE_MS) return;
     t.restart();
 #endif
     if (depth_of_view < 0) depth_of_view = 0;
@@ -4188,7 +4189,8 @@ void UserPanel::on_DIST_BTN_clicked() {
 //        qDebug("%s", read_dist.toLatin1().data());
 
         read.clear();
-        read = communicate_display(1, generate_ba(new uchar[6]{0xEE, 0x16, 0x02, 0x03, 0x02, 0x05}, 6), 6, 10, true);
+        uchar buf_dist[] = {0xEE, 0x16, 0x02, 0x03, 0x02, 0x05};
+        read = communicate_display(1, QByteArray((char*)buf_dist, 6), 6, 10, true);
 //        qDebug("%s", read_dist.toLatin1().data());
 //        communicate_display(com[1], 7, 7, true);
 //        QString ascii;
@@ -4480,7 +4482,8 @@ void UserPanel::start_laser()
 {
 //    ptr_tcu->communicate_display(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
 //    ptr_tcu->send_data(PortData{generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false, false});
-    p_tcu->emit send_data(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 0, 0);
+    uchar buf_laser_on[] = {0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99};
+    p_tcu->emit send_data(QByteArray((char*)buf_laser_on, 7), 0, 0);
 
     QTimer::singleShot(1000, this, SLOT(init_laser()));
 }
@@ -5949,7 +5952,8 @@ void UserPanel::on_LASER_BTN_clicked()
     if (ui->LASER_BTN->text() == tr("ON")) {
         ui->LASER_BTN->setEnabled(false);
 //        ptr_tcu->communicate_display(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 7, 0, false);
-        p_tcu->emit send_data(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99}, 7), 0, 0);
+        uchar buf_laser_on[] = {0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99};
+        p_tcu->emit send_data(QByteArray((char*)buf_laser_on, 7), 0, 0);
         QTimer::singleShot(4000, this, SLOT(start_laser()));
     }
     else {
@@ -5965,7 +5969,8 @@ void UserPanel::on_LASER_BTN_clicked()
 //        qDebug() << QString("OFF\r");
         if (ui->FIRE_LASER_BTN->text() == tr("STOP")) ui->FIRE_LASER_BTN->click();
 //        ptr_tcu->communicate_display(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 7, 0, false);
-        p_tcu->send_data(generate_ba(new uchar[7]{0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99}, 7), 0, 0);
+        uchar buf_laser_off[] = {0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99};
+        p_tcu->send_data(QByteArray((char*)buf_laser_off, 7), 0, 0);
 
         ui->LASER_BTN->setText(tr("ON"));
         ui->CURRENT_EDIT->setEnabled(false);

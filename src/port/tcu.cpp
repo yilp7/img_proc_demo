@@ -1,4 +1,6 @@
 #include "tcu.h"
+#include "tcu_protocol.h"
+#include "util/constants.h"
 
 TCU::TCU(int index, int tcu_type) :
     ControlPort{index},
@@ -15,7 +17,7 @@ TCU::TCU(int index, int tcu_type) :
     mcp(5),
     laser_on(0b0000),
     tcu_dist(300),
-    dist_ns(3e8 * 1e-9 / 2),
+    dist_ns(LIGHT_SPEED_M_NS),
     delay_n(0),
     gate_width_n(0),
     delay_dist(delay_a * dist_ns),
@@ -29,7 +31,7 @@ TCU::TCU(int index, int tcu_type) :
     use_gw_lut(false),
     gw_lut{0}
 {
-    uchar q[] = {0x88, 0x15, 0x00, 0x00, 0x00, 0x00, 0x99};
+    uchar q[] = {TCU_HEAD, TCU_QUERY_CMD, 0x00, 0x00, 0x00, 0x00, TCU_TAIL};
     query = QByteArray((char*)q, 7);
 }
 
@@ -166,7 +168,7 @@ void TCU::try_communicate()
     read = last_read;
     retrieve_mutex.unlock();
 
-    if (read.size() != 1 || read[0] != char(0x15)) successive_count = 0;
+    if (read.size() != 1 || read[0] != char(TCU_QUERY_REPLY)) successive_count = 0;
     else                                           successive_count++;
 }
 
@@ -174,15 +176,15 @@ void TCU::set_user_param(qint32 tcu_param, double val)
 {
     uint clock_cycle;
     switch (tcu_type.load()) {
-        case 0: clock_cycle = 8; break;
-        case 1: clock_cycle = 4; break;
-        case 2: clock_cycle = 4; break;
+        case 0: clock_cycle = TCU_CLOCK_8; break;
+        case 1: clock_cycle = TCU_CLOCK_4; break;
+        case 2: clock_cycle = TCU_CLOCK_4; break;
         default: break;
     }
 
     switch (tcu_param) {
         case REPEATED_FREQ: rep_freq = val;     set_tcu_param(tcu_param, (1e6 / clock_cycle) / rep_freq); break;
-        case LASER_WIDTH  : laser_width = val;  set_tcu_param(tcu_param, tcu_type.load() == 0 ? laser_width / 8 : laser_width); break;
+        case LASER_WIDTH  : laser_width = val;  set_tcu_param(tcu_param, tcu_type.load() == 0 ? laser_width / TCU_CLOCK_8 : laser_width); break;
         case DELAY_A:       delay_a = val;      set_tcu_param(tcu_param, delay_a); break;
         case GATE_WIDTH_A:  gate_width_a = val; set_tcu_param(tcu_param, gate_width_a); break;
         case DELAY_B:       delay_b = val;      set_tcu_param(tcu_param, delay_b); emit tcu_param_updated(EST_DIST); break;
@@ -208,8 +210,8 @@ void TCU::set_user_param(qint32 tcu_param, double val)
             if (scan_mode) rep_freq = rep_freq_scan;
             else if (auto_rep_freq) {
                 // change repeated frequency according to delay: rep frequency (kHz) <= 1s / delay (μs)
-                rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000) : 30;
-                if (rep_freq > 30) rep_freq = 30;
+                rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000) : TCU_MAX_PRF_KHZ;
+                if (rep_freq > TCU_MAX_PRF_KHZ) rep_freq = TCU_MAX_PRF_KHZ;
 //                if (rep_freq < 10) rep_freq = 10;
                 set_user_param(TCU::REPEATED_FREQ, rep_freq);
             }
@@ -270,7 +272,7 @@ void TCU::set_user_param(qint32 tcu_param, uint val)
         {
             int change = laser_on ^ int(val);
             laser_on = val;
-            for(int i = 0; i < 4; i++) if ((change >> i) & 1) set_tcu_param(TCU::PARAMS(TCU::LASER_1 + i), int(val) & (1 << i) ? 8 : 4);
+            for(int i = 0; i < 4; i++) if ((change >> i) & 1) set_tcu_param(TCU::PARAMS(TCU::LASER_1 + i), int(val) & (1 << i) ? 0x08 : 0x04);
             break;
         }
         case PS_STEP_1: ps_step[0] = val; break;
@@ -340,9 +342,9 @@ void TCU::set_tcu_param(qint32 tcu_param, double val)
             decimal_part = 0;
 
             QByteArray out(7, 0x00);
-            out[0] = 0x88;
+            out[0] = TCU_HEAD;
             out[1] = tcu_param;
-            out[6] = 0x99;
+            out[6] = TCU_TAIL;
 
             out[5] = integer_part & 0xFF; integer_part >>= 8;
             out[4] = integer_part & 0xFF; integer_part >>= 8;
@@ -392,9 +394,9 @@ void TCU::set_tcu_param(qint32 tcu_param, double val)
             }
 
             QByteArray out_1(7, 0x00);
-            out_1[0] = 0x88;
+            out_1[0] = TCU_HEAD;
             out_1[1] = tcu_param;
-            out_1[6] = 0x99;
+            out_1[6] = TCU_TAIL;
 
             out_1[5] = integer_part & 0xFF; integer_part >>= 8;
             out_1[4] = integer_part & 0xFF; integer_part >>= 8;
@@ -405,9 +407,9 @@ void TCU::set_tcu_param(qint32 tcu_param, double val)
 
             if (param_ps != TCU::PARAMS::NO_PARAM) {
                 QByteArray out_2(7, 0x00);
-                out_2[0] = 0x88;
+                out_2[0] = TCU_HEAD;
                 out_2[1] = param_ps;
-                out_2[6] = 0x99;
+                out_2[6] = TCU_TAIL;
 
                 out_2[5] = decimal_part & 0xFF; decimal_part >>= 8;
                 out_2[4] = decimal_part & 0xFF; decimal_part >>= 8;
@@ -451,9 +453,9 @@ void TCU::set_tcu_param(qint32 tcu_param, double val)
             }
 
             QByteArray out_1(7, 0x00);
-            out_1[0] = 0x88;
+            out_1[0] = TCU_HEAD;
             out_1[1] = tcu_param;
-            out_1[6] = 0x99;
+            out_1[6] = TCU_TAIL;
 
             out_1[5] = integer_part & 0xFF; integer_part >>= 8;
             out_1[4] = integer_part & 0xFF; integer_part >>= 8;
@@ -464,9 +466,9 @@ void TCU::set_tcu_param(qint32 tcu_param, double val)
 
             if (param_ps != TCU::PARAMS::NO_PARAM) {
                 QByteArray out_2(7, 0x00);
-                out_2[0] = 0x88;
+                out_2[0] = TCU_HEAD;
                 out_2[1] = param_ps;
-                out_2[6] = 0x99;
+                out_2[6] = TCU_TAIL;
 
                 out_2[5] = decimal_part & 0xFF; decimal_part >>= 8;
                 out_2[4] = decimal_part & 0xFF; decimal_part >>= 8;

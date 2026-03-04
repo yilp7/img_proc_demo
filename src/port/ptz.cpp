@@ -1,4 +1,5 @@
 #include "ptz.h"
+#include "pelco_protocol.h"
 
 PTZ::PTZ(int index, uchar address, uint speed) :
     ControlPort{index},
@@ -7,10 +8,10 @@ PTZ::PTZ(int index, uchar address, uint speed) :
     angle_v(0),
     ptz_speed(speed)
 {
-    uchar q0[] = {0xFF, address, 0x00, 0x51, 0x00, 0x00, 0x00};
+    uchar q0[] = {SYNC_BYTE, address, 0x00, PTZ_QUERY_H, 0x00, 0x00, 0x00};
     query[0] = QByteArray((char*)q0, 7);
     query[0][6] = checksum(query[0]);
-    uchar q1[] = {0xFF, address, 0x00, 0x53, 0x00, 0x00, 0x00};
+    uchar q1[] = {SYNC_BYTE, address, 0x00, PTZ_QUERY_V, 0x00, 0x00, 0x00};
     query[1] = QByteArray((char*)q1, 7);
     query[1][6] = checksum(query[1]);
 }
@@ -75,7 +76,7 @@ void PTZ::try_communicate()
 
     static int write_idx = 0;
 
-    communicate(query[write_idx], 7, 40, true);
+    communicate(query[write_idx], 7, READ_TIMEOUT_MS, true);
     QByteArray read;
     retrieve_mutex.lock();
     read = last_read;
@@ -86,10 +87,10 @@ void PTZ::try_communicate()
     switch (write_idx)
     {
         case 0:
-            if (read[3] == char(0x59)) {
+            if (read[3] == char(PTZ_REPLY_H)) {
                 successive_count++;
-                angle_fb %= 36000;
-                double temp_angle = angle_fb / 100.;
+                angle_fb %= FULL_ROTATION;
+                double temp_angle = angle_fb / (double)ANGLE_SCALE;
                 // Ensure horizontal angle is always positive (0 to 360)
                 temp_angle = temp_angle < 0 ? temp_angle + 360.0 : temp_angle;
                 emit ptz_param_updated(PTZ::ANGLE_H, angle_h = temp_angle);
@@ -97,12 +98,12 @@ void PTZ::try_communicate()
             else successive_count = 0;
             break;
         case 1:
-            if (read[3] == char(0x5B))
+            if (read[3] == char(PTZ_REPLY_V))
             {
                 successive_count++;
-                angle_fb = (angle_fb + 4000) % 36000 - 4000;
-                angle_fb = std::min(std::max(angle_fb, -4000), 4000);
-                emit ptz_param_updated(PTZ::ANGLE_V, angle_v = angle_fb / 100.);
+                angle_fb = (angle_fb + VERTICAL_LIMIT) % FULL_ROTATION - VERTICAL_LIMIT;
+                angle_fb = std::min(std::max(angle_fb, -VERTICAL_LIMIT), VERTICAL_LIMIT);
+                emit ptz_param_updated(PTZ::ANGLE_V, angle_v = angle_fb / (double)ANGLE_SCALE);
             }
             else successive_count = 0;
             break;
@@ -117,24 +118,24 @@ int PTZ::ptz_control(qint32 ptz_param, double val)
     QByteArray command;
     switch(ptz_param)
     {
-        case STOP:       { uchar buf[] = {0xFF, address, 0x00, 0x00, 0x00,      0x00,      0x00}; command = QByteArray((char*)buf, 7); break; }
-        case UP_LEFT:    { uchar buf[] = {0xFF, address, 0x00, 0x0C, ptz_speed, ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); break; }
-        case UP:         { uchar buf[] = {0xFF, address, 0x00, 0x08, 0x00,      ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); break; }
-        case UP_RIGHT:   { uchar buf[] = {0xFF, address, 0x00, 0x0A, ptz_speed, ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); break; }
-        case LEFT:       { uchar buf[] = {0xFF, address, 0x00, 0x04, ptz_speed, 0x00,      0x00}; command = QByteArray((char*)buf, 7); break; }
-        case SELF_CHECK: { uchar buf[] = {0xFF, address, 0x00, 0x07, 0x00,      0x77,      0x00}; command = QByteArray((char*)buf, 7); break; }
-        case RIGHT:      { uchar buf[] = {0xFF, address, 0x00, 0x02, ptz_speed, 0x00,      0x00}; command = QByteArray((char*)buf, 7); break; }
-        case DOWN_LEFT:  { uchar buf[] = {0xFF, address, 0x00, 0x14, ptz_speed, ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); break; }
-        case DOWN:       { uchar buf[] = {0xFF, address, 0x00, 0x10, 0x00,      ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); break; }
-        case DOWN_RIGHT: { uchar buf[] = {0xFF, address, 0x00, 0x12, ptz_speed, ptz_speed, 0x00}; command = QByteArray((char*)buf, 7); break; }
+        case STOP:       { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_STOP,       0x00,                  0x00,                  0x00}; command = QByteArray((char*)buf, 7); break; }
+        case UP_LEFT:    { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_UP_LEFT,    ptz_speed,             ptz_speed,             0x00}; command = QByteArray((char*)buf, 7); break; }
+        case UP:         { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_UP,         0x00,                  ptz_speed,             0x00}; command = QByteArray((char*)buf, 7); break; }
+        case UP_RIGHT:   { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_UP_RIGHT,   ptz_speed,             ptz_speed,             0x00}; command = QByteArray((char*)buf, 7); break; }
+        case LEFT:       { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_LEFT,       ptz_speed,             0x00,                  0x00}; command = QByteArray((char*)buf, 7); break; }
+        case SELF_CHECK: { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_SELF_CHECK, 0x00,                  PTZ_SELF_CHECK_DATA, 0x00}; command = QByteArray((char*)buf, 7); break; }
+        case RIGHT:      { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_RIGHT,      ptz_speed,             0x00,                  0x00}; command = QByteArray((char*)buf, 7); break; }
+        case DOWN_LEFT:  { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_DOWN_LEFT,  ptz_speed,             ptz_speed,             0x00}; command = QByteArray((char*)buf, 7); break; }
+        case DOWN:       { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_DOWN,       0x00,                  ptz_speed,             0x00}; command = QByteArray((char*)buf, 7); break; }
+        case DOWN_RIGHT: { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_DOWN_RIGHT, ptz_speed,             ptz_speed,             0x00}; command = QByteArray((char*)buf, 7); break; }
         case ANGLE_H:
         case ANGLE_V:
         {
             uchar buffer_out[7] = {0};
-            buffer_out[0] = 0xFF;
+            buffer_out[0] = SYNC_BYTE;
             buffer_out[1] = address;
             buffer_out[2] = 0x00;
-            buffer_out[3] = ptz_param == ANGLE_H ? 0x51 : 0x53;
+            buffer_out[3] = ptz_param == ANGLE_H ? PTZ_QUERY_H : PTZ_QUERY_V;
             buffer_out[4] = 0x00;
             buffer_out[5] = 0x00;
             buffer_out[6] = ptz_param == ANGLE_H ? 0x52 : 0x54;
@@ -143,12 +144,12 @@ int PTZ::ptz_control(qint32 ptz_param, double val)
         }
         case SET_H:
         {
-            int angle = (int((angle_h = val) * 100) % 36000 + 36000) % 36000;
+            int angle = (int((angle_h = val) * ANGLE_SCALE) % FULL_ROTATION + FULL_ROTATION) % FULL_ROTATION;
             uchar buffer_out[7] = {0};
-            buffer_out[0] = 0xFF;
+            buffer_out[0] = SYNC_BYTE;
             buffer_out[1] = address;
             buffer_out[2] = 0x00;
-            buffer_out[3] = 0x4B;
+            buffer_out[3] = PTZ_SET_H;
             buffer_out[4] = (angle >> 8) & 0xFF;
             buffer_out[5] = angle & 0xFF;
             buffer_out[6] = 0x00;
@@ -157,19 +158,19 @@ int PTZ::ptz_control(qint32 ptz_param, double val)
         }
         case SET_V:
         {
-            int angle = (int(std::min(std::max(angle_v = val, -40.), 40.) * 100) % 36000 + 36000) % 36000;
+            int angle = (int(std::min(std::max(angle_v = val, -VERTICAL_DEG), VERTICAL_DEG) * ANGLE_SCALE) % FULL_ROTATION + FULL_ROTATION) % FULL_ROTATION;
             uchar buffer_out[7] = {0};
-            buffer_out[0] = 0xFF;
+            buffer_out[0] = SYNC_BYTE;
             buffer_out[1] = address;
             buffer_out[2] = 0x00;
-            buffer_out[3] = 0x4D;
+            buffer_out[3] = PTZ_SET_V;
             buffer_out[4] = (angle >> 8) & 0xFF;
             buffer_out[5] = angle & 0xFF;
             buffer_out[6] = 0x00;
             command = QByteArray((char*)buffer_out, 7);
             break;
         }
-        case SPEED: ptz_speed = std::min(std::max((uchar)val, uchar(0x01)), uchar(0x3F)); return 0;
+        case SPEED: ptz_speed = std::min(std::max((uchar)val, uchar(MIN_SPEED)), uchar(MAX_SPEED)); return 0;
         case ADDRESS: address = val; return 0;
         default: return -11111;
     }
@@ -179,7 +180,7 @@ int PTZ::ptz_control(qint32 ptz_param, double val)
         case ANGLE_H:
         case ANGLE_V:
         {
-            communicate(command, 7, 40);
+            communicate(command, 7, READ_TIMEOUT_MS);
             QByteArray read;
             retrieve_mutex.lock();
             read = last_read;
@@ -189,24 +190,24 @@ int PTZ::ptz_control(qint32 ptz_param, double val)
             switch (ptz_param)
             {
                 case ANGLE_H:
-                    angle %= 36000;
+                    angle %= FULL_ROTATION;
                     {
-                        double temp_angle = angle / 100.;
+                        double temp_angle = angle / (double)ANGLE_SCALE;
                         // Ensure horizontal angle is always positive (0 to 360)
                         temp_angle = temp_angle < 0 ? temp_angle + 360.0 : temp_angle;
                         emit ptz_param_updated(ptz_param, angle_h = temp_angle);
                     }
                     break;
                 case ANGLE_V:
-                    angle = (angle + 4000) % 36000 - 4000;
-                    angle = std::min(std::max(angle, -4000), 4000);
-                    emit ptz_param_updated(ptz_param, angle_v = angle / 100.);
+                    angle = (angle + VERTICAL_LIMIT) % FULL_ROTATION - VERTICAL_LIMIT;
+                    angle = std::min(std::max(angle, -VERTICAL_LIMIT), VERTICAL_LIMIT);
+                    emit ptz_param_updated(ptz_param, angle_v = angle / (double)ANGLE_SCALE);
                     break;
             }
             break;
         }
         default:
-            communicate(command, 0, 40);
+            communicate(command, 0, READ_TIMEOUT_MS);
             break;
     }
         return 0;
@@ -241,7 +242,7 @@ void PTZ::load_from_json(const nlohmann::json &j)
 void PTZ::send_ctrl_cmd(uchar dir)
 {
     QByteArray command(7, 0x00);
-    command[0] = 0xFF;
+    command[0] = SYNC_BYTE;
     command[1] = 0x01;
     command[2] = 0x00;
     command[3] = dir;

@@ -85,10 +85,10 @@ void ControlPortThread::setup_serial_port()
         // send initial data
         switch (idx) {
         case 4:
-            q.push(PortData{generate_ba(new uchar[5]{0XFF, 0XAA, 0X69, 0X88, 0XB5}, 5), 5, 1, true, true, nullptr, nullptr});
-            q.push(PortData{generate_ba(new uchar[5]{0xFF, 0xAA, 0x03, 0x03, 0x00}, 5), 5, 1, true, true, nullptr, nullptr});
-            q.push(PortData{generate_ba(new uchar[5]{0xFF, 0xAA, 0x02, 0x0F, 0x00}, 5), 5, 1, true, true, nullptr, nullptr});
-            q.push(PortData{generate_ba(new uchar[5]{0XFF, 0XAA, 0X00, 0X00, 0X00}, 5), 5, 1, true, true, nullptr, nullptr});
+            { uchar buf[] = {0XFF, 0XAA, 0X69, 0X88, 0XB5}; q.push(PortData{QByteArray((char*)buf, 5), 5, 1, true, true, nullptr, nullptr}); }
+            { uchar buf[] = {0xFF, 0xAA, 0x03, 0x03, 0x00}; q.push(PortData{QByteArray((char*)buf, 5), 5, 1, true, true, nullptr, nullptr}); }
+            { uchar buf[] = {0xFF, 0xAA, 0x02, 0x0F, 0x00}; q.push(PortData{QByteArray((char*)buf, 5), 5, 1, true, true, nullptr, nullptr}); }
+            { uchar buf[] = {0XFF, 0XAA, 0X00, 0X00, 0X00}; q.push(PortData{QByteArray((char*)buf, 5), 5, 1, true, true, nullptr, nullptr}); }
             break;
         default:
             break;
@@ -558,7 +558,8 @@ void TCUThread::try_communicate()
     // TODO: disable self-check system
     if (!connected_to_serial && !connected_to_tcp) return;
 
-    static QByteArray write[1] = {generate_ba(new uchar[7]{0x88, 0x15, 0x00, 0x00, 0x00, 0x00, 0x99}, 7)};
+    static uchar buf0[] = {0x88, 0x15, 0x00, 0x00, 0x00, 0x00, 0x99};
+    static QByteArray write[1] = {QByteArray((char*)buf0, 7)};
     q.push(PortData{write[write_idx], 7, 1, true, true, nullptr, nullptr});
 //    QByteArray read = communicate_display(write, 7, 1, true, false);
 //    if (read != QByteArray(1, 0x15)) successive_count++;
@@ -576,16 +577,26 @@ LensThread::LensThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *st
 
 int LensThread::lens_control(PARAMS command, uint *val)
 {
-    static QByteArray write[ ] = {generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), // stop
-                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41}, 7), // zoom in
-                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21}, 7), // zoom out
-                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81}, 7), // focus far
-                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02}, 7), // focus near
-                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03}, 7), // radius up
-                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05}, 7), // radius down
-                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7), // zoom pos
-                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7), // focus pos
-                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x57, 0x00, 0x00, 0x58}, 7), // laser radius
+    static uchar buf_stop[]   = {0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01};
+    static uchar buf_zi[]     = {0xFF, 0x01, 0x00, 0x40, 0x00, 0x00, 0x41};
+    static uchar buf_zo[]     = {0xFF, 0x01, 0x00, 0x20, 0x00, 0x00, 0x21};
+    static uchar buf_ff[]     = {0xFF, 0x01, 0x00, 0x80, 0x00, 0x00, 0x81};
+    static uchar buf_fn[]     = {0xFF, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02};
+    static uchar buf_ru[]     = {0xFF, 0x01, 0x02, 0x00, 0x00, 0x00, 0x03};
+    static uchar buf_rd[]     = {0xFF, 0x01, 0x04, 0x00, 0x00, 0x00, 0x05};
+    static uchar buf_zp[]     = {0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56};
+    static uchar buf_fp[]     = {0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57};
+    static uchar buf_lr[]     = {0xFF, 0x01, 0x00, 0x57, 0x00, 0x00, 0x58};
+    static QByteArray write[ ] = {QByteArray((char*)buf_stop, 7), // stop
+                                  QByteArray((char*)buf_zi, 7),   // zoom in
+                                  QByteArray((char*)buf_zo, 7),   // zoom out
+                                  QByteArray((char*)buf_ff, 7),   // focus far
+                                  QByteArray((char*)buf_fn, 7),   // focus near
+                                  QByteArray((char*)buf_ru, 7),   // radius up
+                                  QByteArray((char*)buf_rd, 7),   // radius down
+                                  QByteArray((char*)buf_zp, 7),   // zoom pos
+                                  QByteArray((char*)buf_fp, 7),   // focus pos
+                                  QByteArray((char*)buf_lr, 7),   // laser radius
                                   };
     switch (command) {
     case STOP:
@@ -666,9 +677,12 @@ void LensThread::try_communicate()
     // TODO: disable self-check system
     if (!connected_to_serial && !connected_to_tcp) return;
 
-    static QByteArray write[3] = {generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56}, 7),
-                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57}, 7),
-                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x57, 0x00, 0x00, 0x58}, 7)};
+    static uchar buf_zp[] = {0xFF, 0x01, 0x00, 0x55, 0x00, 0x00, 0x56};
+    static uchar buf_fp[] = {0xFF, 0x01, 0x00, 0x56, 0x00, 0x00, 0x57};
+    static uchar buf_lr[] = {0xFF, 0x01, 0x00, 0x57, 0x00, 0x00, 0x58};
+    static QByteArray write[3] = {QByteArray((char*)buf_zp, 7),
+                                  QByteArray((char*)buf_fp, 7),
+                                  QByteArray((char*)buf_lr, 7)};
 
     q.push(PortData{write[write_idx], 7, 7, true, true, nullptr, nullptr});
     write_idx = (write_idx + 1) % 3;
@@ -694,7 +708,8 @@ void LaserThread::try_communicate()
     // TODO: disable self-check system
     if (!connected_to_serial && !connected_to_tcp) return;
 
-    static QByteArray write = generate_ba(new uchar[7]{0x88, 0x15, 0x00, 0x00, 0x00, 0x00, 0x99}, 7);
+    static uchar buf[] = {0x88, 0x15, 0x00, 0x00, 0x00, 0x00, 0x99};
+    static QByteArray write = QByteArray((char*)buf, 7);
     QByteArray read = communicate_display(write, 7, 7, true, false);
     if (read != QByteArray(1, 0x15)) successive_count++;
     else                             successive_count = 0;
@@ -710,7 +725,7 @@ PTZThread::PTZThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *stat
 int PTZThread::ptz_control(PARAMS param, float *val)
 {
     switch(param){
-    case STOP: q.push(PortData{generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false, false}); break;
+    case STOP: { uchar buf[] = {0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}; q.push(PortData{QByteArray((char*)buf, 7), 7, 1, false, false}); break; }
     case UP_LEFT:    send_ctrl_cmd(0x08); send_ctrl_cmd(0x04); break;
     case UP:         send_ctrl_cmd(0x08);                      break;
     case UP_RIGHT:   send_ctrl_cmd(0x08); send_ctrl_cmd(0x02); break;
@@ -796,8 +811,10 @@ void PTZThread::try_communicate()
     // TODO: disable self-check system
     if (!connected_to_serial && !connected_to_tcp) return;
 
-    static QByteArray write[2] = {generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x51, 0x00, 0x00, 0x52}, 7),
-                                  generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x53, 0x00, 0x00, 0x54}, 7)};
+    static uchar buf_h[] = {0xFF, 0x01, 0x00, 0x51, 0x00, 0x00, 0x52};
+    static uchar buf_v[] = {0xFF, 0x01, 0x00, 0x53, 0x00, 0x00, 0x54};
+    static QByteArray write[2] = {QByteArray((char*)buf_h, 7),
+                                  QByteArray((char*)buf_v, 7)};
 
     q.push(PortData{write[write_idx], 7, 7, true, true, nullptr, nullptr});
     write_idx = (write_idx + 1) % 2;

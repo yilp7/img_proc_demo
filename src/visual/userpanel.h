@@ -36,7 +36,6 @@
 
 #include "widgets/mywidget.h"
 #include "thread/joystick.h"
-#include "thread/controlportthread.h"
 #include "util/threadpool.h"
 #include "plugins/plugininterface.h"
 #include "yolo/yolo_detector.h"

@@ -36,23 +36,23 @@ protected slots:
 
 private:
     std::map<int, QByteArray> commands = {
-        {ZOOM_STOP, generate_ba(new uchar[6]{0x81, 0x01, 0x04, 0x07, 0x00, 0xFF}, 6)},
-        {ZOOM_IN,   generate_ba(new uchar[6]{0x81, 0x01, 0x04, 0x07, 0x20, 0xFF}, 6)},
-        {ZOOM_OUT,  generate_ba(new uchar[6]{0x81, 0x01, 0x04, 0x07, 0x30, 0xFF}, 6)},
-        {ZOOM_POS,  generate_ba(new uchar[5]{0x81, 0x09, 0x04, 0x47, 0xFF}, 5)},
+        {ZOOM_STOP, QByteArray("\x81\x01\x04\x07\x00\xFF", 6)},
+        {ZOOM_IN,   QByteArray("\x81\x01\x04\x07\x20\xFF", 6)},
+        {ZOOM_OUT,  QByteArray("\x81\x01\x04\x07\x30\xFF", 6)},
+        {ZOOM_POS,  QByteArray("\x81\x09\x04\x47\xFF", 5)},
 
-        {FOCUS_STOP, generate_ba(new uchar[6]{0x81, 0x01, 0x04, 0x08, 0x00, 0xFF}, 6)},
-        {FOCUS_FAR,  generate_ba(new uchar[6]{0x81, 0x01, 0x04, 0x08, 0x20, 0xFF}, 6)},
-        {FOCUS_NEAR, generate_ba(new uchar[6]{0x81, 0x01, 0x04, 0x08, 0x30, 0xFF}, 6)},
-        {FOCUS_POS,  generate_ba(new uchar[5]{0x81, 0x09, 0x04, 0x48, 0xFF}, 5)},
+        {FOCUS_STOP, QByteArray("\x81\x01\x04\x08\x00\xFF", 6)},
+        {FOCUS_FAR,  QByteArray("\x81\x01\x04\x08\x20\xFF", 6)},
+        {FOCUS_NEAR, QByteArray("\x81\x01\x04\x08\x30\xFF", 6)},
+        {FOCUS_POS,  QByteArray("\x81\x09\x04\x48\xFF", 5)},
 
-        {ICR_AUTO,   generate_ba(new uchar[6]{0x81, 0x01, 0x04, 0x51, 0x01, 0xFF}, 6)},
-        {ICR_MANUAL, generate_ba(new uchar[6]{0x81, 0x01, 0x04, 0x51, 0x03, 0xFF}, 6)},
-        {ICR_ON,     generate_ba(new uchar[6]{0x81, 0x01, 0x04, 0x01, 0x02, 0xFF}, 6)},
-        {ICR_OFF,    generate_ba(new uchar[6]{0x81, 0x09, 0x04, 0x01, 0x03, 0xFF}, 6)},
+        {ICR_AUTO,   QByteArray("\x81\x01\x04\x51\x01\xFF", 6)},
+        {ICR_MANUAL, QByteArray("\x81\x01\x04\x51\x03\xFF", 6)},
+        {ICR_ON,     QByteArray("\x81\x01\x04\x01\x02\xFF", 6)},
+        {ICR_OFF,    QByteArray("\x81\x09\x04\x01\x03\xFF", 6)},
 
-        {OSD_ON,  generate_ba(new uchar[6]{0x81, 0x01, 0x04, 0x74, 0x2F, 0xFF}, 6)},
-        {OSD_OFF, generate_ba(new uchar[6]{0x81, 0x01, 0x04, 0x74, 0x3F, 0xFF}, 6)},
+        {OSD_ON,  QByteArray("\x81\x01\x04\x74\x2F\xFF", 6)},
+        {OSD_OFF, QByteArray("\x81\x01\x04\x74\x3F\xFF", 6)},
     };
 
     uchar speed;
