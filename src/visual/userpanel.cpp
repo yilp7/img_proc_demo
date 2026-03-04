@@ -3,6 +3,22 @@
 #include "ui_preferences.h"
 #include "util/constants.h"
 
+static bool throttle_check(QElapsedTimer &t)
+{
+    if (t.isValid() && t.elapsed() < THROTTLE_MS) return true;
+    t.restart();
+    return false;
+}
+
+static void setup_slider(QSlider *slider, int min, int max, int step, int page, int initial)
+{
+    slider->setMinimum(min);
+    slider->setMaximum(max);
+    slider->setSingleStep(step);
+    slider->setPageStep(page);
+    slider->setValue(initial);
+}
+
 GrabThread::GrabThread(UserPanel *panel, int idx)
 {
     m_panel = panel;
@@ -298,33 +314,17 @@ UserPanel::UserPanel(QWidget *parent) :
 //    setup_com(com + 3, 3, com_edit[3]->text(), 9600);
 
     // - set up sliders
-    ui->MCP_SLIDER->setMinimum(0);
-    ui->MCP_SLIDER->setMaximum(mcp_max);
-    ui->MCP_SLIDER->setSingleStep(1);
-    ui->MCP_SLIDER->setPageStep(10);
-    ui->MCP_SLIDER->setValue(0);
+    setup_slider(ui->MCP_SLIDER, 0, mcp_max, 1, 10, 0);
     connect(ui->MCP_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_mcp(int)));
     connect(ui->MCP_SLIDER, &QSlider::sliderMoved, this, [this](int){ if (ui->AUTO_MCP_CHK->isChecked()) ui->AUTO_MCP_CHK->click(); });
 
-    ui->DELAY_SLIDER->setMinimum(0);
-    ui->DELAY_SLIDER->setMaximum(pref->max_dist);
-    ui->DELAY_SLIDER->setSingleStep(10);
-    ui->DELAY_SLIDER->setPageStep(100);
-    ui->DELAY_SLIDER->setValue(0);
+    setup_slider(ui->DELAY_SLIDER, 0, pref->max_dist, 10, 100, 0);
     connect(ui->DELAY_SLIDER, SIGNAL(sliderMoved(int)), SLOT(change_delay(int)));
 
-    ui->GW_SLIDER->setMinimum(0);
-    ui->GW_SLIDER->setMaximum(pref->max_dov);
-    ui->GW_SLIDER->setSingleStep(5);
-    ui->GW_SLIDER->setPageStep(25);
-    ui->GW_SLIDER->setValue(0);
+    setup_slider(ui->GW_SLIDER, 0, pref->max_dov, 5, 25, 0);
     connect(ui->GW_SLIDER, SIGNAL(sliderMoved(int)), SLOT(change_gatewidth(int)));
 
-    ui->FOCUS_SPEED_SLIDER->setMinimum(1);
-    ui->FOCUS_SPEED_SLIDER->setMaximum(63);
-    ui->FOCUS_SPEED_SLIDER->setSingleStep(1);
-    ui->FOCUS_SPEED_SLIDER->setPageStep(4);
-    ui->FOCUS_SPEED_SLIDER->setValue(31);
+    setup_slider(ui->FOCUS_SPEED_SLIDER, 1, 63, 1, 4, 31);
     connect(ui->FOCUS_SPEED_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_focus_speed(int)));
     ui->FOCUS_SPEED_EDIT->setText("31");
 
@@ -351,25 +351,13 @@ UserPanel::UserPanel(QWidget *parent) :
                 pref->ui->LOWER_3D_THRESH_EDT->setText(QString::number(pref->lower_3d_thresh, 'f', 3));
     });
 
-    ui->BRIGHTNESS_SLIDER->setMinimum(-5);
-    ui->BRIGHTNESS_SLIDER->setMaximum(5);
-    ui->BRIGHTNESS_SLIDER->setSingleStep(1);
-    ui->BRIGHTNESS_SLIDER->setPageStep(2);
-    ui->BRIGHTNESS_SLIDER->setValue(0);
+    setup_slider(ui->BRIGHTNESS_SLIDER, -5, 5, 1, 2, 0);
     ui->BRIGHTNESS_SLIDER->setTickInterval(5);
 
-    ui->CONTRAST_SLIDER->setMinimum(-10);
-    ui->CONTRAST_SLIDER->setMaximum(10);
-    ui->CONTRAST_SLIDER->setSingleStep(1);
-    ui->CONTRAST_SLIDER->setPageStep(3);
-    ui->CONTRAST_SLIDER->setValue(0);
+    setup_slider(ui->CONTRAST_SLIDER, -10, 10, 1, 3, 0);
     ui->CONTRAST_SLIDER->setTickInterval(5);
 
-    ui->GAMMA_SLIDER->setMinimum(0);
-    ui->GAMMA_SLIDER->setMaximum(20);
-    ui->GAMMA_SLIDER->setSingleStep(1);
-    ui->GAMMA_SLIDER->setPageStep(3);
-    ui->GAMMA_SLIDER->setValue(10);
+    setup_slider(ui->GAMMA_SLIDER, 0, 20, 1, 3, 10);
     ui->GAMMA_SLIDER->setTickInterval(5);
 
     ui->RULER_V->vertical = true;
@@ -1042,25 +1030,21 @@ int UserPanel::grab_thread_process(int *idx) {
 //        qDebug () << QDateTime::currentDateTime().toString() << updated << img_mem.data;
 
         if (updated) {
+            auto release_buffers = [&]() {
+                prev_img.release(), prev_3d.release();
+                seq_sum.release(), frame_a_sum.release(), frame_b_sum.release();
+                for (auto& m: seq) m.release();
+                seq_idx = 0;
+            };
             switch (image_rotate[0]) {
             case 0:
-                if (_w != w[thread_idx]) {
-                    prev_img.release(), prev_3d.release();
-                    seq_sum.release(), frame_a_sum.release(), frame_b_sum.release();
-                    for (auto& m: seq) m.release();
-                    seq_idx = 0;
-                }
+                if (_w != w[thread_idx]) release_buffers();
                 _w = w[thread_idx];
                 _h = h[thread_idx];
                 break;
             case 2:
                 cv::flip(img_mem[thread_idx], img_mem[thread_idx], -1);
-                if (_w != w[thread_idx]) {
-                    prev_img.release(), prev_3d.release();
-                    seq_sum.release(), frame_a_sum.release(), frame_b_sum.release();
-                    for (auto& m: seq) m.release();
-                    seq_idx = 0;
-                }
+                if (_w != w[thread_idx]) release_buffers();
                 _w = w[thread_idx];
                 _h = h[thread_idx];
                 break;
@@ -1069,11 +1053,7 @@ int UserPanel::grab_thread_process(int *idx) {
             case 3:
                 cv::flip(img_mem[thread_idx], img_mem[thread_idx], 0);
                 cv::transpose(img_mem[thread_idx], img_mem[thread_idx]);
-                if (_w != h[thread_idx]) {
-                    prev_img.release(), prev_3d.release();
-                    seq_sum.release(), frame_a_sum.release(), frame_b_sum.release();
-                    for (auto& m: seq) m.release();
-                    seq_idx = 0;  }
+                if (_w != h[thread_idx]) release_buffers();
                 _w = h[thread_idx];
                 _h = w[thread_idx];
                 break;
@@ -2061,6 +2041,18 @@ void UserPanel::enable_controls(bool cam_rdy) {
 
 }
 
+void UserPanel::connect_port_edit(QLineEdit *edit, ControlPort *port, QString &config_port)
+{
+    port->emit connect_to_serial(edit->text());
+    QString port_text = edit->text();
+#ifdef WIN32
+    config_port = port_text.isEmpty() ? "" : "COM" + port_text;
+#else
+    config_port = port_text;
+#endif
+    config->auto_save();
+}
+
 void UserPanel::init_control_port()
 {
     p_tcu   = new TCU(0);
@@ -2085,14 +2077,7 @@ void UserPanel::init_control_port()
     th_rf   ->start();
 
     connect(ui->TCU_COM_EDIT, &QLineEdit::returnPressed, this, [this]() {
-        p_tcu->emit connect_to_serial(ui->TCU_COM_EDIT->text());
-        QString port_text = ui->TCU_COM_EDIT->text();
-#ifdef WIN32
-        config->get_data().com_tcu.port = port_text.isEmpty() ? "" : "COM" + port_text;
-#else
-        config->getData().com_tcu.port = port_text;
-#endif
-        config->auto_save();
+        connect_port_edit(ui->TCU_COM_EDIT, p_tcu, config->get_data().com_tcu.port);
     });
     connect(p_tcu, &ControlPort::port_status_updated, this, [this]() { update_port_status(p_tcu, ui->TCU_COM); });
     connect(p_tcu, &ControlPort::port_io_log, this, &UserPanel::append_data, Qt::QueuedConnection);
@@ -2101,14 +2086,7 @@ void UserPanel::init_control_port()
     connect(this, SIGNAL(send_uint_tcu_msg(qint32, uint)), p_tcu, SLOT(set_user_param(qint32, uint)), Qt::QueuedConnection);
 
     connect(ui->LENS_COM_EDIT, &QLineEdit::returnPressed, this, [this]() {
-        p_lens->emit connect_to_serial(ui->LENS_COM_EDIT->text());
-        QString port_text = ui->LENS_COM_EDIT->text();
-#ifdef WIN32
-        config->get_data().com_lens.port = port_text.isEmpty() ? "" : "COM" + port_text;
-#else
-        config->getData().com_lens.port = port_text;
-#endif
-        config->auto_save();
+        connect_port_edit(ui->LENS_COM_EDIT, p_lens, config->get_data().com_lens.port);
     });
     connect(p_lens, &ControlPort::port_status_updated, this, [this]() { update_port_status(p_lens, ui->LENS_COM); });
     connect(p_lens, &ControlPort::port_io_log, this, &UserPanel::append_data, Qt::QueuedConnection);
@@ -2117,14 +2095,7 @@ void UserPanel::init_control_port()
     connect(this, SIGNAL(set_lens_pos(qint32, uint)), p_lens, SLOT(set_pos_temp(qint32, uint)), Qt::QueuedConnection);
 
     connect(ui->LASER_COM_EDIT, &QLineEdit::returnPressed, this, [this]() {
-        p_laser->emit connect_to_serial(ui->LASER_COM_EDIT->text());
-        QString port_text = ui->LASER_COM_EDIT->text();
-#ifdef WIN32
-        config->get_data().com_laser.port = port_text.isEmpty() ? "" : "COM" + port_text;
-#else
-        config->getData().com_laser.port = port_text;
-#endif
-        config->auto_save();
+        connect_port_edit(ui->LASER_COM_EDIT, p_laser, config->get_data().com_laser.port);
     });
     connect(p_laser, &ControlPort::port_status_updated, this, [this]() { update_port_status(p_laser, ui->LASER_COM); });
     connect(this, SIGNAL(send_laser_msg(QString)), p_laser, SLOT(laser_control(QString)), Qt::QueuedConnection);
@@ -3861,41 +3832,25 @@ void UserPanel::update_laser_width()
 {
 #ifndef LVTONG
     static QElapsedTimer t;
-    if (t.elapsed() < THROTTLE_MS) return;
-    t.start();
+    if (throttle_check(t)) return;
 #endif
-    if (laser_width < 0) laser_width = 0;
-    if (laser_width > pref->max_laser_width) laser_width = pref->max_laser_width;
-
-//    ptr_tcu->set_user_param(TCU::LASER_WIDTH, laser_width);
-//    ptr_tcu->set_user_param(TCUThread::LASER_USR, laser_width);
+    laser_width = qBound(0.0f, laser_width, pref->max_laser_width);
     emit send_double_tcu_msg(TCU::LASER_USR, laser_width);
 }
 
 void UserPanel::update_delay()
 {
-//    qDebug() << sender();
     static QElapsedTimer t;
-    if (t.isValid() && t.elapsed() < THROTTLE_MS) return;
-    t.restart();
+    if (throttle_check(t)) return;
 
-    // REPEATED FREQUENCY
-    // FIXME check if delay_dist + offset is valid
-    if (delay_dist < 0) delay_dist = 0;
-    if (delay_dist > pref->max_dist) delay_dist = pref->max_dist;
-//    qDebug("estimated distance: %f\n", delay_dist);
+    delay_dist = qBound(0.0f, delay_dist, pref->max_dist);
 
     if (!aliasing_mode) {
-//        ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist - ptr_tcu->delay_offset * dist_ns));
-//        ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
         if (!qobject_cast<QSlider*>(sender())) ui->DELAY_SLIDER->setValue(delay_dist);
-
-//        ptr_tcu->set_user_param(TCUThread::EST_DIST, delay_dist);
         emit send_double_tcu_msg(TCU::EST_DIST, delay_dist);
     }
     else {
         aliasing_mode = false;
-//        ptr_tcu->set_user_param(TCUThread::EST_DIST, ptr_tcu->delay_dist);
         emit send_double_tcu_msg(TCU::EST_DIST, p_tcu->get(TCU::EST_DIST));
     }
 }
@@ -3903,22 +3858,9 @@ void UserPanel::update_delay()
 void UserPanel::update_gate_width() {
 #ifndef LVTONG
     static QElapsedTimer t;
-    if (t.isValid() && t.elapsed() < THROTTLE_MS) return;
-    t.restart();
+    if (throttle_check(t)) return;
 #endif
-    if (depth_of_view < 0) depth_of_view = 0;
-    if (depth_of_view > pref->max_dov) depth_of_view = pref->max_dov;
-
-//    if (ptr_tcu->set_user_param(TCUThread::EST_DOV, depth_of_view) == -1) {
-//        depth_of_view = ptr_tcu->gate_width_a * dist_ns;
-//        ui->GATE_WIDTH_A_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->gate_width_a)));
-//        ui->GATE_WIDTH_A_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->gate_width_a)));
-//        ui->GATE_WIDTH_A_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->gate_width_a, 0)));
-//        ui->GATE_WIDTH_B_EDIT_U->setText(QString::asprintf("%d", get_width_in_us(ptr_tcu->gate_width_b)));
-//        ui->GATE_WIDTH_B_EDIT_N->setText(QString::asprintf("%03d", get_width_in_ns(ptr_tcu->gate_width_b)));
-//        ui->GATE_WIDTH_B_EDIT_P->setText(QString::asprintf("%03d", get_width_in_ps(ptr_tcu->gate_width_b, 2)));
-//        QMessageBox::warning(this, "PROMPT", tr("gatewidth not supported"));
-//    }
+    depth_of_view = qBound(0.0f, depth_of_view, pref->max_dov);
 
     if (!qobject_cast<QSlider*>(sender())) ui->GW_SLIDER->setValue(depth_of_view);
 
@@ -4964,10 +4906,10 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
 //            (ptr_laser->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ||
 //            (ptr_ptz->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ?
 //                disconnect_from_serial_server_tcp() : connect_to_serial_server_tcp();
-            (p_tcu->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ||
-            (p_lens->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ||
-            (p_laser->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ||
-            (p_ptz->get_port_status() & ControlPortThread::PortStatus::TCP_CONNECTED) ?
+            (p_tcu->get_port_status() & ControlPort::TCP_CONNECTED) ||
+            (p_lens->get_port_status() & ControlPort::TCP_CONNECTED) ||
+            (p_laser->get_port_status() & ControlPort::TCP_CONNECTED) ||
+            (p_ptz->get_port_status() & ControlPort::TCP_CONNECTED) ?
                 disconnect_from_serial_server_tcp() : connect_to_serial_server_tcp();
             break;
         case Qt::Key_L:

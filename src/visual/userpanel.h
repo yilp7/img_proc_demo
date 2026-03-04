@@ -414,6 +414,7 @@ private:
 
     // attempt to communicate with 4 COMs
     void init_control_port();
+    void connect_port_edit(QLineEdit *edit, ControlPort *port, QString &config_port);
     void setup_serial_port(QSerialPort **port, int id, QString port_num, int baud_rate);
     void setup_tcp_port(QTcpSocket **port);
 

@@ -81,6 +81,7 @@ protected slots:
 
 private:
     void set_tcu_param(qint32 tcu_param, double val);
+    void init_tcu_on_connect();
 
 private:
     // 0: default, head(88) cmd(00) data(MM NN PP QQ) tail(99)

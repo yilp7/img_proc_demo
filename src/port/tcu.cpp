@@ -111,49 +111,33 @@ nlohmann::json TCU::to_json()
 bool TCU::connect_to_serial_port(QString port_name, qint32 baudrate)
 {
     bool success = ControlPort::connect_to_serial_port(port_name, baudrate);
-
-    if (success) {
-        set_user_param(TCU::REPEATED_FREQ, rep_freq);
-        set_user_param(TCU::LASER_WIDTH  , laser_width);
-        set_user_param(TCU::DELAY_A      , delay_a);
-        set_user_param(TCU::GATE_WIDTH_A , gate_width_a);
-        set_user_param(TCU::DELAY_B      , delay_b);
-        set_user_param(TCU::GATE_WIDTH_B , gate_width_b);
-        set_user_param(TCU::CCD_FREQ     , ccd_freq);
-        set_user_param(TCU::DUTY         , duty);
-        set_user_param(TCU::MCP          , mcp);
-        set_user_param(TCU::LASER_1      , uint(0x04));
-        set_user_param(TCU::LASER_2      , uint(0x04));
-        set_user_param(TCU::LASER_3      , uint(0x04));
-        set_user_param(TCU::LASER_4      , uint(0x04));
-        set_user_param(TCU::TOGGLE_LASER , uint(0x00));
-    }
-
+    if (success) init_tcu_on_connect();
     return success;
 }
 
 bool TCU::connect_to_tcp_port(QString ip, ushort port)
 {
     bool success = ControlPort::connect_to_tcp_port(ip, port);
-
-    if (success) {
-        set_user_param(TCU::REPEATED_FREQ, rep_freq);
-        set_user_param(TCU::LASER_WIDTH  , laser_width);
-        set_user_param(TCU::DELAY_A      , delay_a);
-        set_user_param(TCU::GATE_WIDTH_A , gate_width_a);
-        set_user_param(TCU::DELAY_B      , delay_b);
-        set_user_param(TCU::GATE_WIDTH_B , gate_width_b);
-        set_user_param(TCU::CCD_FREQ     , ccd_freq);
-        set_user_param(TCU::DUTY         , duty);
-        set_user_param(TCU::MCP          , mcp);
-        set_user_param(TCU::LASER_1      , uint(0x04));
-        set_user_param(TCU::LASER_2      , uint(0x04));
-        set_user_param(TCU::LASER_3      , uint(0x04));
-        set_user_param(TCU::LASER_4      , uint(0x04));
-        set_user_param(TCU::TOGGLE_LASER , uint(0x00));
-    }
-
+    if (success) init_tcu_on_connect();
     return success;
+}
+
+void TCU::init_tcu_on_connect()
+{
+    set_user_param(TCU::REPEATED_FREQ, rep_freq);
+    set_user_param(TCU::LASER_WIDTH  , laser_width);
+    set_user_param(TCU::DELAY_A      , delay_a);
+    set_user_param(TCU::GATE_WIDTH_A , gate_width_a);
+    set_user_param(TCU::DELAY_B      , delay_b);
+    set_user_param(TCU::GATE_WIDTH_B , gate_width_b);
+    set_user_param(TCU::CCD_FREQ     , ccd_freq);
+    set_user_param(TCU::DUTY         , duty);
+    set_user_param(TCU::MCP          , mcp);
+    set_user_param(TCU::LASER_1      , uint(0x04));
+    set_user_param(TCU::LASER_2      , uint(0x04));
+    set_user_param(TCU::LASER_3      , uint(0x04));
+    set_user_param(TCU::LASER_4      , uint(0x04));
+    set_user_param(TCU::TOGGLE_LASER , uint(0x00));
 }
 
 void TCU::try_communicate()
