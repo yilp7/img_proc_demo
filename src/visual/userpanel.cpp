@@ -341,6 +341,12 @@ UserPanel::UserPanel(QWidget *parent) :
     connect(this, SIGNAL(update_scan(bool)), SLOT(enable_scan_options(bool)), Qt::QueuedConnection);
     connect(this, SIGNAL(update_delay_in_thread()), SLOT(update_delay()), Qt::QueuedConnection);
     connect(this, SIGNAL(update_mcp_in_thread(int)), SLOT(change_mcp(int)), Qt::QueuedConnection);
+    connect(this, &UserPanel::finish_scan_signal, this, &UserPanel::on_SCAN_BUTTON_clicked, Qt::QueuedConnection);
+#ifdef LVTONG
+    connect(this, &UserPanel::set_model_list_enabled, this, [this](bool enabled) {
+        pref->ui->MODEL_LIST->setEnabled(enabled);
+    }, Qt::QueuedConnection);
+#endif
 
     // register signal when thread pool full
     connect(this, SIGNAL(task_queue_full()), SLOT(stop_image_writing()), Qt::UniqueConnection);
@@ -930,7 +936,7 @@ int UserPanel::grab_thread_process(int *idx) {
     int packets_lost = 0;
 //    double *range = (double*)calloc(w * h, sizeof(double));
 #ifdef LVTONG
-    pref->ui->MODEL_LIST->setEnabled(false);
+    emit set_model_list_enabled(false);
     cv::Mat fishnet_res;
     QString model_name;
     switch (pref->model_idx) {
@@ -1069,7 +1075,7 @@ int UserPanel::grab_thread_process(int *idx) {
             if (pref->symmetry) cv::flip(img_mem[thread_idx], img_mem[thread_idx], pref->symmetry - 2);
 
             // mcp self-adaptive
-            if (pref->auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
+            if (auto_mcp && !ui->MCP_SLIDER->hasFocus()) {
                 int thresh_num = img_mem[thread_idx].total() / AUTO_MCP_DIVISOR, thresh = (1 << pixel_depth[thread_idx]) - 1;
                 while (thresh && thresh_num > 0) thresh_num -= hist[thresh--];
 //                if (thresh > (1 << pixel_depth[thread_idx]) * 0.94) emit update_mcp_in_thread(ptr_tcu->mcp - sqrt(thresh - (1 << pixel_depth[thread_idx]) * 0.94));
@@ -1725,7 +1731,7 @@ int UserPanel::grab_thread_process(int *idx) {
                     }
                     else {
                         scan_img_count = -1;
-                        on_SCAN_BUTTON_clicked();
+                        emit finish_scan_signal();
                     }
                 }
 
@@ -1793,7 +1799,7 @@ int UserPanel::grab_thread_process(int *idx) {
     }
 //    free(range);
 #ifdef LVTONG
-    pref->ui->MODEL_LIST->setEnabled(true);
+    emit set_model_list_enabled(true);
 #endif
     grab_thread_state[thread_idx] = false;
     return 0;

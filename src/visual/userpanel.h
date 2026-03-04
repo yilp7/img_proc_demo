@@ -361,6 +361,14 @@ signals:
     // task queue full in thread pool
     void task_queue_full();
 
+    // scan finished in grab thread
+    void finish_scan_signal();
+
+#ifdef LVTONG
+    // enable/disable model list from grab thread
+    void set_model_list_enabled(bool enabled);
+#endif
+
     // local video (or stream) stopped playing
     void video_stopped();
 
