@@ -435,3 +435,50 @@ target_link_libraries(GLI_params ${PROJECT_LIBS})
 #    target_link_libraries(LvTong ${PROJECT_LIBS} opencv_dnn)
 #endif()
 #target_link_libraries(LvTong ${PROJECT_LIBS})
+
+# ── Tests ──────────────────────────────────────────────────────────────
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Test REQUIRED)
+enable_testing()
+
+# Tier 1: pure function tests (no hardware deps)
+
+add_executable(test_constants tests/test_constants.cpp)
+target_include_directories(test_constants PRIVATE src)
+target_link_libraries(test_constants Qt${QT_VERSION_MAJOR}::Test)
+add_test(NAME constants COMMAND test_constants)
+
+add_executable(test_config tests/test_config.cpp src/util/config.h src/util/config.cpp)
+target_include_directories(test_config PRIVATE src)
+target_link_libraries(test_config Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core)
+add_test(NAME config COMMAND test_config)
+
+add_executable(test_imageproc tests/test_imageproc.cpp)
+target_include_directories(test_imageproc PRIVATE src)
+target_link_libraries(test_imageproc Qt${QT_VERSION_MAJOR}::Test ImgProc)
+add_test(NAME imageproc COMMAND test_imageproc)
+
+add_executable(test_imageio tests/test_imageio.cpp src/image/imageio.h src/image/imageio.cpp)
+target_include_directories(test_imageio PRIVATE src)
+if(WIN32)
+    target_link_libraries(test_imageio Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::SerialPort Qt${QT_VERSION_MAJOR}::Network opencv_core454 opencv_imgcodecs454 opencv_imgproc454)
+else()
+    target_link_libraries(test_imageio Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::SerialPort Qt${QT_VERSION_MAJOR}::Network opencv_core opencv_imgcodecs opencv_imgproc)
+endif()
+add_test(NAME imageio COMMAND test_imageio)
+
+# Tier 2: protocol tests (stubbed communicate)
+
+add_executable(test_ptz tests/test_ptz.cpp src/port/ptz.cpp src/port/controlport.cpp src/util/util.cpp)
+target_include_directories(test_ptz PRIVATE src)
+target_link_libraries(test_ptz Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::SerialPort Qt${QT_VERSION_MAJOR}::Network)
+add_test(NAME ptz COMMAND test_ptz)
+
+add_executable(test_lens tests/test_lens.cpp src/port/lens.cpp src/port/controlport.cpp src/util/util.cpp)
+target_include_directories(test_lens PRIVATE src)
+target_link_libraries(test_lens Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::SerialPort Qt${QT_VERSION_MAJOR}::Network)
+add_test(NAME lens COMMAND test_lens)
+
+add_executable(test_tcu tests/test_tcu.cpp src/port/tcu.cpp src/port/controlport.cpp src/util/util.cpp)
+target_include_directories(test_tcu PRIVATE src)
+target_link_libraries(test_tcu Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::SerialPort Qt${QT_VERSION_MAJOR}::Network)
+add_test(NAME tcu COMMAND test_tcu)

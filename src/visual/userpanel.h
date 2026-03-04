@@ -570,7 +570,7 @@ private:
     TimedQueue                 q_fps_calc;
 //    bool                    updated[3];                 // whether the program get a new image from stream
     // TODO add other scan features
-    std::vector<TCUDataGroup>  q_scan;                   // targets' tcu param found while scanning
+//    std::vector<TCUDataGroup>  q_scan;                   // targets' tcu param found while scanning
 
     int  device_type;        // 1: hik gige
     bool device_on;          // whether curr device is on

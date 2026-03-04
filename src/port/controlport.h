@@ -59,7 +59,7 @@ protected slots:
     virtual void disconnect_from_port(bool tcp = false);
     virtual void try_communicate();
     void update_timer_interval(uint interval = 0);
-    void communicate(QByteArray write, uint read_size = 0, uint read_timeout = 40, bool heartbeat = false);
+    virtual void communicate(QByteArray write, uint read_size = 0, uint read_timeout = 40, bool heartbeat = false);
     void handle_received();
 
 #if ENABLE_PORT_JSON
