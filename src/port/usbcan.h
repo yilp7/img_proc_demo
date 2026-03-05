@@ -3,8 +3,9 @@
 
 #include "ECanVci.h"
 #include "util/util.h"
+#include "iptzcontroller.h"
 
-class USBCAN : public QObject
+class USBCAN : public QObject, public IPTZController
 {
     Q_OBJECT
 public:
@@ -30,6 +31,17 @@ public:
 
     bool is_connected() const { return connected; }
     void update_timer_interval(uint interval = 0);
+
+    // IPTZController interface
+    void ptz_move(int direction, int speed) override;
+    void ptz_stop() override;
+    void ptz_set_angle(float h, float v) override;
+    void ptz_set_angle_h(float h) override;
+    void ptz_set_angle_v(float v) override;
+    float ptz_get_angle_h() const override { return position; }
+    float ptz_get_angle_v() const override { return pitch; }
+    bool ptz_is_connected() const override { return connected; }
+    QObject* ptz_qobject() override { return this; }
     void communicate(QByteArray write, uint read_size = 0, uint read_timeout = 40, bool heartbeat = false);
 
 public slots:

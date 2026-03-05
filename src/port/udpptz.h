@@ -2,8 +2,9 @@
 #define UDPPTZ_H
 
 #include "util/util.h"
+#include "iptzcontroller.h"
 
-class UDPPTZ : public QObject
+class UDPPTZ : public QObject, public IPTZController
 {
     Q_OBJECT
 public:
@@ -67,6 +68,17 @@ public:
     }
     void set_velocities(float h_vel, float v_vel) { horizontal_velocity = h_vel; vertical_velocity = v_vel; }
     void update_timer_interval(uint interval = 0);
+
+    // IPTZController interface
+    void ptz_move(int direction, int speed) override;
+    void ptz_stop() override;
+    void ptz_set_angle(float h, float v) override;
+    void ptz_set_angle_h(float h) override;
+    void ptz_set_angle_v(float v) override;
+    float ptz_get_angle_h() const override { return horizontal_angle; }
+    float ptz_get_angle_v() const override { return vertical_angle; }
+    bool ptz_is_connected() const override { return is_connected(); }
+    QObject* ptz_qobject() override { return this; }
     void communicate(QByteArray write, uint read_size = 0, uint read_timeout = 40, bool heartbeat = false);
 
 public slots:

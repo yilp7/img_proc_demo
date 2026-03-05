@@ -180,6 +180,42 @@ void UDPPTZ::transmit_data(qint32 op)
     }
 }
 
+// IPTZController interface
+
+void UDPPTZ::ptz_move(int direction, int speed)
+{
+    float velocity = speed / 2.0f;
+    float h_vel = 0, v_vel = 0;
+    switch (direction) {
+    case DIR_UP_LEFT:    h_vel = -velocity; v_vel =  velocity; break;
+    case DIR_UP:                            v_vel =  velocity; break;
+    case DIR_UP_RIGHT:   h_vel =  velocity; v_vel =  velocity; break;
+    case DIR_LEFT:       h_vel = -velocity;                    break;
+    case DIR_RIGHT:      h_vel =  velocity;                    break;
+    case DIR_DOWN_LEFT:  h_vel = -velocity; v_vel = -velocity; break;
+    case DIR_DOWN:                          v_vel = -velocity; break;
+    case DIR_DOWN_RIGHT: h_vel =  velocity; v_vel = -velocity; break;
+    default: return;
+    }
+    set_velocities(h_vel, v_vel);
+    transmit_data(MANUAL_SEARCH);
+}
+
+void UDPPTZ::ptz_stop()
+{
+    set_velocities(0, 0);
+    transmit_data(MANUAL_SEARCH);
+}
+
+void UDPPTZ::ptz_set_angle(float h, float v)
+{
+    device_control(ANGLE_H, h);
+    device_control(ANGLE_V, v);
+}
+
+void UDPPTZ::ptz_set_angle_h(float h) { device_control(ANGLE_H, h); }
+void UDPPTZ::ptz_set_angle_v(float v) { device_control(ANGLE_V, v); }
+
 void UDPPTZ::device_control(qint32 op, float val)
 {
     switch (op) {

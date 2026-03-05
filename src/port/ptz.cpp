@@ -21,6 +21,37 @@ PTZ::~PTZ()
 
 }
 
+// IPTZController interface
+
+void PTZ::ptz_move(int direction, int speed)
+{
+    ptz_speed = std::min(std::max((uchar)speed, uchar(MIN_SPEED)), uchar(MAX_SPEED));
+    // Direction enum values map directly to PARAMS enum (direction + 1 for Pelco-D)
+    ptz_control(direction + 1);
+}
+
+void PTZ::ptz_stop()
+{
+    ptz_control(STOP);
+}
+
+void PTZ::ptz_set_angle(float h, float v)
+{
+    ptz_control(SET_H, h);
+    ptz_control(SET_V, v);
+}
+
+void PTZ::ptz_set_angle_h(float h) { ptz_control(SET_H, h); }
+void PTZ::ptz_set_angle_v(float v) { ptz_control(SET_V, v); }
+
+float PTZ::ptz_get_angle_h() const { return (float)angle_h; }
+float PTZ::ptz_get_angle_v() const { return (float)angle_v; }
+
+bool PTZ::ptz_is_connected() const
+{
+    return get_port_status() & (ControlPort::SERIAL_CONNECTED | ControlPort::TCP_CONNECTED);
+}
+
 double PTZ::get(qint32 ptz_param)
 {
     switch (ptz_param)
@@ -94,6 +125,7 @@ void PTZ::try_communicate()
                 // Ensure horizontal angle is always positive (0 to 360)
                 temp_angle = temp_angle < 0 ? temp_angle + 360.0 : temp_angle;
                 emit ptz_param_updated(PTZ::ANGLE_H, angle_h = temp_angle);
+                emit angle_updated((float)angle_h, (float)angle_v);
             }
             else successive_count = 0;
             break;
@@ -104,6 +136,7 @@ void PTZ::try_communicate()
                 angle_fb = (angle_fb + VERTICAL_LIMIT) % FULL_ROTATION - VERTICAL_LIMIT;
                 angle_fb = std::min(std::max(angle_fb, -VERTICAL_LIMIT), VERTICAL_LIMIT);
                 emit ptz_param_updated(PTZ::ANGLE_V, angle_v = angle_fb / (double)ANGLE_SCALE);
+                emit angle_updated((float)angle_h, (float)angle_v);
             }
             else successive_count = 0;
             break;
@@ -196,12 +229,14 @@ int PTZ::ptz_control(qint32 ptz_param, double val)
                         // Ensure horizontal angle is always positive (0 to 360)
                         temp_angle = temp_angle < 0 ? temp_angle + 360.0 : temp_angle;
                         emit ptz_param_updated(ptz_param, angle_h = temp_angle);
+                        emit angle_updated((float)angle_h, (float)angle_v);
                     }
                     break;
                 case ANGLE_V:
                     angle = (angle + VERTICAL_LIMIT) % FULL_ROTATION - VERTICAL_LIMIT;
                     angle = std::min(std::max(angle, -VERTICAL_LIMIT), VERTICAL_LIMIT);
                     emit ptz_param_updated(ptz_param, angle_v = angle / (double)ANGLE_SCALE);
+                    emit angle_updated((float)angle_h, (float)angle_v);
                     break;
             }
             break;

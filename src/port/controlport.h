@@ -26,7 +26,7 @@ public:
     void   set_baudrate(qint32 baudrate);
     bool   get_use_tcp();
     void   set_use_tcp(bool use_tcp);
-    qint32 get_port_status();
+    qint32 get_port_status() const;
 
     void share_port_from(ControlPort *port);
 

@@ -2,8 +2,9 @@
 #define PTZ_H
 
 #include "controlport.h"
+#include "iptzcontroller.h"
 
-class PTZ : public ControlPort
+class PTZ : public ControlPort, public IPTZController
 {
     Q_OBJECT
 public:
@@ -32,12 +33,24 @@ public:
 
     double get(qint32 ptz_param);
 
+    // IPTZController interface
+    void ptz_move(int direction, int speed) override;
+    void ptz_stop() override;
+    void ptz_set_angle(float h, float v) override;
+    void ptz_set_angle_h(float h) override;
+    void ptz_set_angle_v(float v) override;
+    float ptz_get_angle_h() const override;
+    float ptz_get_angle_v() const override;
+    bool ptz_is_connected() const override;
+    QObject* ptz_qobject() override { return this; }
+
 #if ENABLE_PORT_JSON
     nlohmann::json to_json() override;
 #endif
 
 signals:
     void ptz_param_updated(qint32 ptz_param, double val);
+    void angle_updated(float _h, float _v);
 
 protected slots:
     bool connect_to_serial_port(QString port_name, qint32 baudrate = QSerialPort::Baud9600) override;

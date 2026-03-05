@@ -1716,8 +1716,7 @@ int UserPanel::grab_thread_process(int *idx) {
 
                     if (scan_ptz_idx < scan_ptz_route.size()) {
 //                        qDebug() << scan_ptz_route[scan_ptz_idx];
-                        p_usbcan->emit control(USBCAN::POSITION, scan_ptz_route[scan_ptz_idx].first);
-                        p_usbcan->emit control(USBCAN::PITCH, scan_ptz_route[scan_ptz_idx].second);
+                        if (active_ptz) active_ptz->ptz_set_angle(scan_ptz_route[scan_ptz_idx].first, scan_ptz_route[scan_ptz_idx].second);
 
                         scan_save_path_a = save_location + "/" + scan_name + "/" + QString::number(scan_ptz_idx);
                         QDir().mkdir(scan_save_path_a);
@@ -2133,10 +2132,12 @@ void UserPanel::init_control_port()
     connect(p_ptz, &ControlPort::port_status_updated, this, [this]() {
         update_port_status(p_ptz, ui->PTZ_COM);
         bool connected = p_ptz->get_port_status() & (ControlPort::SERIAL_CONNECTED | ControlPort::TCP_CONNECTED);
+        if (connected) active_ptz = p_ptz;
         pref->set_ptz_type_enabled(!connected);
     });
     connect(p_ptz, &ControlPort::port_io_log, this, &UserPanel::append_data, Qt::QueuedConnection);
     connect(p_ptz, &PTZ::ptz_param_updated, this, &UserPanel::update_ptz_params);
+    connect(p_ptz, &PTZ::angle_updated, this, &UserPanel::update_ptz_angle);
     connect(this, SIGNAL(send_ptz_msg(qint32, double)), p_ptz, SLOT(ptz_control(qint32, double)), Qt::QueuedConnection);
 
     connect(p_rf, &RangeFinder::distance_updated, this, &UserPanel::update_distance);
@@ -2145,8 +2146,9 @@ void UserPanel::init_control_port()
     th_usbcan = new QThread(this);
     p_usbcan->moveToThread(th_usbcan);
     th_usbcan->start();
-    connect(p_usbcan, &USBCAN::angle_updated, this, &UserPanel::update_usbcan_angle);
+    connect(p_usbcan, &USBCAN::angle_updated, this, &UserPanel::update_ptz_angle);
     connect(p_usbcan, &USBCAN::connection_status_changed, this, [this](bool connected) {
+        if (connected) active_ptz = p_usbcan;
         pref->set_ptz_type_enabled(!connected);
     });
     connect(p_usbcan, &USBCAN::connection_status_changed, this, &UserPanel::update_ptz_status);
@@ -2157,13 +2159,16 @@ void UserPanel::init_control_port()
     th_udpptz = new QThread(this);
     p_udpptz->moveToThread(th_udpptz);
     th_udpptz->start();
-    connect(p_udpptz, &UDPPTZ::angle_updated, this, &UserPanel::update_udpptz_angle);
+    connect(p_udpptz, &UDPPTZ::angle_updated, this, &UserPanel::update_ptz_angle);
     connect(p_udpptz, &UDPPTZ::connection_status_changed, this, [this](bool connected) {
+        if (connected) active_ptz = p_udpptz;
         pref->set_ptz_type_enabled(!connected);
     });
     connect(p_udpptz, &UDPPTZ::connection_status_changed, this, &UserPanel::update_ptz_status);
     connect(p_udpptz, &UDPPTZ::connect_to, this, [this]() { pref->set_ptz_type_enabled(false); });
     connect(p_udpptz, &UDPPTZ::disconnect_from, this, [this]() { pref->set_ptz_type_enabled(true); });
+
+    active_ptz = nullptr;
 
     // Initialize PTZ status display
     update_ptz_status();
@@ -3190,11 +3195,8 @@ void UserPanel::update_ptz_params(qint32 ptz_param, double val)
 {
     switch (ptz_param)
     {
-        case PTZ::ANGLE_H: if (!ui->ANGLE_H_EDIT->hasFocus()) ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", val)); break;
-        case PTZ::ANGLE_V: if (!ui->ANGLE_V_EDIT->hasFocus()) ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", val)); break;
         case PTZ::NO_PARAM:
-            update_ptz_params(PTZ::ANGLE_H, p_ptz->get(PTZ::ANGLE_H));
-            update_ptz_params(PTZ::ANGLE_V, p_ptz->get(PTZ::ANGLE_V));
+            update_ptz_angle((float)p_ptz->get(PTZ::ANGLE_H), (float)p_ptz->get(PTZ::ANGLE_V));
             ui->PTZ_SPEED_SLIDER->setValue(std::round(p_ptz->get(PTZ::SPEED)));
             break;
         default:break;
@@ -3206,20 +3208,9 @@ void UserPanel::update_distance(double distance)
     ui->DISTANCE->setText(QString::asprintf("%.2f m", distance));
 }
 
-void UserPanel::update_usbcan_angle(float _h, float _v)
+void UserPanel::update_ptz_angle(float _h, float _v)
 {
-    // Ensure horizontal angle is always positive (0 to 360)
     float display_h = _h < 0 ? _h + 360.0f : _h;
-
-    if (!ui->ANGLE_H_EDIT->hasFocus()) ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", display_h));
-    if (!ui->ANGLE_V_EDIT->hasFocus()) ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", _v));
-}
-
-void UserPanel::update_udpptz_angle(float _h, float _v)
-{
-    // Ensure horizontal angle is always positive (0 to 360)
-    float display_h = _h < 0 ? _h + 360.0f : _h;
-
     if (!ui->ANGLE_H_EDIT->hasFocus()) ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", display_h));
     if (!ui->ANGLE_V_EDIT->hasFocus()) ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", _v));
 }
@@ -4825,28 +4816,14 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             }
             else if (edit == ui->ANGLE_H_EDIT) {
                 angle_h = ui->ANGLE_H_EDIT->text().toDouble();
-                // Ensure horizontal angle is always positive (0 to 360)
                 angle_h = fmod(angle_h + 360.0, 360.0);
                 ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", angle_h));
-                switch (pref->ptz_type) {
-                case 0: emit send_ptz_msg(PTZ::SET_H, angle_h); break;
-                case 1: p_usbcan->emit control(USBCAN::POSITION, angle_h); break;
-                case 2: p_udpptz->emit control(UDPPTZ::ANGLE_H, angle_h); break;
-                }
+                if (active_ptz) active_ptz->ptz_set_angle_h(angle_h);
             }
             else if (edit == ui->ANGLE_V_EDIT) {
                 angle_v = ui->ANGLE_V_EDIT->text().toDouble();
-                // Clamp vertical angle to -90 to 90 range for UDPPTZ
-                if (pref->ptz_type == 2) {
-                    if (angle_v > 90.0) angle_v = 90.0;
-                    if (angle_v < -90.0) angle_v = -90.0;
-                }
                 ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", angle_v));
-                switch (pref->ptz_type) {
-                case 0: emit send_ptz_msg(PTZ::SET_V, angle_v); break;
-                case 1: p_usbcan->emit control(USBCAN::PITCH, angle_v); break;
-                case 2: p_udpptz->emit control(UDPPTZ::ANGLE_V, angle_v); break;
-                }
+                if (active_ptz) active_ptz->ptz_set_angle_v(angle_v);
             }
             this->focusWidget()->clearFocus();
             break;
@@ -6134,29 +6111,14 @@ void UserPanel::send_ctrl_cmd(uchar dir)
 }
 
 void UserPanel::ptz_button_pressed(int id) {
-    if (id == 4) if (QMessageBox::warning(nullptr, "PTZ", tr("Initialize?"), QMessageBox::StandardButton::Ok | QMessageBox::StandardButton::Cancel) != QMessageBox::StandardButton::Ok) return;
+    if (!active_ptz) return;
 
-    switch (pref->ptz_type) {
-    case 0: // pelco-p
-        emit send_ptz_msg(id + 1);
-        break;
-    case 1: // usbcan
-        switch (id) {
-        case 0:
-            p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
-            p_usbcan->emit control(USBCAN::UP, ui->PTZ_SPEED_SLIDER->value());
-            break;
+    if (id == 4) {
+        if (QMessageBox::warning(nullptr, "PTZ", tr("Initialize?"), QMessageBox::StandardButton::Ok | QMessageBox::StandardButton::Cancel) != QMessageBox::StandardButton::Ok) return;
+        // Self-check sequences are type-specific
+        switch (pref->ptz_type) {
+        case 0: emit send_ptz_msg(PTZ::SELF_CHECK); break;
         case 1:
-            p_usbcan->emit control(USBCAN::UP, ui->PTZ_SPEED_SLIDER->value());
-            break;
-        case 2:
-            p_usbcan->emit control(USBCAN::RIGHT, ui->PTZ_SPEED_SLIDER->value());
-            p_usbcan->emit control(USBCAN::UP, ui->PTZ_SPEED_SLIDER->value());
-            break;
-        case 3:
-            p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
-            break;
-        case 4:
             p_usbcan->emit transmit(USBCAN::OFF);
             QThread::msleep(1000);
             p_usbcan->emit transmit(USBCAN::SELF_CHECK);
@@ -6164,84 +6126,17 @@ void UserPanel::ptz_button_pressed(int id) {
             p_usbcan->emit transmit(USBCAN::LOCK);
             QThread::msleep(1000);
             break;
-        case 5:
-            p_usbcan->emit control(USBCAN::RIGHT, ui->PTZ_SPEED_SLIDER->value());
-            break;
-        case 6:
-            p_usbcan->emit control(USBCAN::LEFT, ui->PTZ_SPEED_SLIDER->value());
-            p_usbcan->emit control(USBCAN::DOWN, ui->PTZ_SPEED_SLIDER->value());
-            break;
-        case 7:
-            p_usbcan->emit control(USBCAN::DOWN, ui->PTZ_SPEED_SLIDER->value());
-            break;
-        case 8:
-            p_usbcan->emit control(USBCAN::RIGHT, ui->PTZ_SPEED_SLIDER->value());
-            p_usbcan->emit control(USBCAN::DOWN, ui->PTZ_SPEED_SLIDER->value());
-            break;
-        default: break;
+        case 2: p_udpptz->emit transmit_data(UDPPTZ::RETURN_ZERO); break;
         }
-        break;
-    case 2: // udp-scw
-        {
-            float velocity = ui->PTZ_SPEED_SLIDER->value() / 2.0f; // 1-64 slider -> 0.5-32 deg/s
-            switch (id) {
-            case 0: // UP_LEFT
-                p_udpptz->set_velocities(-velocity, velocity); // left, up
-                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
-                break;
-            case 1: // UP
-                p_udpptz->set_velocities(0, velocity); // no horizontal, up
-                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
-                break;
-            case 2: // UP_RIGHT
-                p_udpptz->set_velocities(velocity, velocity); // right, up
-                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
-                break;
-            case 3: // LEFT
-                p_udpptz->set_velocities(-velocity, 0); // left, no vertical
-                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
-                break;
-            case 4: // RETURN_ZERO (keep as is)
-                p_udpptz->emit transmit_data(UDPPTZ::RETURN_ZERO);
-                break;
-            case 5: // RIGHT
-                p_udpptz->set_velocities(velocity, 0); // right, no vertical
-                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
-                break;
-            case 6: // DOWN_LEFT
-                p_udpptz->set_velocities(-velocity, -velocity); // left, down
-                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
-                break;
-            case 7: // DOWN
-                p_udpptz->set_velocities(0, -velocity); // no horizontal, down
-                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
-                break;
-            case 8: // DOWN_RIGHT
-                p_udpptz->set_velocities(velocity, -velocity); // right, down
-                p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
-                break;
-            default:
-                break;
-            }
-        }
-        break;
+        return;
     }
+
+    active_ptz->ptz_move(id, ui->PTZ_SPEED_SLIDER->value());
 }
 
 void UserPanel::ptz_button_released(int id) {
-//    qDebug("%dr", id);
     if (id == 4) return;
-//    ptr_ptz->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
-//    ptr_ptz->ptz_control(PTZThread::STOP);
-    switch (pref->ptz_type) {
-    case 0: emit send_ptz_msg(PTZ::STOP); break;
-    case 1: p_usbcan->emit control(USBCAN::STOP, 0); break;
-    case 2:
-        p_udpptz->set_velocities(0, 0);
-        p_udpptz->emit transmit_data(UDPPTZ::MANUAL_SEARCH);
-//        p_udpptz->emit transmit_data(UDPPTZ::STANDBY);
-        break;
-    }
+    if (active_ptz) active_ptz->ptz_stop();
 }
 
 // VID_PAGE camera control implementations
@@ -6353,33 +6248,12 @@ void UserPanel::on_GET_ANGLE_BTN_clicked()
 
 void UserPanel::set_ptz_angle()
 {
-    switch (pref->ptz_type) {
-    case 0:
-        emit send_ptz_msg(PTZ::SET_H, angle_h);
-        emit send_ptz_msg(PTZ::SET_V, angle_v);
-        break;
-    case 1:
-        p_usbcan->emit control(USBCAN::POSITION, angle_h);
-        p_usbcan->emit transmit(USBCAN::POSITION);
-        p_usbcan->emit control(USBCAN::PITCH, angle_v);
-        p_usbcan->emit transmit(USBCAN::PITCH);
-        break;
-    case 2:
-        p_udpptz->emit control(UDPPTZ::ANGLE_H, angle_h);
-        p_udpptz->emit control(UDPPTZ::ANGLE_V, angle_v);
-        break;
-    }
+    if (active_ptz) active_ptz->ptz_set_angle(angle_h, angle_v);
 }
 
 void UserPanel::on_STOP_BTN_clicked()
 {
-//    ptr_ptz->communicate_display(generate_ba(new uchar[7]{0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}, 7), 7, 1, false);
-//    ptr_ptz->ptz_control(PTZThread::STOP);
-    switch (pref->ptz_type) {
-    case 0: emit send_ptz_msg(PTZ::STOP); break;
-    case 1: p_usbcan->emit control(USBCAN::STOP, 0); break;
-    case 2: p_udpptz->emit transmit_data(UDPPTZ::STANDBY); break;
-    }
+    if (active_ptz) active_ptz->ptz_stop();
 }
 
 void UserPanel::point_ptz_to_target(QPoint target)

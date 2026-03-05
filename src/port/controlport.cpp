@@ -61,7 +61,7 @@ void ControlPort::set_use_tcp(bool use_tcp)
     this->use_tcp = use_tcp;
 }
 
-int ControlPort::get_port_status()
+int ControlPort::get_port_status() const
 {
     return (connected_to_tcp ? PortStatus::TCP_CONNECTED : PortStatus::NOT_CONNECTED) |
            (connected_to_serial ? PortStatus::SERIAL_CONNECTED : PortStatus::NOT_CONNECTED);

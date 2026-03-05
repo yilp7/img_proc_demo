@@ -198,6 +198,7 @@ set(SOURCE_FILES
     src/port/lens.cpp
     src/port/laser.h
     src/port/laser.cpp
+    src/port/iptzcontroller.h
     src/port/ptz.h
     src/port/ptz.cpp
     src/port/rangefinder.h

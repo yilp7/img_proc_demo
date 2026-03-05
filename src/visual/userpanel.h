@@ -171,8 +171,7 @@ public slots:
     void update_lens_params(qint32 lens_param, uint val);
     void update_ptz_params(qint32 ptz_param, double val);
     void update_distance(double distance);
-    void update_usbcan_angle(float _h, float _v);
-    void update_udpptz_angle(float _h, float _v);
+    void update_ptz_angle(float _h, float _v);
     void update_ptz_status();
 
     // signaled by Aliasing
@@ -539,6 +538,7 @@ private:
     RangeFinder *p_rf;
     USBCAN  *p_usbcan;
     UDPPTZ  *p_udpptz;
+    IPTZController *active_ptz;
     QThread *th_tcu;
     QThread *th_lens;
     QThread *th_laser;
