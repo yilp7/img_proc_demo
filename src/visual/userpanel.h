@@ -39,6 +39,7 @@
 #include "util/threadpool.h"
 #include "plugins/plugininterface.h"
 #include "yolo/yolo_detector.h"
+#include "pipeline/processingparams.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class UserPanel; }
@@ -91,6 +92,34 @@ private:
 class UserPanel : public QMainWindow
 {
     Q_OBJECT
+
+// Persistent frame-averaging state passed to extracted pipeline methods
+struct FrameAverageState {
+    cv::Mat seq[8], seq_sum, frame_a_sum, frame_b_sum;
+    cv::Mat prev_img, prev_3d;
+    int seq_idx = 0;
+    bool frame_a = true;
+    void release_avg_buffers() {
+        seq_sum.release(); frame_a_sum.release(); frame_b_sum.release();
+        for (auto& m : seq) m.release();
+        seq_idx = 0;
+    }
+    void release_all() {
+        prev_img.release(); prev_3d.release();
+        release_avg_buffers();
+    }
+};
+
+// Persistent ECC temporal denoising state
+struct ECCState {
+    std::deque<cv::Mat> fusion_buf, fusion_warps, fusion_warps_inv;
+    cv::Mat fusion_last_warp;
+    int prev_ecc_warp_mode = -1;
+    void clear() {
+        fusion_buf.clear(); fusion_warps.clear(); fusion_warps_inv.clear();
+        fusion_last_warp.release();
+    }
+};
 
 // enumerations only
 public:
@@ -367,6 +396,9 @@ signals:
     // enable/disable model list from grab thread
     void set_model_list_enabled(bool enabled);
 #endif
+
+    // packet loss status update from grab thread
+    void packet_lost_updated(int packets_lost);
 
     // local video (or stream) stopped playing
     void video_stopped();
@@ -685,6 +717,35 @@ private:
     QMutex                  m_yolo_init_mutex;
     int                     m_yolo_last_model[3] = {-1, -1, -1};  // Track loaded model for each thread
     void draw_yolo_boxes(cv::Mat& image, const std::vector<YoloResult>& results);
+
+    // ProcessingParams: thread-safe snapshot of UI widget state for grab_thread_process
+    QMutex                  m_params_mutex;
+    ProcessingParams        m_processing_params;
+    void update_processing_params();
+
+    // Pipeline methods extracted from grab_thread_process
+    // Returns false if iteration should be skipped (LVTONG empty queue)
+    bool acquire_frame(int thread_idx, cv::Mat& prev_img, bool& updated, int& packets_lost);
+    void preprocess_frame(int thread_idx, const ProcessingParams& params,
+        FrameAverageState& avg_state, int& _w, int& _h, uint hist[256]);
+    std::vector<YoloResult> detect_yolo(int thread_idx, bool updated, YoloDetector*& yolo);
+#ifdef LVTONG
+    double detect_fishnet(int thread_idx, cv::dnn::Net& net);
+#endif
+    void frame_average_and_3d(int thread_idx, bool updated, const ProcessingParams& params,
+        FrameAverageState& avg_state, ECCState& ecc_state, int _w, int _h, int _pixel_depth,
+        int& ww, int& hh);
+    void enhance_frame(int thread_idx, const ProcessingParams& params);
+    void render_and_display(int thread_idx, int display_idx,
+        const ProcessingParams& params, const std::vector<YoloResult>& yolo_results,
+        double is_net, int ww, int hh, int _w, int _h, float weight,
+        uint hist[256], const QString& info_tcu, const QString& info_time);
+    void advance_scan(int thread_idx, bool updated, int& scan_img_count,
+        QString& scan_save_path_a, QString& scan_save_path);
+    void record_frame(int thread_idx, int display_idx, bool updated,
+        const ProcessingParams& params, double is_net,
+        const QString& info_tcu, const QString& info_time,
+        int ww, int hh, float weight);
 
 public:
 

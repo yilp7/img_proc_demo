@@ -218,6 +218,7 @@ set(SOURCE_FILES
     src/yolo/inference.h
     src/yolo/inference.cpp
     src/yolo/yolo_app_config.h
+    src/pipeline/processingparams.h
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss
