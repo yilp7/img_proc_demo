@@ -5,66 +5,12 @@ Preferences::Preferences(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::Preferences),
     pressed(false),
-    device_idx(0),
-    rotation(0),
-    symmetry(0),
     split(false),
-    ebus_cam(false),
-    ptz_type(0),
     cameralink(false),
     port_idx(0),
-    share_port(false),
     use_tcp(false),
     dist_ns(3e8 / 2e9),
-    auto_rep_freq(false),
-    auto_mcp(false),
-    ab_lock(true),
-    hz_unit(0),
-    base_unit(0),
-    max_dist(15000),
-    delay_offset(0),
-    max_dov(15000),
-    gate_width_offset(0),
-    max_laser_width(25000),
-    laser_width_offset(0),
-    ps_step{40, 40, 40, 40},
-    laser_grp(NULL),
-    laser_on(0),
-    save_info(true),
-    custom_topleft_info(false),
-    save_in_grayscale(false),
-    consecutive_capture(true),
-    integrate_info(true),
-    img_format(0),
-    accu_base(1),
-    gamma(1.2),
-    low_in(0),
-    high_in(0.05),
-    low_out(0),
-    high_out(1),
-    dehaze_pct(0.95),
-    sky_tolerance(40),
-    fast_gf(1),
-    colormap(cv::COLORMAP_JET),
-    lower_3d_thresh(0),
-    upper_3d_thresh(0.981),
-    truncate_3d(false),
-    custom_3d_param(false),
-    custom_3d_delay(0),
-    custom_3d_gate_width(0),
-    model_idx(0),
-    fishnet_recog(false),
-    fishnet_thresh(0.99),
-    ecc_window_mode(0),
-    ecc_warp_mode(2),
-    ecc_fusion_method(2),
-    ecc_backward(20),
-    ecc_forward(0),
-    ecc_levels(1),
-    ecc_max_iter(8),
-    ecc_eps(0.001),
-    ecc_half_res_reg(true),
-    ecc_half_res_fuse(false)
+    laser_grp(NULL)
 {
     ui->setupUi(this);
 
@@ -88,21 +34,21 @@ Preferences::Preferences(QWidget *parent) :
     ui->IP_EDIT->setEnabled(false);
     ui->DEVICE_LIST->installEventFilter(this);
     connect(ui->DEVICE_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
-            [this](int index){ device_idx = index; emit query_dev_ip(); });
+            [this](int index){ if (m_config) m_config->get_data().tcu.type = index; emit query_dev_ip(); });
     ui->ROTATE_OPTION_LIST->addItem("  0°");
     ui->ROTATE_OPTION_LIST->addItem(" 90°");
     ui->ROTATE_OPTION_LIST->addItem("180°");
     ui->ROTATE_OPTION_LIST->addItem("270°");
     ui->ROTATE_OPTION_LIST->installEventFilter(this);
     connect(ui->ROTATE_OPTION_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
-            [this](int index){ emit rotate_image(rotation = index); });
+            [this](int index){ if (m_config) m_config->get_data().device.rotation = index; emit rotate_image(index); });
     ui->FLIP_OPTION_LIST->addItem("None");
     ui->FLIP_OPTION_LIST->addItem("Both");
     ui->FLIP_OPTION_LIST->addItem("X");
     ui->FLIP_OPTION_LIST->addItem("Y");
     ui->FLIP_OPTION_LIST->installEventFilter(this);
     connect(ui->FLIP_OPTION_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
-            [this](int index){ symmetry = index; });
+            [this](int index){ if (m_config) m_config->get_data().device.flip = index; });
     ui->PIXEL_FORMAT_LIST->addItem("Mono8");
     ui->PIXEL_FORMAT_LIST->addItem("Mono10");
     ui->PIXEL_FORMAT_LIST->addItem("Mono12");
@@ -119,13 +65,13 @@ Preferences::Preferences(QWidget *parent) :
 #endif
     connect(ui->SPLIT_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ split = arg1; });
     connect(ui->UNDERWATER_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit device_underwater(arg1); });
-    connect(ui->EBUS_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ ebus_cam = arg1; emit search_for_devices(); });
+    connect(ui->EBUS_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ if (m_config) m_config->get_data().device.ebus = arg1; emit search_for_devices(); });
     ui->PTZ_TYPE_LIST->addItem("pelco-p");
     ui->PTZ_TYPE_LIST->addItem("usbcan");
     ui->PTZ_TYPE_LIST->addItem("udp-scw");
     ui->PTZ_TYPE_LIST->installEventFilter(this);
     connect(ui->PTZ_TYPE_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
-            [this](int index){ ptz_type = index; });
+            [this](int index){ if (m_config) m_config->get_data().device.ptz_type = index; });
     connect(ui->CAMERALINK_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ cameralink = arg1; emit search_for_devices(); });
 //![1]
 
@@ -172,7 +118,7 @@ Preferences::Preferences(QWidget *parent) :
     connect(ui->TCP_SERVER_CHK, &QCheckBox::stateChanged, this,
             [this](int arg1){ emit set_tcp_status(ui->COM_LIST->currentIndex(), arg1); });
 
-    connect(ui->SHARE_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ share_port = arg1; emit share_tcu_port(arg1); });
+    connect(ui->SHARE_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ if (m_config) m_config->get_data().device.share_tcu_port = arg1; emit share_tcu_port(arg1); });
 
 //    QFont temp = QFont(consolas);
 //    temp.setPixelSize(11);
@@ -198,9 +144,9 @@ Preferences::Preferences(QWidget *parent) :
                 }
             });
 
-    connect(ui->AUTO_REP_FREQ_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit set_auto_rep_freq(auto_rep_freq = arg1); });
-    connect(ui->AUTO_MCP_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit set_auto_mcp(auto_mcp = arg1); });
-    connect(ui->AB_LOCK_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ emit set_ab_lock(ab_lock = arg1); });
+    connect(ui->AUTO_REP_FREQ_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ if (m_config) m_config->get_data().tcu.auto_rep_freq = arg1; emit set_auto_rep_freq(arg1); });
+    connect(ui->AUTO_MCP_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ if (m_config) m_config->get_data().tcu.auto_mcp = arg1; emit set_auto_mcp(arg1); });
+    connect(ui->AB_LOCK_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ if (m_config) m_config->get_data().tcu.ab_lock = arg1; emit set_ab_lock(arg1); });
 
     ui->HZ_LIST->addItem("kHz");
     ui->HZ_LIST->addItem("Hz");
@@ -215,29 +161,30 @@ Preferences::Preferences(QWidget *parent) :
     ui->UNIT_LIST->installEventFilter(this);
 
     connect(ui->HZ_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
-            [this](int index){ emit rep_freq_unit_changed(hz_unit = index); });
+            [this](int index){ if (m_config) m_config->get_data().tcu.hz_unit = index; emit rep_freq_unit_changed(index); });
     connect(ui->UNIT_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
             [this](int index) {
-                emit base_unit_changed(base_unit = index);
+                if (m_config) m_config->get_data().tcu.base_unit = index;
+                emit base_unit_changed(index);
                 update_distance_display();
             });
 
     connect(ui->AB_LOCK_CHK, &QCheckBox::stateChanged, this, [this](){});
 
-    connect(ui->MAX_DIST_EDT, &QLineEdit::editingFinished, this, [this](){ emit max_dist_changed(max_dist); });
+    connect(ui->MAX_DIST_EDT, &QLineEdit::editingFinished, this, [this](){ if (m_config) emit max_dist_changed(m_config->get_data().tcu.max_dist); });
     connect(ui->DELAY_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
-                emit delay_offset_changed(delay_offset * dist_ns);
+                if (m_config) emit delay_offset_changed(m_config->get_data().tcu.delay_offset * dist_ns);
     });
-    connect(ui->MAX_DOV_EDT, &QLineEdit::editingFinished, this, [this](){ emit max_dov_changed(max_dov); });
+    connect(ui->MAX_DOV_EDT, &QLineEdit::editingFinished, this, [this](){ if (m_config) emit max_dov_changed(m_config->get_data().tcu.max_dov); });
     connect(ui->GATE_WIDTH_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
-                emit gate_width_offset_changed(gate_width_offset * dist_ns);
+                if (m_config) emit gate_width_offset_changed(m_config->get_data().tcu.gate_width_offset * dist_ns);
     });
-    connect(ui->MAX_LASER_EDT, &QLineEdit::editingFinished, this, [this](){ emit max_laser_changed(max_laser_width); });
+    connect(ui->MAX_LASER_EDT, &QLineEdit::editingFinished, this, [this](){ if (m_config) emit max_laser_changed(m_config->get_data().tcu.max_laser_width); });
     connect(ui->LASER_OFFSET_EDT, &QLineEdit::editingFinished, this,
             [this](){
-                emit laser_offset_changed(laser_width_offset);
+                if (m_config) emit laser_offset_changed(m_config->get_data().tcu.laser_width_offset);
     });
 
     ui->PS_CONFIG_GRP->hide();
@@ -251,18 +198,23 @@ Preferences::Preferences(QWidget *parent) :
             [this](int idx){ emit ps_config_updated(true, idx, 0); });
     connect(ui->PS_STEPPING_EDT, &QLineEdit::editingFinished, this,
             [this](){
+                if (!m_config) return;
                 int idx = ui->TCU_PS_CONFIG_LIST->currentIndex();
-                ps_step[idx] = std::min(std::max(ui->PS_STEPPING_EDT->text().toUInt(), (uint)1), (uint)4000);
-                ui->MAX_PS_STEP_EDT->setText(QString::number(int(std::round(4000. / ps_step[idx]))));
-                ui->PS_STEPPING_EDT->setText(QString::number(ps_step[idx]));
+                auto& ps = m_config->get_data().tcu.ps_step[idx];
+                ps = std::min(std::max(ui->PS_STEPPING_EDT->text().toUInt(), (uint)1), (uint)4000);
+                ui->MAX_PS_STEP_EDT->setText(QString::number(int(std::round(4000. / ps))));
+                ui->PS_STEPPING_EDT->setText(QString::number(ps));
                 emit ps_config_updated(false, idx, ui->PS_STEPPING_EDT->text().toInt());
             });
     connect(ui->MAX_PS_STEP_EDT, &QLineEdit::editingFinished, this,
             [this](){
+                if (!m_config) return;
                 int idx = ui->TCU_PS_CONFIG_LIST->currentIndex();
                 int max_step = std::min(std::max(ui->MAX_PS_STEP_EDT->text().toInt(), 1), 100);
                 ui->MAX_PS_STEP_EDT->setText(QString::number(max_step));
-                ui->PS_STEPPING_EDT->setText(QString::number(ps_step[idx] = int(std::round(4000. / max_step))));
+                auto& ps = m_config->get_data().tcu.ps_step[idx];
+                ps = int(std::round(4000. / max_step));
+                ui->PS_STEPPING_EDT->setText(QString::number(ps));
                 emit ps_config_updated(false, idx, ui->PS_STEPPING_EDT->text().toInt());
             });
 
@@ -282,30 +234,30 @@ Preferences::Preferences(QWidget *parent) :
 //![3]
 
 //[4]
-    connect(ui->SAVE_INFO_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ save_info = arg1; });
+    connect(ui->SAVE_INFO_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ if (m_config) m_config->get_data().save.save_info = arg1; });
     QFont temp_f(consolas);
     temp_f.setPixelSize(11);
     ui->CUSTOM_INFO_EDT->setFont(temp_f);
     connect(ui->CUSTOM_INFO_CHK, &QCheckBox::stateChanged, this,
-            [this](int arg1){ custom_topleft_info = arg1; ui->CUSTOM_INFO_EDT->setEnabled(arg1); });
+            [this](int arg1){ if (m_config) m_config->get_data().save.custom_topleft_info = arg1; ui->CUSTOM_INFO_EDT->setEnabled(arg1); });
     connect(ui->GRAYSCALE_CHK, &QCheckBox::stateChanged, this,
-            [this](int arg1){ save_in_grayscale = arg1; });
+            [this](int arg1){ if (m_config) m_config->get_data().save.save_in_grayscale = arg1; });
     connect(ui->INTEGRATE_INFO_CHK, &QCheckBox::stateChanged, this,
-            [this](int arg1){ integrate_info = arg1; });
+            [this](int arg1){ if (m_config) m_config->get_data().save.integrate_info = arg1; });
     ui->IMG_FORMAT_LST->addItem("bmp/tiff");
     ui->IMG_FORMAT_LST->addItem("jpg");
     ui->IMG_FORMAT_LST->setCurrentIndex(0);
     connect(ui->IMG_FORMAT_LST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
-            [this](int idx) { img_format = idx; });
+            [this](int idx) { if (m_config) m_config->get_data().save.img_format = idx; });
     connect(ui->CONSECUTIVE_CAPTURE_CHK, &QCheckBox::stateChanged, this,
-            [this](int arg1){ consecutive_capture = arg1; });
+            [this](int arg1){ if (m_config) m_config->get_data().save.consecutive_capture = arg1; });
 //![4]
 
 //[5] set up ui for image proc
     connect(ui->LOWER_3D_THRESH_EDT, &QLineEdit::editingFinished, this,
-            [this](){ if (lower_3d_thresh < 0) lower_3d_thresh = 0; emit lower_3d_thresh_updated(); });
+            [this](){ if (m_config && m_config->get_data().image_proc.lower_3d_thresh < 0) m_config->get_data().image_proc.lower_3d_thresh = 0; emit lower_3d_thresh_updated(); });
     connect(ui->UPPER_3D_THRESH_EDT, &QLineEdit::editingFinished, this,
-            [this](){ if (upper_3d_thresh > 1.001) upper_3d_thresh = 1.001; });
+            [this](){ if (m_config && m_config->get_data().image_proc.upper_3d_thresh > 1.001) m_config->get_data().image_proc.upper_3d_thresh = 1.001; });
     QStringList colormap_names;
     colormap_names << "AUTUMN" << "BONE" << "JET" << "WINTER" << "RAINBOW" << "OCEAN" << "SUMMER" << "SPRING"
                    << "COOL" << "HSV" << "PINK" << "HOT" << "PARULA" << "MAGMA" << "INFERNO" << "PLASMA"
@@ -313,12 +265,12 @@ Preferences::Preferences(QWidget *parent) :
     ui->COLORMAP_3D_LIST->addItems(colormap_names);
     ui->COLORMAP_3D_LIST->installEventFilter(this);
     connect(ui->COLORMAP_3D_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
-            [this](int index){ colormap = index; });
+            [this](int index){ if (m_config) m_config->get_data().image_proc.colormap = index; });
     connect(ui->TRUNCATE_3D_CHK, &QCheckBox::stateChanged, this,
-            [this](int arg1){ truncate_3d = arg1; });
+            [this](int arg1){ if (m_config) m_config->get_data().image_proc.truncate_3d = arg1; });
     connect(ui->CUSTOM_3D_PARAM_CHK, &QCheckBox::stateChanged, this,
             [this](int arg1){
-                custom_3d_param = arg1;
+                if (m_config) m_config->get_data().image_proc.custom_3d_param = arg1;
                 ui->CUSTOM_3D_DELAY_EDT->setEnabled(arg1);
                 ui->CUSTOM_3D_GW_EDT->setEnabled(arg1);
                 emit query_tcu_param();
@@ -336,14 +288,16 @@ Preferences::Preferences(QWidget *parent) :
     ui->MODEL_LIST->setCurrentIndex(model_idx = 0);
     connect(ui->MODEL_LIST, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged), this,
             [this](int index){
-                model_idx = index;
-                ui->FISHNET_THRESH_EDIT->setEnabled(!model_idx);
+                if (m_config) m_config->get_data().image_proc.model_idx = index;
+                ui->FISHNET_THRESH_EDIT->setEnabled(!index);
             });
-    connect(ui->FISHNET_RECOG_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ fishnet_recog = arg1; });
+    connect(ui->FISHNET_RECOG_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ if (m_config) m_config->get_data().image_proc.fishnet_recog = arg1; });
     connect(ui->FISHNET_THRESH_EDIT, &QLineEdit::editingFinished, this,
             [this](){
-                fishnet_thresh = ui->FISHNET_THRESH_EDIT->text().toFloat();
-                ui->FISHNET_THRESH_EDIT->setText(QString::number(fishnet_thresh, 'f', 2));
+                if (!m_config) return;
+                auto& ft = m_config->get_data().image_proc.fishnet_thresh;
+                ft = ui->FISHNET_THRESH_EDIT->text().toFloat();
+                ui->FISHNET_THRESH_EDIT->setText(QString::number(ft, 'f', 2));
             });
 #else
     ui->FISHNET->hide();
@@ -385,122 +339,171 @@ void Preferences::init()
 
 void Preferences::data_exchange(bool read)
 {
+    if (!m_config) return;
+    auto& ip = m_config->get_data().image_proc;
+    auto& tcu = m_config->get_data().tcu;
+    auto& sv = m_config->get_data().save;
+
+    auto& dev = m_config->get_data().device;
+
     if (read) {
-        gamma = ui->GAMMA_EDIT->text().toFloat();
-        accu_base = ui->ACCU_BASE_EDIT->text().toFloat();
-        low_in = ui->LOW_IN_EDIT->text().toFloat();
-        high_in = ui->HIGH_IN_EDIT->text().toFloat();
-        low_out = ui->LOW_OUT_EDIT->text().toFloat();
-        high_out = ui->HIGH_OUT_EDIT->text().toFloat();
-        dehaze_pct = ui->DEHAZE_PCT_EDIT->text().toFloat() / 100;
-        sky_tolerance = ui->SKY_TOLERANCE_EDIT->text().toFloat();
-        fast_gf = ui->FAST_GF_EDIT->text().toInt();
-        colormap = ui->COLORMAP_3D_LIST->currentIndex();
-        lower_3d_thresh = ui->LOWER_3D_THRESH_EDT->text().toFloat();
-        upper_3d_thresh = ui->UPPER_3D_THRESH_EDT->text().toFloat();
-        custom_3d_param = ui->CUSTOM_3D_PARAM_CHK->isChecked();
-        custom_3d_delay = ui->CUSTOM_3D_DELAY_EDT->text().toFloat();
-        custom_3d_gate_width = ui->CUSTOM_3D_GW_EDT->text().toFloat();
+        // device
+        dev.flip = ui->FLIP_OPTION_LIST->currentIndex();
+        dev.rotation = ui->ROTATE_OPTION_LIST->currentIndex();
+        dev.ptz_type = ui->PTZ_TYPE_LIST->currentIndex();
+        dev.ebus = ui->EBUS_CHK->isChecked();
+        dev.share_tcu_port = ui->SHARE_CHK->isChecked();
+        dev.underwater = ui->UNDERWATER_CHK->isChecked();
+
+        // save
+        sv.save_info = ui->SAVE_INFO_CHK->isChecked();
+        sv.custom_topleft_info = ui->CUSTOM_INFO_CHK->isChecked();
+        sv.save_in_grayscale = ui->GRAYSCALE_CHK->isChecked();
+        sv.consecutive_capture = ui->CONSECUTIVE_CAPTURE_CHK->isChecked();
+        sv.integrate_info = ui->INTEGRATE_INFO_CHK->isChecked();
+        sv.img_format = ui->IMG_FORMAT_LST->currentIndex();
+
+        // TCU type/hz_unit
+        tcu.type = ui->TCU_LIST->currentIndex();
+        tcu.hz_unit = ui->HZ_LIST->currentIndex();
+
+        // image proc
+        ip.gamma = ui->GAMMA_EDIT->text().toFloat();
+        ip.accu_base = ui->ACCU_BASE_EDIT->text().toFloat();
+        ip.low_in = ui->LOW_IN_EDIT->text().toFloat();
+        ip.high_in = ui->HIGH_IN_EDIT->text().toFloat();
+        ip.low_out = ui->LOW_OUT_EDIT->text().toFloat();
+        ip.high_out = ui->HIGH_OUT_EDIT->text().toFloat();
+        ip.dehaze_pct = ui->DEHAZE_PCT_EDIT->text().toFloat() / 100;
+        ip.sky_tolerance = ui->SKY_TOLERANCE_EDIT->text().toFloat();
+        ip.fast_gf = ui->FAST_GF_EDIT->text().toInt();
+        ip.colormap = ui->COLORMAP_3D_LIST->currentIndex();
+        ip.lower_3d_thresh = ui->LOWER_3D_THRESH_EDT->text().toFloat();
+        ip.upper_3d_thresh = ui->UPPER_3D_THRESH_EDT->text().toFloat();
+        ip.custom_3d_param = ui->CUSTOM_3D_PARAM_CHK->isChecked();
+        ip.custom_3d_delay = ui->CUSTOM_3D_DELAY_EDT->text().toFloat();
+        ip.custom_3d_gate_width = ui->CUSTOM_3D_GW_EDT->text().toFloat();
 #ifdef LVTONG
-        fishnet_recog = ui->FISHNET_RECOG_CHK->isChecked();
-        fishnet_thresh = ui->FISHNET_THRESH_EDIT->text().toFloat();
+        ip.fishnet_recog = ui->FISHNET_RECOG_CHK->isChecked();
+        ip.fishnet_thresh = ui->FISHNET_THRESH_EDIT->text().toFloat();
 #endif
 
-        ecc_window_mode = ui->ECC_WINDOW_MODE_LIST->currentIndex();
-        ecc_warp_mode = ui->ECC_WARP_MODE_LIST->currentIndex();
-        ecc_fusion_method = ui->ECC_FUSION_MODE_LIST->currentIndex();
-        ecc_backward = ui->ECC_BACKWARD_EDIT->text().toInt();
-        ecc_forward = ui->ECC_FORWARD_EDIT->text().toInt();
-        if (ecc_window_mode == 0) ecc_forward = 0;
-        else if (ecc_window_mode == 1) ecc_forward = ecc_backward;
-        ecc_levels = ui->ECC_LEVELS_EDIT->text().toInt();
-        ecc_max_iter = ui->ECC_MAXITER_EDIT->text().toInt();
-        ecc_eps = ui->ECC_EPS_EDIT->text().toDouble();
-        ecc_half_res_reg = ui->ECC_HALF_REG_CHK->isChecked();
-        ecc_half_res_fuse = ui->ECC_HALF_FUSE_CHK->isChecked();
+        ip.ecc_window_mode = ui->ECC_WINDOW_MODE_LIST->currentIndex();
+        ip.ecc_warp_mode = ui->ECC_WARP_MODE_LIST->currentIndex();
+        ip.ecc_fusion_method = ui->ECC_FUSION_MODE_LIST->currentIndex();
+        ip.ecc_backward = ui->ECC_BACKWARD_EDIT->text().toInt();
+        ip.ecc_forward = ui->ECC_FORWARD_EDIT->text().toInt();
+        if (ip.ecc_window_mode == 0) ip.ecc_forward = 0;
+        else if (ip.ecc_window_mode == 1) ip.ecc_forward = ip.ecc_backward;
+        ip.ecc_levels = ui->ECC_LEVELS_EDIT->text().toInt();
+        ip.ecc_max_iter = ui->ECC_MAXITER_EDIT->text().toInt();
+        ip.ecc_eps = ui->ECC_EPS_EDIT->text().toDouble();
+        ip.ecc_half_res_reg = ui->ECC_HALF_REG_CHK->isChecked();
+        ip.ecc_half_res_fuse = ui->ECC_HALF_FUSE_CHK->isChecked();
 
-        auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
-        ab_lock = ui->AB_LOCK_CHK->isChecked();
-        base_unit = ui->UNIT_LIST->currentIndex();
-        switch (base_unit) {
+        tcu.auto_rep_freq = ui->AUTO_REP_FREQ_CHK->isChecked();
+        tcu.ab_lock = ui->AB_LOCK_CHK->isChecked();
+        tcu.base_unit = ui->UNIT_LIST->currentIndex();
+        switch (tcu.base_unit) {
         // ns
         case 0:
-            max_dist = ui->MAX_DIST_EDT->text().toFloat() * dist_ns;
-            delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat();
-            max_dov = ui->MAX_DOV_EDT->text().toFloat() * dist_ns;
-            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat();
-            max_laser_width = ui->MAX_LASER_EDT->text().toFloat();
-            laser_width_offset = ui->LASER_OFFSET_EDT->text().toFloat();
+            tcu.max_dist = ui->MAX_DIST_EDT->text().toFloat() * dist_ns;
+            tcu.delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat();
+            tcu.max_dov = ui->MAX_DOV_EDT->text().toFloat() * dist_ns;
+            tcu.gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat();
+            tcu.max_laser_width = ui->MAX_LASER_EDT->text().toFloat();
+            tcu.laser_width_offset = ui->LASER_OFFSET_EDT->text().toFloat();
             break;
         // μs
         case 1:
-            max_dist = ui->MAX_DIST_EDT->text().toFloat() * dist_ns * 1000;
-            delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat() * 1000;
-            max_dov = ui->MAX_DOV_EDT->text().toFloat() * dist_ns * 1000;
-            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat() * 1000;
-            max_laser_width = ui->MAX_LASER_EDT->text().toFloat();
-            laser_width_offset = ui->LASER_OFFSET_EDT->text().toFloat();
+            tcu.max_dist = ui->MAX_DIST_EDT->text().toFloat() * dist_ns * 1000;
+            tcu.delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat() * 1000;
+            tcu.max_dov = ui->MAX_DOV_EDT->text().toFloat() * dist_ns * 1000;
+            tcu.gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat() * 1000;
+            tcu.max_laser_width = ui->MAX_LASER_EDT->text().toFloat();
+            tcu.laser_width_offset = ui->LASER_OFFSET_EDT->text().toFloat();
             break;
         // m
         case 2:
-            max_dist = ui->MAX_DIST_EDT->text().toFloat();
-            delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat() / dist_ns;
-            max_dov = ui->MAX_DOV_EDT->text().toFloat();
-            gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat() / dist_ns;
-            max_laser_width = ui->MAX_LASER_EDT->text().toFloat();
-            laser_width_offset = ui->LASER_OFFSET_EDT->text().toFloat();
+            tcu.max_dist = ui->MAX_DIST_EDT->text().toFloat();
+            tcu.delay_offset = ui->DELAY_OFFSET_EDT->text().toFloat() / dist_ns;
+            tcu.max_dov = ui->MAX_DOV_EDT->text().toFloat();
+            tcu.gate_width_offset = ui->GATE_WIDTH_OFFSET_EDT->text().toFloat() / dist_ns;
+            tcu.max_laser_width = ui->MAX_LASER_EDT->text().toFloat();
+            tcu.laser_width_offset = ui->LASER_OFFSET_EDT->text().toFloat();
             break;
         default: break;
         }
-        ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()] = ui->PS_STEPPING_EDT->text().toInt();
-        laser_on = 0;
-        laser_on |= ui->LASER_CHK_1->isChecked() << 0;
-        laser_on |= ui->LASER_CHK_2->isChecked() << 1;
-        laser_on |= ui->LASER_CHK_3->isChecked() << 2;
-        laser_on |= ui->LASER_CHK_4->isChecked() << 3;
+        tcu.ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()] = ui->PS_STEPPING_EDT->text().toInt();
+        tcu.laser_on = 0;
+        tcu.laser_on |= ui->LASER_CHK_1->isChecked() << 0;
+        tcu.laser_on |= ui->LASER_CHK_2->isChecked() << 1;
+        tcu.laser_on |= ui->LASER_CHK_3->isChecked() << 2;
+        tcu.laser_on |= ui->LASER_CHK_4->isChecked() << 3;
     }
     else {
-        ui->GAMMA_EDIT->setText(QString::number(gamma, 'f', 2));
-        ui->ACCU_BASE_EDIT->setText(QString::number(accu_base, 'f', 2));
-        ui->LOW_IN_EDIT->setText(QString::number(low_in, 'f', 2));
-        ui->HIGH_IN_EDIT->setText(QString::number(high_in, 'f', 2));
-        ui->LOW_OUT_EDIT->setText(QString::number(low_out, 'f', 2));
-        ui->HIGH_OUT_EDIT->setText(QString::number(high_out, 'f', 2));
-        ui->DEHAZE_PCT_EDIT->setText(QString::number(dehaze_pct * 100, 'f', 2));
-        ui->SKY_TOLERANCE_EDIT->setText(QString::number(sky_tolerance, 'f', 2));
-        ui->FAST_GF_EDIT->setText(QString::number(fast_gf));
-        ui->COLORMAP_3D_LIST->setCurrentIndex(colormap);
-        ui->LOWER_3D_THRESH_EDT->setText(QString::number(lower_3d_thresh, 'f', 3));
-        ui->UPPER_3D_THRESH_EDT->setText(QString::number(upper_3d_thresh, 'f', 3));
-        ui->CUSTOM_3D_PARAM_CHK->setChecked(custom_3d_param);
-        ui->CUSTOM_3D_DELAY_EDT->setText(QString::number((int)std::round(custom_3d_delay)));
-        ui->CUSTOM_3D_GW_EDT->setText(QString::number((int)std::round(custom_3d_gate_width)));
+        // device
+        ui->FLIP_OPTION_LIST->setCurrentIndex(dev.flip);
+        ui->ROTATE_OPTION_LIST->setCurrentIndex(dev.rotation);
+        ui->PTZ_TYPE_LIST->setCurrentIndex(dev.ptz_type);
+        ui->EBUS_CHK->setChecked(dev.ebus);
+        ui->SHARE_CHK->setChecked(dev.share_tcu_port);
+        ui->UNDERWATER_CHK->setChecked(dev.underwater);
+
+        // save
+        ui->SAVE_INFO_CHK->setChecked(sv.save_info);
+        ui->CUSTOM_INFO_CHK->setChecked(sv.custom_topleft_info);
+        ui->GRAYSCALE_CHK->setChecked(sv.save_in_grayscale);
+        ui->CONSECUTIVE_CAPTURE_CHK->setChecked(sv.consecutive_capture);
+        ui->INTEGRATE_INFO_CHK->setChecked(sv.integrate_info);
+        ui->IMG_FORMAT_LST->setCurrentIndex(sv.img_format);
+
+        // TCU type/hz_unit
+        ui->TCU_LIST->setCurrentIndex(tcu.type);
+        ui->HZ_LIST->setCurrentIndex(tcu.hz_unit);
+
+        // image proc
+        ui->GAMMA_EDIT->setText(QString::number(ip.gamma, 'f', 2));
+        ui->ACCU_BASE_EDIT->setText(QString::number(ip.accu_base, 'f', 2));
+        ui->LOW_IN_EDIT->setText(QString::number(ip.low_in, 'f', 2));
+        ui->HIGH_IN_EDIT->setText(QString::number(ip.high_in, 'f', 2));
+        ui->LOW_OUT_EDIT->setText(QString::number(ip.low_out, 'f', 2));
+        ui->HIGH_OUT_EDIT->setText(QString::number(ip.high_out, 'f', 2));
+        ui->DEHAZE_PCT_EDIT->setText(QString::number(ip.dehaze_pct * 100, 'f', 2));
+        ui->SKY_TOLERANCE_EDIT->setText(QString::number(ip.sky_tolerance, 'f', 2));
+        ui->FAST_GF_EDIT->setText(QString::number(ip.fast_gf));
+        ui->COLORMAP_3D_LIST->setCurrentIndex(ip.colormap);
+        ui->LOWER_3D_THRESH_EDT->setText(QString::number(ip.lower_3d_thresh, 'f', 3));
+        ui->UPPER_3D_THRESH_EDT->setText(QString::number(ip.upper_3d_thresh, 'f', 3));
+        ui->CUSTOM_3D_PARAM_CHK->setChecked(ip.custom_3d_param);
+        ui->CUSTOM_3D_DELAY_EDT->setText(QString::number((int)std::round(ip.custom_3d_delay)));
+        ui->CUSTOM_3D_GW_EDT->setText(QString::number((int)std::round(ip.custom_3d_gate_width)));
 #ifdef LVTONG
-        ui->FISHNET_RECOG_CHK->setChecked(fishnet_recog);
-        ui->FISHNET_THRESH_EDIT->setText(QString::number(fishnet_thresh, 'f', 2));
+        ui->FISHNET_RECOG_CHK->setChecked(ip.fishnet_recog);
+        ui->FISHNET_THRESH_EDIT->setText(QString::number(ip.fishnet_thresh, 'f', 2));
 #endif
 
-        ui->ECC_WINDOW_MODE_LIST->setCurrentIndex(ecc_window_mode);
-        ui->ECC_WARP_MODE_LIST->setCurrentIndex(ecc_warp_mode);
-        ui->ECC_FUSION_MODE_LIST->setCurrentIndex(ecc_fusion_method);
-        ui->ECC_BACKWARD_EDIT->setText(QString::number(ecc_backward));
-        ui->ECC_FORWARD_EDIT->setText(QString::number(ecc_forward));
-        ui->ECC_LEVELS_EDIT->setText(QString::number(ecc_levels));
-        ui->ECC_MAXITER_EDIT->setText(QString::number(ecc_max_iter));
-        ui->ECC_EPS_EDIT->setText(QString::number(ecc_eps, 'f', 4));
-        ui->ECC_HALF_REG_CHK->setChecked(ecc_half_res_reg);
-        ui->ECC_HALF_FUSE_CHK->setChecked(ecc_half_res_fuse);
+        ui->ECC_WINDOW_MODE_LIST->setCurrentIndex(ip.ecc_window_mode);
+        ui->ECC_WARP_MODE_LIST->setCurrentIndex(ip.ecc_warp_mode);
+        ui->ECC_FUSION_MODE_LIST->setCurrentIndex(ip.ecc_fusion_method);
+        ui->ECC_BACKWARD_EDIT->setText(QString::number(ip.ecc_backward));
+        ui->ECC_FORWARD_EDIT->setText(QString::number(ip.ecc_forward));
+        ui->ECC_LEVELS_EDIT->setText(QString::number(ip.ecc_levels));
+        ui->ECC_MAXITER_EDIT->setText(QString::number(ip.ecc_max_iter));
+        ui->ECC_EPS_EDIT->setText(QString::number(ip.ecc_eps, 'f', 4));
+        ui->ECC_HALF_REG_CHK->setChecked(ip.ecc_half_res_reg);
+        ui->ECC_HALF_FUSE_CHK->setChecked(ip.ecc_half_res_fuse);
 
-        ui->AUTO_REP_FREQ_CHK->setChecked(auto_rep_freq);
-        ui->AB_LOCK_CHK->setChecked(ab_lock);
-        ui->UNIT_LIST->setCurrentIndex(base_unit);
+        ui->AUTO_REP_FREQ_CHK->setChecked(tcu.auto_rep_freq);
+        ui->AB_LOCK_CHK->setChecked(tcu.ab_lock);
+        ui->UNIT_LIST->setCurrentIndex(tcu.base_unit);
         update_distance_display();
-        ui->PS_STEPPING_EDT->setText(QString::number(ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]));
-        ui->MAX_PS_STEP_EDT->setText(QString::number(int(std::round(4000. / ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]))));
-        ui->LASER_CHK_1->setChecked(laser_on & 0b0001);
-        ui->LASER_CHK_2->setChecked(laser_on & 0b0010);
-        ui->LASER_CHK_3->setChecked(laser_on & 0b0100);
-        ui->LASER_CHK_4->setChecked(laser_on & 0b1000);
+        ui->PS_STEPPING_EDT->setText(QString::number(tcu.ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]));
+        ui->MAX_PS_STEP_EDT->setText(QString::number(int(std::round(4000. / tcu.ps_step[ui->TCU_PS_CONFIG_LIST->currentIndex()]))));
+        ui->LASER_CHK_1->setChecked(tcu.laser_on & 0b0001);
+        ui->LASER_CHK_2->setChecked(tcu.laser_on & 0b0010);
+        ui->LASER_CHK_3->setChecked(tcu.laser_on & 0b0100);
+        ui->LASER_CHK_4->setChecked(tcu.laser_on & 0b1000);
     }
 }
 
@@ -529,41 +532,43 @@ void Preferences::set_pixel_format(int idx)
 
 void Preferences::update_distance_display()
 {
-    switch (base_unit) {
+    if (!m_config) return;
+    const auto& tcu = m_config->get_data().tcu;
+
+    switch (tcu.base_unit) {
     case 0: // ns
-        ui->MAX_DIST_EDT->setText(QString::number(std::round(max_dist / dist_ns), 'f', 0));
+        ui->MAX_DIST_EDT->setText(QString::number(std::round(tcu.max_dist / dist_ns), 'f', 0));
         ui->MAX_DIST_UNIT->setText("ns");
-        ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(delay_offset), 'f', 0));
+        ui->DELAY_OFFSET_EDT->setText(QString::number(std::round(tcu.delay_offset), 'f', 0));
         ui->DELAY_OFFSET_UNIT->setText("ns");
-        ui->MAX_DOV_EDT->setText(QString::number(std::round(max_dov / dist_ns), 'f', 0));
+        ui->MAX_DOV_EDT->setText(QString::number(std::round(tcu.max_dov / dist_ns), 'f', 0));
         ui->MAX_DOV_UNIT->setText("ns");
-        ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(std::round(gate_width_offset), 'f', 0));
+        ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(std::round(tcu.gate_width_offset), 'f', 0));
         ui->GATE_WIDTH_OFFSET_UNIT->setText("ns");
         break;
     case 1: // μs
-        ui->MAX_DIST_EDT->setText(QString::number(max_dist / dist_ns / 1000, 'f', 3));
+        ui->MAX_DIST_EDT->setText(QString::number(tcu.max_dist / dist_ns / 1000, 'f', 3));
         ui->MAX_DIST_UNIT->setText("μs");
-        ui->DELAY_OFFSET_EDT->setText(QString::number(delay_offset / 1000, 'f', 3));
+        ui->DELAY_OFFSET_EDT->setText(QString::number(tcu.delay_offset / 1000, 'f', 3));
         ui->DELAY_OFFSET_UNIT->setText("μs");
-        ui->MAX_DOV_EDT->setText(QString::number(max_dov / dist_ns / 1000, 'f', 3));
+        ui->MAX_DOV_EDT->setText(QString::number(tcu.max_dov / dist_ns / 1000, 'f', 3));
         ui->MAX_DOV_UNIT->setText("μs");
-        ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(gate_width_offset / 1000, 'f', 3));
+        ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(tcu.gate_width_offset / 1000, 'f', 3));
         ui->GATE_WIDTH_OFFSET_UNIT->setText("μs");
         break;
     case 2: // m
-        ui->MAX_DIST_EDT->setText(QString::number(max_dist, 'f', 2));
+        ui->MAX_DIST_EDT->setText(QString::number(tcu.max_dist, 'f', 2));
         ui->MAX_DIST_UNIT->setText("m");
-        ui->DELAY_OFFSET_EDT->setText(QString::number(delay_offset * dist_ns, 'f', 2));
+        ui->DELAY_OFFSET_EDT->setText(QString::number(tcu.delay_offset * dist_ns, 'f', 2));
         ui->DELAY_OFFSET_UNIT->setText("m");
-        ui->MAX_DOV_EDT->setText(QString::number(max_dov, 'f', 2));
+        ui->MAX_DOV_EDT->setText(QString::number(tcu.max_dov, 'f', 2));
         ui->MAX_DOV_UNIT->setText("m");
-        ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(gate_width_offset * dist_ns, 'f', 2));
+        ui->GATE_WIDTH_OFFSET_EDT->setText(QString::number(tcu.gate_width_offset * dist_ns, 'f', 2));
         ui->GATE_WIDTH_OFFSET_UNIT->setText("m");
         break;
     default: break;
     }
-    ui->MAX_LASER_EDT->setText(QString::number(max_laser_width, 'f', 0));
-
+    ui->MAX_LASER_EDT->setText(QString::number(tcu.max_laser_width, 'f', 0));
 }
 
 void Preferences::display_baudrate(int id, int baudrate)
@@ -691,8 +696,8 @@ void Preferences::send_cmd(QString str)
 
 void Preferences::toggle_laser(int id, bool on)
 {
+    if (!m_config) return;
+    auto& laser_on = m_config->get_data().tcu.laser_on;
     laser_on ^= 1 << id;
-//    if (on) laser_on |= 1 << id;
-//    else    laser_on &= 0 << id;
     emit laser_toggled(laser_on);
 }

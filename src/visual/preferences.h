@@ -2,6 +2,7 @@
 #define PREFERENCES_H
 
 #include "util/util.h"
+#include "util/config.h"
 
 namespace Ui {
 class Preferences;
@@ -16,6 +17,7 @@ public:
     ~Preferences();
 
     void init();
+    void set_config(Config* config) { m_config = config; }
 
     void data_exchange(bool read);
     void config_ip(bool read, int ip = 0, int gateway = 0, int nic_address = 0); // ip and gateway will only be used when reading ip
@@ -85,84 +87,19 @@ signals:
 
 public:
     Ui::Preferences* ui;
+    Config*          m_config = nullptr;
 
     // ui-control
     bool             pressed;
     QPoint           prev_pos;
 
-    // 1 device
-    int              device_idx;
-    int              rotation;
-    int              symmetry;
-    int              pixel_type;
+    // runtime state (not in Config)
     bool             split;
-    bool             ebus_cam;
-    int              ptz_type;  // 0: pelco-p, 1: usbcan, 2: udp-scw
     bool             cameralink;
-
-    // 2 serial comm.
     int              port_idx;
-    bool             share_port;
     bool             use_tcp;
-
-    // 3 tcu config
     float            dist_ns;
-    bool             auto_rep_freq;
-    bool             auto_mcp;
-    bool             ab_lock;
-    int              hz_unit;   // 0: kHz, 1:Hz
-    int              base_unit; // 0: ns, 1: μs, 2: m
-    float            max_dist;
-    float            delay_offset; // distance offset (unit: ns)
-    float            max_dov;
-    float            gate_width_offset; // depth offset (unit: ns)
-    float            max_laser_width;
-    float            laser_width_offset; // laser width offset (from hardware)
-    uint             ps_step[4]; // ps-stepping in ps-TCU
-    bool             laser_enable;
     QButtonGroup*    laser_grp;
-    int              laser_on; // does not rely on laser_enable
-
-    // 4 save options
-    bool             save_info;
-    bool             custom_topleft_info;
-    bool             save_in_grayscale;
-    bool             consecutive_capture;
-    bool             integrate_info; // Save TCU params as BMP note
-    int              img_format; // 0: bmp/tiff, 1: jpg
-
-    // 5 img proc
-    float            accu_base;
-    float            gamma;
-    float            low_in;
-    float            high_in;
-    float            low_out;
-    float            high_out;
-    float            dehaze_pct;
-    float            sky_tolerance;
-    int              fast_gf;
-    int              colormap;
-    double           lower_3d_thresh;
-    double           upper_3d_thresh;
-    bool             truncate_3d;
-    bool             custom_3d_param;
-    float            custom_3d_delay;
-    float            custom_3d_gate_width;
-    int              model_idx;
-    bool             fishnet_recog;
-    float            fishnet_thresh;
-
-    // ECC temporal denoising
-    int              ecc_window_mode;  // 0=backward, 1=balanced, 2=custom
-    int              ecc_warp_mode;    // 0=translation, 1=euclidean, 2=affine, 3=homography
-    int              ecc_fusion_method;// 0=mean, 1=median, 2=med+trim_mean
-    int              ecc_backward;
-    int              ecc_forward;
-    int              ecc_levels;
-    int              ecc_max_iter;
-    double           ecc_eps;
-    bool             ecc_half_res_reg;
-    bool             ecc_half_res_fuse;
 
 };
 

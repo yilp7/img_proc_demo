@@ -55,11 +55,60 @@ public:
     };
 
     struct DeviceSettings {
-        bool flip = false;
+        int flip = 0; // 0=none, 1=both, 2=X-axis, 3=Y-axis (cv::flip flipCode = flip-2)
         bool underwater = false;
         bool ebus = false;
         bool share_tcu_port = false;
         int ptz_type = 0;
+        int rotation = 0;
+        int pixel_type = 0;
+    };
+
+    struct SaveSettings {
+        bool save_info = true;
+        bool custom_topleft_info = false;
+        bool save_in_grayscale = false;
+        bool consecutive_capture = true;
+        bool integrate_info = true;
+        int img_format = 0;
+    };
+
+    struct ImageProcSettings {
+        // basic
+        float accu_base = 1.0f;
+        float gamma = 1.2f;
+        float low_in = 0.0f;
+        float high_in = 0.05f;
+        float low_out = 0.0f;
+        float high_out = 1.0f;
+        // dehaze
+        float dehaze_pct = 0.95f;
+        float sky_tolerance = 40.0f;
+        int fast_gf = 1;
+        // colormap
+        int colormap = 2; // cv::COLORMAP_JET
+        // 3D gated
+        double lower_3d_thresh = 0.0;
+        double upper_3d_thresh = 0.981;
+        bool truncate_3d = false;
+        bool custom_3d_param = false;
+        float custom_3d_delay = 0.0f;
+        float custom_3d_gate_width = 0.0f;
+        // model/fishnet
+        int model_idx = 0;
+        bool fishnet_recog = false;
+        float fishnet_thresh = 0.99f;
+        // ECC temporal denoising
+        int ecc_window_mode = 0;
+        int ecc_warp_mode = 2;
+        int ecc_fusion_method = 2;
+        int ecc_backward = 20;
+        int ecc_forward = 0;
+        int ecc_levels = 1;
+        int ecc_max_iter = 8;
+        double ecc_eps = 0.001;
+        bool ecc_half_res_reg = true;
+        bool ecc_half_res_fuse = false;
     };
 
     struct YoloSettings {
@@ -95,6 +144,8 @@ public:
         CameraSettings camera;
         TCUSettings tcu;
         DeviceSettings device;
+        SaveSettings save;
+        ImageProcSettings image_proc;
         YoloSettings yolo;
 
         ConfigData() {
@@ -143,6 +194,12 @@ private:
 
     nlohmann::json device_settings_to_json(const DeviceSettings &settings) const;
     DeviceSettings device_settings_from_json(const nlohmann::json &obj) const;
+
+    nlohmann::json save_settings_to_json(const SaveSettings &settings) const;
+    SaveSettings save_settings_from_json(const nlohmann::json &obj) const;
+
+    nlohmann::json image_proc_settings_to_json(const ImageProcSettings &settings) const;
+    ImageProcSettings image_proc_settings_from_json(const nlohmann::json &obj) const;
 
     nlohmann::json yolo_settings_to_json(const YoloSettings &settings) const;
     YoloSettings yolo_settings_from_json(const nlohmann::json &obj) const;

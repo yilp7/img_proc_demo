@@ -90,6 +90,16 @@ bool Config::load_from_file(const QString &filepath)
         m_data.device = device_settings_from_json(root["device"]);
     }
 
+    // Load save settings
+    if (root.contains("save") && root["save"].is_object()) {
+        m_data.save = save_settings_from_json(root["save"]);
+    }
+
+    // Load image processing settings
+    if (root.contains("image_proc") && root["image_proc"].is_object()) {
+        m_data.image_proc = image_proc_settings_from_json(root["image_proc"]);
+    }
+
     // Load YOLO settings
     if (root.contains("yolo") && root["yolo"].is_object()) {
         m_data.yolo = yolo_settings_from_json(root["yolo"]);
@@ -127,6 +137,12 @@ bool Config::save_to_file(const QString &filepath) const
     
     // Save device settings
     root["device"] = device_settings_to_json(m_data.device);
+
+    // Save save settings
+    root["save"] = save_settings_to_json(m_data.save);
+
+    // Save image processing settings
+    root["image_proc"] = image_proc_settings_to_json(m_data.image_proc);
 
     // Save YOLO settings
     root["yolo"] = yolo_settings_to_json(m_data.yolo);
@@ -268,7 +284,7 @@ nlohmann::json Config::tcu_settings_to_json(const TCUSettings &settings) const
     }
     obj["ps_step"] = psStepArray;
     
-    obj["laser_on"] = settings.laser_on;
+    // laser_on is intentionally NOT saved — lasers must always be disabled on startup (safety)
     return obj;
 }
 
@@ -321,28 +337,33 @@ Config::TCUSettings Config::tcu_settings_from_json(const nlohmann::json &obj) co
         }
     }
     
-    if (obj.contains("laser_on") && obj["laser_on"].is_number()) {
-        settings.laser_on = obj["laser_on"].get<int>();
-    }
+    // laser_on is intentionally NOT loaded — lasers must always be disabled on startup (safety)
+    // settings.laser_on remains at default value 0
     return settings;
 }
 
 nlohmann::json Config::device_settings_to_json(const DeviceSettings &settings) const
 {
     nlohmann::json obj;
-    obj["flip"] = settings.flip;
+    obj["flip"] = settings.flip; // int: 0=none, 1=both, 2=X, 3=Y
     obj["underwater"] = settings.underwater;
     obj["ebus"] = settings.ebus;
     obj["share_tcu_port"] = settings.share_tcu_port;
     obj["ptz_type"] = settings.ptz_type;
+    obj["rotation"] = settings.rotation;
+    obj["pixel_type"] = settings.pixel_type;
     return obj;
 }
 
 Config::DeviceSettings Config::device_settings_from_json(const nlohmann::json &obj) const
 {
     DeviceSettings settings;
-    if (obj.contains("flip") && obj["flip"].is_boolean()) {
-        settings.flip = obj["flip"].get<bool>();
+    if (obj.contains("flip")) {
+        if (obj["flip"].is_number()) {
+            settings.flip = obj["flip"].get<int>();
+        } else if (obj["flip"].is_boolean()) {
+            settings.flip = obj["flip"].get<bool>() ? 1 : 0; // backward compat
+        }
     }
     if (obj.contains("underwater") && obj["underwater"].is_boolean()) {
         settings.underwater = obj["underwater"].get<bool>();
@@ -355,6 +376,188 @@ Config::DeviceSettings Config::device_settings_from_json(const nlohmann::json &o
     }
     if (obj.contains("ptz_type") && obj["ptz_type"].is_number()) {
         settings.ptz_type = obj["ptz_type"].get<int>();
+    }
+    if (obj.contains("rotation") && obj["rotation"].is_number()) {
+        settings.rotation = obj["rotation"].get<int>();
+    }
+    if (obj.contains("pixel_type") && obj["pixel_type"].is_number()) {
+        settings.pixel_type = obj["pixel_type"].get<int>();
+    }
+    return settings;
+}
+
+nlohmann::json Config::save_settings_to_json(const SaveSettings &settings) const
+{
+    nlohmann::json obj;
+    obj["save_info"] = settings.save_info;
+    obj["custom_topleft_info"] = settings.custom_topleft_info;
+    obj["save_in_grayscale"] = settings.save_in_grayscale;
+    obj["consecutive_capture"] = settings.consecutive_capture;
+    obj["integrate_info"] = settings.integrate_info;
+    obj["img_format"] = settings.img_format;
+    return obj;
+}
+
+Config::SaveSettings Config::save_settings_from_json(const nlohmann::json &obj) const
+{
+    SaveSettings settings;
+    if (obj.contains("save_info") && obj["save_info"].is_boolean()) {
+        settings.save_info = obj["save_info"].get<bool>();
+    }
+    if (obj.contains("custom_topleft_info") && obj["custom_topleft_info"].is_boolean()) {
+        settings.custom_topleft_info = obj["custom_topleft_info"].get<bool>();
+    }
+    if (obj.contains("save_in_grayscale") && obj["save_in_grayscale"].is_boolean()) {
+        settings.save_in_grayscale = obj["save_in_grayscale"].get<bool>();
+    }
+    if (obj.contains("consecutive_capture") && obj["consecutive_capture"].is_boolean()) {
+        settings.consecutive_capture = obj["consecutive_capture"].get<bool>();
+    }
+    if (obj.contains("integrate_info") && obj["integrate_info"].is_boolean()) {
+        settings.integrate_info = obj["integrate_info"].get<bool>();
+    }
+    if (obj.contains("img_format") && obj["img_format"].is_number()) {
+        settings.img_format = obj["img_format"].get<int>();
+    }
+    return settings;
+}
+
+nlohmann::json Config::image_proc_settings_to_json(const ImageProcSettings &settings) const
+{
+    nlohmann::json obj;
+    // basic
+    obj["accu_base"] = static_cast<double>(settings.accu_base);
+    obj["gamma"] = static_cast<double>(settings.gamma);
+    obj["low_in"] = static_cast<double>(settings.low_in);
+    obj["high_in"] = static_cast<double>(settings.high_in);
+    obj["low_out"] = static_cast<double>(settings.low_out);
+    obj["high_out"] = static_cast<double>(settings.high_out);
+    // dehaze
+    obj["dehaze_pct"] = static_cast<double>(settings.dehaze_pct);
+    obj["sky_tolerance"] = static_cast<double>(settings.sky_tolerance);
+    obj["fast_gf"] = settings.fast_gf;
+    // colormap
+    obj["colormap"] = settings.colormap;
+    // 3D gated
+    obj["lower_3d_thresh"] = settings.lower_3d_thresh;
+    obj["upper_3d_thresh"] = settings.upper_3d_thresh;
+    obj["truncate_3d"] = settings.truncate_3d;
+    obj["custom_3d_param"] = settings.custom_3d_param;
+    obj["custom_3d_delay"] = static_cast<double>(settings.custom_3d_delay);
+    obj["custom_3d_gate_width"] = static_cast<double>(settings.custom_3d_gate_width);
+    // model/fishnet
+    obj["model_idx"] = settings.model_idx;
+    obj["fishnet_recog"] = settings.fishnet_recog;
+    obj["fishnet_thresh"] = static_cast<double>(settings.fishnet_thresh);
+    // ECC
+    obj["ecc_window_mode"] = settings.ecc_window_mode;
+    obj["ecc_warp_mode"] = settings.ecc_warp_mode;
+    obj["ecc_fusion_method"] = settings.ecc_fusion_method;
+    obj["ecc_backward"] = settings.ecc_backward;
+    obj["ecc_forward"] = settings.ecc_forward;
+    obj["ecc_levels"] = settings.ecc_levels;
+    obj["ecc_max_iter"] = settings.ecc_max_iter;
+    obj["ecc_eps"] = settings.ecc_eps;
+    obj["ecc_half_res_reg"] = settings.ecc_half_res_reg;
+    obj["ecc_half_res_fuse"] = settings.ecc_half_res_fuse;
+    return obj;
+}
+
+Config::ImageProcSettings Config::image_proc_settings_from_json(const nlohmann::json &obj) const
+{
+    ImageProcSettings settings;
+    // basic
+    if (obj.contains("accu_base") && obj["accu_base"].is_number()) {
+        settings.accu_base = static_cast<float>(obj["accu_base"].get<double>());
+    }
+    if (obj.contains("gamma") && obj["gamma"].is_number()) {
+        settings.gamma = static_cast<float>(obj["gamma"].get<double>());
+    }
+    if (obj.contains("low_in") && obj["low_in"].is_number()) {
+        settings.low_in = static_cast<float>(obj["low_in"].get<double>());
+    }
+    if (obj.contains("high_in") && obj["high_in"].is_number()) {
+        settings.high_in = static_cast<float>(obj["high_in"].get<double>());
+    }
+    if (obj.contains("low_out") && obj["low_out"].is_number()) {
+        settings.low_out = static_cast<float>(obj["low_out"].get<double>());
+    }
+    if (obj.contains("high_out") && obj["high_out"].is_number()) {
+        settings.high_out = static_cast<float>(obj["high_out"].get<double>());
+    }
+    // dehaze
+    if (obj.contains("dehaze_pct") && obj["dehaze_pct"].is_number()) {
+        settings.dehaze_pct = static_cast<float>(obj["dehaze_pct"].get<double>());
+    }
+    if (obj.contains("sky_tolerance") && obj["sky_tolerance"].is_number()) {
+        settings.sky_tolerance = static_cast<float>(obj["sky_tolerance"].get<double>());
+    }
+    if (obj.contains("fast_gf") && obj["fast_gf"].is_number()) {
+        settings.fast_gf = obj["fast_gf"].get<int>();
+    }
+    // colormap
+    if (obj.contains("colormap") && obj["colormap"].is_number()) {
+        settings.colormap = obj["colormap"].get<int>();
+    }
+    // 3D gated
+    if (obj.contains("lower_3d_thresh") && obj["lower_3d_thresh"].is_number()) {
+        settings.lower_3d_thresh = obj["lower_3d_thresh"].get<double>();
+    }
+    if (obj.contains("upper_3d_thresh") && obj["upper_3d_thresh"].is_number()) {
+        settings.upper_3d_thresh = obj["upper_3d_thresh"].get<double>();
+    }
+    if (obj.contains("truncate_3d") && obj["truncate_3d"].is_boolean()) {
+        settings.truncate_3d = obj["truncate_3d"].get<bool>();
+    }
+    if (obj.contains("custom_3d_param") && obj["custom_3d_param"].is_boolean()) {
+        settings.custom_3d_param = obj["custom_3d_param"].get<bool>();
+    }
+    if (obj.contains("custom_3d_delay") && obj["custom_3d_delay"].is_number()) {
+        settings.custom_3d_delay = static_cast<float>(obj["custom_3d_delay"].get<double>());
+    }
+    if (obj.contains("custom_3d_gate_width") && obj["custom_3d_gate_width"].is_number()) {
+        settings.custom_3d_gate_width = static_cast<float>(obj["custom_3d_gate_width"].get<double>());
+    }
+    // model/fishnet
+    if (obj.contains("model_idx") && obj["model_idx"].is_number()) {
+        settings.model_idx = obj["model_idx"].get<int>();
+    }
+    if (obj.contains("fishnet_recog") && obj["fishnet_recog"].is_boolean()) {
+        settings.fishnet_recog = obj["fishnet_recog"].get<bool>();
+    }
+    if (obj.contains("fishnet_thresh") && obj["fishnet_thresh"].is_number()) {
+        settings.fishnet_thresh = static_cast<float>(obj["fishnet_thresh"].get<double>());
+    }
+    // ECC
+    if (obj.contains("ecc_window_mode") && obj["ecc_window_mode"].is_number()) {
+        settings.ecc_window_mode = obj["ecc_window_mode"].get<int>();
+    }
+    if (obj.contains("ecc_warp_mode") && obj["ecc_warp_mode"].is_number()) {
+        settings.ecc_warp_mode = obj["ecc_warp_mode"].get<int>();
+    }
+    if (obj.contains("ecc_fusion_method") && obj["ecc_fusion_method"].is_number()) {
+        settings.ecc_fusion_method = obj["ecc_fusion_method"].get<int>();
+    }
+    if (obj.contains("ecc_backward") && obj["ecc_backward"].is_number()) {
+        settings.ecc_backward = obj["ecc_backward"].get<int>();
+    }
+    if (obj.contains("ecc_forward") && obj["ecc_forward"].is_number()) {
+        settings.ecc_forward = obj["ecc_forward"].get<int>();
+    }
+    if (obj.contains("ecc_levels") && obj["ecc_levels"].is_number()) {
+        settings.ecc_levels = obj["ecc_levels"].get<int>();
+    }
+    if (obj.contains("ecc_max_iter") && obj["ecc_max_iter"].is_number()) {
+        settings.ecc_max_iter = obj["ecc_max_iter"].get<int>();
+    }
+    if (obj.contains("ecc_eps") && obj["ecc_eps"].is_number()) {
+        settings.ecc_eps = obj["ecc_eps"].get<double>();
+    }
+    if (obj.contains("ecc_half_res_reg") && obj["ecc_half_res_reg"].is_boolean()) {
+        settings.ecc_half_res_reg = obj["ecc_half_res_reg"].get<bool>();
+    }
+    if (obj.contains("ecc_half_res_fuse") && obj["ecc_half_res_fuse"].is_boolean()) {
+        settings.ecc_half_res_fuse = obj["ecc_half_res_fuse"].get<bool>();
     }
     return settings;
 }
