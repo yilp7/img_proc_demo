@@ -25,14 +25,14 @@
 #include "visual/presetpanel.h"
 #include "visual/serialserver.h"
 #include "util/config.h"
-#include "port/tcu.h"
-#include "port/lens.h"
-#include "port/laser.h"
-//#include "port/inclin.h"
-#include "port/ptz.h"
-#include "port/rangefinder.h"
-#include "port/usbcan.h"
-#include "port/udpptz.h"
+// port headers included via controller/devicemanager.h
+#include "controller/devicemanager.h"
+#include "controller/tcucontroller.h"
+#include "controller/lenscontroller.h"
+#include "controller/lasercontroller.h"
+#include "controller/rfcontroller.h"
+#include "controller/scancontroller.h"
+#include "controller/auxpanelmanager.h"
 
 #include "widgets/mywidget.h"
 #include "thread/joystick.h"
@@ -164,60 +164,50 @@ public slots:
     // signaled in preferences ui
     void search_for_devices();
     void rotate(int angle);
-    void update_light_speed(bool uw);
-    void setup_hz(int hz_unit);
-    void setup_stepping(int base_unit);
-    void setup_max_dist(float max_dist);
-    void setup_max_dov(float max_dist);
-    void update_delay_offset(float dist_offset);
-    void update_gate_width_offset(float dov_offset);
-    void update_laser_offset(float laser_offset);
-    void setup_laser(int laser_on);
-    void set_baudrate(int idx, int baudrate);
-    void set_tcp_status_on_port(int idx, bool use_tcp);
-    void set_tcu_as_shared_port(bool share);
-    void com_write_data(int com_idx, QByteArray data);
-    void display_port_info(int idx);
+    // TCU-related slots delegated to TCUController
+    void update_light_speed(bool uw) { m_tcu_ctrl->update_light_speed(uw); }
+    void setup_hz(int hz_unit) { m_tcu_ctrl->setup_hz(hz_unit); }
+    void setup_stepping(int base_unit) { m_tcu_ctrl->setup_stepping(base_unit); }
+    void setup_max_dist(float max_dist) { m_tcu_ctrl->setup_max_dist(max_dist); }
+    void setup_max_dov(float max_dov) { m_tcu_ctrl->setup_max_dov(max_dov); }
+    void update_delay_offset(float dist_offset) { m_tcu_ctrl->update_delay_offset(dist_offset); }
+    void update_gate_width_offset(float dov_offset) { m_tcu_ctrl->update_gate_width_offset(dov_offset); }
+    void update_laser_offset(float laser_offset) { m_tcu_ctrl->update_laser_offset(laser_offset); }
+    void setup_laser(int laser_on) { m_tcu_ctrl->setup_laser(laser_on); }
+    // Delegated to DeviceManager
+    void set_baudrate(int idx, int baudrate) { m_device_mgr->set_baudrate(idx, baudrate); }
+    void set_tcp_status_on_port(int idx, bool use_tcp) { m_device_mgr->set_tcp_status_on_port(idx, use_tcp); }
+    void set_tcu_as_shared_port(bool share) { m_device_mgr->set_tcu_as_shared_port(share); }
+    void com_write_data(int com_idx, QByteArray data) { m_device_mgr->com_write_data(com_idx, data); }
+    void display_port_info(int idx) { m_device_mgr->display_port_info(idx); }
     void update_dev_ip();
     void set_dev_ip(int ip, int gateway);
     void change_pixel_format(int pixel_format, int display_idx = 0);
     void update_lower_3d_thresh();
     void reset_custom_3d_params();
     void export_current_video();
-    void set_tcu_type(int idx);
-    void update_ps_config(bool read, int idx, uint val);
-    void set_auto_mcp(bool auto_mcp);
+    void set_tcu_type(int idx) { m_tcu_ctrl->set_tcu_type(idx); }
+    void update_ps_config(bool read, int idx, uint val) { m_tcu_ctrl->update_ps_config(read, idx, val); }
+    void set_auto_mcp(bool auto_mcp) { m_tcu_ctrl->set_auto_mcp_slot(auto_mcp); }
 
     // signaled by joystick input
     void joystick_button_pressed(int btn);
     void joystick_button_released(int btn);
     void joystick_direction_changed(int direction);
 
-    // signaled by ControlPort
-    void update_port_status(ControlPort *port, QLabel *lbl = nullptr);
+    // signaled by ControlPort (port_status, ptz delegated to DeviceManager)
     void append_data(QString str);
-    void update_port_status(int connected_status);
-    void update_lens_params(qint32 lens_param, uint val);
-    void update_ptz_params(qint32 ptz_param, double val);
-    void update_distance(double distance);
-    void update_ptz_angle(float _h, float _v);
-    void update_ptz_status();
+    // Lens params delegated to LensController
+    void update_lens_params(qint32 lens_param, uint val) { m_lens_ctrl->update_lens_params(lens_param, val); }
+    void update_distance(double distance) { m_rf_ctrl->update_distance(distance); }
 
-    // signaled by Aliasing
-    void set_distance_set(int id);
+    // signaled by Aliasing - delegated to TCUController
+    void set_distance_set(int id) { m_tcu_ctrl->set_distance_set(id); }
 
     // ui switching
     void switch_ui();
 
-    // VID_PAGE camera control (UDP PTZ)
-    void vid_camera_pressed(int operation);
-    void vid_camera_released();
-    void vid_defog_toggled(bool checked);
-    void vid_ir_power_toggled(bool checked);
-    void vid_ir_auto_focus_clicked();
-    void vid_ldm_toggled(bool checked);
-    void vid_video_source_toggled(bool checked);
-    void vid_osd_toggled(bool checked);
+    // VID_PAGE camera control - delegated to DeviceManager
 
 private slots:
     // on clicking enum btn: enumerate devices
@@ -264,67 +254,64 @@ private slots:
     void on_IMG_3D_CHECK_stateChanged(int arg1);
     void on_FRAME_AVG_CHECK_stateChanged(int arg1);
 
-    // lens control functions
-    void on_ZOOM_IN_BTN_pressed();
-    void on_ZOOM_IN_BTN_released();
-    void on_ZOOM_OUT_BTN_pressed();
-    void on_ZOOM_OUT_BTN_released();
-    void on_FOCUS_FAR_BTN_pressed();
-    void on_FOCUS_FAR_BTN_released();
-    void on_FOCUS_NEAR_BTN_pressed();
-    void on_FOCUS_NEAR_BTN_released();
-    void on_RADIUS_INC_BTN_pressed();
-    void on_RADIUS_INC_BTN_released();
-    void on_RADIUS_DEC_BTN_pressed();
-    void on_RADIUS_DEC_BTN_released();
+    // lens control functions - delegated to LensController
+    void on_ZOOM_IN_BTN_pressed() { m_lens_ctrl->on_ZOOM_IN_BTN_pressed(); }
+    void on_ZOOM_IN_BTN_released() { m_lens_ctrl->on_ZOOM_IN_BTN_released(); }
+    void on_ZOOM_OUT_BTN_pressed() { m_lens_ctrl->on_ZOOM_OUT_BTN_pressed(); }
+    void on_ZOOM_OUT_BTN_released() { m_lens_ctrl->on_ZOOM_OUT_BTN_released(); }
+    void on_FOCUS_FAR_BTN_pressed() { m_lens_ctrl->on_FOCUS_FAR_BTN_pressed(); }
+    void on_FOCUS_FAR_BTN_released() { m_lens_ctrl->on_FOCUS_FAR_BTN_released(); }
+    void on_FOCUS_NEAR_BTN_pressed() { m_lens_ctrl->on_FOCUS_NEAR_BTN_pressed(); }
+    void on_FOCUS_NEAR_BTN_released() { m_lens_ctrl->on_FOCUS_NEAR_BTN_released(); }
+    void on_RADIUS_INC_BTN_pressed() { m_lens_ctrl->on_RADIUS_INC_BTN_pressed(); }
+    void on_RADIUS_INC_BTN_released() { m_lens_ctrl->on_RADIUS_INC_BTN_released(); }
+    void on_RADIUS_DEC_BTN_pressed() { m_lens_ctrl->on_RADIUS_DEC_BTN_pressed(); }
+    void on_RADIUS_DEC_BTN_released() { m_lens_ctrl->on_RADIUS_DEC_BTN_released(); }
 
-    void on_GET_LENS_PARAM_BTN_clicked();
-    // TODO rewrite auto focus function
-    void on_AUTO_FOCUS_BTN_clicked();
+    void on_GET_LENS_PARAM_BTN_clicked() { m_lens_ctrl->on_GET_LENS_PARAM_BTN_clicked(); }
+    void on_AUTO_FOCUS_BTN_clicked() { m_lens_ctrl->on_AUTO_FOCUS_BTN_clicked(); }
 
-    void on_IRIS_OPEN_BTN_pressed();
-    void on_IRIS_CLOSE_BTN_pressed();
-    void on_IRIS_OPEN_BTN_released();
-    void on_IRIS_CLOSE_BTN_released();
-    void laser_preset_reached();
+    void on_IRIS_OPEN_BTN_pressed() { m_lens_ctrl->on_IRIS_OPEN_BTN_pressed(); }
+    void on_IRIS_CLOSE_BTN_pressed() { m_lens_ctrl->on_IRIS_CLOSE_BTN_pressed(); }
+    void on_IRIS_OPEN_BTN_released() { m_lens_ctrl->on_IRIS_OPEN_BTN_released(); }
+    void on_IRIS_CLOSE_BTN_released() { m_lens_ctrl->on_IRIS_CLOSE_BTN_released(); }
+    void laser_preset_reached() { m_laser_ctrl->laser_preset_reached(); }
 
-    // slider-controlled slots
-    void change_mcp(int val);
+    // slider-controlled slots (TCU-related delegated to TCUController)
+    void change_mcp(int val) { m_tcu_ctrl->change_mcp(val); }
     void change_gain(int val);
-    void change_delay(int val);
-    void change_gatewidth(int val);
-    void change_focus_speed(int val);
+    void change_delay(int val) { m_tcu_ctrl->change_delay(val); }
+    void change_gatewidth(int val) { m_tcu_ctrl->change_gatewidth(val); }
+    void change_focus_speed(int val) { m_lens_ctrl->change_focus_speed(val); }
 
-    // TODO add pause function
-    // process scan
-    void on_SCAN_BUTTON_clicked();
-    void on_CONTINUE_SCAN_BUTTON_clicked();
-    void on_RESTART_SCAN_BUTTON_clicked();
-    void on_SCAN_CONFIG_BTN_clicked();
+    // Scan control - delegated to ScanController
+    void on_SCAN_BUTTON_clicked() { m_scan_ctrl->on_SCAN_BUTTON_clicked(); }
+    void on_CONTINUE_SCAN_BUTTON_clicked() { m_scan_ctrl->on_CONTINUE_SCAN_BUTTON_clicked(); }
+    void on_RESTART_SCAN_BUTTON_clicked() { m_scan_ctrl->on_RESTART_SCAN_BUTTON_clicked(); }
+    void on_SCAN_CONFIG_BTN_clicked() { m_scan_ctrl->on_SCAN_CONFIG_BTN_clicked(); }
+    void enable_scan_options(bool show) { m_scan_ctrl->enable_scan_options(show); }
 
-    // enable continue & restart button when scan paused
-    void enable_scan_options(bool show);
-
-    // update delay, rep_freq, gate width, laser_width and their widgets
-    void update_laser_width();
-    void update_delay();
-    void update_gate_width();
-    void update_tcu_params(qint32 tcu_param);
+    // update delay, rep_freq, gate width, laser_width and their widgets - delegated to TCUController
+    void update_laser_width() { m_tcu_ctrl->update_laser_width(); }
+    void update_delay() { m_tcu_ctrl->update_delay(); }
+    void update_gate_width() { m_tcu_ctrl->update_gate_width(); }
+    void update_tcu_params(qint32 tcu_param) { m_tcu_ctrl->update_tcu_params(tcu_param); }
 
     // start laser & initialize laser stat
-    void on_LASER_BTN_clicked();
-    void start_laser();
-    void init_laser();
+    // Laser control delegated to LaserController
+    void on_LASER_BTN_clicked() { m_laser_ctrl->on_LASER_BTN_clicked(); }
+    void start_laser() { m_laser_ctrl->start_laser(); }
+    void init_laser() { m_laser_ctrl->init_laser(); }
 
     // hide left parameter bar
     void on_HIDE_BTN_clicked();
-    // change alt display content
-    void on_MISC_RADIO_1_clicked();
-    void on_MISC_RADIO_2_clicked();
-    void on_MISC_RADIO_3_clicked();
-    void on_MISC_OPTION_1_currentIndexChanged(int index);
-    void on_MISC_OPTION_2_currentIndexChanged(int index);
-    void on_MISC_OPTION_3_currentIndexChanged(int index);
+    // Alt display panel - delegated to AuxPanelManager
+    void on_MISC_RADIO_1_clicked() { m_aux_panel->on_MISC_RADIO_1_clicked(); }
+    void on_MISC_RADIO_2_clicked() { m_aux_panel->on_MISC_RADIO_2_clicked(); }
+    void on_MISC_RADIO_3_clicked() { m_aux_panel->on_MISC_RADIO_3_clicked(); }
+    void on_MISC_OPTION_1_currentIndexChanged(int index) { m_aux_panel->on_MISC_OPTION_1_currentIndexChanged(index); }
+    void on_MISC_OPTION_2_currentIndexChanged(int index) { m_aux_panel->on_MISC_OPTION_2_currentIndexChanged(index); }
+    void on_MISC_OPTION_3_currentIndexChanged(int index) { m_aux_panel->on_MISC_OPTION_3_currentIndexChanged(index); }
 
     // choose how mouse works in DISPLAY
     // TODO add a new exclusive button group
@@ -344,14 +331,7 @@ private slots:
     // config optical gatewidth by file (serial number)
     void config_gatewidth(QString filename);
 
-    void ptz_button_pressed(int id);
-    void ptz_button_released(int id);
-    void on_PTZ_SPEED_SLIDER_valueChanged(int value);
-    void on_PTZ_SPEED_EDIT_editingFinished();
-    void on_GET_ANGLE_BTN_clicked();
-    void set_ptz_angle();
-    void on_STOP_BTN_clicked();
-    void point_ptz_to_target(QPoint target);
+    // PTZ button handlers - delegated to DeviceManager
 
     void alt_display_control(int cmd);
 
@@ -361,13 +341,13 @@ private slots:
 
     void display_fishnet_result(int result);
 
-    void on_FIRE_LASER_BTN_clicked();
+    void on_FIRE_LASER_BTN_clicked() { m_laser_ctrl->on_FIRE_LASER_BTN_clicked(); }
 
     void on_IMG_REGION_BTN_clicked();
     void on_SENSOR_TAPS_BTN_clicked();
-    void on_SWITCH_TCU_UI_BTN_clicked();
-    void on_SIMPLE_LASER_CHK_clicked();
-    void on_AUTO_MCP_CHK_clicked();
+    void on_SWITCH_TCU_UI_BTN_clicked() { m_tcu_ctrl->on_SWITCH_TCU_UI_BTN_clicked(); }
+    void on_SIMPLE_LASER_CHK_clicked() { m_tcu_ctrl->on_SIMPLE_LASER_CHK_clicked(); }
+    void on_AUTO_MCP_CHK_clicked() { m_tcu_ctrl->on_AUTO_MCP_CHK_clicked(); }
 
     void on_PSEUDOCOLOR_CHK_stateChanged(int arg1);
 
@@ -451,43 +431,35 @@ private:
     // update activated / deactivated buttons
     void enable_controls(bool cam_rdy);
 
-    // attempt to communicate with 4 COMs
-    void init_control_port();
-    void connect_port_edit(QLineEdit *edit, ControlPort *port, QString &config_port);
-    void setup_serial_port(QSerialPort **port, int id, QString port_num, int baud_rate);
-    void setup_tcp_port(QTcpSocket **port);
+    // Port init/setup delegated to DeviceManager
 
-    // stop lens operation (focus / zoom)
-    void lens_stop();
+    // Lens operations delegated to LensController
+    void lens_stop() { m_lens_ctrl->lens_stop(); }
+    void set_zoom() { m_lens_ctrl->set_zoom_from_ui(); }
+    void set_focus() { m_lens_ctrl->set_focus_from_ui(); }
+    void focus_far() { m_lens_ctrl->focus_far(); }
+    void focus_near() { m_lens_ctrl->focus_near(); }
 
-    // set zoom & focus value
-    void set_zoom();
-    void set_focus();
-    // inline function for auto-focus
-    void focus_far();
-    void focus_near();
-
-    // laser preset
-    void set_laser_preset_target(int *pos);
-    void goto_laser_preset(char target);
+    // Laser preset delegated to LaserController
+    void goto_laser_preset(char target) { m_laser_ctrl->goto_laser_preset(target); }
 
     // save img in buffer to file; or save imgs while scanning
     void save_to_file(bool save_result, int idx);
     void save_scan_img(QString path, QString name);
 
-    // convert data to be sent to HEX buffer
-    QByteArray convert_to_send_tcu(uchar num, unsigned int send);
+    // convert data to be sent to HEX buffer - delegated to TCUController
+    QByteArray convert_to_send_tcu(uchar num, unsigned int send) { return m_tcu_ctrl->convert_to_send_tcu(num, send); }
 
     // update data to data-display; fb: whether reading feedback from com
     QByteArray generate_ba(uchar *data, int len);
     QByteArray communicate_display(int id, QByteArray write, int write_size, int read_size, bool fb);
 
-    // configure scan
+    // filter_scan stays (uses img_mem[0])
     void filter_scan();
-    void auto_scan_for_target();
+    void auto_scan_for_target() { m_scan_ctrl->auto_scan_for_target(); }
 
-    // change current in laser
-    void update_current();
+    // change current in laser - delegated to TCUController
+    void update_current() { m_tcu_ctrl->update_current(); }
 
     // write/read params to config file
     void convert_write(QDataStream &out, const int TYPE);
@@ -500,9 +472,7 @@ private:
     void syncConfigToPreferences();
     void syncPreferencesToConfig();
 
-    // connect to serial port using tcp socket
-    void connect_to_serial_server_tcp();
-    void disconnect_from_serial_server_tcp();
+    // TCP server connection delegated to DeviceManager
 
     // send ptz control cmd
     void send_ctrl_cmd(uchar dir);
@@ -516,13 +486,6 @@ private:
     // status display
     void update_pixel_depth(int depth, int display_idx = 0);
 
-    // tcu_type
-    void update_tcu_param_pos(int dir, QLabel *u_unit, QLineEdit *n_input, QLabel *n_unit, QLineEdit *p_input);
-    void split_value_by_unit(float val, uint &us, uint &ns, uint &ps, int idx = -1);
-//    uint get_width_in_us(float val);
-//    uint get_width_in_ns(float val);
-//    uint get_width_in_ps(float val, int idx = -1);
-
 public:
     bool                  mouse_pressed;
     std::vector<cv::Rect> list_roi;                   // user-selected roi
@@ -531,6 +494,13 @@ private:
     Ui::UserPanel*  ui;
     StatusBar*      status_bar;
     Preferences*    pref;
+    DeviceManager*  m_device_mgr;
+    TCUController*  m_tcu_ctrl;
+    LensController* m_lens_ctrl;
+    LaserController* m_laser_ctrl;
+    RFController*    m_rf_ctrl;
+    ScanController*  m_scan_ctrl;
+    AuxPanelManager* m_aux_panel;
     ScanConfig*     scan_config;
     LaserControl*   laser_settings;
     Config*         config;
@@ -562,50 +532,6 @@ private:
     QString         output_filename;            // target output name when exporting video
     QString         temp_output_filename;       // temp save location of target output file
     
-    // implemented through moveToThread
-    TCU     *p_tcu;
-    Lens    *p_lens;
-    Laser   *p_laser;
-    PTZ     *p_ptz;
-    RangeFinder *p_rf;
-    USBCAN  *p_usbcan;
-    UDPPTZ  *p_udpptz;
-    IPTZController *active_ptz;
-    QThread *th_tcu;
-    QThread *th_lens;
-    QThread *th_laser;
-//    QThread *th_inclin;
-    QThread *th_ptz;
-    QThread *th_rf;
-    QThread *th_usbcan;
-    QThread *th_udpptz;
-
-    // WARNING port communication mostly moved to new class ControlPort
-    QSerialPort*  serial_port[5];           // 0: tcu, 1: rangefinder, 2: lens, 3: laser, 4: PTZ
-    bool          serial_port_connected[5];
-    QTcpSocket*   tcp_port[5];              // 0-1: 232, 2-4: 485
-    bool          use_tcp[5];
-    bool          share_serial_port;        // whether using a single comm for serial communication
-    float         stepping;
-    int           hz_unit;
-    int           base_unit;
-    int           laser_on;
-    uint          zoom;
-    uint          focus;
-    int           distance;                 // dist read from rangefinder (or manually set)
-    float         rep_freq;
-    float         laser_width;
-    float         delay_dist;               // estimated distance calculated from delay
-    float         depth_of_view;            // depth of view from gate width
-    int           mcp_max;
-    bool          aliasing_mode;
-    int           aliasing_level;
-    int           focus_direction;
-    int           clarity[3];
-    char          curr_laser_idx;
-    int           alt_display_option;         // data display option: 1: com data; 2: histogram; 3: PTZ; 4: addons
-    QButtonGroup* display_grp;
-
     std::queue<cv::Mat>        q_img[3];                   // image queue in grab_thread
     std::queue<int>            q_frame_info;
     TimedQueue                 q_fps_calc;
@@ -654,29 +580,6 @@ private:
 //    cv::Mat                 dist_mat[3];
     cv::Mat                 user_mask[3];
 
-    QLabel*                 com_label[5];               // for com communication
-    QLineEdit*              com_edit[5];
-
-    bool                    auto_scan_mode;             // search for target
-    bool                    scan;                       // auto-scan for object detection
-    float                   scan_distance;              // curr distance of scanning
-    float                   scan_step;                  // stepping size when scanning
-    float                   scan_stopping_delay;        // upper limit for scanning
-    QString                 scan_name;
-    cv::Mat                 scan_3d;
-    cv::Mat                 scan_sum;
-    int                     scan_idx;
-    std::vector<std::pair<float, float>> scan_ptz_route;
-    std::vector<float>      scan_tcu_route;
-    int                     scan_ptz_idx;
-    int                     scan_tcu_idx;
-
-    float                   c;                          // light speed
-    float                   dist_ns;                    // dist of light per ns
-    bool                    frame_a_3d;                 // skip every second frame
-    bool                    auto_mcp;                   // adaptive mcp
-    bool                    multi_laser_lenses;         // send additional data to lens com if true
-
     bool                    hide_left;                  // whether left bar is hidden
     int                     resize_place;               // mouse position when resizing or at border
     QPoint                  prev_pos;                   // previous window position
@@ -689,19 +592,12 @@ private:
     bool                    joybtn_L2;
     bool                    joybtn_R1;
     bool                    joybtn_R2;
-    uint                    lens_adjust_ongoing;
     bool                    ptz_adjust_ongoing;
 
     uchar                   lang;                       // 0: en_us, 1: zh_cn
     QTranslator             trans;
 
     ThreadPool              tp;
-
-    QButtonGroup*           ptz_grp;                    // ptz button group
-    QButtonGroup*           vid_camera_grp;             // VID_PAGE camera control button group
-    int                     ptz_speed;
-    float                   angle_h;
-    float                   angle_v;
 
     QButtonGroup*           alt_ctrl_grp;               // alt display control button group
 

@@ -219,6 +219,20 @@ set(SOURCE_FILES
     src/yolo/inference.cpp
     src/yolo/yolo_app_config.h
     src/pipeline/processingparams.h
+    src/controller/devicemanager.h
+    src/controller/devicemanager.cpp
+    src/controller/tcucontroller.h
+    src/controller/tcucontroller.cpp
+    src/controller/lenscontroller.h
+    src/controller/lenscontroller.cpp
+    src/controller/lasercontroller.h
+    src/controller/lasercontroller.cpp
+    src/controller/rfcontroller.h
+    src/controller/rfcontroller.cpp
+    src/controller/scancontroller.h
+    src/controller/scancontroller.cpp
+    src/controller/auxpanelmanager.h
+    src/controller/auxpanelmanager.cpp
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss
@@ -410,6 +424,7 @@ else()
 endif()
 
 add_executable(GLI_params WIN32 ${TRANSLATE} ${SOURCE_FILES})
+set_property(TARGET GLI_params PROPERTY AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/src/visual")
 target_compile_definitions(GLI_params PRIVATE PARAM=1)
 if(USING_CAMERALINK)
     target_compile_definitions(GLI_params PRIVATE USING_CAMERALINK=1)
