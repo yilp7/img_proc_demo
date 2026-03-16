@@ -167,7 +167,10 @@ void DeviceManager::init(Ui::UserPanel *ui, Preferences *pref)
         emit send_ptz_msg(PTZ::ANGLE_V);
     });
     connect(ui->STOP_BTN, &QPushButton::clicked, this, [this]() {
-        if (active_ptz) active_ptz->ptz_stop();
+        if (m_config->get_data().device.ptz_type == 0)
+            emit send_ptz_msg(PTZ::STOP);
+        else if (active_ptz)
+            active_ptz->ptz_stop();
     });
 
     // Create port objects and threads
@@ -370,8 +373,8 @@ void DeviceManager::update_ptz_params(qint32 ptz_param, double val)
 
 void DeviceManager::update_ptz_angle(float _h, float _v)
 {
-    angle_h = _h;
-    angle_v = _v;
+    angle_h.store(_h);
+    angle_v.store(_v);
     float display_h = _h < 0 ? _h + 360.0f : _h;
     if (!m_ui->ANGLE_H_EDIT->hasFocus()) m_ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", display_h));
     if (!m_ui->ANGLE_V_EDIT->hasFocus()) m_ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", _v));
@@ -406,12 +409,12 @@ void DeviceManager::update_ptz_status()
 
 void DeviceManager::ptz_button_pressed(int id)
 {
-    if (!active_ptz) return;
+    int ptz_type = m_config->get_data().device.ptz_type;
 
     if (id == 4) {
         if (QMessageBox::warning(nullptr, "PTZ", QObject::tr("Initialize?"), QMessageBox::StandardButton::Ok | QMessageBox::StandardButton::Cancel) != QMessageBox::StandardButton::Ok) return;
         // Self-check sequences are type-specific
-        switch (m_config->get_data().device.ptz_type) {
+        switch (ptz_type) {
         case 0: emit send_ptz_msg(PTZ::SELF_CHECK); break;
         case 1:
             p_usbcan->emit transmit(USBCAN::OFF);
@@ -426,18 +429,58 @@ void DeviceManager::ptz_button_pressed(int id)
         return;
     }
 
-    active_ptz->ptz_move(id, m_ui->PTZ_SPEED_SLIDER->value());
+    int speed = m_ui->PTZ_SPEED_SLIDER->value();
+    if (ptz_type == 0) {
+        emit send_ptz_msg(PTZ::SPEED, speed);
+        emit send_ptz_msg(id + 1); // direction enum offset by 1 for Pelco-D
+    } else if (active_ptz) {
+        active_ptz->ptz_move(id, speed);
+    }
 }
 
 void DeviceManager::ptz_button_released(int id)
 {
     if (id == 4) return;
-    if (active_ptz) active_ptz->ptz_stop();
+    if (m_config->get_data().device.ptz_type == 0)
+        emit send_ptz_msg(PTZ::STOP);
+    else if (active_ptz)
+        active_ptz->ptz_stop();
 }
 
 void DeviceManager::set_ptz_angle()
 {
-    if (active_ptz) active_ptz->ptz_set_angle(angle_h, angle_v);
+    if (m_config->get_data().device.ptz_type == 0) {
+        emit send_ptz_msg(PTZ::SET_H, angle_h.load());
+        emit send_ptz_msg(PTZ::SET_V, angle_v.load());
+    } else if (active_ptz) {
+        active_ptz->ptz_set_angle(angle_h.load(), angle_v.load());
+    }
+}
+
+void DeviceManager::send_ptz_angle(float h, float v)
+{
+    if (m_config->get_data().device.ptz_type == 0) {
+        emit send_ptz_msg(PTZ::SET_H, h);
+        emit send_ptz_msg(PTZ::SET_V, v);
+    } else if (active_ptz) {
+        active_ptz->ptz_set_angle(h, v);
+    }
+}
+
+void DeviceManager::send_ptz_angle_h(float h)
+{
+    if (m_config->get_data().device.ptz_type == 0)
+        emit send_ptz_msg(PTZ::SET_H, h);
+    else if (active_ptz)
+        active_ptz->ptz_set_angle_h(h);
+}
+
+void DeviceManager::send_ptz_angle_v(float v)
+{
+    if (m_config->get_data().device.ptz_type == 0)
+        emit send_ptz_msg(PTZ::SET_V, v);
+    else if (active_ptz)
+        active_ptz->ptz_set_angle_v(v);
 }
 
 void DeviceManager::point_ptz_to_target(QPoint target)
@@ -447,11 +490,11 @@ void DeviceManager::point_ptz_to_target(QPoint target)
     static float tot_h = 0.82, tot_v = 0.57;// small FOV
     display_width = m_ui->SOURCE_DISPLAY->width();
     display_height = m_ui->SOURCE_DISPLAY->height();
-    angle_h += target.x() * tot_h / display_width - tot_h / 2;
-    angle_v += target.y() * tot_v / display_height - tot_v / 2;
+    angle_h.store(angle_h.load() + target.x() * tot_h / display_width - tot_h / 2);
+    angle_v.store(angle_v.load() + target.y() * tot_v / display_height - tot_v / 2);
 
     // Ensure horizontal angle is always positive (0 to 360)
-    angle_h = fmod(angle_h + 360.0, 360.0);
+    angle_h.store(fmod(angle_h.load() + 360.0, 360.0));
 
     set_ptz_angle();
 }

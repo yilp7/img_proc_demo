@@ -40,6 +40,7 @@
 #include "plugins/plugininterface.h"
 #include "yolo/yolo_detector.h"
 #include "pipeline/processingparams.h"
+#include "pipeline/pipelineconfig.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class UserPanel; }
@@ -443,9 +444,7 @@ private:
     // Laser preset delegated to LaserController
     void goto_laser_preset(char target) { m_laser_ctrl->goto_laser_preset(target); }
 
-    // save img in buffer to file; or save imgs while scanning
-    void save_to_file(bool save_result, int idx);
-    void save_scan_img(QString path, QString name);
+    // save img in buffer to file; or save imgs while scanning (declarations moved to pipeline section)
 
     // convert data to be sent to HEX buffer - delegated to TCUController
     QByteArray convert_to_send_tcu(uchar num, unsigned int send) { return m_tcu_ctrl->convert_to_send_tcu(num, send); }
@@ -614,34 +613,44 @@ private:
     int                     m_yolo_last_model[3] = {-1, -1, -1};  // Track loaded model for each thread
     void draw_yolo_boxes(cv::Mat& image, const std::vector<YoloResult>& results);
 
-    // ProcessingParams: thread-safe snapshot of UI widget state for grab_thread_process
+    // Thread-safe snapshots of UI widget state and Config for grab_thread_process
     QMutex                  m_params_mutex;
     ProcessingParams        m_processing_params;
+    PipelineConfig          m_pipeline_config;
     void update_processing_params();
 
     // Pipeline methods extracted from grab_thread_process
     // Returns false if iteration should be skipped (LVTONG empty queue)
     bool acquire_frame(int thread_idx, cv::Mat& prev_img, bool& updated, int& packets_lost);
     void preprocess_frame(int thread_idx, const ProcessingParams& params,
+        const PipelineConfig& pcfg,
         FrameAverageState& avg_state, int& _w, int& _h, uint hist[256]);
-    std::vector<YoloResult> detect_yolo(int thread_idx, bool updated, YoloDetector*& yolo);
+    std::vector<YoloResult> detect_yolo(int thread_idx, bool updated,
+        const PipelineConfig& pcfg, YoloDetector*& yolo);
 #ifdef LVTONG
-    double detect_fishnet(int thread_idx, cv::dnn::Net& net);
+    double detect_fishnet(int thread_idx, const PipelineConfig& pcfg, cv::dnn::Net& net);
 #endif
     void frame_average_and_3d(int thread_idx, bool updated, const ProcessingParams& params,
+        const PipelineConfig& pcfg,
         FrameAverageState& avg_state, ECCState& ecc_state, int _w, int _h, int _pixel_depth,
         int& ww, int& hh);
-    void enhance_frame(int thread_idx, const ProcessingParams& params);
+    void enhance_frame(int thread_idx, const ProcessingParams& params,
+        const PipelineConfig& pcfg);
     void render_and_display(int thread_idx, int display_idx,
-        const ProcessingParams& params, const std::vector<YoloResult>& yolo_results,
+        const ProcessingParams& params, const PipelineConfig& pcfg,
+        const std::vector<YoloResult>& yolo_results,
         double is_net, int ww, int hh, int _w, int _h, float weight,
         uint hist[256], const QString& info_tcu, const QString& info_time);
-    void advance_scan(int thread_idx, bool updated, int& scan_img_count,
+    void advance_scan(int thread_idx, bool updated, const PipelineConfig& pcfg,
+        int& scan_img_count,
         QString& scan_save_path_a, QString& scan_save_path);
     void record_frame(int thread_idx, int display_idx, bool updated,
-        const ProcessingParams& params, double is_net,
+        const ProcessingParams& params, const PipelineConfig& pcfg,
+        double is_net,
         const QString& info_tcu, const QString& info_time,
         int ww, int hh, float weight);
+    void save_to_file(bool save_result, int idx, const PipelineConfig& pcfg);
+    void save_scan_img(QString path, QString name, const PipelineConfig& pcfg);
 
 public:
 

@@ -675,7 +675,8 @@ void UserPanel::init()
     pref->ui->SHARE_CHK->click();
     pref->ui->IMG_FORMAT_LST->setCurrentIndex(1);
 
-    connect(this, SIGNAL(update_fishnet_result(int)), SLOT(display_fishnet_result(int)));
+    connect(this, SIGNAL(update_fishnet_result(int)),
+            SLOT(display_fishnet_result(int)), Qt::QueuedConnection);
 
     ui->START_BUTTON->click();
     ui->HIDE_BTN->click();
@@ -855,6 +856,7 @@ bool UserPanel::acquire_frame(int thread_idx, cv::Mat& prev_img, bool& updated, 
 }
 
 void UserPanel::preprocess_frame(int thread_idx, const ProcessingParams& params,
+    const PipelineConfig& pcfg,
     FrameAverageState& avg_state, int& _w, int& _h, uint hist[256])
 {
     switch (image_rotate[0]) {
@@ -887,7 +889,7 @@ void UserPanel::preprocess_frame(int thread_idx, const ProcessingParams& params,
     if (!is_color[thread_idx]) for (int i = 0; i < _h; i++) for (int j = 0; j < _w; j++) hist[(img_mem[thread_idx].data + i * img_mem[thread_idx].cols)[j]]++;
 
     // if the image needs flipping
-    { int sym = config->get_data().device.flip; if (sym) cv::flip(img_mem[thread_idx], img_mem[thread_idx], sym - 2); }
+    { int sym = pcfg.flip; if (sym) cv::flip(img_mem[thread_idx], img_mem[thread_idx], sym - 2); }
 
     // mcp self-adaptive
     if (m_tcu_ctrl->get_auto_mcp() && !params.mcp_slider_focused) {
@@ -898,16 +900,17 @@ void UserPanel::preprocess_frame(int thread_idx, const ProcessingParams& params,
     }
 }
 
-std::vector<YoloResult> UserPanel::detect_yolo(int thread_idx, bool updated, YoloDetector*& yolo)
+std::vector<YoloResult> UserPanel::detect_yolo(int thread_idx, bool updated,
+    const PipelineConfig& pcfg, YoloDetector*& yolo)
 {
     // Check if YOLO model selection has changed and update detector if needed
     int current_model_selection = 0;
     if (thread_idx == 0) {
-        current_model_selection = config->get_data().yolo.main_display_model;
+        current_model_selection = pcfg.main_display_model;
     } else if (thread_idx == 1) {
-        current_model_selection = config->get_data().yolo.alt1_display_model;
+        current_model_selection = pcfg.alt1_display_model;
     } else if (thread_idx == 2) {
-        current_model_selection = config->get_data().yolo.alt2_display_model;
+        current_model_selection = pcfg.alt2_display_model;
     }
 
     // If model changed, reinitialize
@@ -924,21 +927,21 @@ std::vector<YoloResult> UserPanel::detect_yolo(int thread_idx, bool updated, Yol
         if (current_model_selection > 0) {
             m_yolo_detector[thread_idx] = new YoloDetector();
             QString app_dir = QCoreApplication::applicationDirPath() + "/";
-            QString cfg_path = app_dir + config->get_data().yolo.config_path;
+            QString cfg_path = app_dir + pcfg.config_path;
 
             QString model_path, classes_file;
             switch (current_model_selection) {
                 case 1:
-                    model_path = app_dir + config->get_data().yolo.visible_model_path;
-                    classes_file = app_dir + config->get_data().yolo.visible_classes_file;
+                    model_path = app_dir + pcfg.visible_model_path;
+                    classes_file = app_dir + pcfg.visible_classes_file;
                     break;
                 case 2:
-                    model_path = app_dir + config->get_data().yolo.thermal_model_path;
-                    classes_file = app_dir + config->get_data().yolo.thermal_classes_file;
+                    model_path = app_dir + pcfg.thermal_model_path;
+                    classes_file = app_dir + pcfg.thermal_classes_file;
                     break;
                 case 3:
-                    model_path = app_dir + config->get_data().yolo.gated_model_path;
-                    classes_file = app_dir + config->get_data().yolo.gated_classes_file;
+                    model_path = app_dir + pcfg.gated_model_path;
+                    classes_file = app_dir + pcfg.gated_classes_file;
                     break;
             }
 
@@ -971,6 +974,7 @@ std::vector<YoloResult> UserPanel::detect_yolo(int thread_idx, bool updated, Yol
 }
 
 void UserPanel::frame_average_and_3d(int thread_idx, bool updated, const ProcessingParams& params,
+    const PipelineConfig& pcfg,
     FrameAverageState& avg_state, ECCState& ecc_state, int _w, int _h, int _pixel_depth,
     int& ww, int& hh)
 {
@@ -1005,9 +1009,9 @@ void UserPanel::frame_average_and_3d(int thread_idx, bool updated, const Process
             // --- option "ECC": display from temporal denoising ---
             if (updated) {
                 // clear state on warp mode change (matrix shape mismatch)
-                if (config->get_data().image_proc.ecc_warp_mode != ecc_state.prev_ecc_warp_mode) {
+                if (pcfg.ecc_warp_mode != ecc_state.prev_ecc_warp_mode) {
                     ecc_state.clear();
-                    ecc_state.prev_ecc_warp_mode = config->get_data().image_proc.ecc_warp_mode;
+                    ecc_state.prev_ecc_warp_mode = pcfg.ecc_warp_mode;
                 }
 
                 // convert current frame to grayscale CV_32F [0,255]
@@ -1028,21 +1032,21 @@ void UserPanel::frame_average_and_3d(int thread_idx, bool updated, const Process
                         ecc_state.fusion_buf.back(), gray,
                         warp, warp_inv,
                         ecc_state.fusion_last_warp,
-                        config->get_data().image_proc.ecc_levels, config->get_data().image_proc.ecc_max_iter, config->get_data().image_proc.ecc_eps,
-                        config->get_data().image_proc.ecc_half_res_reg,
-                        config->get_data().image_proc.ecc_warp_mode);
+                        pcfg.ecc_levels, pcfg.ecc_max_iter, pcfg.ecc_eps,
+                        pcfg.ecc_half_res_reg,
+                        pcfg.ecc_warp_mode);
                     ecc_state.fusion_warps.push_back(warp);
                     ecc_state.fusion_warps_inv.push_back(warp_inv);
                     ecc_state.fusion_last_warp = warp.clone();
                 }
 
                 // compute effective forward
-                int ecc_fwd = (config->get_data().image_proc.ecc_window_mode == 1) ? config->get_data().image_proc.ecc_backward
-                            : (config->get_data().image_proc.ecc_window_mode == 2) ? config->get_data().image_proc.ecc_forward : 0;
+                int ecc_fwd = (pcfg.ecc_window_mode == 1) ? pcfg.ecc_backward
+                            : (pcfg.ecc_window_mode == 2) ? pcfg.ecc_forward : 0;
 
                 // push frame to buffer
                 ecc_state.fusion_buf.push_back(gray);
-                int max_buf = config->get_data().image_proc.ecc_backward + 1 + ecc_fwd;
+                int max_buf = pcfg.ecc_backward + 1 + ecc_fwd;
                 while ((int)ecc_state.fusion_buf.size() > max_buf) {
                     ecc_state.fusion_buf.pop_front();
                     if (!ecc_state.fusion_warps.empty()) ecc_state.fusion_warps.pop_front();
@@ -1050,16 +1054,16 @@ void UserPanel::frame_average_and_3d(int thread_idx, bool updated, const Process
                 }
 
                 // fuse when we have enough frames
-                int min_frames = (ecc_fwd > 0) ? config->get_data().image_proc.ecc_backward + 1 + ecc_fwd : 2;
+                int min_frames = (ecc_fwd > 0) ? pcfg.ecc_backward + 1 + ecc_fwd : 2;
                 if ((int)ecc_state.fusion_buf.size() >= min_frames) {
                     int target = (int)ecc_state.fusion_buf.size() - 1 - ecc_fwd;
                     ImageProc::temporal_denoise_fuse(
                         ecc_state.fusion_buf, ecc_state.fusion_warps, ecc_state.fusion_warps_inv,
-                        target, config->get_data().image_proc.ecc_backward, ecc_fwd,
+                        target, pcfg.ecc_backward, ecc_fwd,
                         modified_result[thread_idx],
-                        config->get_data().image_proc.ecc_half_res_fuse,
-                        config->get_data().image_proc.ecc_warp_mode,
-                        config->get_data().image_proc.ecc_fusion_method);
+                        pcfg.ecc_half_res_fuse,
+                        pcfg.ecc_warp_mode,
+                        pcfg.ecc_fusion_method);
                 } else {
                     int show_idx = std::max(0, (int)ecc_state.fusion_buf.size() - 1 - ecc_fwd);
                     ecc_state.fusion_buf[show_idx].convertTo(modified_result[thread_idx], CV_8U);
@@ -1092,29 +1096,29 @@ void UserPanel::frame_average_and_3d(int thread_idx, bool updated, const Process
                 avg_state.frame_b_sum.convertTo(frame_b_avg, _pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
 #ifdef LVTONG
                 ImageProc::gated3D_v2(m_tcu_ctrl->get_frame_a_3d() ? frame_b_avg : frame_a_avg, m_tcu_ctrl->get_frame_a_3d() ? frame_a_avg : frame_b_avg, modified_result[thread_idx],
-                                      config->get_data().image_proc.custom_3d_param ? params.custom_3d_delay : (m_tcu_ctrl->get_delay_dist() - m_device_mgr->tcu()->get(TCU::OFFSET_DELAY) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
-                                      config->get_data().image_proc.custom_3d_param ? params.custom_3d_gate_width : (m_tcu_ctrl->get_depth_of_view() - m_device_mgr->tcu()->get(TCU::OFFSET_GW) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
-                                      config->get_data().image_proc.colormap, config->get_data().image_proc.lower_3d_thresh, config->get_data().image_proc.upper_3d_thresh, config->get_data().image_proc.truncate_3d);
+                                      pcfg.custom_3d_param ? pcfg.custom_3d_delay : (m_tcu_ctrl->get_delay_dist() - m_device_mgr->tcu()->get(TCU::OFFSET_DELAY) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
+                                      pcfg.custom_3d_param ? pcfg.custom_3d_gate_width : (m_tcu_ctrl->get_depth_of_view() - m_device_mgr->tcu()->get(TCU::OFFSET_GW) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
+                                      pcfg.colormap, pcfg.lower_3d_thresh, pcfg.upper_3d_thresh, pcfg.truncate_3d);
 #else //LVTONG
                 ImageProc::gated3D_v2(m_tcu_ctrl->get_frame_a_3d() ? frame_b_avg : frame_a_avg, m_tcu_ctrl->get_frame_a_3d() ? frame_a_avg : frame_b_avg, modified_result[thread_idx],
-                                      config->get_data().image_proc.custom_3d_param ? params.custom_3d_delay : (m_tcu_ctrl->get_delay_dist() - m_device_mgr->tcu()->get(TCU::OFFSET_DELAY) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
-                                      config->get_data().image_proc.custom_3d_param ? params.custom_3d_gate_width : (m_tcu_ctrl->get_depth_of_view() - m_device_mgr->tcu()->get(TCU::OFFSET_GW) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
-                                      config->get_data().image_proc.colormap, config->get_data().image_proc.lower_3d_thresh, config->get_data().image_proc.upper_3d_thresh, config->get_data().image_proc.truncate_3d, &dist_mat, &dist_min, &dist_max);
+                                      pcfg.custom_3d_param ? pcfg.custom_3d_delay : (m_tcu_ctrl->get_delay_dist() - m_device_mgr->tcu()->get(TCU::OFFSET_DELAY) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
+                                      pcfg.custom_3d_param ? pcfg.custom_3d_gate_width : (m_tcu_ctrl->get_depth_of_view() - m_device_mgr->tcu()->get(TCU::OFFSET_GW) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
+                                      pcfg.colormap, pcfg.lower_3d_thresh, pcfg.upper_3d_thresh, pcfg.truncate_3d, &dist_mat, &dist_min, &dist_max);
 #endif //LVTONG
             }
             else {
 #ifdef LVTONG
                 ImageProc::gated3D_v2(m_tcu_ctrl->get_frame_a_3d() ? avg_state.prev_img : img_mem[thread_idx], m_tcu_ctrl->get_frame_a_3d() ? img_mem[thread_idx] : avg_state.prev_img, modified_result[thread_idx],
-                                      config->get_data().image_proc.custom_3d_param ? params.custom_3d_delay : (m_tcu_ctrl->get_delay_dist() - m_device_mgr->tcu()->get(TCU::OFFSET_DELAY) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
-                                      config->get_data().image_proc.custom_3d_param ? params.custom_3d_gate_width : (m_tcu_ctrl->get_depth_of_view() - m_device_mgr->tcu()->get(TCU::OFFSET_GW) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
-                                      config->get_data().image_proc.colormap, config->get_data().image_proc.lower_3d_thresh, config->get_data().image_proc.upper_3d_thresh, config->get_data().image_proc.truncate_3d);
+                                      pcfg.custom_3d_param ? pcfg.custom_3d_delay : (m_tcu_ctrl->get_delay_dist() - m_device_mgr->tcu()->get(TCU::OFFSET_DELAY) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
+                                      pcfg.custom_3d_param ? pcfg.custom_3d_gate_width : (m_tcu_ctrl->get_depth_of_view() - m_device_mgr->tcu()->get(TCU::OFFSET_GW) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
+                                      pcfg.colormap, pcfg.lower_3d_thresh, pcfg.upper_3d_thresh, pcfg.truncate_3d);
 #else //LVTONG
                 ImageProc::gated3D_v2(m_tcu_ctrl->get_frame_a_3d() ? avg_state.prev_img : img_mem[thread_idx], m_tcu_ctrl->get_frame_a_3d() ? img_mem[thread_idx] : avg_state.prev_img, modified_result[thread_idx],
-                                      config->get_data().image_proc.custom_3d_param ? params.custom_3d_delay : (m_tcu_ctrl->get_delay_dist() - m_device_mgr->tcu()->get(TCU::OFFSET_DELAY) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
-                                      config->get_data().image_proc.custom_3d_param ? params.custom_3d_gate_width : (m_tcu_ctrl->get_depth_of_view() - m_device_mgr->tcu()->get(TCU::OFFSET_GW) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
-                                      config->get_data().image_proc.colormap, config->get_data().image_proc.lower_3d_thresh, config->get_data().image_proc.upper_3d_thresh, config->get_data().image_proc.truncate_3d, &dist_mat, &dist_min, &dist_max);
+                                      pcfg.custom_3d_param ? pcfg.custom_3d_delay : (m_tcu_ctrl->get_delay_dist() - m_device_mgr->tcu()->get(TCU::OFFSET_DELAY) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
+                                      pcfg.custom_3d_param ? pcfg.custom_3d_gate_width : (m_tcu_ctrl->get_depth_of_view() - m_device_mgr->tcu()->get(TCU::OFFSET_GW) * m_tcu_ctrl->get_dist_ns()) / m_tcu_ctrl->get_dist_ns(),
+                                      pcfg.colormap, pcfg.lower_3d_thresh, pcfg.upper_3d_thresh, pcfg.truncate_3d, &dist_mat, &dist_min, &dist_max);
 #endif //LVTONG
-                m_tcu_ctrl->set_frame_a_3d(!m_tcu_ctrl->get_frame_a_3d());
+                m_tcu_ctrl->toggle_frame_a_3d();
             }
 #ifdef LVTONG
 #else //LVTONG
@@ -1136,13 +1140,13 @@ void UserPanel::frame_average_and_3d(int thread_idx, bool updated, const Process
 }
 
 #ifdef LVTONG
-double UserPanel::detect_fishnet(int thread_idx, cv::dnn::Net& net)
+double UserPanel::detect_fishnet(int thread_idx, const PipelineConfig& pcfg, cv::dnn::Net& net)
 {
     double is_net = 0;
     double min, max;
-    if (config->get_data().image_proc.fishnet_recog) {
+    if (pcfg.fishnet_recog) {
         cv::Mat fishnet_res;
-        switch (config->get_data().image_proc.model_idx) {
+        switch (pcfg.model_idx) {
         case 0:
         {
             cv::cvtColor(img_mem[thread_idx], fishnet_res, cv::COLOR_GRAY2RGB);
@@ -1158,7 +1162,7 @@ double UserPanel::detect_fishnet(int thread_idx, cv::dnn::Net& net)
             prob -= max;
             is_net = exp(prob.at<float>(1)) / (exp(prob.at<float>(0)) + exp(prob.at<float>(1)));
 
-            emit update_fishnet_result(is_net > config->get_data().image_proc.fishnet_thresh);
+            emit update_fishnet_result(is_net > pcfg.fishnet_thresh);
             break;
         }
         case 1:
@@ -1198,7 +1202,8 @@ double UserPanel::detect_fishnet(int thread_idx, cv::dnn::Net& net)
 }
 #endif
 
-void UserPanel::enhance_frame(int thread_idx, const ProcessingParams& params)
+void UserPanel::enhance_frame(int thread_idx, const ProcessingParams& params,
+    const PipelineConfig& pcfg)
 {
     // process ordinary image enhance (skip when 3D is active on thread 0 with grayscale)
     if (!params.enable_3d || thread_idx != 0 || is_color[thread_idx]) {
@@ -1222,7 +1227,7 @@ void UserPanel::enhance_frame(int thread_idx, const ProcessingParams& params)
             }
             // accumulative
             case 4: {
-                ImageProc::accumulative_enhance(modified_result[thread_idx], modified_result[thread_idx], config->get_data().image_proc.accu_base);
+                ImageProc::accumulative_enhance(modified_result[thread_idx], modified_result[thread_idx], pcfg.accu_base);
                 break;
             }
             // guided image filter
@@ -1232,19 +1237,19 @@ void UserPanel::enhance_frame(int thread_idx, const ProcessingParams& params)
             }
             // adaptive
             case 6: {
-                ImageProc::adaptive_enhance(modified_result[thread_idx], modified_result[thread_idx], config->get_data().image_proc.low_in, config->get_data().image_proc.high_in, config->get_data().image_proc.low_out, config->get_data().image_proc.high_out, config->get_data().image_proc.gamma);
+                ImageProc::adaptive_enhance(modified_result[thread_idx], modified_result[thread_idx], pcfg.low_in, pcfg.high_in, pcfg.low_out, pcfg.high_out, pcfg.gamma);
                 break;
             }
             // enhance_dehaze
             case 7: {
                 modified_result[thread_idx] = ~modified_result[thread_idx];
-                ImageProc::haze_removal(modified_result[thread_idx], modified_result[thread_idx], 7, config->get_data().image_proc.dehaze_pct, 0.1, 60, 0.01);
+                ImageProc::haze_removal(modified_result[thread_idx], modified_result[thread_idx], 7, pcfg.dehaze_pct, 0.1, 60, 0.01);
                 modified_result[thread_idx] = ~modified_result[thread_idx];
                 break;
             }
             // dcp
             case 8: {
-                ImageProc::haze_removal(modified_result[thread_idx], modified_result[thread_idx], 7, config->get_data().image_proc.dehaze_pct, 0.1, 60, 0.01);
+                ImageProc::haze_removal(modified_result[thread_idx], modified_result[thread_idx], 7, pcfg.dehaze_pct, 0.1, 60, 0.01);
                 break;
             }
             // aindane
@@ -1268,13 +1273,14 @@ void UserPanel::enhance_frame(int thread_idx, const ProcessingParams& params)
         cv::Mat mask;
         cv::normalize(modified_result[thread_idx], modified_result[thread_idx], 0, 255, cv::NORM_MINMAX, CV_8UC1, mask);
         cv::Mat temp_mask = modified_result[thread_idx], result_3d;
-        cv::applyColorMap(modified_result[thread_idx], result_3d, config->get_data().image_proc.colormap);
+        cv::applyColorMap(modified_result[thread_idx], result_3d, pcfg.colormap);
         result_3d.copyTo(modified_result[thread_idx], temp_mask);
     }
 }
 
 void UserPanel::render_and_display(int thread_idx, int display_idx,
-    const ProcessingParams& params, const std::vector<YoloResult>& yolo_results,
+    const ProcessingParams& params, const PipelineConfig& pcfg,
+    const std::vector<YoloResult>& yolo_results,
     double is_net, int ww, int hh, int _w, int _h, float weight,
     uint hist[256], const QString& info_tcu, const QString& info_time)
 {
@@ -1320,8 +1326,8 @@ void UserPanel::render_and_display(int thread_idx, int display_idx,
         cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
 #ifdef LVTONG
         int baseline = 0;
-        if (config->get_data().image_proc.fishnet_recog) {
-            cv::putText(modified_result[thread_idx], is_net > config->get_data().image_proc.fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > config->get_data().image_proc.fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+        if (pcfg.fishnet_recog) {
+            cv::putText(modified_result[thread_idx], is_net > pcfg.fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pcfg.fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
         }
 #endif
     }
@@ -1356,7 +1362,8 @@ void UserPanel::render_and_display(int thread_idx, int display_idx,
     }
 }
 
-void UserPanel::advance_scan(int thread_idx, bool updated, int& scan_img_count,
+void UserPanel::advance_scan(int thread_idx, bool updated, const PipelineConfig& pcfg,
+    int& scan_img_count,
     QString& scan_save_path_a, QString& scan_save_path)
 {
     if (thread_idx != 0 || !m_scan_ctrl->is_scanning() || !updated) return;
@@ -1366,7 +1373,7 @@ void UserPanel::advance_scan(int thread_idx, bool updated, int& scan_img_count,
 
     int save_img_num = scan_config->num_single_pos;
     if (scan_img_count > 0 && scan_img_count <= save_img_num) {
-        save_scan_img(scan_save_path, QString::number(save_img_num - scan_img_count + 1) + ".bmp");
+        save_scan_img(scan_save_path, QString::number(save_img_num - scan_img_count + 1) + ".bmp", pcfg);
     }
     if (thread_idx == 0 && scan_img_count == save_img_num) {
         window()->grab().save(scan_save_path + "/screenshot_" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".png");
@@ -1377,8 +1384,8 @@ void UserPanel::advance_scan(int thread_idx, bool updated, int& scan_img_count,
 
         int tcu_idx = m_scan_ctrl->get_scan_tcu_idx();
         int ptz_idx = m_scan_ctrl->get_scan_ptz_idx();
-        const auto& tcu_route = m_scan_ctrl->get_scan_tcu_route();
-        const auto& ptz_route = m_scan_ctrl->get_scan_ptz_route();
+        const auto tcu_route = m_scan_ctrl->get_scan_tcu_route();
+        const auto ptz_route = m_scan_ctrl->get_scan_ptz_route();
 
         if (tcu_idx == (int)tcu_route.size() - 1 || tcu_idx == -1) {
             m_scan_ctrl->set_scan_tcu_idx(-1);
@@ -1387,7 +1394,7 @@ void UserPanel::advance_scan(int thread_idx, bool updated, int& scan_img_count,
             m_scan_ctrl->set_scan_ptz_idx(ptz_idx);
 
             if (ptz_idx < (int)ptz_route.size()) {
-                if (m_device_mgr->active_ptz_ctrl()) m_device_mgr->active_ptz_ctrl()->ptz_set_angle(ptz_route[ptz_idx].first, ptz_route[ptz_idx].second);
+                m_device_mgr->send_ptz_angle(ptz_route[ptz_idx].first, ptz_route[ptz_idx].second);
 
                 scan_save_path_a = save_location + "/" + m_scan_ctrl->get_scan_name() + "/" + QString::number(ptz_idx);
                 QDir().mkdir(scan_save_path_a);
@@ -1419,21 +1426,22 @@ void UserPanel::advance_scan(int thread_idx, bool updated, int& scan_img_count,
 }
 
 void UserPanel::record_frame(int thread_idx, int display_idx, bool updated,
-    const ProcessingParams& params, double is_net,
+    const ProcessingParams& params, const PipelineConfig& pcfg,
+    double is_net,
     const QString& info_tcu, const QString& info_time,
     int ww, int hh, float weight)
 {
     if (updated && save_original[thread_idx]) {
-        save_to_file(false, thread_idx);
-        if (device_type == -1 || !config->get_data().save.consecutive_capture || display_idx) save_original[thread_idx] = 0;
+        save_to_file(false, thread_idx, pcfg);
+        if (device_type == -1 || !pcfg.consecutive_capture || display_idx) save_original[thread_idx] = 0;
     }
     if (updated && save_modified[thread_idx]) {
-        save_to_file(true, thread_idx);
-        if (device_type == -1 || !config->get_data().save.consecutive_capture || display_idx) save_modified[thread_idx] = 0;
+        save_to_file(true, thread_idx, pcfg);
+        if (device_type == -1 || !pcfg.consecutive_capture || display_idx) save_modified[thread_idx] = 0;
     }
     if (updated && record_original[thread_idx]) {
         cv::Mat temp = img_mem[thread_idx].clone();
-        if (config->get_data().save.save_info) {
+        if (pcfg.save_info) {
             cv::putText(temp, info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
             cv::putText(temp, info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
         }
@@ -1445,13 +1453,13 @@ void UserPanel::record_frame(int thread_idx, int display_idx, bool updated,
     if (updated && record_modified[thread_idx]) {
         cv::Mat temp = modified_result[thread_idx].clone();
         if (!image_3d[thread_idx] && !params.show_info) {
-            if (config->get_data().save.save_info) {
+            if (pcfg.save_info) {
                 cv::putText(modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
 #ifdef LVTONG
                 int baseline = 0;
-                if (config->get_data().image_proc.fishnet_recog) {
-                    cv::putText(modified_result[thread_idx], is_net > config->get_data().image_proc.fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > config->get_data().image_proc.fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                if (pcfg.fishnet_recog) {
+                    cv::putText(modified_result[thread_idx], is_net > pcfg.fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::Point(ww - 40 - cv::getTextSize(is_net > pcfg.fishnet_thresh ? "FISHNET FOUND" : "FISHNET NOT FOUND", cv::FONT_HERSHEY_SIMPLEX, weight, weight * 2, &baseline).width, hh - 100 + 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 }
 #endif
             }
@@ -1482,13 +1490,13 @@ int UserPanel::grab_thread_process(int *idx) {
 #ifdef LVTONG
     emit set_model_list_enabled(false);
     QString model_name;
-    switch (config->get_data().image_proc.model_idx) {
+    { QMutexLocker lk(&m_params_mutex); switch (m_pipeline_config.model_idx) {
     case 0: model_name = "models/fishnet_lvtong_legacy.onnx"; break;
     case 1: model_name = "models/fishnet_pix2pix_maxpool.onnx"; break;
     case 2: model_name = "models/fishnet_maskguided.onnx"; break;
     case 3: model_name = "models/fishnet_semantic_static_sim.onnx"; break;
     default: break;
-    }
+    } }
 
     cv::dnn::Net net = cv::dnn::readNet(model_name.toLatin1().constData());
 #endif
@@ -1501,7 +1509,8 @@ int UserPanel::grab_thread_process(int *idx) {
 
     while (grab_image[thread_idx]) {
         ProcessingParams params;
-        { QMutexLocker lk(&m_params_mutex); params = m_processing_params; }
+        PipelineConfig pcfg;
+        { QMutexLocker lk(&m_params_mutex); params = m_processing_params; pcfg = m_pipeline_config; }
 
         if (!acquire_frame(thread_idx, avg_state.prev_img, updated, packets_lost)) continue;
 
@@ -1510,10 +1519,10 @@ int UserPanel::grab_thread_process(int *idx) {
 //        qDebug () << QDateTime::currentDateTime().toString() << updated << img_mem.data;
 
         if (updated) {
-            preprocess_frame(thread_idx, params, avg_state, _w, _h, hist);
+            preprocess_frame(thread_idx, params, pcfg, avg_state, _w, _h, hist);
         }
 
-        std::vector<YoloResult> yolo_results = detect_yolo(thread_idx, updated, yolo);
+        std::vector<YoloResult> yolo_results = detect_yolo(thread_idx, updated, pcfg, yolo);
 
 /*
         // tenengrad (sobel) auto-focus
@@ -1531,25 +1540,25 @@ int UserPanel::grab_thread_process(int *idx) {
 */
         double is_net = 0.0;
 #ifdef LVTONG
-        is_net = detect_fishnet(thread_idx, net);
+        is_net = detect_fishnet(thread_idx, pcfg, net);
 #endif
 
-        frame_average_and_3d(thread_idx, updated, params, avg_state, ecc_state, _w, _h, _pixel_depth, ww, hh);
+        frame_average_and_3d(thread_idx, updated, params, pcfg, avg_state, ecc_state, _w, _h, _pixel_depth, ww, hh);
 
-        enhance_frame(thread_idx, params);
+        enhance_frame(thread_idx, params, pcfg);
 
         // compute info strings (needed by both render_and_display and record_frame)
-        QString info_tcu = config->get_data().save.custom_topleft_info ?
+        QString info_tcu = pcfg.custom_topleft_info ?
                     params.custom_info_text :
                     m_tcu_ctrl->get_base_unit() == 2 ? QString::asprintf("DIST %05d m  DOV %04d m", (int)m_tcu_ctrl->get_delay_dist(), (int)m_tcu_ctrl->get_depth_of_view()) :
                                      QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(m_tcu_ctrl->get_delay_dist() / m_tcu_ctrl->get_dist_ns()), (int)std::round(m_tcu_ctrl->get_depth_of_view() / m_tcu_ctrl->get_dist_ns()));
         QString info_time = QDateTime::currentDateTime().toString("hh:mm:ss:zzz");
 
-        render_and_display(thread_idx, *idx, params, yolo_results, is_net, ww, hh, _w, _h, weight, hist, info_tcu, info_time);
+        render_and_display(thread_idx, *idx, params, pcfg, yolo_results, is_net, ww, hh, _w, _h, weight, hist, info_tcu, info_time);
 
-        advance_scan(thread_idx, updated, scan_img_count, scan_save_path_a, scan_save_path);
+        advance_scan(thread_idx, updated, pcfg, scan_img_count, scan_save_path_a, scan_save_path);
 
-        record_frame(thread_idx, *idx, updated, params, is_net, info_tcu, info_time, ww, hh, weight);
+        record_frame(thread_idx, *idx, updated, params, pcfg, is_net, info_tcu, info_time, ww, hh, weight);
 
         if (updated) avg_state.prev_img = img_mem[thread_idx].clone();
         } // QMutexLocker automatically unlocks here
@@ -1806,7 +1815,7 @@ void UserPanel::enable_controls(bool cam_rdy) {
 
 // connect_port_edit, init_control_port → DeviceManager
 
-void UserPanel::save_to_file(bool save_result, int idx) {
+void UserPanel::save_to_file(bool save_result, int idx, const PipelineConfig& pcfg) {
 //    QString temp = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"),
 //            dest = QString(save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp");
 //    cv::imwrite(temp.toLatin1().data(), save_result ? modified_result : img_mem);
@@ -1825,13 +1834,13 @@ void UserPanel::save_to_file(bool save_result, int idx) {
 //    }
     // TODO implement 16bit result image processing/writing
     cv::Mat result_image;
-    if (config->get_data().save.save_in_grayscale) cv::cvtColor(*temp, result_image, cv::COLOR_RGB2GRAY);
+    if (pcfg.save_in_grayscale) cv::cvtColor(*temp, result_image, cv::COLOR_RGB2GRAY);
     else                         result_image = temp->clone();
 
     if (save_result) {
         QString dt = QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz");
         if (pref->split) {
-            if (config->get_data().save.integrate_info) {
+            if (pcfg.integrate_info) {
                 QString tcu_note = QString::fromStdString(m_device_mgr->tcu()->to_json().dump());
                 if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp", tcu_note))) emit task_queue_full();
                 if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp", tcu_note))) emit task_queue_full();
@@ -1844,9 +1853,9 @@ void UserPanel::save_to_file(bool save_result, int idx) {
                 if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp"))) emit task_queue_full();
             }
         }
-        switch (config->get_data().save.img_format){
+        switch (pcfg.img_format){
         case 0:
-            if (config->get_data().save.integrate_info) {
+            if (pcfg.integrate_info) {
                 QString tcu_note = QString::fromStdString(m_device_mgr->tcu()->to_json().dump());
                 if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image, save_location + "/res_bmp/" + dt + ".bmp", tcu_note))) emit task_queue_full();
             } else {
@@ -1859,9 +1868,9 @@ void UserPanel::save_to_file(bool save_result, int idx) {
     } else {
         switch (pixel_depth[0]) {
         case  8:
-            switch (config->get_data().save.img_format){
+            switch (pcfg.img_format){
             case 0:
-                if (config->get_data().save.integrate_info) {
+                if (pcfg.integrate_info) {
                     QString tcu_note = QString::fromStdString(m_device_mgr->tcu()->to_json().dump());
                     if (!tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image, save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", tcu_note))) emit task_queue_full();
                 } else {
@@ -1875,7 +1884,7 @@ void UserPanel::save_to_file(bool save_result, int idx) {
         case 10:
         case 12:
         case 16:
-            switch (config->get_data().save.img_format){
+            switch (pcfg.img_format){
             case 0: if (!tp.append_task(std::bind(ImageIO::save_image_tif, result_image * (1 << (16 - pixel_depth[0])), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
             case 1: if (!tp.append_task(std::bind(ImageIO::save_image_jpg, result_image * (1 << (16 - pixel_depth[0])), save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".jpg"))) emit task_queue_full(); break;
             default: break;
@@ -1886,7 +1895,7 @@ void UserPanel::save_to_file(bool save_result, int idx) {
     }
 }
 
-void UserPanel::save_scan_img(QString path, QString name) {
+void UserPanel::save_scan_img(QString path, QString name, const PipelineConfig& pcfg) {
 //        QString temp = QString(TEMP_SAVE_LOCATION + "/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp"),
 //                dest = QString(save_location + "/" + scan_name + "/ori_bmp/" + QString::number(delay_a_n + delay_a_u * 1000) + ".bmp");
 //        cv::imwrite(temp.toLatin1().data(), img_mem);
@@ -1898,7 +1907,7 @@ void UserPanel::save_scan_img(QString path, QString name) {
 //            t_ori.detach();
 //            tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
 //            tp.append_task(std::bind(ImageIO::save_image_bmp, img_mem[0].clone(), save_location + "/" + scan_name + "/ori_bmp/" + (base_unit == 2 ? QString::asprintf("%.2fm", delay_dist) : QString::asprintf("%.2fns", m_device_mgr->tcu()->get(TCU::DELAY_A))) + ".bmp"));
-        if (config->get_data().save.integrate_info) {
+        if (pcfg.integrate_info) {
             QString tcu_note = QString::fromStdString(m_device_mgr->tcu()->to_json().dump());
             tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), img_mem[0].clone(), path + "/ori_bmp/" + name, tcu_note));
         } else {
@@ -1914,7 +1923,7 @@ void UserPanel::save_scan_img(QString path, QString name) {
 //            t_res.detach();
 //            tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", ptr_tcu->delay_a)) + ".bmp"));
 //            tp.append_task(std::bind(ImageIO::save_image_bmp, modified_result[0].clone(), save_location + "/" + scan_name + "/res_bmp/" + (base_unit == 2 ? QString::asprintf("%fm", delay_dist) : QString::asprintf("%.2fns", m_device_mgr->tcu()->get(TCU::DELAY_A))) + ".bmp"));
-        if (config->get_data().save.integrate_info) {
+        if (pcfg.integrate_info) {
             QString tcu_note = QString::fromStdString(m_device_mgr->tcu()->to_json().dump());
             tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), modified_result[0].clone(), path + "/res_bmp/" + name, tcu_note));
         } else {
@@ -1924,7 +1933,7 @@ void UserPanel::save_scan_img(QString path, QString name) {
 
 //    qDebug() << "####################" << thread_idx;
     if (grab_image[1]) {
-        if (config->get_data().save.integrate_info) {
+        if (pcfg.integrate_info) {
             QString tcu_note = QString::fromStdString(m_device_mgr->tcu()->to_json().dump());
             tp.append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), img_mem[1].clone(), path + "/alt_bmp/" + name, tcu_note));
         } else {
@@ -2758,9 +2767,54 @@ void UserPanel::update_processing_params()
     m_processing_params.mcp_slider_focused   = ui->MCP_SLIDER->hasFocus();
     m_processing_params.hist_display_size    = ui->HIST_DISPLAY->size();
     m_processing_params.split                = pref->split;
-    m_processing_params.custom_3d_delay      = config->get_data().image_proc.custom_3d_delay;
-    m_processing_params.custom_3d_gate_width = config->get_data().image_proc.custom_3d_gate_width;
     m_processing_params.custom_info_text     = pref->ui->CUSTOM_INFO_EDT->text();
+
+    // Snapshot Config fields read by pipeline methods
+    const auto& data = config->get_data();
+    m_pipeline_config.flip                = data.device.flip;
+    m_pipeline_config.accu_base           = data.image_proc.accu_base;
+    m_pipeline_config.gamma               = data.image_proc.gamma;
+    m_pipeline_config.low_in              = data.image_proc.low_in;
+    m_pipeline_config.high_in             = data.image_proc.high_in;
+    m_pipeline_config.low_out             = data.image_proc.low_out;
+    m_pipeline_config.high_out            = data.image_proc.high_out;
+    m_pipeline_config.dehaze_pct          = data.image_proc.dehaze_pct;
+    m_pipeline_config.colormap            = data.image_proc.colormap;
+    m_pipeline_config.lower_3d_thresh     = data.image_proc.lower_3d_thresh;
+    m_pipeline_config.upper_3d_thresh     = data.image_proc.upper_3d_thresh;
+    m_pipeline_config.truncate_3d         = data.image_proc.truncate_3d;
+    m_pipeline_config.custom_3d_param     = data.image_proc.custom_3d_param;
+    m_pipeline_config.custom_3d_delay     = data.image_proc.custom_3d_delay;
+    m_pipeline_config.custom_3d_gate_width = data.image_proc.custom_3d_gate_width;
+    m_pipeline_config.model_idx           = data.image_proc.model_idx;
+    m_pipeline_config.fishnet_recog       = data.image_proc.fishnet_recog;
+    m_pipeline_config.fishnet_thresh      = data.image_proc.fishnet_thresh;
+    m_pipeline_config.ecc_window_mode     = data.image_proc.ecc_window_mode;
+    m_pipeline_config.ecc_warp_mode       = data.image_proc.ecc_warp_mode;
+    m_pipeline_config.ecc_fusion_method   = data.image_proc.ecc_fusion_method;
+    m_pipeline_config.ecc_backward        = data.image_proc.ecc_backward;
+    m_pipeline_config.ecc_forward         = data.image_proc.ecc_forward;
+    m_pipeline_config.ecc_levels          = data.image_proc.ecc_levels;
+    m_pipeline_config.ecc_max_iter        = data.image_proc.ecc_max_iter;
+    m_pipeline_config.ecc_eps             = data.image_proc.ecc_eps;
+    m_pipeline_config.ecc_half_res_reg    = data.image_proc.ecc_half_res_reg;
+    m_pipeline_config.ecc_half_res_fuse   = data.image_proc.ecc_half_res_fuse;
+    m_pipeline_config.save_info           = data.save.save_info;
+    m_pipeline_config.custom_topleft_info = data.save.custom_topleft_info;
+    m_pipeline_config.save_in_grayscale   = data.save.save_in_grayscale;
+    m_pipeline_config.consecutive_capture = data.save.consecutive_capture;
+    m_pipeline_config.integrate_info      = data.save.integrate_info;
+    m_pipeline_config.img_format          = data.save.img_format;
+    m_pipeline_config.config_path         = data.yolo.config_path;
+    m_pipeline_config.main_display_model  = data.yolo.main_display_model;
+    m_pipeline_config.alt1_display_model  = data.yolo.alt1_display_model;
+    m_pipeline_config.alt2_display_model  = data.yolo.alt2_display_model;
+    m_pipeline_config.visible_model_path  = data.yolo.visible_model_path;
+    m_pipeline_config.visible_classes_file = data.yolo.visible_classes_file;
+    m_pipeline_config.thermal_model_path  = data.yolo.thermal_model_path;
+    m_pipeline_config.thermal_classes_file = data.yolo.thermal_classes_file;
+    m_pipeline_config.gated_model_path    = data.yolo.gated_model_path;
+    m_pipeline_config.gated_classes_file  = data.yolo.gated_classes_file;
 }
 
 void UserPanel::syncPreferencesToConfig()
@@ -3526,13 +3580,13 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
                 ah = fmod(ah + 360.0, 360.0);
                 m_device_mgr->set_angle_h(ah);
                 ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", ah));
-                if (m_device_mgr->active_ptz_ctrl()) m_device_mgr->active_ptz_ctrl()->ptz_set_angle_h(ah);
+                m_device_mgr->send_ptz_angle_h(ah);
             }
             else if (edit == ui->ANGLE_V_EDIT) {
                 float av = ui->ANGLE_V_EDIT->text().toDouble();
                 m_device_mgr->set_angle_v(av);
                 ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", av));
-                if (m_device_mgr->active_ptz_ctrl()) m_device_mgr->active_ptz_ctrl()->ptz_set_angle_v(av);
+                m_device_mgr->send_ptz_angle_v(av);
             }
             this->focusWidget()->clearFocus();
             break;

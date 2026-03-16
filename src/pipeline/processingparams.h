@@ -27,8 +27,6 @@ struct ProcessingParams {
 
     // from Preferences
     bool    split              = false;   // pref->split
-    float   custom_3d_delay    = 0.0f;   // pref->ui->CUSTOM_3D_DELAY_EDT
-    float   custom_3d_gate_width = 0.0f; // pref->ui->CUSTOM_3D_GW_EDT
     QString custom_info_text;            // pref->ui->CUSTOM_INFO_EDT
 };
 

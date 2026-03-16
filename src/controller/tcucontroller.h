@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QLabel>
 #include <QLineEdit>
+#include <atomic>
 
 #include "port/tcu.h"
 #include "util/config.h"
@@ -32,7 +33,7 @@ public:
     int   get_base_unit() const     { return base_unit; }
     float get_rep_freq() const      { return rep_freq; }
     float get_laser_width() const   { return laser_width; }
-    float get_delay_dist() const    { return delay_dist; }
+    float get_delay_dist() const    { return delay_dist.load(); }
     float get_depth_of_view() const { return depth_of_view; }
     int   get_mcp_max() const       { return mcp_max; }
     bool  get_aliasing_mode() const { return aliasing_mode; }
@@ -40,16 +41,20 @@ public:
     float get_c() const             { return c; }
     float get_dist_ns() const       { return dist_ns; }
     bool  get_auto_mcp() const      { return auto_mcp; }
-    bool  get_frame_a_3d() const    { return frame_a_3d; }
+    bool  get_frame_a_3d() const    { return frame_a_3d.load(); }
     int   get_distance() const      { return distance; }
 
     // Setters used by other components
     void set_stepping(float v)      { stepping = v; }
     void set_rep_freq(float v)      { rep_freq = v; }
     void set_laser_width(float v)   { laser_width = v; }
-    void set_delay_dist(float v)    { delay_dist = v; }
+    void set_delay_dist(float v)    { delay_dist.store(v); }
     void set_depth_of_view(float v) { depth_of_view = v; }
-    void set_frame_a_3d(bool v)     { frame_a_3d = v; }
+    void set_frame_a_3d(bool v)     { frame_a_3d.store(v); }
+    void toggle_frame_a_3d() {
+        bool expected = frame_a_3d.load();
+        while (!frame_a_3d.compare_exchange_weak(expected, !expected));
+    }
     void set_auto_mcp(bool v)       { auto_mcp = v; }
     void set_distance(int v)        { distance = v; }
 
@@ -120,7 +125,7 @@ private:
     int             base_unit;
     float           rep_freq;
     float           laser_width;
-    float           delay_dist;
+    std::atomic<float> delay_dist{0.0f};
     float           depth_of_view;
     int             mcp_max;
     bool            aliasing_mode;
@@ -128,7 +133,7 @@ private:
     float           c;
     float           dist_ns;
     bool            auto_mcp;
-    bool            frame_a_3d;
+    std::atomic<bool> frame_a_3d{false};
     int             distance;
 };
 

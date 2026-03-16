@@ -183,7 +183,8 @@ void TCUController::update_tcu_params(qint32 tcu_param)
             m_ui->LASER_WIDTH_EDIT_P->setText(QString::asprintf("%03d", ps));
             break;
         case TCU::EST_DIST:
-            m_ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist = m_device_mgr->tcu()->get(TCU::EST_DIST)));
+            delay_dist.store(m_device_mgr->tcu()->get(TCU::EST_DIST));
+            m_ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist.load()));
             rep_freq = m_device_mgr->tcu()->get(TCU::REPEATED_FREQ);
             setup_hz(hz_unit);
             split_value_by_unit(m_device_mgr->tcu()->get(TCU::DELAY_A), us, ns, ps, 1);
@@ -194,7 +195,7 @@ void TCUController::update_tcu_params(qint32 tcu_param)
             m_ui->DELAY_B_EDIT_U->setText(QString::asprintf(  "%d", us));
             m_ui->DELAY_B_EDIT_N->setText(QString::asprintf("%03d", ns));
             m_ui->DELAY_B_EDIT_P->setText(QString::asprintf("%03d", ps));
-            m_ui->DELAY_SLIDER->setValue(delay_dist);
+            m_ui->DELAY_SLIDER->setValue(delay_dist.load());
             break;
         case TCU::EST_DOV:
             m_ui->GATE_WIDTH->setText(QString::asprintf("%.2f m", depth_of_view = m_device_mgr->tcu()->get(TCU::EST_DOV)));
@@ -233,8 +234,8 @@ void TCUController::change_mcp(int val)
 
 void TCUController::change_delay(int val)
 {
-    if (abs(delay_dist - val) < 1) return;
-    delay_dist = val;
+    if (abs(delay_dist.load() - val) < 1) return;
+    delay_dist.store(val);
     update_delay();
 }
 
@@ -253,10 +254,10 @@ void TCUController::apply_distance(int dist)
     if (distance < 100) distance = 100;
     m_ui->DISTANCE->setText(QString::asprintf("%d m", distance));
 
-    delay_dist = distance;
+    delay_dist.store(distance);
     update_delay();
 
-    rep_freq = 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000);
+    rep_freq = 1e6 / (delay_dist.load() / dist_ns + depth_of_view / dist_ns + 1000);
     if (rep_freq > 30) rep_freq = 30;
     if      (distance < 1000) depth_of_view =  500 * dist_ns, emit send_double_tcu_msg(TCU::LASER_WIDTH, std::round(depth_of_view / dist_ns));
     else if (distance < 3000) depth_of_view = 1000 * dist_ns, emit send_double_tcu_msg(TCU::LASER_WIDTH, std::round(depth_of_view / dist_ns));
@@ -264,7 +265,7 @@ void TCUController::apply_distance(int dist)
     else                      depth_of_view = 3500 * dist_ns, emit send_double_tcu_msg(TCU::LASER_WIDTH, std::round(depth_of_view / dist_ns));
 
     emit send_uint_tcu_msg(TCU::DIST, distance);
-    m_ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist));
+    m_ui->EST_DIST->setText(QString::asprintf("%.2f m", delay_dist.load()));
 
     setup_hz(hz_unit);
     uint us, ns, ps;
@@ -342,11 +343,11 @@ void TCUController::update_delay()
     static QElapsedTimer t;
     if (throttle_check(t)) return;
 
-    delay_dist = qBound(0.0f, delay_dist, m_config->get_data().tcu.max_dist);
+    delay_dist.store(qBound(0.0f, delay_dist.load(), m_config->get_data().tcu.max_dist));
 
     if (!aliasing_mode) {
-        if (!qobject_cast<QSlider*>(sender())) m_ui->DELAY_SLIDER->setValue(delay_dist);
-        emit send_double_tcu_msg(TCU::EST_DIST, delay_dist);
+        if (!qobject_cast<QSlider*>(sender())) m_ui->DELAY_SLIDER->setValue(delay_dist.load());
+        emit send_double_tcu_msg(TCU::EST_DIST, delay_dist.load());
     }
     else {
         aliasing_mode = false;

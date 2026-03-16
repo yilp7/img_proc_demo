@@ -9,6 +9,7 @@
 #include <QLineEdit>
 #include <QButtonGroup>
 #include <QMessageBox>
+#include <atomic>
 
 #include "port/tcu.h"
 #include "port/lens.h"
@@ -64,11 +65,14 @@ public:
 
     // PTZ (non-slot)
     void set_ptz_angle();
+    void send_ptz_angle(float h, float v);
+    void send_ptz_angle_h(float h);
+    void send_ptz_angle_v(float v);
     void point_ptz_to_target(QPoint target);
-    float get_angle_h() const { return angle_h; }
-    float get_angle_v() const { return angle_v; }
-    void set_angle_h(float h) { angle_h = h; }
-    void set_angle_v(float v) { angle_v = v; }
+    float get_angle_h() const { return angle_h.load(); }
+    float get_angle_v() const { return angle_v.load(); }
+    void set_angle_h(float h) { angle_h.store(h); }
+    void set_angle_v(float v) { angle_v.store(v); }
 
 public slots:
     // PTZ slots (connected via SIGNAL/SLOT)
@@ -157,8 +161,8 @@ private:
     QButtonGroup*   ptz_grp;
     QButtonGroup*   vid_camera_grp;
     int             ptz_speed;
-    float           angle_h;
-    float           angle_v;
+    std::atomic<float> angle_h{0.0f};
+    std::atomic<float> angle_v{0.0f};
 };
 
 #endif // DEVICEMANAGER_H
