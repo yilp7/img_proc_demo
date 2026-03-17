@@ -424,7 +424,7 @@ void DeviceManager::ptz_button_pressed(int id)
             p_usbcan->emit transmit(USBCAN::LOCK);
             QThread::msleep(1000);
             break;
-        case 2: p_udpptz->emit transmit_data(UDPPTZ::RETURN_ZERO); break;
+        case 2: p_udpptz->emit transmit(UDPPTZ::RETURN_ZERO); break;
         }
         return;
     }

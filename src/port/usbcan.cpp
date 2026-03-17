@@ -202,31 +202,31 @@ void USBCAN::ptz_move(int direction, int speed)
 {
     float spd = (float)speed;
     switch (direction) {
-    case DIR_UP_LEFT:    device_control(LEFT, spd); device_control(UP, spd); break;
-    case DIR_UP:         device_control(UP, spd); break;
-    case DIR_UP_RIGHT:   device_control(RIGHT, spd); device_control(UP, spd); break;
-    case DIR_LEFT:       device_control(LEFT, spd); break;
-    case DIR_RIGHT:      device_control(RIGHT, spd); break;
-    case DIR_DOWN_LEFT:  device_control(LEFT, spd); device_control(DOWN, spd); break;
-    case DIR_DOWN:       device_control(DOWN, spd); break;
-    case DIR_DOWN_RIGHT: device_control(RIGHT, spd); device_control(DOWN, spd); break;
+    case DIR_UP_LEFT:    emit control(LEFT, spd); emit control(UP, spd); break;
+    case DIR_UP:         emit control(UP, spd); break;
+    case DIR_UP_RIGHT:   emit control(RIGHT, spd); emit control(UP, spd); break;
+    case DIR_LEFT:       emit control(LEFT, spd); break;
+    case DIR_RIGHT:      emit control(RIGHT, spd); break;
+    case DIR_DOWN_LEFT:  emit control(LEFT, spd); emit control(DOWN, spd); break;
+    case DIR_DOWN:       emit control(DOWN, spd); break;
+    case DIR_DOWN_RIGHT: emit control(RIGHT, spd); emit control(DOWN, spd); break;
     default: break;
     }
 }
 
 void USBCAN::ptz_stop()
 {
-    device_control(STOP, 0);
+    emit control(STOP, 0);
 }
 
 void USBCAN::ptz_set_angle(float h, float v)
 {
-    ptz_set_angle_h(h);
-    ptz_set_angle_v(v);
+    emit control(POSITION, h);
+    emit control(PITCH, v);
 }
 
-void USBCAN::ptz_set_angle_h(float h) { device_control(POSITION, h); transmit_data(POSITION); }
-void USBCAN::ptz_set_angle_v(float v) { device_control(PITCH, v); transmit_data(PITCH); }
+void USBCAN::ptz_set_angle_h(float h) { emit control(POSITION, h); }
+void USBCAN::ptz_set_angle_v(float v) { emit control(PITCH, v); }
 
 void USBCAN::device_control(qint32 op, float val)
 {

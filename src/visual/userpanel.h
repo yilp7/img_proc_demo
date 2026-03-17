@@ -373,6 +373,9 @@ signals:
     // scan finished in grab thread
     void finish_scan_signal();
 
+    // screenshot request from grab thread
+    void save_screenshot_signal(QString path);
+
 #ifdef LVTONG
     // enable/disable model list from grab thread
     void set_model_list_enabled(bool enabled);

@@ -299,6 +299,9 @@ UserPanel::UserPanel(QWidget *parent) :
     // update_scan → ScanController::enable_scan_options wired in ScanController::init()
     connect(this, SIGNAL(update_delay_in_thread()), SLOT(update_delay()), Qt::QueuedConnection);
     connect(this, SIGNAL(update_mcp_in_thread(int)), SLOT(change_mcp(int)), Qt::QueuedConnection);
+    connect(this, &UserPanel::save_screenshot_signal, this, [this](QString path) {
+        window()->grab().save(path);
+    }, Qt::QueuedConnection);
     // finish_scan_signal → ScanController::on_SCAN_BUTTON_clicked wired after ScanController creation
 #ifdef LVTONG
     connect(this, &UserPanel::set_model_list_enabled, this, [this](bool enabled) {
@@ -1376,7 +1379,7 @@ void UserPanel::advance_scan(int thread_idx, bool updated, const PipelineConfig&
         save_scan_img(scan_save_path, QString::number(save_img_num - scan_img_count + 1) + ".bmp", pcfg);
     }
     if (thread_idx == 0 && scan_img_count == save_img_num) {
-        window()->grab().save(scan_save_path + "/screenshot_" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".png");
+        emit save_screenshot_signal(scan_save_path + "/screenshot_" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".png");
     }
 
     if (!scan_img_count) {

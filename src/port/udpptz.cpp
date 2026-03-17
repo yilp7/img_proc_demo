@@ -198,23 +198,24 @@ void UDPPTZ::ptz_move(int direction, int speed)
     default: return;
     }
     set_velocities(h_vel, v_vel);
-    transmit_data(MANUAL_SEARCH);
+    emit transmit(MANUAL_SEARCH);
 }
 
 void UDPPTZ::ptz_stop()
 {
     set_velocities(0, 0);
-    transmit_data(MANUAL_SEARCH);
+//    emit transmit(MANUAL_SEARCH); // for 500
+    emit transmit(STANDBY); // for 530
 }
 
 void UDPPTZ::ptz_set_angle(float h, float v)
 {
-    device_control(ANGLE_H, h);
-    device_control(ANGLE_V, v);
+    emit control(ANGLE_H, h);
+    emit control(ANGLE_V, v);
 }
 
-void UDPPTZ::ptz_set_angle_h(float h) { device_control(ANGLE_H, h); }
-void UDPPTZ::ptz_set_angle_v(float v) { device_control(ANGLE_V, v); }
+void UDPPTZ::ptz_set_angle_h(float h) { emit control(ANGLE_H, h); }
+void UDPPTZ::ptz_set_angle_v(float v) { emit control(ANGLE_V, v); }
 
 void UDPPTZ::device_control(qint32 op, float val)
 {
