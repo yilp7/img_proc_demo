@@ -239,6 +239,132 @@ private slots:
         QVERIFY(config2.load_from_file(tmpFile));
         QCOMPARE(config2.get_version(), originalVersion);
     }
+
+    // TC-CF-010: ImageProcSettings round-trip
+    void imageProcSettingsRoundTrip()
+    {
+        QTemporaryDir tmpDir;
+        QVERIFY(tmpDir.isValid());
+        QString tmpFile = tmpDir.path() + "/imgproc.json";
+
+        Config config1;
+        auto &ip = config1.get_data().image_proc;
+        ip.accu_base = 2.5f;
+        ip.gamma = 0.8f;
+        ip.low_in = 0.1f;
+        ip.high_in = 0.9f;
+        ip.dehaze_pct = 0.75f;
+        ip.colormap = 4;
+        ip.lower_3d_thresh = 0.05;
+        ip.upper_3d_thresh = 0.95;
+        ip.truncate_3d = true;
+        ip.custom_3d_param = true;
+        ip.custom_3d_delay = 100.0f;
+        ip.custom_3d_gate_width = 50.0f;
+        ip.ecc_backward = 10;
+        ip.ecc_forward = 5;
+        ip.ecc_levels = 3;
+        ip.ecc_max_iter = 16;
+        ip.ecc_eps = 0.0001;
+        QVERIFY(config1.save_to_file(tmpFile));
+
+        Config config2;
+        QVERIFY(config2.load_from_file(tmpFile));
+        const auto &ip2 = config2.get_data().image_proc;
+        QCOMPARE(ip2.accu_base, 2.5f);
+        QCOMPARE(ip2.gamma, 0.8f);
+        QCOMPARE(ip2.low_in, 0.1f);
+        QCOMPARE(ip2.high_in, 0.9f);
+        QCOMPARE(ip2.dehaze_pct, 0.75f);
+        QCOMPARE(ip2.colormap, 4);
+        QCOMPARE(ip2.lower_3d_thresh, 0.05);
+        QCOMPARE(ip2.upper_3d_thresh, 0.95);
+        QCOMPARE(ip2.truncate_3d, true);
+        QCOMPARE(ip2.custom_3d_param, true);
+        QCOMPARE(ip2.custom_3d_delay, 100.0f);
+        QCOMPARE(ip2.custom_3d_gate_width, 50.0f);
+        QCOMPARE(ip2.ecc_backward, 10);
+        QCOMPARE(ip2.ecc_forward, 5);
+        QCOMPARE(ip2.ecc_levels, 3);
+        QCOMPARE(ip2.ecc_max_iter, 16);
+        QVERIFY(qAbs(ip2.ecc_eps - 0.0001) < 1e-6);
+    }
+
+    // TC-CF-011: SaveSettings round-trip
+    void saveSettingsRoundTrip()
+    {
+        QTemporaryDir tmpDir;
+        QVERIFY(tmpDir.isValid());
+        QString tmpFile = tmpDir.path() + "/save.json";
+
+        Config config1;
+        auto &s = config1.get_data().save;
+        s.save_info = false;
+        s.custom_topleft_info = true;
+        s.save_in_grayscale = true;
+        s.consecutive_capture = false;
+        s.integrate_info = false;
+        s.img_format = 2;
+        QVERIFY(config1.save_to_file(tmpFile));
+
+        Config config2;
+        QVERIFY(config2.load_from_file(tmpFile));
+        const auto &s2 = config2.get_data().save;
+        QCOMPARE(s2.save_info, false);
+        QCOMPARE(s2.custom_topleft_info, true);
+        QCOMPARE(s2.save_in_grayscale, true);
+        QCOMPARE(s2.consecutive_capture, false);
+        QCOMPARE(s2.integrate_info, false);
+        QCOMPARE(s2.img_format, 2);
+    }
+
+    // TC-CF-012: DeviceSettings flip int round-trip (backward compat)
+    void deviceFlipIntRoundTrip()
+    {
+        QTemporaryDir tmpDir;
+        QVERIFY(tmpDir.isValid());
+        QString tmpFile = tmpDir.path() + "/device.json";
+
+        Config config1;
+        config1.get_data().device.flip = 2;
+        config1.get_data().device.rotation = 90;
+        config1.get_data().device.pixel_type = 1;
+        QVERIFY(config1.save_to_file(tmpFile));
+
+        Config config2;
+        QVERIFY(config2.load_from_file(tmpFile));
+        QCOMPARE(config2.get_data().device.flip, 2);
+        QCOMPARE(config2.get_data().device.rotation, 90);
+        QCOMPARE(config2.get_data().device.pixel_type, 1);
+    }
+
+    // TC-CF-013: ImageProcSettings defaults preserved on partial JSON
+    void imageProcDefaultsOnPartialJson()
+    {
+        QTemporaryDir tmpDir;
+        QVERIFY(tmpDir.isValid());
+        QString tmpFile = tmpDir.path() + "/partial_ip.json";
+
+        // Write JSON with only image_proc.colormap set
+        QFile file(tmpFile);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream out(&file);
+        out << "{\"version\":\"1.0.0\",\"image_proc\":{\"colormap\":11}}";
+        file.close();
+
+        Config config;
+        QVERIFY(config.load_from_file(tmpFile));
+        const auto &ip = config.get_data().image_proc;
+
+        QCOMPARE(ip.colormap, 11);
+        // All other fields remain at defaults
+        QCOMPARE(ip.accu_base, 1.0f);
+        QCOMPARE(ip.gamma, 1.2f);
+        QCOMPARE(ip.lower_3d_thresh, 0.0);
+        QCOMPARE(ip.upper_3d_thresh, 0.981);
+        QCOMPARE(ip.ecc_backward, 20);
+        QCOMPARE(ip.ecc_max_iter, 8);
+    }
 };
 
 QTEST_MAIN(TestConfig)

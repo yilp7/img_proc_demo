@@ -1,8 +1,12 @@
 #include "rangefinder.h"
 
-RangeFinder::RangeFinder(int index) {}
+RangeFinder::RangeFinder(int index) : ControlPort(index), rf_type(0), freq(0), baudrate(0) {}
 
 RangeFinder::~RangeFinder() {}
+
+uint RangeFinder::type() { return rf_type.load(); }
+
+void RangeFinder::set_type(uint type) { rf_type.store(type); }
 
 #if ENABLE_PORT_JSON
 nlohmann::json RangeFinder::to_json() { return nlohmann::json(); }
