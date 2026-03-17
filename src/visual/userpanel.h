@@ -546,10 +546,10 @@ private:
     bool device_on;          // whether curr device is on
     bool trigger_mode_on;    // whether img grabbing is on trigger mode
     bool start_grabbing;     // whether the device is rdy to grab imgs
-    bool record_original[3]; // whether recording original stream
-    bool record_modified[3]; // whether recording modified stream
-    bool save_original[3];   // saving original bmp
-    bool save_modified[3];   // saving modified bmp
+    std::atomic<bool> record_original[3]; // whether recording original stream
+    std::atomic<bool> record_modified[3]; // whether recording modified stream
+    std::atomic<bool> save_original[3];   // saving original bmp
+    std::atomic<bool> save_modified[3];   // saving modified bmp
     bool image_3d[3];        // whether to build a 3d image
     int  image_rotate[3];    // rotate image ccw
     int  trigger_source;     // where the device gets the trigger signal

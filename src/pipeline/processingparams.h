@@ -3,6 +3,7 @@
 
 #include <QSize>
 #include <QString>
+#include <opencv2/core.hpp>
 
 // Thread-safe parameter snapshot for grab_thread_process().
 // GUI thread writes via update_processing_params() under m_params_mutex;
@@ -24,6 +25,18 @@ struct ProcessingParams {
     bool  dual_display         = false;   // ui->DUAL_DISPLAY_CHK
     bool  mcp_slider_focused   = false;   // ui->MCP_SLIDER->hasFocus()
     QSize hist_display_size;             // ui->HIST_DISPLAY->size()
+
+    // display config (per-thread, snapshotted for thread safety)
+    int   image_rotate         = 0;      // image_rotate[thread_idx]
+    bool  pseudocolor          = false;  // pseudocolor[thread_idx]
+    bool  image_3d             = false;  // image_3d[thread_idx]
+
+    // display selection rect (from Display widget)
+    cv::Point selection_v1;              // displays[display_idx]->selection_v1
+    cv::Point selection_v2;              // displays[display_idx]->selection_v2
+    cv::Rect  display_region;            // displays[display_idx]->display_region
+    int       display_width = 0;         // displays[display_idx]->width()
+    int       display_height = 0;        // displays[display_idx]->height()
 
     // from Preferences
     bool    split              = false;   // pref->split

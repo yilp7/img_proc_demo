@@ -864,7 +864,7 @@ void UserPanel::preprocess_frame(int thread_idx, const ProcessingParams& params,
     const PipelineConfig& pcfg,
     FrameAverageState& avg_state, int& _w, int& _h, uint hist[256])
 {
-    switch (image_rotate[0]) {
+    switch (params.image_rotate) {
     case 0:
         if (_w != w[thread_idx]) avg_state.release_all();
         _w = w[thread_idx];
@@ -1303,7 +1303,7 @@ void UserPanel::render_and_display(int thread_idx, int display_idx,
     // display the gray-value histogram of the current grayscale image, or the distance histogram of the current 3D image
     if (m_aux_panel->get_alt_display_option() == 2) {
         cv::Mat mat_for_hist;
-        if (!is_color[thread_idx] && !pseudocolor[thread_idx]) mat_for_hist = modified_result[thread_idx].clone();
+        if (!is_color[thread_idx] && !params.pseudocolor) mat_for_hist = modified_result[thread_idx].clone();
         else                       cv::cvtColor(modified_result[thread_idx], mat_for_hist, cv::COLOR_RGB2GRAY);
         for (int i = 0; i < _h; i++) for (int j = 0; j < _w; j++) hist[(mat_for_hist.data + i * mat_for_hist.cols)[j]]++;
 
@@ -1323,7 +1323,7 @@ void UserPanel::render_and_display(int thread_idx, int display_idx,
     }
 
     // crop the region to display
-    cv::Rect region = cv::Rect(disp->display_region.tl() * ww / disp->width(), disp->display_region.br() * ww / disp->width());
+    cv::Rect region = cv::Rect(params.display_region.tl() * ww / params.display_width, params.display_region.br() * ww / params.display_width);
     if (region.height + region.y > modified_result[thread_idx].rows) region.height = modified_result[thread_idx].rows - region.y;
     if (region.width + region.x > modified_result[thread_idx].cols) region.width = modified_result[thread_idx].cols - region.x;
     modified_result[thread_idx] = modified_result[thread_idx](region);
@@ -1343,23 +1343,23 @@ void UserPanel::render_and_display(int thread_idx, int display_idx,
 
     // resize to display size
     cv::Mat img_display;
-    cv::resize(modified_result[thread_idx], img_display, cv::Size(disp->width(), disp->height()), 0, 0, cv::INTER_AREA);
+    cv::resize(modified_result[thread_idx], img_display, cv::Size(params.display_width, params.display_height), 0, 0, cv::INTER_AREA);
     bool use_mask = modified_result[thread_idx].channels() == 1;
-    cv::Mat info_mask(cv::Size(disp->width(), disp->height()), CV_8U, cv::Scalar(0)), thresh_result;
+    cv::Mat info_mask(cv::Size(params.display_width, params.display_height), CV_8U, cv::Scalar(0)), thresh_result;
     if (use_mask) cv::threshold(img_display, thresh_result, 128, 255, cv::THRESH_BINARY);
     // draw the center cross
-    if (!image_3d[thread_idx] && params.show_center) {
+    if (!params.image_3d && params.show_center) {
         cv::line(use_mask ? info_mask : img_display, cv::Point(info_mask.cols / 2 - 9, info_mask.rows / 2), cv::Point(info_mask.cols / 2 + 10, info_mask.rows / 2), cv::Scalar(255), 1);
         cv::line(use_mask ? info_mask : img_display, cv::Point(info_mask.cols / 2, info_mask.rows / 2 - 9), cv::Point(info_mask.cols / 2, info_mask.rows / 2 + 10), cv::Scalar(255), 1);
     }
-    if (params.select_tool && disp->selection_v1 != disp->selection_v2) {
-        cv::rectangle(use_mask ? info_mask : img_display, disp->selection_v1, disp->selection_v2, cv::Scalar(255));
-        cv::circle(use_mask ? info_mask : img_display, (disp->selection_v1 + disp->selection_v2) / 2, 1, cv::Scalar(255), -1);
+    if (params.select_tool && params.selection_v1 != params.selection_v2) {
+        cv::rectangle(use_mask ? info_mask : img_display, params.selection_v1, params.selection_v2, cv::Scalar(255));
+        cv::circle(use_mask ? info_mask : img_display, (params.selection_v1 + params.selection_v2) / 2, 1, cv::Scalar(255), -1);
     }
     if (use_mask) img_display = (img_display & (~info_mask)) + ((~thresh_result) & info_mask);
 
     // image display
-    QImage stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, is_color[thread_idx] || pseudocolor[thread_idx] ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+    QImage stream = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, is_color[thread_idx] || params.pseudocolor ? QImage::Format_RGB888 : QImage::Format_Indexed8);
     disp->emit set_pixmap(QPixmap::fromImage(stream.scaled(disp->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 
     if (display_idx == 0 && params.dual_display) {
@@ -1461,7 +1461,7 @@ void UserPanel::record_frame(int thread_idx, int display_idx, bool updated,
     }
     if (updated && record_modified[thread_idx]) {
         cv::Mat temp = modified_result[thread_idx].clone();
-        if (!image_3d[thread_idx] && !params.show_info) {
+        if (!params.image_3d && !params.show_info) {
             if (pcfg.save_info) {
                 cv::putText(modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
                 cv::putText(modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
@@ -1473,7 +1473,7 @@ void UserPanel::record_frame(int thread_idx, int display_idx, bool updated,
 #endif
             }
         }
-        if (is_color[thread_idx] || pseudocolor[thread_idx]) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
+        if (is_color[thread_idx] || params.pseudocolor) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
         // inc by 1 because main display uses two videowriter
         if (display_idx) vid_out[thread_idx + 1].write(temp);
         else             vid_out[1].write(temp);
@@ -2195,7 +2195,7 @@ void UserPanel::on_SAVE_BMP_BUTTON_clicked()
     if (!QDir(save_location + "/ori_bmp").exists()) QDir().mkdir(save_location + "/ori_bmp");
     if (device_type == -1 || !config->get_data().save.consecutive_capture) save_original[0] = 1;
     else{
-        save_original[0] ^= 1;
+        save_original[0] = !save_original[0];
         ui->SAVE_BMP_BUTTON->setText(save_original[0] ? tr("STOP") : tr("ORI"));
         pref->ui->CONSECUTIVE_CAPTURE_CHK->setEnabled(!save_original[0]);
     }
@@ -2225,7 +2225,7 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
             vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('X', '2', '6', '4'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || pseudocolor[0]);
         }
     }
-    record_modified[0] ^= 1;
+    record_modified[0] = !record_modified[0];
     ui->SAVE_FINAL_BUTTON->setText(record_modified[0] ? tr("STOP") : tr("RES"));
 }
 
@@ -2777,6 +2777,14 @@ void UserPanel::update_processing_params()
     m_processing_params.hist_display_size    = ui->HIST_DISPLAY->size();
     m_processing_params.split                = pref->split;
     m_processing_params.custom_info_text     = pref->ui->CUSTOM_INFO_EDT->text();
+    m_processing_params.image_rotate         = image_rotate[0];
+    m_processing_params.pseudocolor          = pseudocolor[0];
+    m_processing_params.image_3d             = image_3d[0];
+    m_processing_params.selection_v1         = displays[0]->selection_v1;
+    m_processing_params.selection_v2         = displays[0]->selection_v2;
+    m_processing_params.display_region       = displays[0]->display_region;
+    m_processing_params.display_width        = displays[0]->width();
+    m_processing_params.display_height       = displays[0]->height();
 
     // Snapshot Config fields read by pipeline methods
     const auto& data = config->get_data();
@@ -3334,6 +3342,7 @@ void UserPanel::on_IMG_3D_CHECK_stateChanged(int arg1)
     image_3d[0] = arg1;
     if (!arg1) m_tcu_ctrl->set_frame_a_3d(false)/*, prev_3d[0] = cv::Mat(w[0], h[0], CV_8UC3)*/;
     image_mutex[0].unlock();
+    update_processing_params();
 
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
@@ -4276,6 +4285,7 @@ void UserPanel::rotate(int angle)
     image_mutex[0].lock();
     image_rotate[0] = angle;
     image_mutex[0].unlock();
+    update_processing_params();
 
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
@@ -4383,7 +4393,7 @@ void UserPanel::on_SAVE_AVI_BUTTON_clicked()
         vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('X', '2', '6', '4'), frame_rate_edit, cv::Size(w[0], h[0]), is_color[0]);
         image_mutex[0].unlock();
     }
-    record_original[0] ^= 1;
+    record_original[0] = !record_original[0];
     ui->SAVE_AVI_BUTTON->setText(record_original[0] ? tr("STOP") : tr("ORI"));
 }
 
@@ -4409,7 +4419,7 @@ void UserPanel::on_SAVE_RESULT_BUTTON_clicked()
     if (!QDir(save_location + "/res_bmp").exists()) QDir().mkdir(save_location + "/res_bmp");
     if (device_type == -1 || !config->get_data().save.consecutive_capture) save_modified[0] = 1;
     else{
-        save_modified[0] ^= 1;
+        save_modified[0] = !save_modified[0];
         ui->SAVE_RESULT_BUTTON->setText(save_modified[0] ? tr("STOP") : tr("RES"));
         pref->ui->CONSECUTIVE_CAPTURE_CHK->setEnabled(!save_modified[0]);
     }
@@ -4591,7 +4601,7 @@ void UserPanel::alt_display_control(int cmd)
             vid_out[display_idx + 1].open(raw_avi[display_idx - 1].toLatin1().data(), cv::VideoWriter::fourcc('X', '2', '6', '4'), frame_rate_edit, cv::Size(w[display_idx], h[display_idx]), is_color[display_idx]);
             image_mutex[display_idx].unlock();
         }
-        record_modified[display_idx] ^= 1;
+        record_modified[display_idx] = !record_modified[display_idx];
 
         alt_ctrl_grp->button(cmd)->setText(record_modified[display_idx] ? "STOP" : "REC");
         break;
@@ -4777,6 +4787,7 @@ void UserPanel::on_PSEUDOCOLOR_CHK_stateChanged(int arg1)
     image_mutex[0].lock();
     pseudocolor[0] = arg1;
     image_mutex[0].unlock();
+    update_processing_params();
 }
 
 void UserPanel::draw_yolo_boxes(cv::Mat& image, const std::vector<YoloResult>& results)
