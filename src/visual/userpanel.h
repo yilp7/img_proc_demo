@@ -490,6 +490,7 @@ private:
 
 public:
     bool                  mouse_pressed;
+    QMutex                m_roi_mutex;                 // protects list_roi + user_mask
     std::vector<cv::Rect> list_roi;                   // user-selected roi
 
 private:
@@ -563,7 +564,7 @@ private:
     int             display_thread_idx[3];      // idx of the thread displaying in display_i
     bool            grab_image[3];              // whether thread should continue grabbing image
     GrabThread*     h_grab_thread[3];           // img-grab thread handle
-    bool            grab_thread_state[3];       // whether grabbing thread is on
+    std::atomic<bool> grab_thread_state[3];     // whether grabbing thread is on
     bool            video_thread_state;         // whether video reading thread is on
     JoystickThread* h_joystick_thread;          // process joystick input
 

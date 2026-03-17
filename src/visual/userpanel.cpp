@@ -235,12 +235,14 @@ UserPanel::UserPanel(QWidget *parent) :
             [this](cv::Point p1, cv::Point p2){
                 if (!grab_image[0]) return;
                 cv::Rect roi = cv::Rect(p1 * w[0] / ui->SOURCE_DISPLAY->width(), p2 * w[0] / ui->SOURCE_DISPLAY->width());
+                QMutexLocker lk(&m_roi_mutex);
                 list_roi.push_back(roi);
                 user_mask[0](roi).setTo(255);
             });
     connect(ui->SOURCE_DISPLAY, &Display::clear_roi, this,
             [this](){
                 if (!grab_image[0]) return;
+                QMutexLocker lk(&m_roi_mutex);
                 std::vector<cv::Rect>().swap(list_roi);
                 user_mask[0] = 0;
             });
@@ -1132,7 +1134,11 @@ void UserPanel::frame_average_and_3d(int thread_idx, bool updated, const Process
 #ifdef LVTONG
 #else
         cv::Mat masked_dist;
-        if (list_roi.size()) dist_mat.copyTo(masked_dist, user_mask[thread_idx]), emit update_dist_mat(masked_dist, dist_min, dist_max);
+        {
+            QMutexLocker lk(&m_roi_mutex);
+            if (list_roi.size()) dist_mat.copyTo(masked_dist, user_mask[thread_idx]);
+        }
+        if (!masked_dist.empty()) emit update_dist_mat(masked_dist, dist_min, dist_max);
         else emit update_dist_mat(dist_mat, dist_min, dist_max);
 #endif
     }
@@ -4307,7 +4313,7 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
                 h_grab_thread[select_display_thread] = NULL;
             }
         }
-        while (grab_thread_state[select_display_thread]) ;
+        while (grab_thread_state[select_display_thread].load()) QThread::msleep(1);
         std::queue<cv::Mat>().swap(q_img[select_display_thread]);
     }
 
