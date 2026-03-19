@@ -218,8 +218,11 @@ set(SOURCE_FILES
     src/yolo/inference.h
     src/yolo/inference.cpp
     src/yolo/yolo_app_config.h
+    src/util/timedqueue.h
     src/pipeline/processingparams.h
     src/pipeline/pipelineconfig.h
+    src/pipeline/pipelineprocessor.h
+    src/pipeline/pipelineprocessor.cpp
     src/controller/devicemanager.h
     src/controller/devicemanager.cpp
     src/controller/tcucontroller.h
