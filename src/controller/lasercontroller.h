@@ -3,15 +3,9 @@
 
 #include <QObject>
 
-QT_BEGIN_NAMESPACE
-namespace Ui { class UserPanel; }
-class QDataStream;
-QT_END_NAMESPACE
-
 class DeviceManager;
 class LensController;
 class TCUController;
-class Preferences;
 
 class LaserController : public QObject
 {
@@ -20,8 +14,6 @@ class LaserController : public QObject
 public:
     explicit LaserController(DeviceManager *device_mgr, LensController *lens_ctrl,
                              TCUController *tcu_ctrl, QObject *parent = nullptr);
-
-    void init(Ui::UserPanel *ui, Preferences *pref);
 
     // Getters
     char get_curr_laser_idx() const { return curr_laser_idx; }
@@ -42,15 +34,23 @@ public slots:
 signals:
     void send_laser_msg(QString msg);
 
+    // UI state signals
+    void laser_btn_update(bool enabled, QString text);
+    void fire_btn_update(bool enabled, QString text);
+    void current_edit_enabled(bool enabled);
+    void simple_laser_chk_update(bool enabled, int state); // state: -1=no change, 0=uncheck, 1=check, 2=click
+    void laser_enable_requested(bool enable); // request to check/uncheck pref LASER_ENABLE_CHK
+    void update_current_requested(); // request UserPanel to call tcu_ctrl->update_current(value)
+
 private:
     void set_laser_preset_target(int *pos);
 
     DeviceManager*  m_device_mgr;
     LensController* m_lens_ctrl;
     TCUController*  m_tcu_ctrl;
-    Ui::UserPanel*  m_ui;
-    Preferences*    m_pref;
 
+    bool            laser_on;   // true when laser is active (button shows "OFF")
+    bool            firing;     // true when laser is firing (button shows "STOP")
     char            curr_laser_idx;
 };
 

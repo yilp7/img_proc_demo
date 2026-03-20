@@ -2,7 +2,6 @@
 #include "controller/tcucontroller.h"
 #include "controller/devicemanager.h"
 #include "visual/scanconfig.h"
-#include "ui_user_panel.h"
 #include "port/tcu.h"
 
 #include <QDir>
@@ -14,7 +13,6 @@ ScanController::ScanController(TCUController *tcu_ctrl, DeviceManager *device_mg
     : QObject(parent),
       m_tcu_ctrl(tcu_ctrl),
       m_device_mgr(device_mgr),
-      m_ui(nullptr),
       m_scan_config(nullptr),
       m_save_location(nullptr),
       m_w(nullptr),
@@ -30,10 +28,9 @@ ScanController::ScanController(TCUController *tcu_ctrl, DeviceManager *device_mg
 {
 }
 
-void ScanController::init(Ui::UserPanel *ui, ScanConfig *scan_config,
+void ScanController::init(ScanConfig *scan_config,
                            QString *save_location, int *w, int *h)
 {
-    m_ui = ui;
     m_scan_config = scan_config;
     m_save_location = save_location;
     m_w = w;
@@ -44,7 +41,7 @@ void ScanController::init(Ui::UserPanel *ui, ScanConfig *scan_config,
 
 void ScanController::on_SCAN_BUTTON_clicked()
 {
-    bool start_scan = m_ui->SCAN_BUTTON->text() == tr("Scan");
+    bool start_scan = !scan;
 
     if (start_scan) {
         scan_3d = cv::Mat::zeros(*m_h, *m_w, CV_64F);
@@ -92,7 +89,7 @@ void ScanController::on_SCAN_BUTTON_clicked()
     else {
         emit update_scan(false);
         { QMutexLocker lk(&m_scan_mutex); scan = false; }
-        m_ui->SCAN_BUTTON->setText(tr("Scan"));
+        emit scan_button_text_changed(tr("Scan"));
     }
 }
 
@@ -100,7 +97,7 @@ void ScanController::on_CONTINUE_SCAN_BUTTON_clicked()
 {
     { QMutexLocker lk(&m_scan_mutex); scan = true; }
     emit update_scan(true);
-    m_ui->SCAN_BUTTON->setText(tr("Pause"));
+    emit scan_button_text_changed(tr("Pause"));
 }
 
 void ScanController::on_RESTART_SCAN_BUTTON_clicked()
@@ -125,8 +122,7 @@ void ScanController::on_SCAN_CONFIG_BTN_clicked()
 
 void ScanController::enable_scan_options(bool show)
 {
-    m_ui->CONTINUE_SCAN_BUTTON->setEnabled(!is_scanning());
-    m_ui->RESTART_SCAN_BUTTON->setEnabled(false);
+    emit scan_options_changed(!is_scanning(), false);
 }
 
 void ScanController::auto_scan_for_target()

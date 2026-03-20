@@ -7,7 +7,6 @@
 #include <QTcpSocket>
 #include <QLabel>
 #include <QLineEdit>
-#include <QButtonGroup>
 #include <QMessageBox>
 #include <atomic>
 
@@ -21,12 +20,6 @@
 #include "port/iptzcontroller.h"
 #include "util/config.h"
 
-QT_BEGIN_NAMESPACE
-namespace Ui { class UserPanel; }
-QT_END_NAMESPACE
-
-class Preferences;
-
 class DeviceManager : public QObject
 {
     Q_OBJECT
@@ -35,8 +28,8 @@ public:
     explicit DeviceManager(Config *config, QObject *parent = nullptr);
     ~DeviceManager();
 
-    // Initialize port objects, threads, and signal connections
-    void init(Ui::UserPanel *ui, Preferences *pref);
+    // Initialize port objects, threads, and internal signal connections (no UI)
+    void init();
 
     // Accessors for other controllers
     TCU*            tcu()               { return p_tcu; }
@@ -50,17 +43,16 @@ public:
 
     QSerialPort*    serial(int idx)     { return serial_port[idx]; }
     bool            serial_connected(int idx) const { return serial_port_connected[idx]; }
-    QLineEdit*      com_edit_widget(int idx) { return com_edit[idx]; }
-    QLabel*         com_label_widget(int idx) { return com_label[idx]; }
     QTcpSocket*     tcp(int idx) { return tcp_port[idx]; }
 
     // Port management
-    void connect_port_edit(QLineEdit *edit, ControlPort *port, QString &config_port);
+    void connect_port(int port_idx, QString port_text);
+    void connect_ptz_port(QString port_text);
     void setup_serial_port(QSerialPort **port, int id, QString port_num, int baud_rate);
 
     // Port status
-    void update_port_status(ControlPort *port, QLabel *lbl);
-    void update_port_status(int connected_status);
+    void update_port_status(int port_idx);
+    void update_port_status(int connected_status, bool dummy); // overload for debug
     void update_ptz_status();
 
     // PTZ (non-slot)
@@ -68,11 +60,13 @@ public:
     void send_ptz_angle(float h, float v);
     void send_ptz_angle_h(float h);
     void send_ptz_angle_v(float v);
-    void point_ptz_to_target(QPoint target);
+    void point_ptz_to_target(QPoint target, int display_width, int display_height);
     float get_angle_h() const { return angle_h.load(); }
     float get_angle_v() const { return angle_v.load(); }
     void set_angle_h(float h) { angle_h.store(h); }
     void set_angle_v(float v) { angle_v.store(v); }
+
+    int get_ptz_speed() const { return ptz_speed; }
 
 public slots:
     // PTZ slots (connected via SIGNAL/SLOT)
@@ -80,6 +74,7 @@ public slots:
     void update_ptz_params(qint32 ptz_param, double val);
     void ptz_button_pressed(int id);
     void ptz_button_released(int id);
+    void set_ptz_speed(int speed);
 
     // VID camera control slots
     void vid_camera_pressed(int operation);
@@ -99,7 +94,7 @@ public slots:
     void display_port_info(int idx);
 
     // TCP server
-    void connect_to_serial_server_tcp();
+    void connect_to_serial_server_tcp(QString server_ip);
     void disconnect_from_serial_server_tcp();
 
 signals:
@@ -119,13 +114,25 @@ signals:
     void ptz_angle_changed(float h, float v);
     void port_io_log(QString str);
 
-    // PTZ speed changed (for UI sync)
-    void ptz_speed_changed(int speed);
+    // UI update signals
+    void port_label_style_changed(int port_idx, QString style);
+    void angle_display_updated(QString h_text, QString v_text);
+    void ptz_speed_display_changed(int slider_val, QString edit_text);
+
+    void vid_camera_btn_text(int operation, QString text);
+    void vid_camera_buttons_reset();
+    void vid_btn_style_changed(QString btn_name, QString style);
+    void vid_btn_text_changed(QString btn_name, QString text);
+    void ir_power_btn_revert();
+
+    void ptz_type_enable_changed(bool enabled);
+    void baudrate_display_requested(int idx, int baudrate);
+    void tcp_server_chk_update(bool enabled, bool checked);
+    void tcp_server_connect_failed();
+    void get_lens_param_requested();
 
 private:
     Config*         m_config;
-    Ui::UserPanel*  m_ui;
-    Preferences*    m_pref;
 
     // Port objects
     TCU*            p_tcu;
@@ -153,13 +160,7 @@ private:
     bool            use_tcp[5];
     bool            share_serial_port;
 
-    // COM UI widgets
-    QLabel*         com_label[5];
-    QLineEdit*      com_edit[5];
-
-    // PTZ UI groups and state
-    QButtonGroup*   ptz_grp;
-    QButtonGroup*   vid_camera_grp;
+    // PTZ state
     int             ptz_speed;
     std::atomic<float> angle_h{0.0f};
     std::atomic<float> angle_v{0.0f};

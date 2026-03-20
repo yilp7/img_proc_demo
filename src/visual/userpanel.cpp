@@ -365,7 +365,7 @@ UserPanel::UserPanel(QWidget *parent) :
 //            case 0: ui->CURR_COORD->display_pos(converted_pos); break;
             case 1: ui->START_COORD->display_pos(converted_pos); break;
             case 2: ui->SHAPE_INFO->display_pos(converted_pos); break;
-            case 3: m_device_mgr->point_ptz_to_target(pos); break;
+            case 3: m_device_mgr->point_ptz_to_target(pos, disp->width(), disp->height()); break;
             case 4:
                 if (ui->SHAPE_INFO->pair.isNull()) ui->SHIFT_INFO->hide();
                 else ui->SHIFT_INFO->show();
@@ -400,7 +400,36 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // AuxPanelManager: MISC_OPTION combos, display_grp, radio buttons
     m_aux_panel = new AuxPanelManager(this);
-    m_aux_panel->init(ui);
+    {
+        QStringList alt_options_str;
+        alt_options_str << "DATA" << "HIST" << "PTZ" << "ALT" << "ADDON" << "VID" << "YOLO";
+        ui->MISC_OPTION_1->addItems(alt_options_str);
+        ui->MISC_OPTION_2->addItems(alt_options_str);
+        ui->MISC_OPTION_3->addItems(alt_options_str);
+        ui->MISC_OPTION_1->setCurrentIndex(0);
+        ui->MISC_OPTION_2->setCurrentIndex(2);
+        ui->MISC_OPTION_3->setCurrentIndex(5);
+
+        QFont misc_f("consolas", 8);
+        connect(ui->MISC_OPTION_1, SIGNAL(selected()), ui->MISC_RADIO_1, SLOT(click()));
+        connect(ui->MISC_OPTION_2, SIGNAL(selected()), ui->MISC_RADIO_2, SLOT(click()));
+        connect(ui->MISC_OPTION_3, SIGNAL(selected()), ui->MISC_RADIO_3, SLOT(click()));
+        ui->MISC_OPTION_1->view()->setFont(misc_f);
+        ui->MISC_OPTION_2->view()->setFont(misc_f);
+        ui->MISC_OPTION_3->view()->setFont(misc_f);
+
+        QButtonGroup *display_grp = new QButtonGroup(this);
+        display_grp->addButton(ui->MISC_RADIO_1);
+        display_grp->addButton(ui->MISC_RADIO_2);
+        display_grp->addButton(ui->MISC_RADIO_3);
+        display_grp->setExclusive(true);
+        ui->MISC_RADIO_1->setChecked(true);
+        ui->MISC_DISPLAY->setCurrentIndex(1);
+
+        connect(m_aux_panel, &AuxPanelManager::display_page_changed, this, [this](int page) {
+            ui->MISC_DISPLAY->setCurrentIndex(page);
+        });
+    }
 
     ui->DATA_EXCHANGE->document()->setMaximumBlockCount(200);
     ui->DATA_EXCHANGE->setFont(temp_f);
@@ -410,26 +439,24 @@ UserPanel::UserPanel(QWidget *parent) :
     status_bar = ui->STATUS;
 
     m_device_mgr = new DeviceManager(config, this);
-    m_device_mgr->init(ui, pref);
+    m_device_mgr->init();
 
     // Create TCUController
     m_tcu_ctrl = new TCUController(config, m_device_mgr, this);
-    m_tcu_ctrl->init(ui, pref, scan_config, aliasing);
+    m_tcu_ctrl->init(scan_config, aliasing);
 
     // Forward DeviceManager signals
     connect(m_device_mgr, &DeviceManager::tcu_param_updated, m_tcu_ctrl, &TCUController::update_tcu_params);
     // LensController
     m_lens_ctrl = new LensController(m_device_mgr, this);
-    m_lens_ctrl->init(ui, &simple_ui, &lang);
+    m_lens_ctrl->init(&simple_ui, &lang);
     connect(m_device_mgr, &DeviceManager::lens_param_updated, m_lens_ctrl, &LensController::update_lens_params);
     connect(m_lens_ctrl, &LensController::send_lens_msg, m_device_mgr, &DeviceManager::send_lens_msg);
     // LaserController
     m_laser_ctrl = new LaserController(m_device_mgr, m_lens_ctrl, m_tcu_ctrl, this);
-    m_laser_ctrl->init(ui, pref);
     connect(m_laser_ctrl, &LaserController::send_laser_msg, m_device_mgr, &DeviceManager::send_laser_msg);
     // RFController
     m_rf_ctrl = new RFController(this);
-    m_rf_ctrl->init(ui);
     connect(m_device_mgr, &DeviceManager::distance_updated, m_rf_ctrl, &RFController::update_distance);
     connect(m_device_mgr, &DeviceManager::port_io_log, this, &UserPanel::append_data);
     // Forward TCUController signals to DeviceManager
@@ -446,7 +473,252 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // ScanController
     m_scan_ctrl = new ScanController(m_tcu_ctrl, m_device_mgr, this);
-    m_scan_ctrl->init(ui, scan_config, &save_location, &w[0], &h[0]);
+    m_scan_ctrl->init(scan_config, &save_location, &w[0], &h[0]);
+
+    // --- Wire controller UI signals ---
+    // DeviceManager → UI
+    connect(m_device_mgr, &DeviceManager::port_label_style_changed, this, [this](int idx, QString style) {
+        QLabel *labels[] = { ui->TCU_COM, ui->LENS_COM, ui->LASER_COM, ui->PTZ_COM, ui->RANGE_COM };
+        if (idx >= 0 && idx < 5) labels[idx]->setStyleSheet(style);
+    });
+    connect(m_device_mgr, &DeviceManager::angle_display_updated, this, [this](QString h, QString v) {
+        ui->ANGLE_H_EDIT->setText(h);
+        ui->ANGLE_V_EDIT->setText(v);
+    });
+    connect(m_device_mgr, &DeviceManager::ptz_speed_display_changed, this, [this](int val, QString text) {
+        ui->PTZ_SPEED_SLIDER->setValue(val);
+        if (!text.isEmpty()) ui->PTZ_SPEED_EDIT->setText(text);
+    });
+    connect(m_device_mgr, &DeviceManager::vid_camera_btn_text, this, [this](int op, QString text) {
+        QPushButton *btn = nullptr;
+        switch (op) {
+        case UDPPTZ::VL_ZOOM_IN:  btn = ui->VL_ZOOM_IN_BTN;  break;
+        case UDPPTZ::VL_ZOOM_OUT: btn = ui->VL_ZOOM_OUT_BTN; break;
+        case UDPPTZ::VL_FOCUS_FAR:  btn = ui->VL_FOCUS_FAR_BTN;  break;
+        case UDPPTZ::VL_FOCUS_NEAR: btn = ui->VL_FOCUS_NEAR_BTN; break;
+        case UDPPTZ::IR_ZOOM_IN:  btn = ui->IR_ZOOM_IN_BTN;  break;
+        case UDPPTZ::IR_ZOOM_OUT: btn = ui->IR_ZOOM_OUT_BTN; break;
+        case UDPPTZ::IR_FOCUS_FAR:  btn = ui->IR_FOCUS_FAR_BTN;  break;
+        case UDPPTZ::IR_FOCUS_NEAR: btn = ui->IR_FOCUS_NEAR_BTN; break;
+        }
+        if (btn) btn->setText(text);
+    });
+    connect(m_device_mgr, &DeviceManager::vid_camera_buttons_reset, this, [this]() {
+        ui->VL_ZOOM_IN_BTN->setText(""); ui->VL_ZOOM_OUT_BTN->setText("");
+        ui->VL_FOCUS_FAR_BTN->setText(""); ui->VL_FOCUS_NEAR_BTN->setText("");
+        ui->IR_ZOOM_IN_BTN->setText(""); ui->IR_ZOOM_OUT_BTN->setText("");
+        ui->IR_FOCUS_FAR_BTN->setText(""); ui->IR_FOCUS_NEAR_BTN->setText("");
+    });
+    connect(m_device_mgr, &DeviceManager::vid_btn_style_changed, this, [this](QString name, QString style) {
+        QWidget *w = findChild<QWidget*>(name);
+        if (w) w->setStyleSheet(style);
+    });
+    connect(m_device_mgr, &DeviceManager::vid_btn_text_changed, this, [this](QString name, QString text) {
+        QAbstractButton *b = findChild<QAbstractButton*>(name);
+        if (b) b->setText(text);
+    });
+    connect(m_device_mgr, &DeviceManager::ir_power_btn_revert, this, [this]() {
+        ui->IR_POWER_BTN->setChecked(!ui->IR_POWER_BTN->isChecked());
+    });
+    connect(m_device_mgr, &DeviceManager::ptz_type_enable_changed, this, [this](bool enabled) {
+        pref->set_ptz_type_enabled(enabled);
+    });
+    connect(m_device_mgr, &DeviceManager::baudrate_display_requested, this, [this](int idx, int baud) {
+        pref->display_baudrate(idx, baud);
+    });
+    connect(m_device_mgr, &DeviceManager::tcp_server_chk_update, this, [this](bool enabled, bool checked) {
+        pref->ui->TCP_SERVER_CHK->setEnabled(enabled);
+        pref->ui->TCP_SERVER_CHK->setChecked(checked);
+    });
+    connect(m_device_mgr, &DeviceManager::tcp_server_connect_failed, this, [this]() {
+        pref->ui->TCP_SERVER_CHK->setEnabled(true);
+        pref->ui->TCP_SERVER_CHK->setChecked(false);
+    });
+    connect(m_device_mgr, &DeviceManager::get_lens_param_requested, m_lens_ctrl, &LensController::on_GET_LENS_PARAM_BTN_clicked);
+
+    // DeviceManager UI setup (PTZ button group, VID buttons, PTZ speed slider)
+    {
+        QString theme_dir = app_theme ? "light" : "dark";
+        QButtonGroup *ptz_grp = new QButtonGroup(this);
+        ui->UP_LEFT_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/up_left"));
+        ptz_grp->addButton(ui->UP_LEFT_BTN, 0);
+        ui->UP_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/up"));
+        ptz_grp->addButton(ui->UP_BTN, 1);
+        ui->UP_RIGHT_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/up_right"));
+        ptz_grp->addButton(ui->UP_RIGHT_BTN, 2);
+        ui->LEFT_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/left"));
+        ptz_grp->addButton(ui->LEFT_BTN, 3);
+        ui->SELF_TEST_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/self_test"));
+        ptz_grp->addButton(ui->SELF_TEST_BTN, 4);
+        ui->RIGHT_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/right"));
+        ptz_grp->addButton(ui->RIGHT_BTN, 5);
+        ui->DOWN_LEFT_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/down_left"));
+        ptz_grp->addButton(ui->DOWN_LEFT_BTN, 6);
+        ui->DOWN_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/down"));
+        ptz_grp->addButton(ui->DOWN_BTN, 7);
+        ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/down_right"));
+        ptz_grp->addButton(ui->DOWN_RIGHT_BTN, 8);
+        connect(ptz_grp, QOverload<int>::of(&QButtonGroup::buttonPressed), m_device_mgr, &DeviceManager::ptz_button_pressed);
+        connect(ptz_grp, QOverload<int>::of(&QButtonGroup::buttonReleased), m_device_mgr, &DeviceManager::ptz_button_released);
+
+        QButtonGroup *vid_grp = new QButtonGroup(this);
+        vid_grp->addButton(ui->VL_ZOOM_OUT_BTN, UDPPTZ::VL_ZOOM_OUT);
+        vid_grp->addButton(ui->VL_ZOOM_IN_BTN, UDPPTZ::VL_ZOOM_IN);
+        vid_grp->addButton(ui->VL_FOCUS_FAR_BTN, UDPPTZ::VL_FOCUS_FAR);
+        vid_grp->addButton(ui->VL_FOCUS_NEAR_BTN, UDPPTZ::VL_FOCUS_NEAR);
+        vid_grp->addButton(ui->IR_ZOOM_OUT_BTN, UDPPTZ::IR_ZOOM_OUT);
+        vid_grp->addButton(ui->IR_ZOOM_IN_BTN, UDPPTZ::IR_ZOOM_IN);
+        vid_grp->addButton(ui->IR_FOCUS_FAR_BTN, UDPPTZ::IR_FOCUS_FAR);
+        vid_grp->addButton(ui->IR_FOCUS_NEAR_BTN, UDPPTZ::IR_FOCUS_NEAR);
+        connect(vid_grp, QOverload<int>::of(&QButtonGroup::buttonPressed), m_device_mgr, &DeviceManager::vid_camera_pressed);
+        connect(vid_grp, QOverload<int>::of(&QButtonGroup::buttonReleased), this, [this](int) { m_device_mgr->vid_camera_released(); });
+
+        setup_slider(ui->PTZ_SPEED_SLIDER, 1, 64, 1, 4, 32);
+        connect(ui->PTZ_SPEED_SLIDER, &QSlider::valueChanged, m_device_mgr, &DeviceManager::set_ptz_speed);
+        ui->PTZ_SPEED_EDIT->setText("32");
+        connect(ui->PTZ_SPEED_EDIT, &QLineEdit::editingFinished, this, [this]() {
+            m_device_mgr->set_ptz_speed(ui->PTZ_SPEED_EDIT->text().toInt());
+        });
+
+        // VID toggle button connections
+        connect(ui->VL_DEFOG_BTN, &QAbstractButton::toggled, m_device_mgr, &DeviceManager::vid_defog_toggled);
+        connect(ui->IR_POWER_BTN, &QAbstractButton::toggled, m_device_mgr, &DeviceManager::vid_ir_power_toggled);
+        connect(ui->IR_AUTO_FOCUS_BTN, &QAbstractButton::clicked, m_device_mgr, &DeviceManager::vid_ir_auto_focus_clicked);
+        connect(ui->LDM_BTN, &QAbstractButton::toggled, m_device_mgr, &DeviceManager::vid_ldm_toggled);
+        connect(ui->VIDEO_SOURCE_BTN, &QAbstractButton::toggled, m_device_mgr, &DeviceManager::vid_video_source_toggled);
+        connect(ui->OSD_BTN, &QAbstractButton::toggled, m_device_mgr, &DeviceManager::vid_osd_toggled);
+
+        // COM port edit connections
+        connect(ui->TCU_COM_EDIT, &QLineEdit::returnPressed, this, [this]() { m_device_mgr->connect_port(0, ui->TCU_COM_EDIT->text()); });
+        connect(ui->LENS_COM_EDIT, &QLineEdit::returnPressed, this, [this]() { m_device_mgr->connect_port(1, ui->LENS_COM_EDIT->text()); });
+        connect(ui->LASER_COM_EDIT, &QLineEdit::returnPressed, this, [this]() { m_device_mgr->connect_port(2, ui->LASER_COM_EDIT->text()); });
+        connect(ui->PTZ_COM_EDIT, &QLineEdit::returnPressed, this, [this]() { m_device_mgr->connect_ptz_port(ui->PTZ_COM_EDIT->text()); });
+        connect(ui->RANGE_COM_EDIT, &QLineEdit::returnPressed, this, [this]() { m_device_mgr->connect_port(4, ui->RANGE_COM_EDIT->text()); });
+    }
+
+    // TCUController → UI
+    connect(m_tcu_ctrl, &TCUController::freq_display_updated, this, [this](QString unit, QString val) {
+        ui->FREQ_UNIT->setText(unit);
+        ui->FREQ_EDIT->setText(val);
+    });
+    connect(m_tcu_ctrl, &TCUController::stepping_display_updated, this, [this](QString unit, QString val) {
+        ui->STEPPING_UNIT->setText(unit);
+        ui->STEPPING_EDIT->setText(val);
+    });
+    connect(m_tcu_ctrl, &TCUController::delay_slider_max_changed, ui->DELAY_SLIDER, &QSlider::setMaximum);
+    connect(m_tcu_ctrl, &TCUController::gw_slider_max_changed, ui->GW_SLIDER, &QSlider::setMaximum);
+    connect(m_tcu_ctrl, &TCUController::mcp_slider_max_changed, ui->MCP_SLIDER, &QSlider::setMaximum);
+    connect(m_tcu_ctrl, &TCUController::mcp_display_updated, this, [this](int val, QString text) {
+        ui->MCP_SLIDER->setValue(val);
+        ui->MCP_EDIT->setText(text);
+    });
+    connect(m_tcu_ctrl, &TCUController::delay_slider_value_changed, ui->DELAY_SLIDER, &QSlider::setValue);
+    connect(m_tcu_ctrl, &TCUController::gw_slider_value_changed, ui->GW_SLIDER, &QSlider::setValue);
+    connect(m_tcu_ctrl, &TCUController::auto_mcp_chk_changed, ui->AUTO_MCP_CHK, &QCheckBox::setChecked);
+    connect(m_tcu_ctrl, &TCUController::distance_text_updated, ui->DISTANCE, &QLabel::setText);
+    connect(m_tcu_ctrl, &TCUController::est_dist_text_updated, ui->EST_DIST, &QLabel::setText);
+    connect(m_tcu_ctrl, &TCUController::laser_width_display_updated, this, [this](QString u, QString n, QString p) {
+        ui->LASER_WIDTH_EDIT_U->setText(u);
+        ui->LASER_WIDTH_EDIT_N->setText(n);
+        ui->LASER_WIDTH_EDIT_P->setText(p);
+    });
+    connect(m_tcu_ctrl, &TCUController::delay_display_updated, this,
+            [this](QString au, QString an, QString ap, QString bu, QString bn, QString bp) {
+        ui->DELAY_A_EDIT_U->setText(au); ui->DELAY_A_EDIT_N->setText(an); ui->DELAY_A_EDIT_P->setText(ap);
+        ui->DELAY_B_EDIT_U->setText(bu); ui->DELAY_B_EDIT_N->setText(bn); ui->DELAY_B_EDIT_P->setText(bp);
+    });
+    connect(m_tcu_ctrl, &TCUController::gw_display_updated, this,
+            [this](QString au, QString an, QString ap, QString bu, QString bn, QString bp, QString gw) {
+        ui->GATE_WIDTH_A_EDIT_U->setText(au); ui->GATE_WIDTH_A_EDIT_N->setText(an); ui->GATE_WIDTH_A_EDIT_P->setText(ap);
+        ui->GATE_WIDTH_B_EDIT_U->setText(bu); ui->GATE_WIDTH_B_EDIT_N->setText(bn); ui->GATE_WIDTH_B_EDIT_P->setText(bp);
+        if (!gw.isEmpty()) ui->GATE_WIDTH->setText(gw);
+    });
+    connect(m_tcu_ctrl, &TCUController::tcu_type_layout_changed, this, [this](int idx, int diff) {
+        // Show/hide picosecond fields and diff group based on TCU type
+        bool show_ps = (idx >= 2);
+        ui->LASER_WIDTH_EDIT_P->setVisible(show_ps);
+        ui->DELAY_A_EDIT_P->setVisible(show_ps);
+        ui->DELAY_B_EDIT_P->setVisible(show_ps);
+        ui->GATE_WIDTH_A_EDIT_P->setVisible(show_ps);
+        ui->GATE_WIDTH_B_EDIT_P->setVisible(show_ps);
+        bool show_diff = (diff != 0);
+        ui->DELAY_DIFF_GRP->setVisible(show_diff);
+        ui->GATE_WIDTH_DIFF_GRP->setVisible(show_diff);
+    });
+    connect(m_tcu_ctrl, &TCUController::tcu_diff_view_toggled, this, [this](bool show) {
+        ui->DELAY_DIFF_GRP->setVisible(show);
+        ui->GATE_WIDTH_DIFF_GRP->setVisible(show);
+    });
+    connect(m_tcu_ctrl, &TCUController::ps_config_display_updated, this, [this](QString stepping, QString max_step) {
+        pref->ui->PS_STEPPING_EDT->setText(stepping);
+        pref->ui->MAX_PS_STEP_EDT->setText(max_step);
+    });
+    connect(m_tcu_ctrl, &TCUController::auto_mcp_chk_click_requested, this, [this]() {
+        ui->AUTO_MCP_CHK->click();
+    });
+    connect(m_tcu_ctrl, &TCUController::fire_laser_btn_click_requested, this, [this]() {
+        ui->FIRE_LASER_BTN->click();
+    });
+    connect(m_tcu_ctrl, &TCUController::laser_chk_click_requested, this, [this]() {
+        pref->ui->LASER_ENABLE_CHK->click();
+    });
+    connect(m_tcu_ctrl, &TCUController::dist_ns_changed, this, [this](float dist_ns) {
+        pref->dist_ns = dist_ns;
+    });
+    connect(m_tcu_ctrl, &TCUController::update_distance_display_requested, pref, &Preferences::update_distance_display);
+
+    // LensController → UI
+    connect(m_lens_ctrl, &LensController::button_text_changed, this, [this](int id, QString text) {
+        QAbstractButton *btns[] = {
+            ui->ZOOM_IN_BTN, ui->ZOOM_OUT_BTN, ui->FOCUS_FAR_BTN, ui->FOCUS_NEAR_BTN,
+            ui->RADIUS_INC_BTN, ui->RADIUS_DEC_BTN, ui->IRIS_OPEN_BTN, ui->IRIS_CLOSE_BTN
+        };
+        if (id >= 0 && id < 8) btns[id]->setText(text);
+    });
+    connect(m_lens_ctrl, &LensController::zoom_text_updated, this, [this](QString text) {
+        if (!ui->ZOOM_EDIT->hasFocus()) ui->ZOOM_EDIT->setText(text);
+    });
+    connect(m_lens_ctrl, &LensController::focus_text_updated, this, [this](QString text) {
+        if (!ui->FOCUS_EDIT->hasFocus()) ui->FOCUS_EDIT->setText(text);
+    });
+    connect(m_lens_ctrl, &LensController::focus_speed_display_changed, this, [this](int val, QString text) {
+        ui->FOCUS_SPEED_SLIDER->setValue(val);
+        if (!text.isEmpty()) ui->FOCUS_SPEED_EDIT->setText(text);
+    });
+
+    // LaserController → UI
+    connect(m_laser_ctrl, &LaserController::laser_btn_update, this, [this](bool enabled, QString text) {
+        ui->LASER_BTN->setEnabled(enabled);
+        if (!text.isEmpty()) ui->LASER_BTN->setText(text);
+    });
+    connect(m_laser_ctrl, &LaserController::fire_btn_update, this, [this](bool enabled, QString text) {
+        ui->FIRE_LASER_BTN->setEnabled(enabled);
+        if (!text.isEmpty()) ui->FIRE_LASER_BTN->setText(text);
+    });
+    connect(m_laser_ctrl, &LaserController::current_edit_enabled, ui->CURRENT_EDIT, &QWidget::setEnabled);
+    connect(m_laser_ctrl, &LaserController::simple_laser_chk_update, this, [this](bool enabled, int state) {
+        ui->SIMPLE_LASER_CHK->setEnabled(enabled);
+        if (state == 0) ui->SIMPLE_LASER_CHK->setChecked(false);
+        else if (state == 1) ui->SIMPLE_LASER_CHK->setChecked(true);
+        else if (state == 2) ui->SIMPLE_LASER_CHK->click();
+    });
+    connect(m_laser_ctrl, &LaserController::laser_enable_requested, this, [this](bool enable) {
+        pref->ui->LASER_ENABLE_CHK->setChecked(enable);
+    });
+    connect(m_laser_ctrl, &LaserController::update_current_requested, this, [this]() {
+        update_current();
+    });
+
+    // RFController → UI
+    connect(m_rf_ctrl, &RFController::distance_text_updated, ui->DISTANCE, &QLabel::setText);
+
+    // ScanController → UI
+    connect(m_scan_ctrl, &ScanController::scan_button_text_changed, ui->SCAN_BUTTON, &QPushButton::setText);
+    connect(m_scan_ctrl, &ScanController::scan_options_changed, this, [this](bool cont, bool restart) {
+        ui->CONTINUE_SCAN_BUTTON->setVisible(cont);
+        ui->RESTART_SCAN_BUTTON->setVisible(restart);
+    });
+
     // PipelineProcessor — all pipeline methods run by GrabThread
     {
         PipelineProcessor::SharedState ss;
@@ -765,8 +1037,8 @@ void UserPanel::init()
     ui->SENSOR_TAPS_BTN->hide();
 
     // COM ports will be loaded from JSON config during auto-load
-    uchar com[5] = {1, 2, 3, 4, 5};
-    for (int i = 0; i < 5; i++) m_device_mgr->com_edit_widget(i)->emit returnPressed();
+    QLineEdit *com_edits[] = { ui->TCU_COM_EDIT, ui->LENS_COM_EDIT, ui->LASER_COM_EDIT, ui->PTZ_COM_EDIT, ui->RANGE_COM_EDIT };
+    for (int i = 0; i < 5; i++) com_edits[i]->emit returnPressed();
 
     if (m_device_mgr->serial(0)->isOpen() && m_device_mgr->serial(3)->isOpen()) on_LASER_BTN_clicked();
 
@@ -1990,17 +2262,17 @@ void UserPanel::syncPreferencesToConfig()
 
     // Sync COM settings from UI
 #ifdef WIN32
-    data.com_tcu.port = "COM" + m_device_mgr->com_edit_widget(0)->text();
-    data.com_lens.port = "COM" + m_device_mgr->com_edit_widget(1)->text();
-    data.com_laser.port = "COM" + m_device_mgr->com_edit_widget(2)->text();
-    data.com_ptz.port = "COM" + m_device_mgr->com_edit_widget(3)->text();
-    data.com_range.port = "COM" + m_device_mgr->com_edit_widget(4)->text();
+    data.com_tcu.port = "COM" + ui->TCU_COM_EDIT->text();
+    data.com_lens.port = "COM" + ui->LENS_COM_EDIT->text();
+    data.com_laser.port = "COM" + ui->LASER_COM_EDIT->text();
+    data.com_ptz.port = "COM" + ui->PTZ_COM_EDIT->text();
+    data.com_range.port = "COM" + ui->RANGE_COM_EDIT->text();
 #else
-    data.com_tcu.port = m_device_mgr->com_edit_widget(0)->text();
-    data.com_lens.port = m_device_mgr->com_edit_widget(1)->text();
-    data.com_laser.port = m_device_mgr->com_edit_widget(2)->text();
-    data.com_ptz.port = m_device_mgr->com_edit_widget(3)->text();
-    data.com_range.port = m_device_mgr->com_edit_widget(4)->text();
+    data.com_tcu.port = ui->TCU_COM_EDIT->text();
+    data.com_lens.port = ui->LENS_COM_EDIT->text();
+    data.com_laser.port = ui->LASER_COM_EDIT->text();
+    data.com_ptz.port = ui->PTZ_COM_EDIT->text();
+    data.com_range.port = ui->RANGE_COM_EDIT->text();
 #endif
 
     // Sync network settings
@@ -2029,17 +2301,17 @@ void UserPanel::syncConfigToPreferences()
 
     // Sync COM settings to UI
 #ifdef WIN32
-    m_device_mgr->com_edit_widget(0)->setText(data.com_tcu.port.startsWith("COM") ? data.com_tcu.port.mid(3) : data.com_tcu.port);
-    m_device_mgr->com_edit_widget(1)->setText(data.com_lens.port.startsWith("COM") ? data.com_lens.port.mid(3) : data.com_lens.port);
-    m_device_mgr->com_edit_widget(2)->setText(data.com_laser.port.startsWith("COM") ? data.com_laser.port.mid(3) : data.com_laser.port);
-    m_device_mgr->com_edit_widget(3)->setText(data.com_ptz.port.startsWith("COM") ? data.com_ptz.port.mid(3) : data.com_ptz.port);
-    m_device_mgr->com_edit_widget(4)->setText(data.com_range.port.startsWith("COM") ? data.com_range.port.mid(3) : data.com_range.port);
+    ui->TCU_COM_EDIT->setText(data.com_tcu.port.startsWith("COM") ? data.com_tcu.port.mid(3) : data.com_tcu.port);
+    ui->LENS_COM_EDIT->setText(data.com_lens.port.startsWith("COM") ? data.com_lens.port.mid(3) : data.com_lens.port);
+    ui->LASER_COM_EDIT->setText(data.com_laser.port.startsWith("COM") ? data.com_laser.port.mid(3) : data.com_laser.port);
+    ui->PTZ_COM_EDIT->setText(data.com_ptz.port.startsWith("COM") ? data.com_ptz.port.mid(3) : data.com_ptz.port);
+    ui->RANGE_COM_EDIT->setText(data.com_range.port.startsWith("COM") ? data.com_range.port.mid(3) : data.com_range.port);
 #else
-    m_device_mgr->com_edit_widget(0)->setText(data.com_tcu.port);
-    m_device_mgr->com_edit_widget(1)->setText(data.com_lens.port);
-    m_device_mgr->com_edit_widget(2)->setText(data.com_laser.port);
-    m_device_mgr->com_edit_widget(3)->setText(data.com_ptz.port);
-    m_device_mgr->com_edit_widget(4)->setText(data.com_range.port);
+    ui->TCU_COM_EDIT->setText(data.com_tcu.port);
+    ui->LENS_COM_EDIT->setText(data.com_lens.port);
+    ui->LASER_COM_EDIT->setText(data.com_laser.port);
+    ui->PTZ_COM_EDIT->setText(data.com_ptz.port);
+    ui->RANGE_COM_EDIT->setText(data.com_range.port);
 #endif
 
     // Sync network settings
@@ -2824,7 +3096,7 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             (m_device_mgr->lens()->get_port_status() & ControlPort::TCP_CONNECTED) ||
             (m_device_mgr->laser()->get_port_status() & ControlPort::TCP_CONNECTED) ||
             (m_device_mgr->ptz()->get_port_status() & ControlPort::TCP_CONNECTED) ?
-                m_device_mgr->disconnect_from_serial_server_tcp() : m_device_mgr->connect_to_serial_server_tcp();
+                m_device_mgr->disconnect_from_serial_server_tcp() : m_device_mgr->connect_to_serial_server_tcp(pref->ui->TCP_SERVER_IP_EDIT->text());
             break;
         case Qt::Key_L:
             laser_settings->show();
@@ -3591,8 +3863,53 @@ void UserPanel::on_HIDE_BTN_clicked()
     resizeEvent(&e);
 }
 
-// on_MISC_RADIO_1/2/3_clicked, on_MISC_OPTION_1/2/3_currentIndexChanged
-// → AuxPanelManager (inline delegations in header)
+void UserPanel::on_MISC_RADIO_1_clicked()
+{
+    m_aux_panel->select_display(ui->MISC_OPTION_1->currentIndex());
+}
+
+void UserPanel::on_MISC_RADIO_2_clicked()
+{
+    m_aux_panel->select_display(ui->MISC_OPTION_2->currentIndex());
+}
+
+void UserPanel::on_MISC_RADIO_3_clicked()
+{
+    m_aux_panel->select_display(ui->MISC_OPTION_3->currentIndex());
+}
+
+void UserPanel::on_MISC_OPTION_1_currentIndexChanged(int index)
+{
+    m_aux_panel->select_display(index);
+    ui->MISC_RADIO_1->setChecked(true);
+}
+
+void UserPanel::on_MISC_OPTION_2_currentIndexChanged(int index)
+{
+    m_aux_panel->select_display(index);
+    ui->MISC_RADIO_2->setChecked(true);
+}
+
+void UserPanel::on_MISC_OPTION_3_currentIndexChanged(int index)
+{
+    m_aux_panel->select_display(index);
+    ui->MISC_RADIO_3->setChecked(true);
+}
+
+void UserPanel::set_zoom()
+{
+    m_lens_ctrl->set_zoom_value(ui->ZOOM_EDIT->text().toUInt());
+}
+
+void UserPanel::set_focus()
+{
+    m_lens_ctrl->set_focus_value(ui->FOCUS_EDIT->text().toUInt());
+}
+
+void UserPanel::update_current()
+{
+    m_tcu_ctrl->update_current(ui->CURRENT_EDIT->text().toFloat());
+}
 void UserPanel::screenshot()
 {
 //    image_mutex[0].lock();

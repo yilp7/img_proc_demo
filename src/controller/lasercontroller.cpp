@@ -2,9 +2,6 @@
 #include "controller/devicemanager.h"
 #include "controller/lenscontroller.h"
 #include "controller/tcucontroller.h"
-#include "visual/preferences.h"
-#include "ui_user_panel.h"
-#include "ui_preferences.h"
 
 #include <QTimer>
 
@@ -14,40 +11,36 @@ LaserController::LaserController(DeviceManager *device_mgr, LensController *lens
       m_device_mgr(device_mgr),
       m_lens_ctrl(lens_ctrl),
       m_tcu_ctrl(tcu_ctrl),
-      m_ui(nullptr),
-      m_pref(nullptr),
+      laser_on(false),
+      firing(false),
       curr_laser_idx(-1)
 {
-}
-
-void LaserController::init(Ui::UserPanel *ui, Preferences *pref)
-{
-    m_ui = ui;
-    m_pref = pref;
 }
 
 void LaserController::on_LASER_BTN_clicked()
 {
 #ifdef LVTONG
-    if (m_ui->LASER_BTN->text() == tr("ON")) {
-        m_ui->LASER_BTN->setEnabled(false);
+    if (!laser_on) {
+        emit laser_btn_update(false, "");
         uchar buf_laser_on[] = {0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99};
         m_device_mgr->tcu()->emit send_data(QByteArray((char*)buf_laser_on, 7), 0, 0);
         QTimer::singleShot(4000, this, SLOT(start_laser()));
     }
     else {
-        if (m_ui->FIRE_LASER_BTN->text() == tr("STOP")) m_ui->FIRE_LASER_BTN->click();
+        if (firing) on_FIRE_LASER_BTN_clicked();
         uchar buf_laser_off[] = {0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99};
         m_device_mgr->tcu()->send_data(QByteArray((char*)buf_laser_off, 7), 0, 0);
 
-        m_ui->LASER_BTN->setText(tr("ON"));
-        m_ui->CURRENT_EDIT->setEnabled(false);
-        m_ui->FIRE_LASER_BTN->setEnabled(false);
-        m_ui->SIMPLE_LASER_CHK->setEnabled(false);
+        laser_on = false;
+        emit laser_btn_update(true, tr("ON"));
+        emit current_edit_enabled(false);
+        emit fire_btn_update(false, "");
+        emit simple_laser_chk_update(false, -1);
     }
 #else
-    m_pref->ui->LASER_ENABLE_CHK->click();
-    m_ui->LASER_BTN->setText(m_ui->LASER_BTN->text() == tr("ON") ? tr("OFF") : tr("ON"));
+    emit laser_enable_requested(!laser_on);
+    laser_on = !laser_on;
+    emit laser_btn_update(true, laser_on ? tr("OFF") : tr("ON"));
 #endif
 }
 
@@ -61,9 +54,9 @@ void LaserController::start_laser()
 
 void LaserController::init_laser()
 {
-    m_ui->LASER_BTN->setEnabled(true);
-    m_ui->LASER_BTN->setText(tr("OFF"));
-    m_ui->CURRENT_EDIT->setEnabled(true);
+    laser_on = true;
+    emit laser_btn_update(true, tr("OFF"));
+    emit current_edit_enabled(true);
 
     emit send_laser_msg("MODE:RMT 1\r");
     qDebug() << QString("MODE:RMT 1\r");
@@ -74,31 +67,32 @@ void LaserController::init_laser()
     emit send_laser_msg("QSW:PRF 0\r");
     qDebug() << QString("QSW:PRF 0\r");
 
-    m_tcu_ctrl->update_current();
+    emit update_current_requested();
 
-    m_ui->SIMPLE_LASER_CHK->setEnabled(true);
-    m_ui->FIRE_LASER_BTN->setEnabled(true);
-    m_ui->SIMPLE_LASER_CHK->click();
+    emit simple_laser_chk_update(true, 2); // 2 = click
+    emit fire_btn_update(true, "");
 }
 
 void LaserController::on_FIRE_LASER_BTN_clicked()
 {
-    if (m_ui->FIRE_LASER_BTN->text() == tr("FIRE")) {
+    if (!firing) {
         emit send_laser_msg("ON\r");
         qDebug() << QString("ON\r");
 
-        if (!m_pref->ui->LASER_ENABLE_CHK->isChecked()) m_pref->ui->LASER_ENABLE_CHK->click();
+        emit laser_enable_requested(true);
 
-        m_ui->FIRE_LASER_BTN->setText(tr("STOP"));
-        m_ui->SIMPLE_LASER_CHK->setChecked(true);
+        firing = true;
+        emit fire_btn_update(true, tr("STOP"));
+        emit simple_laser_chk_update(true, 1); // 1 = checked
     } else {
         emit send_laser_msg("OFF\r");
         qDebug() << QString("OFF\r");
 
-        if (m_pref->ui->LASER_ENABLE_CHK->isChecked()) m_pref->ui->LASER_ENABLE_CHK->click();
+        emit laser_enable_requested(false);
 
-        m_ui->FIRE_LASER_BTN->setText(tr("FIRE"));
-        m_ui->SIMPLE_LASER_CHK->setChecked(false);
+        firing = false;
+        emit fire_btn_update(true, tr("FIRE"));
+        emit simple_laser_chk_update(true, 0); // 0 = unchecked
     }
 }
 

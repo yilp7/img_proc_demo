@@ -2,18 +2,11 @@
 #define TCUCONTROLLER_H
 
 #include <QObject>
-#include <QLabel>
-#include <QLineEdit>
 #include <atomic>
 
 #include "port/tcu.h"
 #include "util/config.h"
 
-QT_BEGIN_NAMESPACE
-namespace Ui { class UserPanel; }
-QT_END_NAMESPACE
-
-class Preferences;
 class DeviceManager;
 class ScanConfig;
 class Aliasing;
@@ -25,7 +18,7 @@ class TCUController : public QObject
 public:
     explicit TCUController(Config *config, DeviceManager *device_mgr, QObject *parent = nullptr);
 
-    void init(Ui::UserPanel *ui, Preferences *pref, ScanConfig *scan_config, Aliasing *aliasing);
+    void init(ScanConfig *scan_config, Aliasing *aliasing);
 
     // Getters for state accessed by other components
     float get_stepping() const      { return stepping; }
@@ -99,24 +92,53 @@ public slots:
     void update_delay();
     void update_gate_width();
     void update_laser_width();
-    void update_current();
+    void update_current(float current_value);
 
 signals:
     void send_double_tcu_msg(qint32 tcu_param, double val);
     void send_uint_tcu_msg(qint32 tcu_param, uint val);
     void send_laser_msg(QString msg);
 
-    // For UserPanel to forward to scan_config
+    // For UserPanel to forward to scan_config / preferences
     void dist_ns_changed(float dist_ns);
+    void update_distance_display_requested();
+
+    // UI update signals
+    void freq_display_updated(QString unit_text, QString value_text);
+    void stepping_display_updated(QString unit_text, QString value_text);
+    void delay_slider_max_changed(int max);
+    void gw_slider_max_changed(int max);
+    void mcp_slider_max_changed(int max);
+    void mcp_display_updated(int slider_val, QString edit_text);
+    void delay_slider_value_changed(int val);
+    void gw_slider_value_changed(int val);
+    void auto_mcp_chk_changed(bool checked);
+    void distance_text_updated(QString text);
+    void est_dist_text_updated(QString text);
+
+    // TCU param display updates (grouped by section)
+    void laser_width_display_updated(QString u, QString n, QString p);
+    void delay_display_updated(QString au, QString an, QString ap,
+                               QString bu, QString bn, QString bp);
+    void gw_display_updated(QString au, QString an, QString ap,
+                            QString bu, QString bn, QString bp,
+                            QString gw_text);
+
+    // Layout changes
+    void tcu_type_layout_changed(int idx, int diff);
+    void tcu_diff_view_toggled(bool show_diff);
+
+    // Preferences forwarding
+    void ps_config_display_updated(QString stepping_text, QString max_step_text);
+    void auto_mcp_chk_click_requested();
+    void fire_laser_btn_click_requested();
+    void laser_chk_click_requested();
 
 private:
-    void update_tcu_param_pos(int dir, QLabel *u_unit, QLineEdit *n_input, QLabel *n_unit, QLineEdit *p_input);
     void split_value_by_unit(float val, uint &us, uint &ns, uint &ps, int idx = -1);
 
     Config*         m_config;
     DeviceManager*  m_device_mgr;
-    Ui::UserPanel*  m_ui;
-    Preferences*    m_pref;
     ScanConfig*     m_scan_config;
     Aliasing*       m_aliasing;
 

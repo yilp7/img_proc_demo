@@ -9,10 +9,6 @@
 #include <vector>
 #include <utility>
 
-QT_BEGIN_NAMESPACE
-namespace Ui { class UserPanel; }
-QT_END_NAMESPACE
-
 class ScanConfig;
 class TCUController;
 class DeviceManager;
@@ -25,7 +21,7 @@ public:
     explicit ScanController(TCUController *tcu_ctrl, DeviceManager *device_mgr,
                             QObject *parent = nullptr);
 
-    void init(Ui::UserPanel *ui, ScanConfig *scan_config,
+    void init(ScanConfig *scan_config,
               QString *save_location, int *w, int *h);
 
     // Getters (mutex-protected for cross-thread access)
@@ -63,11 +59,12 @@ public slots:
 signals:
     void update_scan(bool show);
     void finish_scan();
+    void scan_button_text_changed(QString text);
+    void scan_options_changed(bool continue_enabled, bool restart_enabled);
 
 private:
     mutable QMutex m_scan_mutex;
 
-    Ui::UserPanel* m_ui;
     ScanConfig*    m_scan_config;
     TCUController* m_tcu_ctrl;
     DeviceManager* m_device_mgr;

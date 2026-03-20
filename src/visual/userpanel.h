@@ -258,12 +258,12 @@ private slots:
     // hide left parameter bar
     void on_HIDE_BTN_clicked();
     // Alt display panel - delegated to AuxPanelManager
-    void on_MISC_RADIO_1_clicked() { m_aux_panel->on_MISC_RADIO_1_clicked(); }
-    void on_MISC_RADIO_2_clicked() { m_aux_panel->on_MISC_RADIO_2_clicked(); }
-    void on_MISC_RADIO_3_clicked() { m_aux_panel->on_MISC_RADIO_3_clicked(); }
-    void on_MISC_OPTION_1_currentIndexChanged(int index) { m_aux_panel->on_MISC_OPTION_1_currentIndexChanged(index); }
-    void on_MISC_OPTION_2_currentIndexChanged(int index) { m_aux_panel->on_MISC_OPTION_2_currentIndexChanged(index); }
-    void on_MISC_OPTION_3_currentIndexChanged(int index) { m_aux_panel->on_MISC_OPTION_3_currentIndexChanged(index); }
+    void on_MISC_RADIO_1_clicked();
+    void on_MISC_RADIO_2_clicked();
+    void on_MISC_RADIO_3_clicked();
+    void on_MISC_OPTION_1_currentIndexChanged(int index);
+    void on_MISC_OPTION_2_currentIndexChanged(int index);
+    void on_MISC_OPTION_3_currentIndexChanged(int index);
 
     // choose how mouse works in DISPLAY
     // TODO add a new exclusive button group
@@ -360,8 +360,8 @@ private:
 
     // Lens operations delegated to LensController
     void lens_stop() { m_lens_ctrl->lens_stop(); }
-    void set_zoom() { m_lens_ctrl->set_zoom_from_ui(); }
-    void set_focus() { m_lens_ctrl->set_focus_from_ui(); }
+    void set_zoom();
+    void set_focus();
     void focus_far() { m_lens_ctrl->focus_far(); }
     void focus_near() { m_lens_ctrl->focus_near(); }
 
@@ -382,7 +382,7 @@ private:
     void auto_scan_for_target() { m_scan_ctrl->auto_scan_for_target(); }
 
     // change current in laser - delegated to TCUController
-    void update_current() { m_tcu_ctrl->update_current(); }
+    void update_current();
 
     // write/read params to config file
     void convert_write(QDataStream &out, const int TYPE);
