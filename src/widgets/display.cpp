@@ -167,16 +167,30 @@ void Display::mouseDoubleClickEvent(QMouseEvent *event)
 {
     QLabel::mouseDoubleClickEvent(event);
 
-    static bool i = 0;
-    if (i ^= 1) {
+    if (mode == 2) return; // PTZ tool: no fullscreen on double-click
+
+    if (!is_fullscreen) {
         reserved_geometry = geometry();
         setWindowFlags(Qt::Dialog);
         showFullScreen();
+        is_fullscreen = true;
     }
     else {
         setGeometry(reserved_geometry);
         setWindowFlags(Qt::Widget);
         showNormal();
+        is_fullscreen = false;
     };
     qDebug() << this->width() << this->size();
+}
+
+void Display::closeEvent(QCloseEvent *event)
+{
+    if (is_fullscreen) {
+        event->ignore();
+        setGeometry(reserved_geometry);
+        setWindowFlags(Qt::Widget);
+        showNormal();
+        is_fullscreen = false;
+    }
 }

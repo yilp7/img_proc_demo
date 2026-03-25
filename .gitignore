@@ -45,3 +45,4 @@ linguist.txt
 # debug/future features
 others/*
 !others/refactor/
+!others/ui_redesign/

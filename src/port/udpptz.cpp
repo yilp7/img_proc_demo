@@ -135,6 +135,9 @@ void UDPPTZ::transmit_data(qint32 op)
     case MANUAL_SEARCH:
         frame = create_command_frame(MANUAL_SEARCH, horizontal_velocity, vertical_velocity);
         break;
+    case FOLLOW:
+        frame = create_command_frame(FOLLOW, target_horizontal_angle, target_vertical_angle);
+        break;
     case ANGLE_POSITION:
         frame = create_command_frame(ANGLE_POSITION, target_horizontal_angle, target_vertical_angle);
         break;
@@ -204,8 +207,8 @@ void UDPPTZ::ptz_move(int direction, int speed)
 void UDPPTZ::ptz_stop()
 {
     set_velocities(0, 0);
-//    emit transmit(MANUAL_SEARCH); // for 500
-    emit transmit(STANDBY); // for 530
+    emit transmit(MANUAL_SEARCH); // for 500
+//    emit transmit(STANDBY); // for 530
 }
 
 void UDPPTZ::ptz_set_angle(float h, float v)
@@ -216,6 +219,13 @@ void UDPPTZ::ptz_set_angle(float h, float v)
 
 void UDPPTZ::ptz_set_angle_h(float h) { emit control(ANGLE_H, h); }
 void UDPPTZ::ptz_set_angle_v(float v) { emit control(ANGLE_V, v); }
+
+void UDPPTZ::ptz_follow(float h, float v)
+{
+    target_horizontal_angle = h;
+    target_vertical_angle = v;
+    transmit_data(FOLLOW);
+}
 
 void UDPPTZ::device_control(qint32 op, float val)
 {

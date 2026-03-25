@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(GLI_user_panel LANGUAGES CXX VERSION 0.10.2.0)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.10.4.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -145,6 +145,7 @@ set(SOURCE_FILES
     src/util/util.cpp
     src/util/threadpool.h
     src/util/threadpool.cpp
+    src/util/timedqueue.h
     src/util/config.h
     src/util/config.cpp
     src/widgets/display.h
@@ -218,7 +219,6 @@ set(SOURCE_FILES
     src/yolo/inference.h
     src/yolo/inference.cpp
     src/yolo/yolo_app_config.h
-    src/util/timedqueue.h
     src/pipeline/processingparams.h
     src/pipeline/pipelineconfig.h
     src/pipeline/pipelineprocessor.h
@@ -511,6 +511,5 @@ if(BUILD_TESTS)
     target_include_directories(test_rangefinder PRIVATE src)
     target_link_libraries(test_rangefinder Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::SerialPort Qt${QT_VERSION_MAJOR}::Network)
     add_test(NAME rangefinder COMMAND test_rangefinder)
-
 
 endif() # BUILD_TESTS

@@ -401,15 +401,16 @@ void DeviceManager::send_ptz_angle_v(float v)
 
 void DeviceManager::point_ptz_to_target(QPoint target, int display_width, int display_height)
 {
-    // TODO config params for max zoom
-    static float tot_h = 0.82, tot_v = 0.57;// small FOV
-    angle_h.store(angle_h.load() + target.x() * tot_h / display_width - tot_h / 2);
-    angle_v.store(angle_v.load() + target.y() * tot_v / display_height - tot_v / 2);
+    if (m_config->get_data().device.ptz_type != 2 || !p_udpptz || !p_udpptz->is_connected())
+        return;
 
-    // Ensure horizontal angle is always positive (0 to 360)
-    angle_h.store(fmod(angle_h.load() + 360.0, 360.0));
+    // Map click position to relative offset angles
+    // Left edge: -9.6°, right edge: +9.6° (horizontal FOV = 19.2°)
+    // Top edge: +5.4°, bottom edge: -5.4° (vertical FOV = 10.8°)
+    float h = (static_cast<float>(target.x()) / display_width - 0.5f) * 19.2f;
+    float v = (0.5f - static_cast<float>(target.y()) / display_height) * 10.8f;
 
-    set_ptz_angle();
+    p_udpptz->ptz_follow(h, v);
 }
 
 void DeviceManager::vid_camera_pressed(int operation)

@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GLI User Panel — Prototype v3</title>
+<style>
+/* ===== BASE ===== */
+:root {
+    /* Surfaces */
+    --bg-deepest: #040303;
+    --bg-base: #080707;
+    --bg-raised: #12100E;
+    --bg-elevated: #1C1815;
+    --bg-header: #261B14;
+    --bg-header-end: #12100E;
+    --bg-active: #2E221A;
+    /* Borders */
+    --border-subtle: #241E1A;
+    --border-default: #382D25;
+    --border-strong: #8F6B4D;
+    /* Text */
+    --text-primary: #F5E1CE;
+    --text-secondary: #CDB299;
+    --text-muted: #8A7461;
+    --text-dim: #5C4A3D;
+    --text-ghost: #3D2E24;
+    /* Accent */
+    --accent: #E0924A;
+    --accent-muted: #9E612B;
+    /* Semantic */
+    --positive: #00ff7f;
+    --negative: #E6455D;
+    --info: #4DA6E6;
+    --warning: #E6B345;
+    /* Misc */
+    --crosshair: #3cb371;
+    --map-terrain: #382D25;
+    /* TCU Bars */
+    --tcu-distance: #E0924A;
+    --tcu-depth: #30b060;
+    --tcu-laser: #8B5CF6;
+    --tcu-mcp: #E6B345;
+    /* Lens Controls */
+    --lens-zoom: #E6455D;
+    --lens-focus: #E0924A;
+    --lens-iris: #4DA6E6;
+    --slider-track: #040303;
+    --slider-thumb: #E0924A;
+    /* PTZ */
+    --btn-icon: #8A7461;
+    --joy-handle: #E0924A;
+    --joy-dir: #5C4A3D;
+    --ptz-stop: #E6455D;
+    /* Console */
+    --bar-hist: #382D25;
+    --con-misc: #5C4A3D;
+    /* Laser */
+    --laser-off: #5C4A3D;
+    --laser-armed: #E6455D;
+    /* ── Derived (auto-computed) ── */
+    /* Surface derived */
+    --track-bg: #040303;
+    --shadow: #00000088;
+    --dot-off: #241E1A;
+    --fp-hdr-end: #12100E;
+    --scene-mid: #12100E;
+    --scene-bright: #1C1815;
+    --scene-side: #080707;
+    --scene-side-alt: #12100E;
+    /* Readout */
+    --readout: #579972;
+    --readout-dim: #487059;
+    /* Positive derived */
+    --positive-bg: #0b1b19;
+    --positive-border: #113c29;
+    --positive-hover-bg: #10251e;
+    --positive-hover-text: #81e0a9;
+    --positive-hover-border: #215c39;
+    /* Negative derived */
+    --negative-bg: #330F14;
+    --negative-border: #661E29;
+    --negative-dim: #992D3E;
+    --negative-hover-bg: #4D161E;
+    --negative-hover-text: #F07385;
+    --negative-hover-border: #802633;
+    --negative-hover-bg-soft: #240A0E;
+    /* Info derived */
+    --info-bg: #0F212E;
+    --info-border: #1D425C;
+    --info-hover-bg: #163145;
+    --info-hover-text: #75BCEB;
+    --info-hover-border: #285C80;
+    /* Warning derived */
+    --warning-bg: #33270F;
+    --warning-border: #664E1E;
+    --warning-hover-bg: #4D3B16;
+    --warning-hover-text: #EFC670;
+    --warning-hover-border: #806226;
+    /* Laser / Fire derived */
+    --laser-off-bg: #040303;
+    --laser-off-text: #8A7461;
+    --laser-armed-bg: #330F14;
+    --fire-active-text: #F5E1CE;
+    --fire-stripe-alt: #661E29;
+    --fire-active-bg-a: #E6455D;
+    --fire-active-bg-b: #992D3E;
+    /* Unlock derived */
+    --unlock-text: #00ff7f;
+    --unlock-bg-a: #040303;
+    --unlock-locked-text: #8A7461;
+    --unlock-locked-border: #382D25;
+    --unlock-locked-bg-a: #080707;
+    --unlock-locked-bg-b: #12100E;
+    /* TCU gradient starts */
+    --tcu-distance-start: #7A4517;
+    --tcu-depth-start: #1f723e;
+    --tcu-laser-start: #422B75;
+    --tcu-mcp-start: #7A5E23;
+    /* Alpha Surfaces */
+    --bg-raised-93: #12100EEE;
+    --bg-raised-80: #12100ECC;
+    --shadow-deep: #00000099;
+    /* Alpha Accents */
+    --accent-glow-20: #E0924A33;
+    --accent-glow-27: #E0924A44;
+    --accent-glow-33: #E0924A55;
+    --accent-glow-40: #E0924A66;
+    --accent-glow-60: #E0924A99;
+    --accent-glow-80: #E0924ACC;
+    --accent-muted-glow-33: #9E612B55;
+    --accent-stop-33: #E0924A55;
+    /* Alpha States */
+    --positive-glow: #00ff7f88;
+    --negative-glow: #E6455D88;
+    --negative-glow-40: #E6455D66;
+    --negative-rec-glow: #E6455D44;
+    --crosshair-20: #3cb37133;
+    --crosshair-33: #3cb37155;
+    --joy-handle-glow: #E0924A55;
+
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: var(--text-secondary); font-family: 'Segoe UI', Consolas, monospace; font-size: 11px; }
+
+/* ===== TOP BAR ===== */
+#topbar {
+    height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 8px;
+    background: linear-gradient(180deg, var(--bg-header) 0%, var(--bg-elevated) 100%);
+    border-bottom: 1px solid var(--border-default); position: relative; z-index: 300; flex-shrink: 0;
+}
+.port-lights { display: flex; gap: 4px; align-items: center; }
+.dot {
+    width: 9px; height: 9px; border-radius: 50%; cursor: pointer; position: relative;
+    border: 1px solid var(--shadow);
+}
+.dot.g { background: var(--positive); box-shadow: 0 0 5px var(--positive-glow); }
+.dot.y { background: var(--accent); box-shadow: 0 0 5px var(--accent-glow-33); }
+.dot.r { background: var(--negative); box-shadow: 0 0 5px var(--negative-glow); }
+.dot.x { background: var(--dot-off); }
+.dot-tt {
+    display: none; position: absolute; top: 14px; left: -8px;
+    background: var(--bg-header); border: 1px solid var(--border-strong); padding: 2px 6px;
+    white-space: nowrap; font-size: 9px; border-radius: 2px; z-index: 400;
+}
+.dot:hover .dot-tt { display: block; }
+.tb-div { width: 1px; height: 14px; background: var(--border-default); margin: 0 3px; }
+.tb-select {
+    height: 20px; padding: 0 6px; background: var(--bg-elevated); color: var(--text-dim);
+    border: 1px solid var(--border-default); border-radius: 2px; font-size: 10px;
+}
+.mode-group { display: flex; gap: 1px; }
+.mode-btn {
+    padding: 3px 12px; font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    color: var(--text-ghost); background: transparent; border: 1px solid transparent;
+    cursor: pointer; border-radius: 3px 3px 0 0; transition: color 0.15s;
+}
+.mode-btn:hover { color: var(--text-muted); }
+.mode-btn.on { color: var(--accent); border-color: var(--border-default); border-bottom: 2px solid var(--accent); background: var(--bg-elevated); }
+.tb-sp { flex: 1; }
+.tb-time { font-family: Consolas; font-size: 10px; color: var(--readout-dim); }
+.tb-time b { color: var(--readout); }
+.autopilot {
+    padding: 2px 7px; font-size: 9px; font-weight: 700; letter-spacing: 1px;
+    color: var(--readout-dim); border: 1px solid var(--positive-border); border-radius: 2px; background: var(--positive-bg);
+}
+.tb-btn {
+    padding: 2px 8px; font-size: 10px; color: var(--text-dim);
+    background: var(--bg-elevated); border: 1px solid var(--border-default); border-radius: 2px; cursor: pointer;
+    transition: color 0.15s;
+}
+.tb-btn:hover { color: var(--text-secondary); }
+.tb-btn.rec { color: var(--negative-dim); border-color: var(--negative-border); }
+.tb-btn.rec.on { color: var(--negative); box-shadow: 0 0 4px var(--negative-rec-glow); }
+
+/* ===== MAIN WINDOW ===== */
+#win {
+    position: relative; overflow: hidden;
+    width: 100%; height: calc(100vh - 32px);
+}
+
+/* ===== MAIN DISPLAY (16:9 widget, centered in remaining space) ===== */
+#main-display {
+    position: absolute;
+    z-index: 10;
+    border: 1px solid var(--border-default); border-radius: 3px;
+    background: radial-gradient(ellipse at 45% 45%, #0e1825 0%, var(--bg-base) 100%);
+    overflow: hidden;
+}
+/* Simulated scene */
+.scene-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(160deg, var(--bg-base) 0%, #0c1420 40%, #0e1828 60%, var(--bg-base) 100%);
+}
+/* Crosshair */
+.ch-h { position: absolute; width: 100%; height: 1px; top: calc(50% - 0.5px); background: var(--crosshair-20); pointer-events: none; }
+.ch-v { position: absolute; height: 100%; width: 1px; left: calc(50% - 0.5px); background: var(--crosshair-20); pointer-events: none; }
+.ch-c {
+    position: absolute; width: 18px; height: 18px; border-radius: 50%;
+    border: 1px solid var(--crosshair-33); top: calc(50% - 9px); left: calc(50% - 9px); pointer-events: none;
+}
+/* Bounding box overlay */
+.bbox {
+    position: absolute; border: 1px solid var(--accent-glow-60); pointer-events: none;
+    left: 33%; top: 26%; width: 20%; height: 38%;
+}
+.bbox-lbl {
+    position: absolute; top: -15px; left: 0;
+    background: var(--accent-glow-80); color: #000; font-size: 8px; padding: 1px 4px; font-weight: 700;
+}
+/* Display info overlays */
+.disp-fps {
+    position: absolute; top: 14px; left: 14px;
+    font-family: Consolas; font-size: 10px; color: var(--readout-dim); pointer-events: none; line-height: 1.7;
+}
+.disp-fps b { color: var(--readout); }
+.disp-coord {
+    position: absolute; top: 14px; right: 6px;
+    font-family: Consolas; font-size: 10px; color: var(--readout-dim); text-align: right;
+    pointer-events: none; line-height: 1.7;
+}
+.disp-coord b { color: var(--readout); }
+
+/* ===== FIXED WIDGET STYLE ===== */
+.widget {
+    position: absolute; background: var(--bg-raised-93);
+    border: 1px solid var(--border-default); border-radius: 3px; z-index: 10;
+    overflow: hidden;
+}
+.widget-hdr {
+    height: 18px; background: linear-gradient(180deg, var(--bg-header), var(--bg-header-end));
+    border-bottom: 1px solid var(--border-default); display: flex; align-items: center;
+    padding: 0 6px; gap: 5px;
+}
+.widget-title { font-size: 9px; font-weight: 700; color: var(--accent); letter-spacing: 1px; text-transform: uppercase; flex: 1; }
+.widget-body { padding: 6px 7px; }
+
+/* ===== SIDE DISPLAY widget ===== */
+#side-display { top: 8px; left: 8px; width: 207px; }
+.side-cam { width: 100%; height: 155px; background: radial-gradient(ellipse at 50% 50%, var(--scene-side-alt) 0%, var(--bg-base) 100%); position: relative; overflow: hidden; }
+.side-cam-overlay { position: absolute; bottom: 4px; left: 5px; font-family: Consolas; font-size: 9px; color: var(--readout-dim); line-height: 1.6; }
+.side-cam-overlay b { color: var(--readout); }
+
+/* ===== MAPBOX widget ===== */
+#mapbox-widget { top: 191px; left: 8px; width: 207px; }
+.map-view { width: 100%; height: 207px; background: var(--bg-raised); position: relative; overflow: hidden; }
+.map-view::before { content: ''; position: absolute; inset: 0; background: linear-gradient(30deg, transparent 45%, var(--map-terrain) 45%, var(--map-terrain) 47%, transparent 47%), linear-gradient(120deg, transparent 40%, var(--map-terrain) 40%, var(--map-terrain) 42%, transparent 42%), linear-gradient(80deg, transparent 60%, var(--map-terrain) 60%, var(--map-terrain) 62%, transparent 62%), var(--bg-header-end); }
+.map-pin { position: absolute; top: 42%; left: 45%; width: 10px; height: 10px; background: var(--negative); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); box-shadow: 0 0 6px var(--negative-glow-40); }
+.map-attribution { position: absolute; bottom: 3px; left: 5px; font-size: 8px; color: var(--text-ghost); font-family: Consolas; }
+
+/* ===== IMG PROC widget ===== */
+#imgproc { top: 8px; right: 8px; width: 198px; }
+.rp-tabs { display: flex; border-bottom: 1px solid var(--border-subtle); }
+.rp-tab { flex: 1; padding: 3px 0; text-align: center; font-size: 9px; font-weight: 700; letter-spacing: 1px; color: var(--text-ghost); cursor: pointer; border-right: 1px solid var(--border-subtle); transition: color 0.1s; }
+.rp-tab:last-child { border-right: none; }
+.rp-tab:hover { color: var(--text-muted); background: var(--bg-header-end); }
+.rp-tab.on { color: var(--accent); background: var(--bg-header-end); }
+.ip-body { padding: 6px 7px; }
+.ip-row { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+.ip-lbl { font-size: 9px; color: var(--text-dim); width: 62px; flex-shrink: 0; }
+.ip-chk { accent-color: var(--accent); }
+.ip-combo { flex: 1; height: 17px; background: var(--bg-base); color: var(--text-muted); border: 1px solid var(--border-subtle); border-radius: 2px; font-size: 9px; padding: 0 3px; }
+
+/* ===== SAVE OPTIONS widget ===== */
+#save-opts { right: 8px; width: 198px; top: 8px; }
+
+/* ===== VISION widget ===== */
+#vision { right: 8px; width: 198px; top: 8px; }
+.vision-rows { padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; }
+.ve-row { display: flex; align-items: stretch; gap: 6px; background: var(--bg-raised); border: 1px solid var(--border-subtle); border-radius: 3px; padding: 4px 5px; }
+.ve-thumb { width: 96px; height: 72px; background: var(--bg-deepest); border: 1px solid var(--border-subtle); border-radius: 2px; flex-shrink: 0; position: relative; overflow: hidden; }
+.ve-thumb.inactive { opacity: 0.3; }
+.ve-info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+.ve-info-top { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.ve-name { font-size: 11px; font-weight: 700; color: var(--text-primary); }
+.ve-active-lbl { font-size: 10px; font-weight: 700; color: var(--accent); }
+.ve-model { font-size: 9px; color: var(--text-dim); }
+.ve-stats { font-family: Consolas; font-size: 9px; color: var(--readout); }
+.ve-inactive-lbl { font-size: 9px; color: var(--text-ghost); margin-top: 2px; }
+
+/* ===== FLOATING PANEL BASE ===== */
+.fp { position: absolute; background: var(--bg-raised-93); border: 1px solid var(--border-default); border-radius: 4px; box-shadow: 0 4px 20px var(--shadow-deep); z-index: 100; min-width: 80px; display: flex; flex-direction: column; }
+.fp.hidden { display: none; }
+.fp-hdr { height: 22px; background: linear-gradient(180deg, var(--bg-header), var(--fp-hdr-end)); border-bottom: 1px solid var(--border-default); border-radius: 4px 4px 0 0; display: flex; align-items: center; padding: 0 6px; cursor: grab; user-select: none; flex-shrink: 0; }
+.fp-hdr:active { cursor: grabbing; }
+.fp.pinned .fp-hdr { cursor: default; }
+.fp-title { flex: 1; font-size: 9px; font-weight: 700; color: var(--accent); letter-spacing: 1.5px; text-transform: uppercase; }
+.fp-btns { display: flex; gap: 2px; }
+.fp-ico { width: 14px; height: 14px; background: none; border: 1px solid var(--border-default); border-radius: 2px; color: var(--text-dim); font-size: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.1s; }
+.fp-ico:hover { background: var(--border-default); color: var(--text-secondary); }
+.fp-ico.on { color: var(--accent); border-color: var(--accent-glow-33); }
+.fp-body { padding: 7px 8px; overflow: visible; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.mt { display: flex; gap: 2px; margin-bottom: 7px; }
+.mt-btn { flex: 1; padding: 2px; text-align: center; font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-ghost); background: var(--bg-raised); border: 1px solid var(--border-subtle); cursor: pointer; border-radius: 2px; transition: all 0.1s; }
+.mt-btn.on { color: var(--accent); border-color: var(--accent-glow-33); background: var(--bg-elevated); }
+
+/* ===== OPTICS & PTZ FLOATING PANEL ===== */
+#optics { bottom: 10px; left: 8px; width: 280px; height: 210px; }
+.ptz-grid { display: grid; grid-template-columns: repeat(3, 28px); grid-template-rows: repeat(3, 28px); gap: 2px; justify-content: center; margin-bottom: 5px; }
+.dir-btn { background: var(--bg-elevated); border: 1px solid var(--border-default); color: var(--btn-icon); font-size: 11px; cursor: pointer; border-radius: 2px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; }
+.dir-btn:hover { background: var(--bg-header); color: var(--text-primary); }
+.dir-btn:active { background: var(--bg-active); }
+.dir-btn.stp { color: var(--accent-stop-33); border-color: var(--ptz-stop); }
+.lens-row { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
+.lens-lbl { font-size: 9px; color: var(--text-dim); width: 38px; text-align: right; flex-shrink: 0; }
+.lens-val { font-family: Consolas; font-size: 10px; color: var(--readout); width: 30px; height: 24px; line-height: 24px; text-align: center; flex-shrink: 0; }
+.lens-btn { width: 24px; height: 24px; background: var(--bg-elevated); border: 1px solid var(--border-default); color: var(--btn-icon); font-size: 11px; line-height: 1; cursor: pointer; border-radius: 2px; transition: all 0.1s; display: flex; align-items: center; justify-content: center; }
+.lens-btn:hover { background: var(--bg-header); color: var(--text-primary); }
+.spd-row { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.spd-lbl { font-size: 9px; color: var(--text-dim); width: 38px; text-align: right; }
+.sl { flex: 1; min-width: 0; height: 3px; -webkit-appearance: none; background: var(--slider-track); border-radius: 2px; outline: none; }
+.sl::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 12px; background: var(--slider-thumb); border-radius: 1px; cursor: pointer; }
+
+/* Modern PTZ */
+.ptz-modern { display: none; }
+.arc-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.arc-canvas { cursor: grab; display: block; }
+.arc-canvas:active { cursor: grabbing; }
+.arc-lbl { font-size: 8px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
+.arc-val { font-family: Consolas; font-size: 9px; color: var(--readout); }
+.joy-wrap { width: 120px; height: 120px; margin: 0 auto 4px; }
+.joy-ring { width: 120px; height: 120px; border-radius: 50%; border: 2px solid #222222 /* hw */; background: radial-gradient(circle, transparent 22%, #252525 22.5%, #252525 25%, transparent 25.5%), radial-gradient(circle, transparent 42%, #252525 42.5%, #252525 45%, transparent 45.5%), radial-gradient(circle, transparent 62%, #252525 62.5%, #252525 65%, transparent 65.5%), radial-gradient(circle at 42% 38%, #1e1e1e, #080808); position: relative; box-shadow: inset 0 4px 16px #000000dd /* hw */; }
+.joy-dir { position: absolute; font-size: 7px; color: var(--joy-dir); pointer-events: none; line-height: 1; }
+.joy-dir.joy-n { top: 7px; left: 50%; transform: translateX(-50%); }
+.joy-dir.joy-s { bottom: 7px; left: 50%; transform: translateX(-50%); }
+.joy-dir.joy-w { left: 7px; top: 50%; transform: translateY(-50%); }
+.joy-dir.joy-e { right: 7px; top: 50%; transform: translateY(-50%); }
+.joy-handle { width: 56px; height: 56px; border-radius: 50%; background: transparent; border: 2px solid var(--joy-handle); box-shadow: 0 0 10px var(--joy-handle-glow); position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); cursor: grab; display: flex; align-items: center; justify-content: center; }
+.joy-handle:active { cursor: grabbing; }
+.joy-dome { width: 40px; height: 40px; border-radius: 50%; background: radial-gradient(circle at 38% 34%, #2a2a2a, #080808); box-shadow: 0 2px 8px #000000cc /* hw */; pointer-events: none; }
+.joy-label { text-align: center; font-size: 9px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+
+/* ===== TCU & LASER FLOATING PANEL ===== */
+#tcu { bottom: 10px; left: 302px; width: 340px; height: 250px; }
+.td-wrap { background: var(--bg-base); border: 1px solid var(--border-subtle); border-radius: 3px; padding: 7px 6px; margin-bottom: 7px; }
+.td-hdr { font-size: 9px; font-weight: 700; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+.td-row { display: flex; align-items: center; height: 20px; gap: 5px; margin-bottom: 3px; }
+.td-lbl { width: 62px; font-size: 9px; color: var(--text-dim); text-align: right; flex-shrink: 0; }
+.td-track { flex: 1; height: 8px; background: var(--track-bg); border-radius: 2px; position: relative; cursor: pointer; }
+.td-bar { position: absolute; top: 0; height: 100%; border-radius: 2px; pointer-events: none; }
+.td-bar.da { background: linear-gradient(90deg, var(--tcu-distance-start), var(--accent)); }
+.td-bar.db { background: linear-gradient(90deg, #0a6070, #10b8c0); }
+.td-bar.gw { background: linear-gradient(90deg, var(--tcu-depth-start), var(--tcu-depth)); }
+.td-bar.lw { background: linear-gradient(90deg, var(--tcu-laser-start), var(--tcu-laser)); }
+.td-bar.mcp { background: linear-gradient(90deg, var(--tcu-mcp-start), var(--tcu-mcp)); }
+.td-val { width: 58px; font-family: Consolas; font-size: 9px; color: var(--readout); text-align: right; flex-shrink: 0; }
+
+.tcu-bot { display: flex; align-items: center; gap: 7px; margin-top: 4px; }
+.tcu-dist { font-family: Consolas; font-size: 10px; color: var(--readout-dim); flex: 1; }
+.tcu-dist b { color: var(--readout); }
+.laser-on { padding: 3px 9px; font-size: 9px; font-weight: 700; background: var(--laser-off-bg); border: 1px solid var(--positive-border); color: var(--laser-off-text); border-radius: 3px; cursor: pointer; transition: all 0.15s; }
+.laser-on.on { background: var(--laser-armed-bg); color: var(--positive-hover-text); }
+.fire-btn { padding: 4px 12px; font-size: 10px; font-weight: 700; color: var(--negative); letter-spacing: 1px; background: repeating-linear-gradient(-45deg, var(--negative-bg), var(--negative-bg) 4px, var(--fire-stripe-alt) 4px, #180e0e 8px); border: 1px solid var(--negative-dim); border-radius: 3px; cursor: pointer; transition: all 0.15s; }
+.fire-btn:hover { border-color: var(--negative-dim); color: var(--negative); }
+.fire-btn.on { background: repeating-linear-gradient(-45deg, var(--fire-active-bg-a), #280a0a 4px, var(--fire-active-bg-b) 4px, #380e0e 8px); color: var(--fire-active-text); border-color: var(--negative-dim); }
+.unlock-bar { margin-top: 6px; padding: 2px 0; text-align: center; font-size: 9px; font-weight: 700; letter-spacing: 2px; color: var(--unlock-text); cursor: pointer; background: repeating-linear-gradient(-45deg, var(--unlock-bg-a), #070e0a 4px, var(--positive-bg) 4px, var(--positive-bg) 8px); border: 1px solid var(--positive-border); border-radius: 2px; }
+.unlock-bar.locked { color: var(--unlock-locked-text); border-color: var(--unlock-locked-border); background: repeating-linear-gradient(-45deg, var(--unlock-locked-bg-a), #0e0a04 4px, var(--unlock-locked-bg-b) 4px, #140f06 8px); }
+
+/* Guru mode */
+.guru { display: none; }
+.guru-row { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
+.guru-lbl { font-size: 9px; color: var(--text-dim); width: 70px; text-align: right; flex-shrink: 0; }
+.guru-inp { width: 36px; height: 17px; background: var(--bg-base); color: var(--readout); border: 1px solid var(--border-subtle); border-radius: 2px; font-size: 9px; font-family: Consolas; padding: 0 3px; text-align: right; }
+.guru-inp:focus { outline: none; border-color: var(--accent-glow-27); }
+.guru-unit { font-size: 9px; color: var(--text-ghost); width: 16px; flex-shrink: 0; }
+.guru-sl { flex: 1; height: 3px; -webkit-appearance: none; background: var(--slider-track); border-radius: 2px; outline: none; min-width: 50px; }
+.guru-sl::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 12px; background: var(--slider-thumb); border-radius: 1px; cursor: pointer; }
+.guru-sep { height: 1px; background: var(--bg-header); margin: 3px 0; }
+.guru-sec { font-size: 9px; font-weight: 700; color: var(--text-ghost); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+
+/* ===== CONSOLE FLOATING PANEL ===== */
+#console { bottom: 10px; right: 8px; width: 295px; height: 231px; }
+.con-tabs { display: flex; gap: 2px; flex-wrap: wrap; margin-bottom: 6px; }
+.con-tab { padding: 1px 6px; font-size: 8px; font-weight: 700; color: var(--text-ghost); background: var(--bg-raised); border: 1px solid var(--border-subtle); border-radius: 2px; cursor: pointer; transition: all 0.1s; }
+.con-tab:hover { color: var(--text-dim); }
+.con-tab.on { color: var(--accent); border-color: var(--accent-glow-27); }
+.con-page { display: none; }
+.con-page.on { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.con-log { flex: 1; background: var(--bg-deepest); border: 1px solid var(--border-subtle); border-radius: 2px; padding: 4px 5px; overflow-y: auto; font-family: Consolas; font-size: 9px; color: var(--readout-dim); line-height: 1.7; }
+.con-hist { flex: 1; background: var(--bg-deepest); border: 1px solid var(--border-subtle); border-radius: 2px; display: flex; align-items: flex-end; gap: 1px; padding: 4px 3px; }
+.hbar { flex: 1; background: var(--bar-hist); border-radius: 1px 1px 0 0; min-height: 2px; }
+.hbar.pk { background: var(--accent-glow-40); }
+.con-ptcloud { flex: 1; background: var(--bg-deepest); border: 1px solid var(--border-subtle); border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--border-subtle); position: relative; overflow: hidden; }
+.con-misc { flex: 1; background: var(--bg-deepest); border: 1px solid var(--border-subtle); border-radius: 2px; padding: 5px; font-size: 9px; color: var(--con-misc); }
+
+/* ===== PANEL TOGGLE BAR ===== */
+#pbar { position: absolute; top: 5px; left: 50%; transform: translateX(-50%); display: flex; gap: 3px; z-index: 200; pointer-events: all; }
+.pb { padding: 2px 8px; font-size: 9px; color: var(--text-ghost); background: var(--bg-raised-80); border: 1px solid var(--border-subtle); border-radius: 2px; cursor: pointer; transition: all 0.1s; }
+.pb:hover { color: var(--text-dim); }
+.pb.on { color: var(--accent); border-color: var(--accent-glow-20); }
+#gli { position: absolute; bottom: 6px; left: 8px; font-size: 10px; font-weight: 700; color: var(--border-subtle); letter-spacing: 3px; z-index: 5; pointer-events: none; }
+
+/* ===== MODE OVERLAYS (BASE) ===== */
+.ov { display: none; position: absolute; inset: 0; background: var(--bg-base); z-index: 250; padding: 16px; overflow-y: auto; gap: 12px; }
+.ov.on { display: flex; }
+.ov-prev { width: 112px; height: 84px; background: var(--bg-deepest); border: 1px solid var(--border-subtle); border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--border-subtle); margin-top: 5px; }
+
+/* --- UI UPGRADE: SCAN AND COMPACTED SETUP --- */
+.ov-grp { background: var(--bg-raised-93); border: 1px solid var(--border-default); border-radius: 3px; padding: 0; overflow: hidden; }
+.ov-ttl { height: 22px; background: linear-gradient(180deg, var(--bg-header), var(--bg-header-end)); border-bottom: 1px solid var(--border-default); display: flex; align-items: center; padding: 0 8px; margin-bottom: 0; font-size: 9px; font-weight: 700; color: var(--accent); letter-spacing: 1px; text-transform: uppercase; }
+.ov-grp-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Action button styling (Scan Screen) */
+.scan-action-btn { padding: 6px 0; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-align: center; text-transform: uppercase; border-radius: 3px; cursor: pointer; transition: all 0.15s; background: var(--bg-header-end); color: var(--text-dim); border: 1px solid var(--border-default); }
+.scan-action-btn:hover { background: var(--bg-header); color: var(--text-secondary); }
+.scan-action-btn.start { border-color: var(--positive-border); color: var(--readout); background: var(--positive-bg); }
+.scan-action-btn.start:hover { background: var(--positive-bg); color: var(--positive-hover-text); border-color: var(--positive-hover-border); }
+.scan-action-btn.stop { border-color: var(--negative-dim); color: var(--negative); background: var(--negative-bg); }
+.scan-action-btn.stop:hover { background: var(--negative-hover-bg-soft); color: var(--negative); border-color: var(--negative-dim); }
+
+/* Setup Screen Enhancements (Densified) */
+.setup-pane { flex: 1; overflow-y: auto; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+/* Using 1.15fr 1.15fr 0.7fr to make the TCU column visibly thinner (60-70% width of others) */
+.setup-grid { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+.setup-col { display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto; }
+.setup-col .ov-grp-body { padding: 5px 8px; gap: 0; }
+
+/* FIXED WIDTH INPUTS to prevent stretching, flex-start to prevent huge gaps */
+.setup-pane .ov-inp, .setup-pane .ov-sel {
+    height: 17px; background: var(--bg-base); color: var(--readout);
+    border: 1px solid var(--border-default); border-radius: 2px;
+    font-size: 9px; font-family: Consolas; padding: 0 4px;
+    text-align: right; width: 60px;
+}
+.setup-pane .ov-inp.wide { width: 90px; }
+.setup-pane .ov-inp.tiny { width: 40px; }
+.setup-pane .ov-sel { width: auto; min-width: 60px; }
+.setup-pane .ov-lbl { font-size: 9px; color: var(--text-dim); text-align: left; margin-right: 6px; }
+
+/* Tightly packed rows */
+.setup-col .ov-row { 
+    display: flex; align-items: center; justify-content: flex-start;
+    margin-bottom: 3px; min-height: 18px; 
+}
+
+/* Grid helper for specific groups */
+.setup-grp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; align-items: center; }
+.setup-grp-grid .ov-row { margin-bottom: 0; }
+
+.setup-col .ov-sep { height: 1px; background: var(--border-default); margin: 4px 0; }
+.setup-chk-row { display: flex; align-items: center; gap: 5px; font-size: 9px; color: var(--text-dim); margin-bottom: 3px; }
+.setup-chk-row input { accent-color: var(--accent); }
+
+/* Upgraded Setup Buttons */
+.setup-btn {
+    padding: 3px 8px; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; white-space: nowrap;
+    text-transform: uppercase; background: var(--bg-header-end); color: var(--text-muted);
+    border: 1px solid var(--border-default); border-radius: 2px; cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+}
+.setup-btn:hover { background: var(--bg-header); color: var(--text-primary); border-color: var(--border-strong); }
+.setup-btn.primary { background: var(--positive-bg); color: var(--readout); border-color: var(--positive-border); }
+.setup-btn.primary:hover { background: var(--positive-hover-bg); color: var(--positive-hover-text); border-color: var(--positive-hover-border); }
+.setup-btn.danger { background: var(--negative-bg); color: var(--negative); border-color: var(--negative-border); }
+.setup-btn.danger:hover { background: var(--negative-hover-bg); color: var(--negative-hover-text); border-color: var(--negative-hover-border); }
+.setup-btn.ori-on { background: var(--info-bg); color: var(--info); border-color: var(--info-border); }
+.setup-btn.ori-on:hover { background: var(--info-hover-bg); color: var(--info-hover-text); border-color: var(--info-hover-border); }
+.setup-btn.res-on { background: var(--warning-bg); color: var(--warning); border-color: var(--warning-border); }
+.setup-btn.res-on:hover { background: var(--warning-hover-bg); color: var(--warning-hover-text); border-color: var(--warning-hover-border); }
+
+/* Trigger Panel grouping */
+.trigger-panel {
+    background: var(--bg-raised); border: 1px solid var(--border-subtle); border-radius: 2px; 
+    padding: 4px; display: flex; align-items: center; gap: 10px; margin-bottom: 4px;
+}
+
+/* Sub-groups for Image Processing */
+.sub-grp { background: var(--bg-raised); border: 1px solid var(--border-subtle); border-radius: 3px; padding: 8px; display: flex; flex-direction: column; gap: 5px; }
+.sub-ttl { font-size: 9px; font-weight: 700; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; padding-bottom: 4px; border-bottom: 1px dashed var(--border-subtle); }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ===== TOP BAR ===== -->
+<div id="topbar">
+    <div class="port-lights">
+        <div class="dot g"><div class="dot-tt">CAM: Connected</div></div>
+        <div class="dot g"><div class="dot-tt">TCU: Connected</div></div>
+        <div class="dot y"><div class="dot-tt">LENS: Connecting</div></div>
+        <div class="dot r"><div class="dot-tt">LASER: Error</div></div>
+        <div class="dot x"><div class="dot-tt">PTZ: Off</div></div>
+    </div>
+    <div class="tb-div"></div>
+    <select class="tb-select"><option>SYSTEM</option><option>GLI-A</option><option>GLI-B</option></select>
+    <div class="tb-div"></div>
+    <div class="mode-group">
+        <div class="mode-btn" data-mode="setup">SETUP</div>
+        <div class="mode-btn on" data-mode="monitor">MONITOR</div>
+        <div class="mode-btn" data-mode="scan">SCAN</div>
+    </div>
+    <div class="tb-sp"></div>
+    <div class="tb-time">TO: <b id="clock">00:00:00</b></div>
+</div>
+
+<!-- ===== MAIN WINDOW ===== -->
+<div id="win">
+
+    <!-- Main camera display (large central widget) -->
+    <div id="main-display">
+        <div class="scene-gradient"></div>
+        <div class="ch-h"></div>
+        <div class="ch-v"></div>
+        <div class="ch-c"></div>
+        <div class="bbox"><span class="bbox-lbl">TARGET 0.82</span></div>
+        <div class="disp-fps">FPS: <b>60</b><br>GAIN: <b>12 dB</b></div>
+        <div class="disp-coord">COORD: [X:<b>-45.1</b>, Y:<b>22.3</b>]<br>DIST: <b>1.5 km</b></div>
+    </div>
+
+    <!-- Side display (16:9) -->
+    <div class="widget" id="side-display">
+        <div class="widget-hdr">
+            <span class="widget-title">Side Display</span>
+        </div>
+        <div class="side-cam">
+            <div class="side-cam-overlay">FPS: <b>60</b><br>GAIN: <b>12dB</b></div>
+        </div>
+    </div>
+
+    <!-- Mapbox (1:1) -->
+    <div class="widget" id="mapbox-widget">
+        <div class="widget-hdr">
+            <span class="widget-title">Mapbox</span>
+        </div>
+        <div class="map-view">
+            <div class="map-pin"></div>
+            <div class="map-attribution">@ mapbox</div>
+        </div>
+    </div>
+
+    <!-- IMG PROC (fixed, top-right) -->
+    <div class="widget" id="imgproc">
+        <div class="widget-hdr">
+            <span class="widget-title">IMG PROC</span>
+        </div>
+        <div class="rp-tabs">
+            <div class="rp-tab on" data-ip="models">MODELS</div>
+            <div class="rp-tab" data-ip="general">GENERAL</div>
+        </div>
+        <div class="ip-body" id="ip-models">
+            <div class="ip-row">
+                <span class="ip-lbl">Model</span>
+                <select class="ip-combo"><option>yolov5s</option><option>yolov5m</option><option>yolov5l</option></select>
+            </div>
+            <div class="ip-row">
+                <input type="checkbox" class="ip-chk">
+                <span class="ip-lbl">Detection</span>
+            </div>
+            <div class="ip-row">
+                <span class="ip-lbl">Confidence</span>
+                <input style="width:42px;height:16px;background:var(--bg-base);color:var(--readout);border:1px solid var(--border-subtle);border-radius:2px;font-size:9px;font-family:Consolas;padding:0 3px;" value="0.50">
+            </div>
+            <div class="ip-row">
+                <input type="checkbox" class="ip-chk">
+                <span class="ip-lbl">Fishnet</span>
+                <select class="ip-combo"><option>Standard</option><option>Dense</option></select>
+            </div>
+        </div>
+        <div class="ip-body" id="ip-general" style="display:none;">
+            <div class="ip-row">
+                <input type="checkbox" class="ip-chk">
+                <span class="ip-lbl">Enhance</span>
+                <select class="ip-combo"><option>CLAHE</option><option>Hist Eq</option><option>Gamma</option></select>
+            </div>
+            <div class="ip-row">
+                <input type="checkbox" class="ip-chk">
+                <span class="ip-lbl">Denoise</span>
+                <select class="ip-combo"><option>Avg ×5</option><option>Avg ×10</option><option>Avg ×20</option></select>
+            </div>
+            <div class="ip-row">
+                <input type="checkbox" class="ip-chk">
+                <span class="ip-lbl">Pseudocolor</span>
+            </div>
+            <div class="ip-row">
+                <input type="checkbox" class="ip-chk">
+                <span class="ip-lbl">3D Recon</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- SAVE OPTIONS (fixed, below imgproc) -->
+    <div class="widget" id="save-opts">
+        <div class="widget-hdr">
+            <span class="widget-title">Save Options</span>
+        </div>
+        <div class="ip-body">
+            <!-- Path + browse -->
+            <div class="ip-row">
+                <input style="flex:1;min-width:0;height:16px;background:var(--bg-base);color:var(--readout);border:1px solid var(--border-subtle);border-radius:2px;font-size:9px;font-family:Consolas;padding:0 3px;" placeholder="C:/save/path">
+                <button class="setup-btn" style="padding:2px 5px;">...</button>
+            </div>
+            <!-- Column headers -->
+            <div style="display:flex;margin-bottom:3px;">
+                <div style="flex:1;text-align:center;font-size:8px;color:var(--text-dim);letter-spacing:0.5px;">Capture</div>
+                <div style="flex:1;text-align:center;font-size:8px;color:var(--text-dim);letter-spacing:0.5px;">Record</div>
+            </div>
+            <!-- ORI / RES buttons (toggleable) -->
+            <div style="display:flex;gap:4px;">
+                <div class="setup-btn" style="flex:1;text-align:center;cursor:pointer;" onclick="this.classList.toggle('ori-on')">ORI</div>
+                <div class="setup-btn" style="flex:1;text-align:center;cursor:pointer;" onclick="this.classList.toggle('res-on')">RES</div>
+                <div class="setup-btn" style="flex:1;text-align:center;cursor:pointer;" onclick="this.classList.toggle('ori-on')">ORI</div>
+                <div class="setup-btn" style="flex:1;text-align:center;cursor:pointer;" onclick="this.classList.toggle('res-on')">RES</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VISION (fixed, below save-opts) -->
+    <div class="widget" id="vision">
+        <div class="widget-hdr">
+            <span class="widget-title">Vision</span>
+        </div>
+        <div class="vision-rows">
+            <div class="ve-row">
+                <div class="ve-thumb"></div>
+                <div class="ve-info">
+                    <div class="ve-info-top">
+                        <span class="ve-name">MAIN</span>
+                        <span class="ve-model">Model 1</span>
+                    </div>
+                    <div class="ve-stats">80.6%<br>72.24&nbsp;&nbsp;7.22</div>
+                </div>
+            </div>
+            <div class="ve-row">
+                <div class="ve-thumb"></div>
+                <div class="ve-info">
+                    <div class="ve-info-top">
+                        <span class="ve-name">ALT1</span>
+                        <span class="ve-model">Model 2</span>
+                    </div>
+                    <div class="ve-stats">57.6%<br>56.39&nbsp;&nbsp;6.21</div>
+                </div>
+            </div>
+            <div class="ve-row">
+                <div class="ve-thumb inactive"></div>
+                <div class="ve-info">
+                    <div class="ve-info-top">
+                        <span class="ve-name" style="color:var(--text-dim);">ALT2</span>
+                        <span class="ve-model">Model 2</span>
+                    </div>
+                    <div class="ve-stats">58.6%<br>56.29&nbsp;&nbsp;4.19</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel toggle bar -->
+    <div id="pbar">
+        <div class="pb on" data-fp="optics">Optics &amp; PTZ</div>
+        <div class="pb on" data-fp="tcu">TCU &amp; Laser</div>
+        <div class="pb on" data-fp="console">Console</div>
+    </div>
+
+    <!-- GLI logo -->
+    <div id="gli">GLI</div>
+
+    <!-- ===== FLOATING: OPTICS & PTZ ===== -->
+    <div class="fp pinned" id="optics">
+        <div class="fp-hdr">
+            <span class="fp-title">Optics &amp; PTZ Control</span>
+            <div class="fp-btns">
+                <div class="fp-ico on" title="Pin" onclick="this.classList.toggle('on');this.closest('.fp').classList.toggle('pinned',this.classList.contains('on'))">P</div>
+                <div class="fp-ico" onclick="hideFp('optics')">✕</div>
+            </div>
+        </div>
+        <div class="fp-body" style="display:flex;flex-direction:column;">
+            <div class="mt">
+                <div class="mt-btn on" data-ptz="classic">Classic</div>
+                <div class="mt-btn" data-ptz="modern">Modern</div>
+            </div>
+            <!-- Classic -->
+            <div id="ptz-classic" style="flex:1;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:stretch;height:100%;">
+                    <!-- Left: PTZ grid + speed -->
+                    <div style="display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0;">
+                        <div class="ptz-grid" style="flex-shrink:0;">
+                            <div class="dir-btn">↖</div><div class="dir-btn">↑</div><div class="dir-btn">↗</div>
+                            <div class="dir-btn">←</div><div class="dir-btn stp">■</div><div class="dir-btn">→</div>
+                            <div class="dir-btn">↙</div><div class="dir-btn">↓</div><div class="dir-btn">↘</div>
+                        </div>
+                        <div>
+                            <div style="font-size:9px;color:var(--text-dim);text-align:center;margin-bottom:2px;">PTZ Speed</div>
+                            <div class="spd-row" style="transform:translateY(3px);"><input type="range" class="sl" min="1" max="10" value="5"></div>
+                        </div>
+                    </div>
+                    <!-- Right: lens controls + lens step -->
+                    <div style="display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0;">
+                        <div class="lens-row">
+                            <span style="font-size:9px;color:var(--text-dim);flex-shrink:0;">H</span>
+                            <span class="lens-val" style="flex:1;width:auto;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:2px;padding:0 4px;">000.00</span>
+                            <span style="font-size:9px;color:var(--text-dim);flex-shrink:0;margin-left:4px;">V</span>
+                            <span class="lens-val" style="flex:1;width:auto;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:2px;padding:0 4px;">+00.00</span>
+                        </div>
+                        <div>
+                            <div class="lens-row">
+                                <span class="lens-lbl">Zoom</span>
+                                <div class="lens-btn">−</div>
+                                <span class="lens-val">128</span>
+                                <div class="lens-btn">+</div>
+                            </div>
+                            <div class="lens-row">
+                                <span class="lens-lbl">Focus</span>
+                                <div class="lens-btn">−</div>
+                                <span class="lens-val">064</span>
+                                <div class="lens-btn">+</div>
+                            </div>
+                            <div class="lens-row">
+                                <span class="lens-lbl">Radius</span>
+                                <div class="lens-btn">−</div>
+                                <span class="lens-val">050</span>
+                                <div class="lens-btn">+</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size:9px;color:var(--text-dim);text-align:center;margin-bottom:2px;transform:translateY(-3px);">Lens Step</div>
+                            <div class="spd-row"><input type="range" class="sl" min="1" max="10" value="3"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Modern -->
+            <div id="ptz-modern" class="ptz-modern">
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <!-- Joystick LEFT -->
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                        <div class="joy-ring" id="joy-ring">
+                            <div class="joy-dir joy-n">▲</div>
+                            <div class="joy-dir joy-s">▼</div>
+                            <div class="joy-dir joy-w">◄</div>
+                            <div class="joy-dir joy-e">►</div>
+                            <div class="joy-handle" id="joy-handle">
+                                <div class="joy-dome"></div>
+                            </div>
+                        </div>
+                        <div class="joy-label">PTZ</div>
+                    </div>
+                    <!-- Arc vertical sliders RIGHT -->
+                    <div style="display:flex;gap:5px;">
+                        <div class="arc-wrap">
+                            <canvas class="arc-canvas" id="arc-zoom" width="40" height="120" data-v="128"></canvas>
+                            <div class="arc-lbl">ZOOM</div>
+                            <div class="arc-val" id="av-zoom">128</div>
+                        </div>
+                        <div class="arc-wrap">
+                            <canvas class="arc-canvas" id="arc-focus" width="40" height="120" data-v="64"></canvas>
+                            <div class="arc-lbl">FOCUS</div>
+                            <div class="arc-val" id="av-focus">064</div>
+                        </div>
+                        <div class="arc-wrap">
+                            <canvas class="arc-canvas" id="arc-radius" width="40" height="120" data-v="50"></canvas>
+                            <div class="arc-lbl">IRIS</div>
+                            <div class="arc-val" id="av-radius">050</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== FLOATING: TCU & LASER ===== -->
+    <div class="fp pinned" id="tcu">
+        <div class="fp-hdr">
+            <span class="fp-title">TCU Timing &amp; Laser Console</span>
+            <div class="fp-btns">
+                <div class="fp-ico on" title="Pin" onclick="this.classList.toggle('on');this.closest('.fp').classList.toggle('pinned',this.classList.contains('on'))">P</div>
+                <div class="fp-ico" onclick="hideFp('tcu')">✕</div>
+            </div>
+        </div>
+        <div class="fp-body">
+            <div class="mt">
+                <div class="mt-btn on" data-tcu="normal">Normal</div>
+                <div class="mt-btn" data-tcu="guru">Guru</div>
+            </div>
+            <!-- Normal: timing diagram -->
+            <div id="tcu-normal">
+                <div class="tcu-bot" style="margin-bottom:4px;">
+                    <div class="tcu-dist">DIST: <b id="n-dist">1500 m</b></div>
+                    <div class="unlock-bar" id="lock-bar" onclick="toggleLock()" style="margin-top:0;padding:3px 0;width:70px;text-align:center;flex-shrink:0;">UNLOCK</div>
+                </div>
+                <div class="fire-btn" id="fire-btn" style="text-align:center;margin-bottom:7px;padding-top:6px;padding-bottom:7px;" onclick="this.classList.toggle('on')">FIRE LASER</div>
+                <div class="td-wrap">
+                    <div class="td-row">
+                        <span class="td-lbl">LASER</span>
+                        <div class="td-track" id="trk-lw"><div class="td-bar lw" id="bar-lw" style="left:4%;width:8%;"></div></div>
+                        <span class="td-val" id="v-lw">8.0 ns</span>
+                    </div>
+                    <div class="td-row">
+                        <span class="td-lbl">DISTANCE</span>
+                        <div class="td-track" id="trk-a"><div class="td-bar da" id="bar-a" style="left:4%;width:55%;"></div></div>
+                        <span class="td-val" id="v-a">500.0 ns</span>
+                    </div>
+                    <div class="td-row">
+                        <span class="td-lbl">DEPTH</span>
+                        <div class="td-track" id="trk-g"><div class="td-bar gw" id="bar-g" style="left:4%;width:18%;"></div></div>
+                        <span class="td-val" id="v-g">50.0 ns</span>
+                    </div>
+                    <div class="td-row">
+                        <span class="td-lbl">MCP</span>
+                        <div class="td-track" id="trk-mcp"><div class="td-bar mcp" id="bar-mcp" style="left:4%;width:65%;"></div></div>
+                        <span class="td-val" id="v-mcp">650</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Guru: full params -->
+            <div id="tcu-guru" class="guru">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;padding:0 16px;">
+                    <!-- Row 1: PRF | Laser W. -->
+                    <div class="guru-row"><span class="guru-lbl" style="width:auto;margin-right:4px;">PRF</span><input class="guru-inp" value="10.0"><span class="guru-unit">kHz</span></div>
+                    <div class="guru-row"><span class="guru-lbl" style="width:auto;margin-right:4px;">Laser W.</span><input class="guru-inp" value="0"><span class="guru-unit">μs</span><input class="guru-inp" value="8"><span class="guru-unit">ns</span></div>
+                    <!-- Row 2: Stepping | MCP -->
+                    <div class="guru-row"><span class="guru-lbl" style="width:auto;margin-right:4px;">Stepping</span><input class="guru-inp" value="100"><span class="guru-unit">ns</span></div>
+                    <div class="guru-row" style="min-width:0;"><span class="guru-lbl" style="width:auto;margin-right:4px;">MCP</span><input class="guru-inp" value="650"><input type="range" class="guru-sl" min="0" max="1000" value="650"></div>
+                    <!-- Row 3: Delay A sec | GW A sec -->
+                    <div class="guru-sec" style="margin-top:4px;">Delay A</div>
+                    <div class="guru-sec" style="margin-top:4px;">Gate Width A</div>
+                    <!-- Row 4: Delay A inputs | GW A inputs -->
+                    <div class="guru-row" style="min-width:0;"><input class="guru-inp" value="0"><span class="guru-unit">μs</span><input class="guru-inp" value="500"><span class="guru-unit">ns</span></div>
+                    <div class="guru-row" style="min-width:0;"><input class="guru-inp" value="0"><span class="guru-unit">μs</span><input class="guru-inp" value="50"><span class="guru-unit">ns</span></div>
+                    <!-- Row 5: Delay B/N header | GW B/diff header -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+                        <span class="guru-sec" style="margin-bottom:0;" id="delay-b-lbl">Delay B</span>
+                        <div onclick="toggleDiff()" style="font-size:8px;color:var(--text-dim);cursor:pointer;border:1px solid var(--border-subtle);border-radius:2px;padding:1px 4px;background:var(--bg-base);">B/N</div>
+                    </div>
+                    <div style="display:flex;align-items:center;margin-bottom:2px;">
+                        <span class="guru-sec" style="margin-bottom:0;" id="gw-b-lbl">Gate Width B</span>
+                    </div>
+                    <!-- Row 6: Delay B/N inputs | GW B/diff inputs -->
+                    <div id="guru-delay-b" class="guru-row" style="min-width:0;"><input class="guru-inp" value="0"><span class="guru-unit">μs</span><input class="guru-inp" value="520"><span class="guru-unit">ns</span></div>
+                    <div id="guru-gw-b" class="guru-row" style="min-width:0;"><input class="guru-inp" value="0"><span class="guru-unit">μs</span><input class="guru-inp" value="50"><span class="guru-unit">ns</span></div>
+                    <div id="guru-delay-n" class="guru-row" style="display:none;"><span style="font-family:Consolas;font-size:9px;color:var(--readout);flex:1;">Δ 20 ns</span></div>
+                    <div id="guru-gw-diff" class="guru-row" style="display:none;"><span style="font-family:Consolas;font-size:9px;color:var(--readout);flex:1;">Δ 0 ns</span></div>
+                    <!-- Row 7: Distance label | DOV label -->
+                    <div class="guru-row" style="margin-top:4px;"><span class="guru-lbl" style="width:auto;margin-right:4px;">Distance</span><span style="font-family:Consolas;font-size:9px;color:var(--readout);">1500 m</span></div>
+                    <div class="guru-row" style="margin-top:4px;"><span class="guru-lbl" style="width:auto;margin-right:4px;">DOV</span><span style="font-family:Consolas;font-size:9px;color:var(--readout);">7.5 m</span></div>
+                    <!-- Row 8: Distance slider | DOV slider -->
+                    <div class="guru-row" style="margin-top:6px;min-width:0;"><input type="range" class="guru-sl" min="0" max="5000" value="1500"></div>
+                    <div class="guru-row" style="margin-top:6px;min-width:0;"><input type="range" class="guru-sl" min="0" max="500" value="50"></div>
+                </div>
+                <!-- Full-width fire button -->
+                <div class="fire-btn" style="text-align:center;margin-top:10px;" onclick="this.classList.toggle('on')">FIRE LASER</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== FLOATING: CONSOLE DATA ===== -->
+    <div class="fp pinned" id="console">
+        <div class="fp-hdr">
+            <span class="fp-title">Console Data</span>
+            <div class="fp-btns">
+                <div class="fp-ico on" title="Pin" onclick="this.classList.toggle('on');this.closest('.fp').classList.toggle('pinned',this.classList.contains('on'))">P</div>
+                <div class="fp-ico" onclick="hideFp('console')">✕</div>
+            </div>
+        </div>
+        <div class="fp-body">
+            <div class="con-tabs">
+                <div class="con-tab on" data-cp="data">DATA</div>
+                <div class="con-tab" data-cp="hist">HIST</div>
+                <div class="con-tab" data-cp="alt">ALT</div>
+                <div class="con-tab" data-cp="addon">ADDON</div>
+                <div class="con-tab" data-cp="vid">VID</div>
+                <div class="con-tab" data-cp="yolo">YOLO</div>
+                <div class="con-tab" data-cp="ptcloud">3D</div>
+            </div>
+            <div class="con-page on" id="cp-data">
+                <div class="con-log" id="data-log">
+                    streams DATA.run[]<br>streams DATA.run[1]<br>streams DATA.run[2]<br>streams DATA.run[3]<br>
+                </div>
+            </div>
+            <div class="con-page" id="cp-hist"><div class="con-hist" id="hist-bars"></div></div>
+            <div class="con-page" id="cp-alt"><div class="con-misc">ALT capture / record controls</div></div>
+            <div class="con-page" id="cp-addon"><div class="con-misc">Plugin display placeholder</div></div>
+            <div class="con-page" id="cp-vid"><div class="con-misc">VL/IR camera controls</div></div>
+            <div class="con-page" id="cp-yolo"><div class="con-misc">Model selector per display</div></div>
+            <div class="con-page" id="cp-ptcloud"><div class="con-ptcloud" id="ptcloud"></div></div>
+        </div>
+    </div>
+
+    <!-- ===== SETUP OVERLAY ===== -->
+    <div class="ov" id="setup-ov" style="align-items:stretch; overflow:hidden;">
+        
+        <!-- Config Area (Scrolls independently) -->
+        <div class="setup-pane">
+            
+            <div class="setup-grid">
+                
+                <!-- COLUMN 1: Ports, Serial, Save/Load -->
+                <div class="setup-col">
+                    <!-- Shared Row for Ports, Serial Ports & Save/Load -->
+                    <div style="display:flex; gap:8px; align-items:flex-start;">
+
+                        <!-- Ports -->
+                        <div class="ov-grp" style="flex-shrink:0;">
+                            <div class="ov-ttl">Ports</div>
+                            <div class="ov-grp-body" style="display: grid; grid-template-columns: max-content max-content; gap: 4px 8px; padding: 8px 10px;">
+                                <span class="ov-lbl" style="margin:0; text-align:left;">TCU</span><input class="ov-inp tiny" value="COM3">
+                                <span class="ov-lbl" style="margin:0; text-align:left;">Rangefinder</span><input class="ov-inp tiny" value="COM4">
+                                <span class="ov-lbl" style="margin:0; text-align:left;">Lens</span><input class="ov-inp tiny" value="COM5">
+                                <span class="ov-lbl" style="margin:0; text-align:left;">Laser</span><input class="ov-inp tiny" value="COM6">
+                                <span class="ov-lbl" style="margin:0; text-align:left;">PTZ</span><input class="ov-inp tiny" value="COM7">
+                            </div>
+                        </div>
+
+                        <!-- Serial Ports -->
+                        <div class="ov-grp" style="flex:1;">
+                            <div class="ov-ttl">Serial Ports</div>
+                            <div class="ov-grp-body">
+                                <div class="ov-row"><span class="ov-lbl" style="width:50px;">Port</span><select class="ov-sel"><option>TCU</option><option>RANGE</option><option>LENS</option><option>LASER</option><option>PTZ</option></select></div>
+                                <div class="ov-row"><span class="ov-lbl" style="width:50px;">Baudrate</span><select class="ov-sel"><option>9600</option><option>19200</option><option>38400</option><option>115200</option></select></div>
+                                <div class="ov-row"><span class="ov-lbl" style="width:50px;">Available</span><div style="display:flex; gap:4px; flex:1;"><select class="ov-sel" style="flex:1;"></select><div class="setup-btn" style="padding:0 6px;">↺</div></div></div>
+                                <div class="ov-sep"></div>
+                                <label class="setup-chk-row"><input type="checkbox"> Use TCP server</label>
+                                <div class="ov-row"><span class="ov-lbl" style="width:50px;">Server IP</span><input class="ov-inp wide" value="192.168.1.233"></div>
+                                <label class="setup-chk-row"><input type="checkbox"> Use TCU port for all</label>
+                                <div class="ov-sep"></div>
+                                <div class="ov-row"><span class="ov-lbl" style="width:65px;">Custom Data</span><input class="ov-inp" style="flex:1;width:auto;" value="88 1F 00 00 00 00 99"></div>
+                            </div>
+                        </div>
+
+                        <!-- Save / Load -->
+                        <div class="ov-grp" style="flex:1;">
+                            <div class="ov-ttl">Save / Load</div>
+                            <div class="ov-grp-body">
+                                <label class="setup-chk-row"><input type="checkbox" checked> Frame info when saving</label>
+                                <div class="ov-sep" style="margin:2px 0;"></div>
+                                <label class="setup-chk-row"><input type="checkbox"> Custom info</label>
+                                <div class="ov-row"><input class="ov-inp" style="width:100%;" value="DIST 00000 m DOV 0000 m" disabled></div>
+                                <div class="ov-sep" style="margin:2px 0;"></div>
+                                <label class="setup-chk-row"><input type="checkbox" checked> Integrate info in file</label>
+                                <label class="setup-chk-row"><input type="checkbox"> Save in gray</label>
+                                <label class="setup-chk-row"><input type="checkbox" checked> Capture consecutive</label>
+                                <div class="ov-row" style="margin-top:2px;"><span class="ov-lbl" style="width:55px;">Img Format</span><select class="ov-sel"><option>bmp/tiff</option><option>jpg</option></select></div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- COLUMN 2: Camera, Devices -->
+                <div class="setup-col">
+                    <!-- Camera -->
+                    <div class="ov-grp">
+                        <div class="ov-ttl">Camera</div>
+                        <div class="ov-grp-body">
+                            <div style="display:flex; gap:4px; margin-bottom:4px;">
+                                <div class="setup-btn" style="flex:1;">Enumerate</div>
+                                <div class="setup-btn primary" style="flex:1;">Turn On</div>
+                                <div class="setup-btn danger" style="flex:1;">Turn Off</div>
+                            </div>
+                            
+                            <!-- 2-row grid: radio | col2 | col3 | btn -->
+                            <div style="display:grid; grid-template-columns:auto auto 1fr auto; gap:3px 6px; align-items:center;">
+                                <label class="setup-chk-row" style="margin:0;"><input type="radio" name="grab" checked> Continuous</label>
+                                <div class="ov-row" style="margin:0;white-space:nowrap;">
+                                    <span class="ov-lbl" style="width:auto;margin-right:4px;">CMOS Freq</span>
+                                    <input class="ov-inp tiny" value="10">
+                                </div>
+                                <div class="ov-row" style="margin:0;white-space:nowrap;">
+                                    <span class="ov-lbl" style="width:auto;margin-right:4px;">Time Expo</span>
+                                    <input class="ov-inp tiny" value="50"><span class="guru-unit" style="margin-left:4px;">ms</span>
+                                </div>
+                                <div class="setup-btn primary">START GRABBING</div>
+
+                                <label class="setup-chk-row" style="margin:0;"><input type="radio" name="grab"> Trigger</label>
+                                <div class="setup-btn">Get Params</div>
+                                <div class="ov-row" style="margin:0;">
+                                    <span class="ov-lbl" style="width:auto;margin-right:4px;">Gain</span>
+                                    <input class="ov-inp tiny" value="23" style="width:32px;">
+                                    <input type="range" style="width:75px;flex-shrink:0;height:3px;margin-left:4px;-webkit-appearance:none;background:var(--bg-elevated);outline:none;" min="0" max="4095" value="23">
+                                </div>
+                                <div class="setup-btn danger">STOP GRABBING</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Devices -->
+                    <div class="ov-grp">
+                        <div class="ov-ttl">Devices</div>
+                        <div class="ov-grp-body">
+                            <div class="setup-grp-grid">
+                                <div class="ov-row"><span class="ov-lbl">Local IP</span><input class="ov-inp wide" value="127.0.0.1" readonly style="color:#2a4858;"></div>
+                                <div class="ov-row"><span class="ov-lbl">Device IP</span><input class="ov-inp wide" value="192.168.1.159"></div>
+                                <div class="ov-row"><span class="ov-lbl">Pixel Type</span><select class="ov-sel"><option>Mono8</option><option>Mono10</option><option>RGB8</option></select></div>
+                                <div class="ov-row"><span class="ov-lbl">PTZ Type</span><select class="ov-sel"><option>pelco-p</option><option>usbcan</option><option>udp-scw</option></select></div>
+                                <div class="ov-row"><span class="ov-lbl">Rotate</span><select class="ov-sel"><option>0°</option><option>90°</option><option>180°</option><option>270°</option></select></div>
+                                <div class="ov-row"><span class="ov-lbl">Flip</span><select class="ov-sel"><option>None</option><option>Both</option><option>X</option><option>Y</option></select></div>
+                            </div>
+                            <div class="ov-row" style="margin-top:4px;"><span class="ov-lbl" style="width:75px;">Device</span><select class="ov-sel" style="flex:1; width:auto;"></select></div>
+                            <div class="ov-sep"></div>
+                            <div style="display:flex; justify-content:space-between; margin-top:2px;">
+                                <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Split</label>
+                                <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Underwater</label>
+                                <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> CL</label>
+                                <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> eBUS</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COLUMN 3: TCU (Thinner column via grid template) -->
+                <div class="setup-col">
+                    <div class="ov-grp">
+                        <div class="ov-ttl">TCU Configuration</div>
+                        <div class="ov-grp-body">
+                            <!-- Rows 1-2: TCU Type / Base Unit / Rep. Freq aligned grid -->
+                            <div style="display:grid;grid-template-columns:max-content max-content max-content max-content;gap:3px 4px;align-items:center;justify-content:center;white-space:nowrap;margin-bottom:3px;">
+                                <span class="ov-lbl" style="margin:0;">TCU Type</span>
+                                <select class="ov-sel" style="grid-column:2/5;"><option>default</option><option>40ps step</option><option>10ps step</option></select>
+                                <span class="ov-lbl" style="margin:0;">Base Unit</span>
+                                <select class="ov-sel" style="width:27px;"><option>ns</option><option>μs</option><option>m</option></select>
+                                <span class="ov-lbl" style="margin:0;">Rep. Freq</span>
+                                <select class="ov-sel" style="width:27px;"><option>kHz</option><option>Hz</option></select>
+                            </div>
+                            <div class="ov-sep"></div>
+                            <div style="display:flex; gap:12px; margin-bottom:4px;">
+                                <label class="setup-chk-row"><input type="checkbox"> Auto PRF</label>
+                                <label class="setup-chk-row"><input type="checkbox"> Auto MCP</label>
+                                <label class="setup-chk-row"><input type="checkbox"> AB Lock</label>
+                            </div>
+                            <div class="ov-sep"></div>
+                            
+                            <div style="display:grid;grid-template-columns:auto auto auto auto auto auto auto;gap:3px 4px;align-items:center;white-space:nowrap;">
+                                <span style="font-size:9px;color:var(--text-dim);text-align:right;">Delay</span>
+                                <span style="font-size:8px;color:var(--text-dim);">max</span><input class="ov-inp" style="width:40px;" value="0"><span class="guru-unit">ns</span>
+                                <span style="font-size:8px;color:var(--text-dim);">offset</span><input class="ov-inp" style="width:32px;" value="0"><span class="guru-unit">ns</span>
+
+                                <span style="font-size:9px;color:var(--text-dim);text-align:right;">Gate W.</span>
+                                <span style="font-size:8px;color:var(--text-dim);">max</span><input class="ov-inp" style="width:40px;" value="0"><span class="guru-unit">ns</span>
+                                <span style="font-size:8px;color:var(--text-dim);">offset</span><input class="ov-inp" style="width:32px;" value="0"><span class="guru-unit">ns</span>
+
+                                <span style="font-size:9px;color:var(--text-dim);text-align:right;">Laser W.</span>
+                                <span style="font-size:8px;color:var(--text-dim);">max</span><input class="ov-inp" style="width:40px;" value="0"><span class="guru-unit">ns</span>
+                                <span style="font-size:8px;color:var(--text-dim);">offset</span><input class="ov-inp" style="width:32px;" value="0"><span class="guru-unit">ns</span>
+                            </div>
+                            
+                            <div class="ov-sep"></div>
+                            <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;font-weight:700;margin-bottom:2px;">PS CONFIG</div>
+                            <div style="display:flex;gap:6px;align-items:center;white-space:nowrap;">
+                                <select class="ov-sel"><option>GW_A</option><option>DELAY_A</option><option>GW_B</option><option>DELAY_B</option></select>
+                                <div class="ov-row" style="margin:0;"><span class="ov-lbl" style="width:auto;margin-right:4px;">Step (ps)</span><input class="ov-inp" style="width:32px;" value="0"></div>
+                                <div class="ov-row" style="margin:0;"><span class="ov-lbl" style="width:auto;margin-right:4px;">Max Steps</span><input class="ov-inp" style="width:32px;" value="0"></div>
+                            </div>
+                            
+                            <div class="ov-sep"></div>
+                            <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;font-weight:700;margin-bottom:2px;">LASER TOGGLE</div>
+                            <div style="display:flex; align-items:center; justify-content:space-between;">
+                                <label class="setup-chk-row"><input type="checkbox"> Enable</label>
+                                <div style="display:flex; gap:6px;">
+                                    <label class="setup-chk-row"><input type="checkbox"> 1</label>
+                                    <label class="setup-chk-row"><input type="checkbox"> 2</label>
+                                    <label class="setup-chk-row"><input type="checkbox"> 3</label>
+                                    <label class="setup-chk-row"><input type="checkbox"> 4</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div> <!-- End Top Grid -->
+
+            <!-- BOTTOM: Image Processing (Spans full width of config area) -->
+            <div class="ov-grp">
+                <div class="ov-ttl">Image Processing</div>
+                <div class="ov-grp-body" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:10px;">
+                    
+                    <div class="sub-grp">
+                        <div class="sub-ttl">Accumulative</div>
+                        <div style="display:grid;grid-template-columns:max-content auto;gap:3px 6px;align-items:center;">
+                            <span class="ov-lbl" style="text-align:right;">Base</span><input class="ov-inp tiny" value="0">
+                        </div>
+                    </div>
+
+                    <div class="sub-grp">
+                        <div class="sub-ttl">Adaptive</div>
+                        <div style="display:grid;grid-template-columns:max-content auto;gap:3px 6px;align-items:center;">
+                            <span class="ov-lbl" style="text-align:right;">Gamma</span><input class="ov-inp tiny" value="1">
+                            <span class="ov-lbl" style="text-align:right;">Low in</span><input class="ov-inp tiny" value="0">
+                            <span class="ov-lbl" style="text-align:right;">High in</span><input class="ov-inp tiny" value="255">
+                            <span class="ov-lbl" style="text-align:right;">Low out</span><input class="ov-inp tiny" value="0">
+                            <span class="ov-lbl" style="text-align:right;">High out</span><input class="ov-inp tiny" value="255">
+                        </div>
+                    </div>
+
+                    <div class="sub-grp">
+                        <div class="sub-ttl">DCP</div>
+                        <div style="display:grid;grid-template-columns:max-content auto;gap:3px 6px;align-items:center;">
+                            <span class="ov-lbl" style="text-align:right;">Dehaze %</span><input class="ov-inp tiny" value="0">
+                            <span class="ov-lbl" style="text-align:right;">Sky Tol.</span><input class="ov-inp tiny" value="0">
+                            <span class="ov-lbl" style="text-align:right;">Fast GF</span><input class="ov-inp tiny" value="0">
+                        </div>
+                    </div>
+
+                    <div class="sub-grp">
+                        <div class="sub-ttl">3D Mapping</div>
+                        <div style="display:grid;grid-template-columns:max-content max-content auto;gap:3px 6px;align-items:center;">
+                            <span class="ov-lbl" style="margin:0;">Rng</span><div style="grid-column:2/4;display:flex;gap:4px;"><input class="ov-inp tiny" value="0"><input class="ov-inp tiny" value="255"></div>
+                            <label class="setup-chk-row" style="margin:0;white-space:nowrap;"><input type="checkbox"> Trim</label><select class="ov-sel" style="grid-column:2/4;"></select>
+                            <label class="setup-chk-row" style="margin:0;white-space:nowrap;"><input type="checkbox"> Custom</label><span class="ov-lbl" style="text-align:right;margin:0;">Delay</span><div style="display:flex;align-items:center;gap:3px;"><input class="ov-inp tiny" value="0" disabled><span class="guru-unit">ns</span></div>
+                            <span></span><span class="ov-lbl" style="text-align:right;margin:0;">Gate</span><div style="display:flex;align-items:center;gap:3px;"><input class="ov-inp tiny" value="0" disabled><span class="guru-unit">ns</span></div>
+                        </div>
+                    </div>
+
+                    <div class="sub-grp">
+                        <div class="sub-ttl">Fishnet</div>
+                        <div style="display:grid;grid-template-columns:max-content auto;gap:3px 6px;align-items:center;">
+                            <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Enable</label><select class="ov-sel"><option>01 legacy</option><option>02 pix2pix</option><option>03 maskguided</option></select>
+                            <span class="ov-lbl">Thresh</span><input class="ov-inp tiny" value="0">
+                        </div>
+                    </div>
+
+                    <div class="sub-grp" style="grid-column: span 2;">
+                        <div class="sub-ttl">ECC Denoise</div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0 12px;">
+                            <div style="display:grid;grid-template-columns:max-content auto;gap:3px 6px;align-items:center;">
+                                <span class="ov-lbl" style="text-align:right;">Window</span><select class="ov-sel"><option>backward</option><option>balanced</option><option>custom</option></select>
+                                <span class="ov-lbl" style="text-align:right;">Warp</span><select class="ov-sel"><option>translate</option><option>euclidean</option><option>affine</option><option>homography</option></select>
+                                <span class="ov-lbl" style="text-align:right;">Fusion</span><select class="ov-sel"><option>mean</option><option>median</option><option>med+trim</option></select>
+                                <span></span><label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Half res reg</label>
+                                <span></span><label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Half res fuse</label>
+                            </div>
+                            <div style="display:grid;grid-template-columns:max-content auto;gap:3px 6px;align-items:center;">
+                                <span class="ov-lbl" style="text-align:right;">Backward</span><input class="ov-inp tiny" value="0">
+                                <span class="ov-lbl" style="text-align:right;">Forward</span><input class="ov-inp tiny" value="0">
+                                <span class="ov-lbl" style="text-align:right;">Levels</span><input class="ov-inp tiny" value="0">
+                                <span class="ov-lbl" style="text-align:right;">Max Iter</span><input class="ov-inp tiny" value="0">
+                                <span class="ov-lbl" style="text-align:right;">Epsilon</span><input class="ov-inp tiny" value="0">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            
+        </div><!-- /Config Area -->
+
+        <!-- Preview Area: Fixed strictly to the right side (Unchanged content) -->
+        <div style="flex:0 0 20%; min-width:0; overflow-y:auto;">
+            <div class="ov-grp">
+                <div class="ov-ttl">Display Previews</div>
+                <div class="ov-grp-body">
+                    <div style="font-size:9px;color:var(--text-dim);margin-bottom:3px;font-weight:700;">Main</div>
+                    <div class="ov-prev" style="width:100%;height:auto;aspect-ratio:4/3;background:var(--bg-deepest);border:1px solid var(--border-subtle);"></div>
+                    <div style="font-size:9px;color:var(--text-dim);margin:8px 0 3px;font-weight:700;">ALT 1</div>
+                    <div class="ov-prev" style="width:100%;height:auto;aspect-ratio:4/3;background:var(--bg-deepest);border:1px solid var(--border-subtle);"></div>
+                    <div style="font-size:9px;color:var(--text-dim);margin:8px 0 3px;font-weight:700;">ALT 2</div>
+                    <div class="ov-prev" style="width:100%;height:auto;aspect-ratio:4/3;background:var(--bg-deepest);border:1px solid var(--border-subtle);"></div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- ===== SCAN OVERLAY ===== -->
+    <div class="ov" id="scan-ov" style="align-items:flex-start;">
+        <div style="flex:2;display:flex;flex-direction:column;gap:10px;min-width:0;">
+            <div style="display:flex;gap:10px;align-items:stretch;">
+                
+                <div class="ov-grp" style="flex:1;">
+                    <div class="ov-ttl">Delay</div>
+                    <div class="ov-grp-body" style="align-items:center;">
+                        <div class="guru-row">
+                            <span class="ov-lbl" style="width:52px; text-align:left;">Starting</span>
+                            <input class="guru-inp" style="width:36px;" value="0"><span class="guru-unit">μs</span>
+                            <input class="guru-inp" style="width:36px;" value="0"><span class="guru-unit">ns</span>
+                        </div>
+                        <div class="guru-row">
+                            <span class="ov-lbl" style="width:52px; text-align:left;">Ending</span>
+                            <input class="guru-inp" style="width:36px;" value="0"><span class="guru-unit">μs</span>
+                            <input class="guru-inp" style="width:36px;" value="500"><span class="guru-unit">ns</span>
+                        </div>
+                        <div class="guru-sep" style="width:100%; margin:4px 0;"></div>
+                        <div class="guru-row">
+                            <span class="ov-lbl" style="width:52px; text-align:left;">Step</span>
+                            <input class="guru-inp" style="width:55px;" value="10.00"><span class="guru-unit">ns</span>
+                        </div>
+                        <div class="guru-row">
+                            <span class="ov-lbl" style="width:52px; text-align:left;">Rep Freq</span>
+                            <input class="guru-inp" style="width:55px;" value="10"><span class="guru-unit">kHz</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ov-grp" style="flex:1;">
+                    <div class="ov-ttl">Gate Width</div>
+                    <div class="ov-grp-body" style="align-items:center;">
+                        <div class="guru-row">
+                            <span class="ov-lbl" style="width:52px; text-align:left;">Starting</span>
+                            <input class="guru-inp" style="width:36px;" value="0"><span class="guru-unit">μs</span>
+                            <input class="guru-inp" style="width:36px;" value="50"><span class="guru-unit">ns</span>
+                        </div>
+                        <div class="guru-row">
+                            <span class="ov-lbl" style="width:52px; text-align:left;">Ending</span>
+                            <input class="guru-inp" style="width:36px;" value="0"><span class="guru-unit">μs</span>
+                            <input class="guru-inp" style="width:36px;" value="50"><span class="guru-unit">ns</span>
+                        </div>
+                        <div class="guru-sep" style="width:100%; margin:4px 0;"></div>
+                        <div class="guru-row">
+                            <span class="ov-lbl" style="width:52px; text-align:left;">Step</span>
+                            <input class="guru-inp" style="width:55px;" value="0.00"><span class="guru-unit">ns</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ov-grp" style="flex:1.2;">
+                    <div class="ov-ttl">PTZ</div>
+                    <div class="ov-grp-body" style="flex-direction:row; justify-content:center; gap:12px;">
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <div class="guru-row" style="margin-bottom:0;">
+                                <span style="width:44px;flex-shrink:0;"></span>
+                                <span style="width:36px;font-size:8px;color:var(--text-dim);text-align:center;flex-shrink:0;">H</span>
+                                <span style="width:36px;font-size:8px;color:var(--text-dim);text-align:center;flex-shrink:0;">V</span>
+                            </div>
+                            <div class="guru-row" style="gap:4px;">
+                                <span class="ov-lbl" style="width:44px; text-align:left;">Starting</span>
+                                <input class="guru-inp" style="width:36px;" value="0.00">
+                                <input class="guru-inp" style="width:36px;" value="0.00">
+                                <span class="guru-unit">°</span>
+                            </div>
+                            <div class="guru-row" style="gap:4px;">
+                                <span class="ov-lbl" style="width:44px; text-align:left;">Ending</span>
+                                <input class="guru-inp" style="width:36px;" value="0.00">
+                                <input class="guru-inp" style="width:36px;" value="0.00">
+                                <span class="guru-unit">°</span>
+                            </div>
+                            <div class="guru-row" style="gap:4px;">
+                                <span class="ov-lbl" style="width:44px; text-align:left;">Step</span>
+                                <input class="guru-inp" style="width:36px;" value="1.00">
+                                <input class="guru-inp" style="width:36px;" value="1.00">
+                                <span class="guru-unit">°</span>
+                            </div>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:8px;padding-top:14px;flex-shrink:0;">
+                            <div>
+                                <div style="font-size:9px;color:var(--text-dim);margin-bottom:3px;">Direction</div>
+                                <div style="display:flex;gap:6px;">
+                                    <label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="radio" name="ptz-dir" checked style="accent-color:var(--accent);"> N</label>
+                                    <label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="radio" name="ptz-dir" style="accent-color:var(--accent);"> Z</label>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size:9px;color:var(--text-dim);margin-bottom:3px;">Wait</div>
+                                <div style="display:flex;align-items:center;gap:3px;">
+                                    <input class="guru-inp" style="width:36px;" value="0"><span class="guru-unit">s</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ov-grp" style="flex:1.2;">
+                    <div class="ov-ttl">Capture / Record</div>
+                    <div class="ov-grp-body" style="flex-direction:row; justify-content:center; gap:16px;">
+                        <div style="display:flex; flex-direction:column; justify-content:space-between;">
+                            <div>
+                                <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;margin-bottom:4px;font-weight:700;">CAPTURE</div>
+                                <div class="ov-row" style="margin-bottom:2px;"><label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="ip-chk"> Original</label></div>
+                                <div class="ov-row"><label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="ip-chk"> Result</label></div>
+                            </div>
+                            <div>
+                                <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;margin-bottom:4px;font-weight:700;">RECORD</div>
+                                <div class="ov-row" style="margin-bottom:2px;"><label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="ip-chk"> Original</label></div>
+                                <div class="ov-row"><label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="ip-chk"> Result</label></div>
+                            </div>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <div>
+                                <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;font-weight:700;">PROFILES</div>
+                                <div style="font-size:8px;color:var(--text-ghost);margin-bottom:3px;"># of TCU+PTZ param sets</div>
+                                <input class="guru-inp" style="width:36px;" value="5">
+                            </div>
+                            <div>
+                                <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;font-weight:700;">IMGS / PROFILE</div>
+                                <div style="font-size:8px;color:var(--text-ghost);margin-bottom:3px;"># of imgs saved per profile</div>
+                                <input class="guru-inp" style="width:36px;" value="1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;width:90px;">
+                    <div class="scan-action-btn start">Start</div>
+                    <div class="scan-action-btn">Continue</div>
+                    <div class="scan-action-btn">Restart</div>
+                    <div style="flex:1;"></div> <div class="scan-action-btn stop">Stop</div>
+                </div>
+            </div>
+        </div>
+
+        <div style="flex:0 0 20%;min-width:0;">
+            <div class="ov-grp">
+                <div class="ov-ttl">Display Previews</div>
+                <div class="ov-grp-body">
+                    <div style="font-size:9px;color:var(--text-dim);margin-bottom:3px;font-weight:700;">Main</div>
+                    <div class="ov-prev" style="width:100%;height:auto;aspect-ratio:4/3;background:var(--bg-deepest);border:1px solid var(--border-subtle);"></div>
+
+                    <div style="font-size:9px;color:var(--text-dim);margin:8px 0 3px;font-weight:700;">ALT 1</div>
+                    <div class="ov-prev" style="width:100%;height:auto;aspect-ratio:4/3;background:var(--bg-deepest);border:1px solid var(--border-subtle);"></div>
+
+                    <div style="font-size:9px;color:var(--text-dim);margin:8px 0 3px;font-weight:700;">ALT 2</div>
+                    <div class="ov-prev" style="width:100%;height:auto;aspect-ratio:4/3;background:var(--bg-deepest);border:1px solid var(--border-subtle);"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div><!-- #win -->
+
+<script>
+// ===== CLOCK =====
+setInterval(() => {
+    const n=new Date(), p=v=>String(v).padStart(2,'0');
+    document.getElementById('clock').textContent=p(n.getHours())+':'+p(n.getMinutes())+':'+p(n.getSeconds());
+},1000);
+
+// ===== POSITION main display (16:9) and stack right-side widgets =====
+function layoutWidgets() {
+    const win   = document.getElementById('win');
+    const md    = document.getElementById('main-display');
+    const ip    = document.getElementById('imgproc');
+    const so    = document.getElementById('save-opts');
+    const vs    = document.getElementById('vision');
+    const W     = win.clientWidth;
+    const H     = win.clientHeight;
+    const PAD   = 8;
+    const LEFT  = 223;   // reserved for side display + mapbox (207px + 8px pad + 8px gap)
+    const RIGHT = ip.offsetWidth + PAD * 2;  // reserved for imgproc/vision
+    const avW   = W - LEFT - RIGHT - PAD * 2;
+    const avH   = H - PAD * 2;
+    // Fit 16:9 within available area
+    let dw = avW, dh = Math.round(avW * 9 / 16);
+    if (dh > avH) { dh = avH; dw = Math.round(avH * 16 / 9); }
+    const dx = LEFT + PAD + Math.round((avW - dw) / 2);
+    const dy = PAD;  // top-aligned
+    md.style.left   = dx + 'px';
+    md.style.top    = dy + 'px';
+    md.style.width  = dw + 'px';
+    md.style.height = dh + 'px';
+    // save-opts sits below imgproc, vision below save-opts
+    so.style.top = (ip.offsetTop + ip.offsetHeight + PAD) + 'px';
+    vs.style.top = (so.offsetTop + so.offsetHeight + PAD) + 'px';
+}
+window.addEventListener('load',   layoutWidgets);
+window.addEventListener('resize', layoutWidgets);
+
+// ===== MODE TABS =====
+document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('on'));
+        btn.classList.add('on');
+        const m=btn.dataset.mode;
+        document.getElementById('setup-ov').classList.toggle('on',m==='setup');
+        document.getElementById('scan-ov').classList.toggle('on',m==='scan');
+        document.querySelectorAll('.fp').forEach(p=>{
+            if(m==='monitor'){if(!p._hidden)p.classList.remove('hidden');}
+            else p.classList.add('hidden');
+        });
+    });
+});
+
+// ===== DRAGGABLE FPs =====
+document.querySelectorAll('.fp-hdr').forEach(hdr => {
+    const p=hdr.closest('.fp');
+    let drag=false,ox=0,oy=0;
+    hdr.addEventListener('mousedown',e=>{
+        if(e.target.classList.contains('fp-ico'))return;
+        if(hdr.querySelector('.fp-ico[title="Pin"]')?.classList.contains('on'))return;
+        drag=true;
+        p.style.left=p.offsetLeft+'px'; p.style.top=p.offsetTop+'px';
+        p.style.bottom='auto'; p.style.right='auto';
+        ox=e.clientX-p.offsetLeft; oy=e.clientY-p.offsetTop;
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove',e=>{if(!drag)return;p.style.left=(e.clientX-ox)+'px';p.style.top=(e.clientY-oy)+'px';});
+    document.addEventListener('mouseup',()=>drag=false);
+});
+
+// ===== PANEL HIDE/SHOW =====
+function hideFp(id){const p=document.getElementById(id);p.classList.add('hidden');p._hidden=true;document.querySelector(`.pb[data-fp="${id}"]`)?.classList.remove('on');}
+document.querySelectorAll('.pb').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+        const id=btn.dataset.fp,p=document.getElementById(id);
+        if(p.classList.contains('hidden')){p.classList.remove('hidden');p._hidden=false;btn.classList.add('on');}
+        else{hideFp(id);}
+    });
+});
+
+// ===== PTZ MODE =====
+document.querySelectorAll('.mt-btn[data-ptz]').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('.mt-btn[data-ptz]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    document.getElementById('ptz-classic').style.display=b.dataset.ptz==='classic'?'block':'none';
+    document.getElementById('ptz-modern').style.display=b.dataset.ptz==='modern'?'block':'none';
+}));
+
+// ===== TCU MODE =====
+document.querySelectorAll('.mt-btn[data-tcu]').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('.mt-btn[data-tcu]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    document.getElementById('tcu-normal').style.display=b.dataset.tcu==='normal'?'block':'none';
+    document.getElementById('tcu-guru').style.display=b.dataset.tcu==='guru'?'block':'none';
+}));
+
+// ===== TIMING BARS (draggable) =====
+[['trk-a','bar-a','v-a',1000,' ns'],['trk-g','bar-g','v-g',500,' ns'],['trk-lw','bar-lw','v-lw',200,' ns'],['trk-mcp','bar-mcp','v-mcp',1000,'']].forEach(([tid,bid,vid,max,unit])=>{
+    const trk=document.getElementById(tid),bar=document.getElementById(bid),val=document.getElementById(vid);
+    let drag=false;
+    trk.addEventListener('mousedown',e=>{drag=true;e.preventDefault();});
+    document.addEventListener('mousemove',e=>{
+        if(!drag)return;
+        const r=trk.getBoundingClientRect();
+        let pct=Math.max(4,Math.min(96,(e.clientX-r.left)/r.width*100));
+        bar.style.width=pct+'%';
+        if(val)val.textContent=(pct/100*max).toFixed(1)+unit;
+    });
+    document.addEventListener('mouseup',()=>drag=false);
+});
+
+// ===== LOCK =====
+let locked=false;
+function toggleDiff(){
+    const showN = document.getElementById('guru-delay-n').style.display === 'none';
+    document.getElementById('guru-delay-b').style.display  = showN ? 'none' : 'flex';
+    document.getElementById('guru-delay-n').style.display  = showN ? 'flex' : 'none';
+    document.getElementById('guru-gw-b').style.display     = showN ? 'none' : 'flex';
+    document.getElementById('guru-gw-diff').style.display  = showN ? 'flex' : 'none';
+    document.getElementById('delay-b-lbl').textContent     = showN ? 'Delay N' : 'Delay B';
+    document.getElementById('gw-b-lbl').textContent        = showN ? 'GW Diff' : 'Gate Width B';
+}
+function toggleLock(){
+    locked=!locked;
+    const el=document.getElementById('lock-bar');
+    el.textContent=locked?'LOCK':'UNLOCK';
+    el.classList.toggle('locked',locked);
+}
+
+// ===== JOYSTICK =====
+(()=>{
+    const ring=document.getElementById('joy-ring'),handle=document.getElementById('joy-handle');
+    if(!ring||!handle)return;
+    let d=false;
+    handle.addEventListener('mousedown',e=>{d=true;e.preventDefault();});
+    document.addEventListener('mousemove',e=>{
+        if(!d)return;
+        const r=ring.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+        let dx=e.clientX-cx,dy=e.clientY-cy,dist=Math.sqrt(dx*dx+dy*dy),maxR=r.width/2-15;
+        if(dist>maxR){dx=dx/dist*maxR;dy=dy/dist*maxR;}
+        handle.style.left=(r.width/2+dx)+'px';handle.style.top=(r.height/2+dy)+'px';
+    });
+    document.addEventListener('mouseup',()=>{if(!d)return;d=false;handle.style.left='50%';handle.style.top='50%';});
+})();
+
+// ===== ARC VERTICAL SLIDER CONTROLS =====
+const cssVar = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+function arcSlider(canvasId, valId, fillColor) {
+    const c = document.getElementById(canvasId);
+    const vEl = document.getElementById(valId);
+    if (!c) return;
+    let v = parseInt(c.dataset.v) || 128;
+    let drag = false;
+    const H = c.height;
+    const CX = -46, CY = H / 2, R = 80;  
+    const halfSweep = Math.asin((CY - 8) / R);
+    const botA = halfSweep;   
+    const topA = -halfSweep;  
+
+    function valToAngle(val) { return botA + (val / 255) * (topA - botA); }
+    function yToVal(my) { return Math.round((1 - Math.max(0, Math.min(1, (my - 8) / (H - 16)))) * 255); }
+
+    function draw() {
+        const ctx = c.getContext('2d');
+        ctx.clearRect(0, 0, c.width, H);
+        ctx.beginPath(); ctx.arc(CX, CY, R, botA, topA, true);
+        ctx.strokeStyle = cssVar('--slider-track'); ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.stroke();
+        for (let i = 0; i <= 8; i++) {
+            const a = botA + (i / 8) * (topA - botA);
+            const nx = Math.cos(a), ny = Math.sin(a);
+            const px = CX + R * nx, py = CY + R * ny;
+            ctx.beginPath();
+            ctx.moveTo(px - nx * 3, py - ny * 3);
+            ctx.lineTo(px - nx * (i % 4 === 0 ? 9 : 6), py - ny * (i % 4 === 0 ? 9 : 6));
+            ctx.strokeStyle = cssVar('--accent-muted'); ctx.lineWidth = 1; ctx.stroke();
+        }
+        const curA = valToAngle(v);
+        if (v > 0) {
+            ctx.beginPath(); ctx.arc(CX, CY, R, botA, curA, true);
+            ctx.strokeStyle = fillColor; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.stroke();
+        }
+        const hx = CX + R * Math.cos(curA), hy = CY + R * Math.sin(curA);
+        ctx.beginPath(); ctx.arc(hx, hy, 5, 0, 2*Math.PI);
+        ctx.fillStyle = fillColor; ctx.fill();
+        if (vEl) vEl.textContent = String(v).padStart(3, '0');
+    }
+    draw();
+
+    c.addEventListener('mousedown', e => {
+        drag = true;
+        const r = c.getBoundingClientRect();
+        v = yToVal(e.clientY - r.top); draw(); e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+        if (!drag) return;
+        const r = c.getBoundingClientRect();
+        v = yToVal(e.clientY - r.top); draw();
+    });
+    document.addEventListener('mouseup', () => drag = false);
+}
+arcSlider('arc-zoom',   'av-zoom',   cssVar('--lens-zoom')); 
+arcSlider('arc-focus',  'av-focus',  cssVar('--lens-focus')); 
+arcSlider('arc-radius', 'av-radius', cssVar('--lens-iris')); 
+
+// ===== IMG PROC TABS =====
+document.querySelectorAll('.rp-tab').forEach(t=>t.addEventListener('click',()=>{
+    document.querySelectorAll('.rp-tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');
+    document.getElementById('ip-models').style.display=t.dataset.ip==='models'?'block':'none';
+    document.getElementById('ip-general').style.display=t.dataset.ip==='general'?'block':'none';
+}));
+
+// ===== CONSOLE TABS =====
+document.querySelectorAll('.con-tab').forEach(t=>t.addEventListener('click',()=>{
+    document.querySelectorAll('.con-tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');
+    document.querySelectorAll('.con-page').forEach(p=>p.classList.remove('on'));
+    document.getElementById('cp-'+t.dataset.cp)?.classList.add('on');
+}));
+
+// ===== HISTOGRAM =====
+(()=>{
+    const c=document.getElementById('hist-bars');if(!c)return;
+    for(let i=0;i<52;i++){
+        const b=document.createElement('div');b.className='hbar';
+        const v=Math.exp(-Math.pow((i-22)/9,2))*85+Math.random()*10+3;
+        b.style.height=v+'px';if(v>75)b.classList.add('pk');
+        c.appendChild(b);
+    }
+})();
+
+// ===== POINT CLOUD =====
+(()=>{
+    const c=document.getElementById('ptcloud');if(!c)return;
+    for(let i=0;i<100;i++){
+        const d=document.createElement('div');
+        d.style.cssText=`position:absolute;width:2px;height:2px;background:#2a7858;border-radius:50%;left:${8+Math.random()*84}%;top:${8+Math.random()*84}%;opacity:${0.3+Math.random()*0.6}`;
+        c.appendChild(d);
+    }
+})();
+
+// ===== DATA LOG =====
+let logN=4;
+setInterval(()=>{
+    const el=document.getElementById('data-log');if(!el)return;
+    el.innerHTML+=`streams DATA.run[${logN++}]<br>`;
+    el.scrollTop=el.scrollHeight;
+},2000);
+</script>
+</body>
+</html>

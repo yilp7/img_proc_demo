@@ -105,41 +105,37 @@ UserPanel::UserPanel(QWidget *parent) :
     ui(new Ui::UserPanel),
     status_bar(NULL),
     pref(NULL),
-    scan_config(NULL),
-    laser_settings(NULL),
-    config(NULL),
+    m_device_mgr(nullptr),
+    m_tcu_ctrl(nullptr),
+    m_lens_ctrl(nullptr),
 #ifdef DISTANCE_3D_VIEW
     view_3d(NULL),
 #endif //DISTANCE_3D_VIEW
+    m_laser_ctrl(nullptr),
+    m_rf_ctrl(nullptr),
+    m_scan_ctrl(nullptr),
+    m_aux_panel(nullptr),
+    scan_config(NULL),
+    laser_settings(NULL),
+    config(NULL),
     aliasing(NULL),
+#if SIMPLE_UI
+    gain_analog_edit(23),
+#else //SIMPLE_UI
     fw_display{NULL},
+#endif //SIMPLE_UI
     secondary_display(NULL),
     simple_ui(false),
     calc_avg_option(5),
     trigger_by_software(false),
     curr_cam(NULL),
     time_exposure_edit(95000),
-#if SIMPLE_UI
-    gain_analog_edit(23),
-#else //SIMPLE_UI
     gain_analog_edit(0),
-#endif //SIMPLE_UI
     frame_rate_edit(10),
-    m_device_mgr(nullptr),
-    m_tcu_ctrl(nullptr),
-    m_lens_ctrl(nullptr),
-    m_laser_ctrl(nullptr),
-    m_rf_ctrl(nullptr),
-    m_scan_ctrl(nullptr),
-    m_aux_panel(nullptr),
     q_fps_calc(5),
     device_type(0),
     device_on(false),
     start_grabbing(false),
-    record_original{false},
-    record_modified{false},
-    save_original{false},
-    save_modified{false},
     image_3d{false},
     image_rotate{0},
     is_color{false},
@@ -151,7 +147,6 @@ UserPanel::UserPanel(QWidget *parent) :
     display_thread_idx{-1, -1, -1},
     grab_image{false},
     h_grab_thread{NULL},
-    grab_thread_state{false},
     video_thread_state(false),
     h_joystick_thread(NULL),
     // multi_laser_lenses removed (dead variable)
@@ -171,6 +166,14 @@ UserPanel::UserPanel(QWidget *parent) :
     tp(THREAD_POOL_SIZE),
     alt_ctrl_grp(NULL)
 {
+    for (int i = 0; i < 3; ++i) {
+        record_original[i].store(false);
+        record_modified[i].store(false);
+        save_original[i].store(false);
+        save_modified[i].store(false);
+        grab_thread_state[i].store(false);
+    }
+
     ui->setupUi(this);
 
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
@@ -1642,9 +1645,9 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         {
             QMutexLocker locker(&image_mutex[0]);
-            res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.avi");
+            res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.mp4");
 //            vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || image_3d[0]);
-            vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('X', '2', '6', '4'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || pseudocolor[0]);
+            vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || pseudocolor[0]);
         }
     }
     record_modified[0] = !record_modified[0];
@@ -2435,13 +2438,13 @@ void UserPanel::prompt_for_input_file()
     grid.addWidget(new QLabel("video URL:", &input_file_dialog), 0, 0);
 
     QComboBox *file_path_x = new QComboBox(&input_file_dialog);
-    static QStringList file_paths = (QStringList() << "rtsp://192.168.2.xxx/mainstream"
+    static QStringList file_paths = (QStringList() << "rtsp://192.168.1.xxx/mainstream"
                                      << "rtsp://admin:abcd1234@192.168.1.xxx:554/h264/ch1/main/av_stream"
                                      << "rtsp://admin:abcd1234@192.168.1.xxx:554");
-    static QStringList sp_paths = (QStringList() << "https://mst3k-localnow.amagi.tv/playlist.m3u8"
-                                   << "http://109.233.89.170/Disney_Channel/mono.m3u8"
+    static QStringList sp_paths = (QStringList() << "https://d3s7x6kmqcnb6b.cloudfront.net/hls/TW6CI6Y/m.m3u8"
+                                   << "https://jmp2.uk/plu-64edf6eaa7ec0d000812f58c.m3u8"
                                    << "https://travelxp-travelxp-1-nz.samsung.wurl.tv/playlist.m3u8"
-                                   << "https://aegis-cloudfront-1.tubi.video/dc8bda97-ce9e-4091-b4e8-11254dea4da6/playlist.m3u8");
+                                   << "https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8");
     file_path_x->addItems(file_paths);
     if (sp_mode) file_path_x->addItems(sp_paths);
     file_path_x->setEditable(true);
@@ -3574,8 +3577,10 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                 return error_code;
             };
 
-            // open input video
-            AVInputFormat *input_format = (AVInputFormat *)av_find_input_format("dshow");
+            // open input video — only use dshow for local devices (e.g. "video=...")
+            AVInputFormat *input_format = nullptr;
+            if (filename.contains("video=") || filename.contains("audio="))
+                input_format = (AVInputFormat *)av_find_input_format("dshow");
             start_time = time(NULL);
             if (avformat_open_input(&format_context, filename.toUtf8().constData(), input_format, NULL) != 0) return cleanup_and_return(-2);
 
@@ -3810,9 +3815,9 @@ void UserPanel::on_SAVE_AVI_BUTTON_clicked()
     else {
 //        curr_cam->start_recording(0, QString(save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         image_mutex[0].lock();
-        raw_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw.avi");
+        raw_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw.mp4");
 //        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w[0], h[0]), is_color[0]);
-        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('X', '2', '6', '4'), frame_rate_edit, cv::Size(w[0], h[0]), is_color[0]);
+        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit, cv::Size(w[0], h[0]), is_color[0]);
         image_mutex[0].unlock();
     }
     record_original[0] = !record_original[0];
@@ -4063,9 +4068,9 @@ void UserPanel::alt_display_control(int cmd)
         }
         else {
             image_mutex[display_idx].lock();
-            raw_avi[display_idx - 1] = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw_alt" + QString::number(display_idx) + ".avi");
+            raw_avi[display_idx - 1] = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw_alt" + QString::number(display_idx) + ".mp4");
 //            vid_out[display_idx + 1].open(raw_avi[display_idx - 1].toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w[display_idx], h[display_idx]), is_color[display_idx]);
-            vid_out[display_idx + 1].open(raw_avi[display_idx - 1].toLatin1().data(), cv::VideoWriter::fourcc('X', '2', '6', '4'), frame_rate_edit, cv::Size(w[display_idx], h[display_idx]), is_color[display_idx]);
+            vid_out[display_idx + 1].open(raw_avi[display_idx - 1].toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit, cv::Size(w[display_idx], h[display_idx]), is_color[display_idx]);
             image_mutex[display_idx].unlock();
         }
         record_modified[display_idx] = !record_modified[display_idx];

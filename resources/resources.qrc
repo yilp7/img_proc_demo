@@ -36,6 +36,7 @@
         <file alias="url">tools/dark/url.png</file>
         <file alias="url_hover">tools/dark/url_hover.png</file>
         <file alias="switch">tools/dark/switch.png</file>
+        <file alias="ptz">tools/dark/ptz.png</file>
     </qresource>
     <qresource prefix="/cursor/dark">
         <file alias="cursor">cursor/dark/cursor.png</file>

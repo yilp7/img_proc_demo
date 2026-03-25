@@ -15,6 +15,7 @@ public:
         RETURN_ZERO     = 0x02,
         SCAN            = 0x03,
         MANUAL_SEARCH   = 0x04,
+        FOLLOW          = 0x05,
         ANGLE_POSITION  = 0x07,
         ANGLE_H         = 0x08,
         ANGLE_V         = 0x09,
@@ -75,6 +76,7 @@ public:
     void ptz_set_angle(float h, float v) override;
     void ptz_set_angle_h(float h) override;
     void ptz_set_angle_v(float v) override;
+    void ptz_follow(float h, float v);
     float ptz_get_angle_h() const override { return horizontal_angle; }
     float ptz_get_angle_v() const override { return vertical_angle; }
     bool ptz_is_connected() const override { return is_connected(); }

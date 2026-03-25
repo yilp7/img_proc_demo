@@ -22,6 +22,7 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event);
     void wheelEvent(QWheelEvent *event);
     void mouseDoubleClickEvent(QMouseEvent *event);
+    void closeEvent(QCloseEvent *event);
 
 signals:
     void set_pixmap(const QPixmap& pm);
@@ -50,6 +51,7 @@ public:
     bool     pressed;
 
     QRect    reserved_geometry;
+    bool     is_fullscreen = false;
 };
 
 #endif // DISPLAY_H
