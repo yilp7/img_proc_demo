@@ -3533,7 +3533,9 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                 if (!display_mutex[display_idx].tryLock(1e3)) return -1;
             }
 
-            bool not_rtsp_stream = !filename.contains("rtsp://");
+            bool is_rtsp_stream = filename.contains("rtsp://");
+            bool is_http_stream = filename.contains("http://") || filename.contains("https://");
+            bool is_local_file = !is_rtsp_stream && !is_http_stream;
 
             AVFormatContext *format_context = avformat_alloc_context();
             std::shared_ptr<AVFormatContext*> closer_format_context(&format_context, avformat_close_input);
@@ -3544,6 +3546,8 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
             std::shared_ptr<AVCodecContext*> closer_codec_context(&codec_context, avcodec_free_context);
             AVFrame *frame = av_frame_alloc();
             std::shared_ptr<AVFrame*> deleter_frame(&frame, av_frame_free);
+            AVFrame *frame_sw = av_frame_alloc();
+            std::shared_ptr<AVFrame*> deleter_frame_sw(&frame_sw, av_frame_free);
             AVFrame *frame_result = av_frame_alloc();
             std::shared_ptr<AVFrame*> deleter_frame_result(&frame_result, av_frame_free);
             AVFrame *frame_filter = av_frame_alloc();
@@ -3581,8 +3585,14 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
             AVInputFormat *input_format = nullptr;
             if (filename.contains("video=") || filename.contains("audio="))
                 input_format = (AVInputFormat *)av_find_input_format("dshow");
+            AVDictionary *format_opts = nullptr;
+            if (is_rtsp_stream) {
+                av_dict_set(&format_opts, "rtsp_transport", "tcp", 0);
+                av_dict_set(&format_opts, "buffer_size", "2097152", 0);
+            }
             start_time = time(NULL);
-            if (avformat_open_input(&format_context, filename.toUtf8().constData(), input_format, NULL) != 0) return cleanup_and_return(-2);
+            if (avformat_open_input(&format_context, filename.toUtf8().constData(), input_format, &format_opts) != 0) { av_dict_free(&format_opts); return cleanup_and_return(-2); }
+            av_dict_free(&format_opts);
 
             // fetch video info
             if (avformat_find_stream_info(format_context, NULL) < 0) return cleanup_and_return(-2);
@@ -3610,19 +3620,48 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
 
             if (avcodec_parameters_to_context(codec_context, codec_param) < 0) return cleanup_and_return(-3);
 
-            if (avcodec_open2(codec_context, codec, NULL) < 0) return cleanup_and_return(-3);
+            // try HW-accelerated decoding (D3D11VA), fall back to multi-threaded SW
+            AVBufferRef *hw_device_ctx = nullptr;
+            bool hw_decoding = false;
+            if (av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_D3D11VA, nullptr, nullptr, 0) == 0) {
+                codec_context->hw_device_ctx = av_buffer_ref(hw_device_ctx);
+                hw_decoding = true;
+                qDebug() << "FFmpeg: using D3D11VA hardware decoding";
+            } else {
+                qDebug() << "FFmpeg: D3D11VA unavailable, using multi-threaded software decoding";
+            }
+            if (hw_device_ctx) av_buffer_unref(&hw_device_ctx);
+
+            codec_context->thread_count = 0;
+            codec_context->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
+
+            if (avcodec_open2(codec_context, codec, NULL) < 0) {
+                // if HW open failed, retry with SW
+                if (hw_decoding) {
+                    qDebug() << "FFmpeg: HW codec open failed, retrying with software decoding";
+                    hw_decoding = false;
+                    avcodec_free_context(&codec_context);
+                    codec_context = avcodec_alloc_context3(NULL);
+                    if (avcodec_parameters_to_context(codec_context, codec_param) < 0) return cleanup_and_return(-3);
+                    codec_context->thread_count = 0;
+                    codec_context->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
+                    if (avcodec_open2(codec_context, codec, NULL) < 0) return cleanup_and_return(-3);
+                } else {
+                    return cleanup_and_return(-3);
+                }
+            }
 
             cv::Mat cv_frame(codec_context->height, codec_context->width, CV_MAKETYPE(CV_8U, format_gray ? 1 : 3));
 
-            // allocate data buffer
+            // allocate data buffer (alignment=32 for SIMD-friendly sws_scale)
             AVPixelFormat pixel_fmt = format_gray ? AV_PIX_FMT_NV12 : AV_PIX_FMT_RGB24;
-            int byte_num = av_image_get_buffer_size(pixel_fmt, codec_context->width, codec_context->height, 1);
+            int byte_num = av_image_get_buffer_size(pixel_fmt, codec_context->width, codec_context->height, 32);
             buffer = (uint8_t *)av_malloc(byte_num * sizeof(uint8_t));
 
-            av_image_fill_arrays(frame_result->data, frame_result->linesize, buffer, pixel_fmt, codec_context->width, codec_context->height, 1);
+            av_image_fill_arrays(frame_result->data, frame_result->linesize, buffer, pixel_fmt, codec_context->width, codec_context->height, 32);
 
-            sws_context = sws_getContext(codec_context->width, codec_context->height, codec_context->pix_fmt,
-                                         codec_context->width, codec_context->height, pixel_fmt, SWS_BILINEAR, NULL, NULL, NULL);
+            // sws_context created lazily — HW decode produces different pix_fmt than codec_context reports
+            AVPixelFormat sws_src_fmt = AV_PIX_FMT_NONE;
 
             if (display) start_static_display(codec_context->width, codec_context->height, !format_gray, display_idx, 8, -2);
 
@@ -3653,10 +3692,20 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                     avcodec_send_packet(codec_context, &packet);
                     // returns 0 only after decoding the entire frame
                     if (avcodec_receive_frame(codec_context, frame) == 0) {
-                        //                    qDebug() << QDateTime::currentDateTime().toString("hh:MM:ss.zzz");
+                        // transfer HW frame to CPU memory if needed
+                        AVFrame *sw_frame = frame;
+                        if (hw_decoding && frame->format != AV_PIX_FMT_NONE && frame->hw_frames_ctx) {
+                            av_frame_unref(frame_sw);
+                            if (av_hwframe_transfer_data(frame_sw, frame, 0) < 0) {
+                                av_frame_unref(frame);
+                                continue;
+                            }
+                            sw_frame = frame_sw;
+                        }
+
                         if (format_gray) {
                             // push the decoded frame into the filtergraph
-                            if (av_buffersrc_add_frame_flags(buffersrc_ctx, frame, AV_BUFFERSRC_FLAG_KEEP_REF) < 0) break;
+                            if (av_buffersrc_add_frame_flags(buffersrc_ctx, sw_frame, AV_BUFFERSRC_FLAG_KEEP_REF) < 0) break;
 
                             // pull filtered frames from the filtergraph
                             av_frame_unref(frame_filter);
@@ -3664,17 +3713,23 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
                         }
                         else {
-                            if (not_rtsp_stream && display && frame->pts != AV_NOPTS_VALUE) {
+                            if (is_local_file && display && sw_frame->pts != AV_NOPTS_VALUE) {
                                 if (last_pts != AV_NOPTS_VALUE) {
-                                    delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1e6;
-//                                    qDebug() << av_rescale_q(frame->pts - last_pts, time_base, time_base_q) << elapsed_timer.nsecsElapsed() / 1000;
+                                    delay = av_rescale_q(sw_frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1e6;
+//                                    qDebug() << av_rescale_q(sw_frame->pts - last_pts, time_base, time_base_q) << elapsed_timer.nsecsElapsed() / 1000;
                                     if (delay > 0 && delay < 1000000) av_usleep(delay);
                                     elapsed_timer.restart();
                                 }
-                                last_pts = frame->pts;
+                                last_pts = sw_frame->pts;
                             }
-                            //                        av_frame_unref(frame_result);
-                            sws_scale(sws_context, frame->data, frame->linesize, 0, codec_context->height, frame_result->data, frame_result->linesize);
+                            // lazily create/recreate sws_context on first frame or format change
+                            if (sws_src_fmt != (AVPixelFormat)sw_frame->format) {
+                                if (sws_context) sws_freeContext(sws_context);
+                                sws_src_fmt = (AVPixelFormat)sw_frame->format;
+                                sws_context = sws_getContext(codec_context->width, codec_context->height, sws_src_fmt,
+                                                             codec_context->width, codec_context->height, pixel_fmt, SWS_BILINEAR, NULL, NULL, NULL);
+                            }
+                            sws_scale(sws_context, sw_frame->data, sw_frame->linesize, 0, codec_context->height, frame_result->data, frame_result->linesize);
                         }
 
                         cv_frame.data = (format_gray ? frame_filter : frame_result)->data[0];
