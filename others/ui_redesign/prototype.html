@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>GLI User Panel — Prototype v3</title>
+<title>GLI User Panel — Prototype v3 (Updated)</title>
 <style>
 /* ===== BASE ===== */
 :root {
@@ -190,6 +190,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
     transition: color 0.15s;
 }
 .tb-btn:hover { color: var(--text-secondary); }
+.tb-btn.on { color: var(--accent); border-color: var(--accent-glow-33); background: var(--bg-header); }
 .tb-btn.rec { color: var(--negative-dim); border-color: var(--negative-border); }
 .tb-btn.rec.on { color: var(--negative); box-shadow: 0 0 4px var(--negative-rec-glow); }
 
@@ -230,7 +231,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
 }
 /* Display info overlays */
 .disp-fps {
-    position: absolute; top: 14px; left: 14px;
+    position: absolute; bottom: 14px; left: 14px; /* Moved to bottom left */
     font-family: Consolas; font-size: 10px; color: var(--readout-dim); pointer-events: none; line-height: 1.7;
 }
 .disp-fps b { color: var(--readout); }
@@ -240,6 +241,26 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
     pointer-events: none; line-height: 1.7;
 }
 .disp-coord b { color: var(--readout); }
+
+/* ===== MAIN TOOLBAR (Replaces #pbar location) ===== */
+#main-toolbar {
+    position: absolute; top: 5px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 4px; align-items: center; z-index: 200; pointer-events: all;
+    background: var(--bg-raised-80); padding: 2px 6px; border: 1px solid var(--border-subtle); border-radius: 3px;
+}
+
+/* ===== PANEL TOGGLE BAR (Moved to Top Right) ===== */
+#pbar {
+    position: absolute; top: 8px; right: 8px; width: 198px;
+    display: flex; gap: 3px; z-index: 200; pointer-events: all;
+}
+.pb {
+    flex: 1; padding: 3px 0; text-align: center; font-size: 8.5px;
+    color: var(--text-ghost); background: var(--bg-raised-80);
+    border: 1px solid var(--border-subtle); border-radius: 2px; cursor: pointer; transition: all 0.1s;
+}
+.pb:hover { color: var(--text-dim); }
+.pb.on { color: var(--accent); border-color: var(--accent-glow-20); }
 
 /* ===== FIXED WIDGET STYLE ===== */
 .widget {
@@ -269,7 +290,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
 .map-attribution { position: absolute; bottom: 3px; left: 5px; font-size: 8px; color: var(--text-ghost); font-family: Consolas; }
 
 /* ===== IMG PROC widget ===== */
-#imgproc { top: 8px; right: 8px; width: 198px; }
+#imgproc { right: 8px; width: 198px; top: 32px; } /* Top managed dynamically by layoutWidgets */
 .rp-tabs { display: flex; border-bottom: 1px solid var(--border-subtle); }
 .rp-tab { flex: 1; padding: 3px 0; text-align: center; font-size: 9px; font-weight: 700; letter-spacing: 1px; color: var(--text-ghost); cursor: pointer; border-right: 1px solid var(--border-subtle); transition: color 0.1s; }
 .rp-tab:last-child { border-right: none; }
@@ -370,11 +391,11 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
 .tcu-dist b { color: var(--readout); }
 .laser-on { padding: 3px 9px; font-size: 9px; font-weight: 700; background: var(--laser-off-bg); border: 1px solid var(--positive-border); color: var(--laser-off-text); border-radius: 3px; cursor: pointer; transition: all 0.15s; }
 .laser-on.on { background: var(--laser-armed-bg); color: var(--positive-hover-text); }
-.fire-btn { padding: 4px 12px; font-size: 10px; font-weight: 700; color: var(--negative); letter-spacing: 1px; background: repeating-linear-gradient(-45deg, var(--negative-bg), var(--negative-bg) 4px, var(--fire-stripe-alt) 4px, #180e0e 8px); border: 1px solid var(--negative-dim); border-radius: 3px; cursor: pointer; transition: all 0.15s; }
+.fire-btn { padding: 4px 12px; font-size: 10px; font-weight: 700; color: var(--negative); letter-spacing: 1px; background: repeating-linear-gradient(-45deg, var(--negative-bg), var(--negative-bg) 4px, var(--fire-stripe-alt) 4px, var(--negative-hover-bg-soft) 8px); border: 1px solid var(--negative-dim); border-radius: 3px; cursor: pointer; transition: all 0.15s; }
 .fire-btn:hover { border-color: var(--negative-dim); color: var(--negative); }
-.fire-btn.on { background: repeating-linear-gradient(-45deg, var(--fire-active-bg-a), #280a0a 4px, var(--fire-active-bg-b) 4px, #380e0e 8px); color: var(--fire-active-text); border-color: var(--negative-dim); }
-.unlock-bar { margin-top: 6px; padding: 2px 0; text-align: center; font-size: 9px; font-weight: 700; letter-spacing: 2px; color: var(--unlock-text); cursor: pointer; background: repeating-linear-gradient(-45deg, var(--unlock-bg-a), #070e0a 4px, var(--positive-bg) 4px, var(--positive-bg) 8px); border: 1px solid var(--positive-border); border-radius: 2px; }
-.unlock-bar.locked { color: var(--unlock-locked-text); border-color: var(--unlock-locked-border); background: repeating-linear-gradient(-45deg, var(--unlock-locked-bg-a), #0e0a04 4px, var(--unlock-locked-bg-b) 4px, #140f06 8px); }
+.fire-btn.on { background: repeating-linear-gradient(-45deg, var(--fire-active-bg-a), var(--negative-hover-bg) 4px, var(--fire-active-bg-b) 4px, var(--negative-border) 8px); color: var(--fire-active-text); border-color: var(--negative-dim); }
+.unlock-bar { margin-top: 6px; padding: 2px 0; text-align: center; font-size: 9px; font-weight: 700; letter-spacing: 2px; color: var(--unlock-text); cursor: pointer; background: repeating-linear-gradient(-45deg, var(--unlock-bg-a), var(--bg-base) 4px, var(--positive-bg) 4px, var(--positive-bg) 8px); border: 1px solid var(--positive-border); border-radius: 2px; }
+.unlock-bar.locked { color: var(--unlock-locked-text); border-color: var(--unlock-locked-border); background: repeating-linear-gradient(-45deg, var(--unlock-locked-bg-a), var(--bg-base) 4px, var(--unlock-locked-bg-b) 4px, var(--bg-raised) 8px); }
 
 /* Guru mode */
 .guru { display: none; }
@@ -403,11 +424,6 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
 .con-ptcloud { flex: 1; background: var(--bg-deepest); border: 1px solid var(--border-subtle); border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--border-subtle); position: relative; overflow: hidden; }
 .con-misc { flex: 1; background: var(--bg-deepest); border: 1px solid var(--border-subtle); border-radius: 2px; padding: 5px; font-size: 9px; color: var(--con-misc); }
 
-/* ===== PANEL TOGGLE BAR ===== */
-#pbar { position: absolute; top: 5px; left: 50%; transform: translateX(-50%); display: flex; gap: 3px; z-index: 200; pointer-events: all; }
-.pb { padding: 2px 8px; font-size: 9px; color: var(--text-ghost); background: var(--bg-raised-80); border: 1px solid var(--border-subtle); border-radius: 2px; cursor: pointer; transition: all 0.1s; }
-.pb:hover { color: var(--text-dim); }
-.pb.on { color: var(--accent); border-color: var(--accent-glow-20); }
 #gli { position: absolute; bottom: 6px; left: 8px; font-size: 10px; font-weight: 700; color: var(--border-subtle); letter-spacing: 3px; z-index: 5; pointer-events: none; }
 
 /* ===== MODE OVERLAYS (BASE) ===== */
@@ -430,10 +446,11 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
 
 /* Setup Screen Enhancements (Densified) */
 .setup-pane { flex: 1; overflow-y: auto; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-/* Using 1.15fr 1.15fr 0.7fr to make the TCU column visibly thinner (60-70% width of others) */
-.setup-grid { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
-.setup-col { display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto; }
-.setup-col .ov-grp-body { padding: 5px 8px; gap: 0; }
+/* Top-level: explicit rows with even spacing */
+.setup-row { display: flex; gap: 8px; justify-content: space-evenly; align-items: flex-start; }
+.setup-row > .ov-grp, .setup-row > .setup-stack { flex: 0 0 auto; }
+.setup-stack { display: flex; flex-direction: column; gap: 8px; }
+.setup-row .ov-grp-body { padding: 5px 8px; gap: 0; }
 
 /* FIXED WIDTH INPUTS to prevent stretching, flex-start to prevent huge gaps */
 .setup-pane .ov-inp, .setup-pane .ov-sel {
@@ -444,8 +461,16 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
 }
 .setup-pane .ov-inp.wide { width: 90px; }
 .setup-pane .ov-inp.tiny { width: 40px; }
-.setup-pane .ov-sel { width: auto; min-width: 60px; }
-.setup-pane .ov-lbl { font-size: 9px; color: var(--text-dim); text-align: left; margin-right: 6px; }
+.setup-pane .ov-inp.hex  { width: 130px; }
+.setup-pane .ov-inp.dev  { width: 200px; text-align: left; }
+.setup-pane .ov-sel { width: 60px; }
+.setup-pane .ov-sel.wide { width: 90px; }
+.setup-pane .ov-sel.tiny { width: 36px; }
+.setup-pane .ov-sel.dev  { width: 200px; }
+.setup-pane .ov-lbl { font-size: 9px; color: var(--text-dim); text-align: left; width: 55px; display: inline-block; }
+.setup-pane .ov-lbl.narrow { width: 40px; }
+.setup-pane .ov-lbl.wide   { width: 65px; }
+.setup-pane .ov-lbl.sub    { width: 30px; font-size: 8px; }
 
 /* Tightly packed rows */
 .setup-col .ov-row { 
@@ -453,9 +478,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
     margin-bottom: 3px; min-height: 18px; 
 }
 
-/* Grid helper for specific groups */
-.setup-grp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; align-items: center; }
-.setup-grp-grid .ov-row { margin-bottom: 0; }
+/* Grid helper (deprecated — all groups now use fixed-width grids) */
 
 .setup-col .ov-sep { height: 1px; background: var(--border-default); margin: 4px 0; }
 .setup-chk-row { display: flex; align-items: center; gap: 5px; font-size: 9px; color: var(--text-dim); margin-bottom: 3px; }
@@ -514,11 +537,43 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
         <div class="mode-btn" data-mode="scan">SCAN</div>
     </div>
     <div class="tb-sp"></div>
-    <div class="tb-time">TO: <b id="clock">00:00:00</b></div>
+
+    <!-- ===== PART 2 A: TOP BAR STATUS & ACTIONS ===== -->
+    <div style="display:flex; gap:8px; align-items:center; margin-right:8px;">
+        <div style="font-family:Consolas; font-size:10px; color:var(--readout-dim);" title="Pixel Depth">8-bit</div>
+        <div style="font-family:Consolas; font-size:10px; color:var(--readout-dim);" title="Resolution">1920×1080</div>
+    </div>
+    <div class="tb-div"></div>
+    <div class="tb-btn" title="Open URL/File">URL</div>
+    <div class="tb-btn" title="Clear">CLS</div>
+    <div class="tb-btn" title="Capture/Screenshot">CAP</div>
+    <div class="tb-btn" title="Toggle Theme">🌗</div>
+    <div class="tb-btn" title="Language">EN</div>
+    <div class="tb-btn" title="Settings">⚙️</div>
+
+    <div class="tb-time" style="margin-left:6px;">TO: <b id="clock">00:00:00</b></div>
 </div>
 
 <!-- ===== MAIN WINDOW ===== -->
 <div id="win">
+
+    <!-- Main Toolbar (Replaces pbar's central location) -->
+    <div id="main-toolbar">
+        <div class="tb-btn on" style="padding:1px 6px; font-size:9px;">SEL</div>
+        <div class="tb-btn" style="padding:1px 6px; font-size:9px;">ZOOM</div>
+        <div class="tb-btn" style="padding:1px 6px; font-size:9px;">PTZ</div>
+        <div class="tb-div" style="height:10px; margin:0 2px;"></div>
+        <label style="font-size:8px; font-weight:700; color:var(--text-dim); display:flex; align-items:center; gap:3px; cursor:pointer;">
+            <input type="checkbox" checked style="accent-color:var(--accent); margin:0;"> INFO
+        </label>
+    </div>
+
+    <!-- Panel Toggle Bar (Moved to top right above img proc) -->
+    <div id="pbar">
+        <div class="pb on" data-fp="optics">Optics &amp; PTZ</div>
+        <div class="pb on" data-fp="tcu">TCU &amp; Laser</div>
+        <div class="pb on" data-fp="console">Console</div>
+    </div>
 
     <!-- Main camera display (large central widget) -->
     <div id="main-display">
@@ -527,8 +582,16 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
         <div class="ch-v"></div>
         <div class="ch-c"></div>
         <div class="bbox"><span class="bbox-lbl">TARGET 0.82</span></div>
-        <div class="disp-fps">FPS: <b>60</b><br>GAIN: <b>12 dB</b></div>
+
+        <div class="disp-fps">FPS: <b>60</b></div>
         <div class="disp-coord">COORD: [X:<b>-45.1</b>, Y:<b>22.3</b>]<br>DIST: <b>1.5 km</b></div>
+        
+        <!-- Coordinate Widgets (Top-left) -->
+        <div class="disp-coord" style="top:14px; bottom:auto; left:14px; right:auto; text-align:left;">
+            START: [X:<b>0.0</b>, Y:<b>0.0</b>]<br>
+            SHIFT: [dX:<b>0.0</b>, dY:<b>0.0</b>]<br>
+            SHAPE: [W:<b>0</b>, H:<b>0</b>]
+        </div>
     </div>
 
     <!-- Side display (16:9) -->
@@ -537,7 +600,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
             <span class="widget-title">Side Display</span>
         </div>
         <div class="side-cam">
-            <div class="side-cam-overlay">FPS: <b>60</b><br>GAIN: <b>12dB</b></div>
+            <div class="side-cam-overlay">FPS: <b>60</b></div>
         </div>
     </div>
 
@@ -552,7 +615,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
         </div>
     </div>
 
-    <!-- IMG PROC (fixed, top-right) -->
+    <!-- IMG PROC (fixed, top-right, position managed by script) -->
     <div class="widget" id="imgproc">
         <div class="widget-hdr">
             <span class="widget-title">IMG PROC</span>
@@ -665,13 +728,6 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Panel toggle bar -->
-    <div id="pbar">
-        <div class="pb on" data-fp="optics">Optics &amp; PTZ</div>
-        <div class="pb on" data-fp="tcu">TCU &amp; Laser</div>
-        <div class="pb on" data-fp="console">Console</div>
     </div>
 
     <!-- GLI logo -->
@@ -904,247 +960,245 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
         <!-- Config Area (Scrolls independently) -->
         <div class="setup-pane">
             
-            <div class="setup-grid">
-                
-                <!-- COLUMN 1: Ports, Serial, Save/Load -->
-                <div class="setup-col">
-                    <!-- Shared Row for Ports, Serial Ports & Save/Load -->
-                    <div style="display:flex; gap:8px; align-items:flex-start;">
+            <!-- Row 1: Connection & Config (tall groups, height-balanced) -->
+            <div class="setup-row">
 
-                        <!-- Ports -->
-                        <div class="ov-grp" style="flex-shrink:0;">
-                            <div class="ov-ttl">Ports</div>
-                            <div class="ov-grp-body" style="display: grid; grid-template-columns: max-content max-content; gap: 4px 8px; padding: 8px 10px;">
-                                <span class="ov-lbl" style="margin:0; text-align:left;">TCU</span><input class="ov-inp tiny" value="COM3">
-                                <span class="ov-lbl" style="margin:0; text-align:left;">Rangefinder</span><input class="ov-inp tiny" value="COM4">
-                                <span class="ov-lbl" style="margin:0; text-align:left;">Lens</span><input class="ov-inp tiny" value="COM5">
-                                <span class="ov-lbl" style="margin:0; text-align:left;">Laser</span><input class="ov-inp tiny" value="COM6">
-                                <span class="ov-lbl" style="margin:0; text-align:left;">PTZ</span><input class="ov-inp tiny" value="COM7">
-                            </div>
-                        </div>
-
-                        <!-- Serial Ports -->
-                        <div class="ov-grp" style="flex:1;">
-                            <div class="ov-ttl">Serial Ports</div>
-                            <div class="ov-grp-body">
-                                <div class="ov-row"><span class="ov-lbl" style="width:50px;">Port</span><select class="ov-sel"><option>TCU</option><option>RANGE</option><option>LENS</option><option>LASER</option><option>PTZ</option></select></div>
-                                <div class="ov-row"><span class="ov-lbl" style="width:50px;">Baudrate</span><select class="ov-sel"><option>9600</option><option>19200</option><option>38400</option><option>115200</option></select></div>
-                                <div class="ov-row"><span class="ov-lbl" style="width:50px;">Available</span><div style="display:flex; gap:4px; flex:1;"><select class="ov-sel" style="flex:1;"></select><div class="setup-btn" style="padding:0 6px;">↺</div></div></div>
-                                <div class="ov-sep"></div>
-                                <label class="setup-chk-row"><input type="checkbox"> Use TCP server</label>
-                                <div class="ov-row"><span class="ov-lbl" style="width:50px;">Server IP</span><input class="ov-inp wide" value="192.168.1.233"></div>
-                                <label class="setup-chk-row"><input type="checkbox"> Use TCU port for all</label>
-                                <div class="ov-sep"></div>
-                                <div class="ov-row"><span class="ov-lbl" style="width:65px;">Custom Data</span><input class="ov-inp" style="flex:1;width:auto;" value="88 1F 00 00 00 00 99"></div>
-                            </div>
-                        </div>
-
-                        <!-- Save / Load -->
-                        <div class="ov-grp" style="flex:1;">
-                            <div class="ov-ttl">Save / Load</div>
-                            <div class="ov-grp-body">
-                                <label class="setup-chk-row"><input type="checkbox" checked> Frame info when saving</label>
-                                <div class="ov-sep" style="margin:2px 0;"></div>
-                                <label class="setup-chk-row"><input type="checkbox"> Custom info</label>
-                                <div class="ov-row"><input class="ov-inp" style="width:100%;" value="DIST 00000 m DOV 0000 m" disabled></div>
-                                <div class="ov-sep" style="margin:2px 0;"></div>
-                                <label class="setup-chk-row"><input type="checkbox" checked> Integrate info in file</label>
-                                <label class="setup-chk-row"><input type="checkbox"> Save in gray</label>
-                                <label class="setup-chk-row"><input type="checkbox" checked> Capture consecutive</label>
-                                <div class="ov-row" style="margin-top:2px;"><span class="ov-lbl" style="width:55px;">Img Format</span><select class="ov-sel"><option>bmp/tiff</option><option>jpg</option></select></div>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-                <!-- COLUMN 2: Camera, Devices -->
-                <div class="setup-col">
-                    <!-- Camera -->
+                <!-- Presets + Ports vertical stack -->
+                <div class="setup-stack">
                     <div class="ov-grp">
-                        <div class="ov-ttl">Camera</div>
-                        <div class="ov-grp-body">
-                            <div style="display:flex; gap:4px; margin-bottom:4px;">
-                                <div class="setup-btn" style="flex:1;">Enumerate</div>
-                                <div class="setup-btn primary" style="flex:1;">Turn On</div>
-                                <div class="setup-btn danger" style="flex:1;">Turn Off</div>
-                            </div>
-                            
-                            <!-- 2-row grid: radio | col2 | col3 | btn -->
-                            <div style="display:grid; grid-template-columns:auto auto 1fr auto; gap:3px 6px; align-items:center;">
-                                <label class="setup-chk-row" style="margin:0;"><input type="radio" name="grab" checked> Continuous</label>
-                                <div class="ov-row" style="margin:0;white-space:nowrap;">
-                                    <span class="ov-lbl" style="width:auto;margin-right:4px;">CMOS Freq</span>
-                                    <input class="ov-inp tiny" value="10">
-                                </div>
-                                <div class="ov-row" style="margin:0;white-space:nowrap;">
-                                    <span class="ov-lbl" style="width:auto;margin-right:4px;">Time Expo</span>
-                                    <input class="ov-inp tiny" value="50"><span class="guru-unit" style="margin-left:4px;">ms</span>
-                                </div>
-                                <div class="setup-btn primary">START GRABBING</div>
-
-                                <label class="setup-chk-row" style="margin:0;"><input type="radio" name="grab"> Trigger</label>
-                                <div class="setup-btn">Get Params</div>
-                                <div class="ov-row" style="margin:0;">
-                                    <span class="ov-lbl" style="width:auto;margin-right:4px;">Gain</span>
-                                    <input class="ov-inp tiny" value="23" style="width:32px;">
-                                    <input type="range" style="width:75px;flex-shrink:0;height:3px;margin-left:4px;-webkit-appearance:none;background:var(--bg-elevated);outline:none;" min="0" max="4095" value="23">
-                                </div>
-                                <div class="setup-btn danger">STOP GRABBING</div>
-                            </div>
+                        <div class="ov-ttl">Presets</div>
+                        <div class="ov-grp-body" style="display:grid; grid-template-columns:55px 55px; gap:4px;">
+                            <div class="setup-btn">Export</div>
+                            <div class="setup-btn">Import</div>
                         </div>
                     </div>
-
-                    <!-- Devices -->
                     <div class="ov-grp">
-                        <div class="ov-ttl">Devices</div>
-                        <div class="ov-grp-body">
-                            <div class="setup-grp-grid">
-                                <div class="ov-row"><span class="ov-lbl">Local IP</span><input class="ov-inp wide" value="127.0.0.1" readonly style="color:#2a4858;"></div>
-                                <div class="ov-row"><span class="ov-lbl">Device IP</span><input class="ov-inp wide" value="192.168.1.159"></div>
-                                <div class="ov-row"><span class="ov-lbl">Pixel Type</span><select class="ov-sel"><option>Mono8</option><option>Mono10</option><option>RGB8</option></select></div>
-                                <div class="ov-row"><span class="ov-lbl">PTZ Type</span><select class="ov-sel"><option>pelco-p</option><option>usbcan</option><option>udp-scw</option></select></div>
-                                <div class="ov-row"><span class="ov-lbl">Rotate</span><select class="ov-sel"><option>0°</option><option>90°</option><option>180°</option><option>270°</option></select></div>
-                                <div class="ov-row"><span class="ov-lbl">Flip</span><select class="ov-sel"><option>None</option><option>Both</option><option>X</option><option>Y</option></select></div>
-                            </div>
-                            <div class="ov-row" style="margin-top:4px;"><span class="ov-lbl" style="width:75px;">Device</span><select class="ov-sel" style="flex:1; width:auto;"></select></div>
-                            <div class="ov-sep"></div>
-                            <div style="display:flex; justify-content:space-between; margin-top:2px;">
-                                <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Split</label>
-                                <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Underwater</label>
-                                <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> CL</label>
-                                <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> eBUS</label>
-                            </div>
+                        <div class="ov-ttl">Ports</div>
+                        <div class="ov-grp-body" style="display:grid; grid-template-columns:55px 40px; gap:4px 8px;">
+                            <span class="ov-lbl">TCU</span><input class="ov-inp tiny" value="COM3">
+                            <span class="ov-lbl">Rangefinder</span><input class="ov-inp tiny" value="COM4">
+                            <span class="ov-lbl">Lens</span><input class="ov-inp tiny" value="COM5">
+                            <span class="ov-lbl">Laser</span><input class="ov-inp tiny" value="COM6">
+                            <span class="ov-lbl">PTZ</span><input class="ov-inp tiny" value="COM7">
                         </div>
                     </div>
                 </div>
 
-                <!-- COLUMN 3: TCU (Thinner column via grid template) -->
-                <div class="setup-col">
-                    <div class="ov-grp">
-                        <div class="ov-ttl">TCU Configuration</div>
-                        <div class="ov-grp-body">
-                            <!-- Rows 1-2: TCU Type / Base Unit / Rep. Freq aligned grid -->
-                            <div style="display:grid;grid-template-columns:max-content max-content max-content max-content;gap:3px 4px;align-items:center;justify-content:center;white-space:nowrap;margin-bottom:3px;">
-                                <span class="ov-lbl" style="margin:0;">TCU Type</span>
-                                <select class="ov-sel" style="grid-column:2/5;"><option>default</option><option>40ps step</option><option>10ps step</option></select>
-                                <span class="ov-lbl" style="margin:0;">Base Unit</span>
-                                <select class="ov-sel" style="width:27px;"><option>ns</option><option>μs</option><option>m</option></select>
-                                <span class="ov-lbl" style="margin:0;">Rep. Freq</span>
-                                <select class="ov-sel" style="width:27px;"><option>kHz</option><option>Hz</option></select>
-                            </div>
-                            <div class="ov-sep"></div>
-                            <div style="display:flex; gap:12px; margin-bottom:4px;">
-                                <label class="setup-chk-row"><input type="checkbox"> Auto PRF</label>
-                                <label class="setup-chk-row"><input type="checkbox"> Auto MCP</label>
-                                <label class="setup-chk-row"><input type="checkbox"> AB Lock</label>
-                            </div>
-                            <div class="ov-sep"></div>
-                            
-                            <div style="display:grid;grid-template-columns:auto auto auto auto auto auto auto;gap:3px 4px;align-items:center;white-space:nowrap;">
-                                <span style="font-size:9px;color:var(--text-dim);text-align:right;">Delay</span>
-                                <span style="font-size:8px;color:var(--text-dim);">max</span><input class="ov-inp" style="width:40px;" value="0"><span class="guru-unit">ns</span>
-                                <span style="font-size:8px;color:var(--text-dim);">offset</span><input class="ov-inp" style="width:32px;" value="0"><span class="guru-unit">ns</span>
+                <!-- Serial Ports -->
+                <div class="ov-grp">
+                    <div class="ov-ttl">Serial Ports</div>
+                    <div class="ov-grp-body" style="display:grid; grid-template-columns:65px 130px; gap:3px 8px; align-items:center;">
+                        <span class="ov-lbl wide">Port</span><select class="ov-sel wide"><option>TCU</option><option>RANGE</option><option>LENS</option><option>LASER</option><option>PTZ</option></select>
+                        <span class="ov-lbl wide">Baudrate</span><select class="ov-sel wide"><option>9600</option><option>19200</option><option>38400</option><option>115200</option></select>
+                        <span class="ov-lbl wide">Available</span><div style="display:flex; gap:4px;"><select class="ov-sel wide"></select><div class="setup-btn" style="padding:0 6px;">↺</div></div>
+                        <div class="ov-sep" style="grid-column:1/-1;"></div>
+                        <label class="setup-chk-row" style="grid-column:1/-1;"><input type="checkbox"> Use TCP server</label>
+                        <span class="ov-lbl wide">Server IP</span><input class="ov-inp wide" value="192.168.1.233">
+                        <label class="setup-chk-row" style="grid-column:1/-1;"><input type="checkbox"> Use TCU port for all</label>
+                        <div class="ov-sep" style="grid-column:1/-1;"></div>
+                        <span class="ov-lbl wide">Custom Data</span><input class="ov-inp hex" value="88 1F 00 00 00 00 99" style="text-align:left;">
+                    </div>
+                </div>
 
-                                <span style="font-size:9px;color:var(--text-dim);text-align:right;">Gate W.</span>
-                                <span style="font-size:8px;color:var(--text-dim);">max</span><input class="ov-inp" style="width:40px;" value="0"><span class="guru-unit">ns</span>
-                                <span style="font-size:8px;color:var(--text-dim);">offset</span><input class="ov-inp" style="width:32px;" value="0"><span class="guru-unit">ns</span>
+                <!-- Save / Load -->
+                <div class="ov-grp">
+                    <div class="ov-ttl">Save / Load</div>
+                    <div class="ov-grp-body" style="display:grid; grid-template-columns:55px 130px; gap:3px 8px; align-items:center;">
+                        <label class="setup-chk-row" style="grid-column:1/-1;"><input type="checkbox" checked> Frame info when saving</label>
+                        <div class="ov-sep" style="grid-column:1/-1; margin:2px 0;"></div>
+                        <label class="setup-chk-row" style="grid-column:1/-1;"><input type="checkbox"> Custom info</label>
+                        <input class="ov-inp hex" style="grid-column:1/-1; text-align:left;" value="DIST 00000 m DOV 0000 m" disabled>
+                        <div class="ov-sep" style="grid-column:1/-1; margin:2px 0;"></div>
+                        <label class="setup-chk-row" style="grid-column:1/-1;"><input type="checkbox" checked> Integrate info in file</label>
+                        <label class="setup-chk-row" style="grid-column:1/-1;"><input type="checkbox"> Save in gray</label>
+                        <label class="setup-chk-row" style="grid-column:1/-1;"><input type="checkbox" checked> Capture consecutive</label>
+                        <span class="ov-lbl">Img Format</span><select class="ov-sel wide"><option>bmp/tiff</option><option>jpg</option></select>
+                    </div>
+                </div>
 
-                                <span style="font-size:9px;color:var(--text-dim);text-align:right;">Laser W.</span>
-                                <span style="font-size:8px;color:var(--text-dim);">max</span><input class="ov-inp" style="width:40px;" value="0"><span class="guru-unit">ns</span>
-                                <span style="font-size:8px;color:var(--text-dim);">offset</span><input class="ov-inp" style="width:32px;" value="0"><span class="guru-unit">ns</span>
-                            </div>
-                            
-                            <div class="ov-sep"></div>
-                            <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;font-weight:700;margin-bottom:2px;">PS CONFIG</div>
-                            <div style="display:flex;gap:6px;align-items:center;white-space:nowrap;">
-                                <select class="ov-sel"><option>GW_A</option><option>DELAY_A</option><option>GW_B</option><option>DELAY_B</option></select>
-                                <div class="ov-row" style="margin:0;"><span class="ov-lbl" style="width:auto;margin-right:4px;">Step (ps)</span><input class="ov-inp" style="width:32px;" value="0"></div>
-                                <div class="ov-row" style="margin:0;"><span class="ov-lbl" style="width:auto;margin-right:4px;">Max Steps</span><input class="ov-inp" style="width:32px;" value="0"></div>
-                            </div>
-                            
-                            <div class="ov-sep"></div>
-                            <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;font-weight:700;margin-bottom:2px;">LASER TOGGLE</div>
-                            <div style="display:flex; align-items:center; justify-content:space-between;">
-                                <label class="setup-chk-row"><input type="checkbox"> Enable</label>
-                                <div style="display:flex; gap:6px;">
-                                    <label class="setup-chk-row"><input type="checkbox"> 1</label>
-                                    <label class="setup-chk-row"><input type="checkbox"> 2</label>
-                                    <label class="setup-chk-row"><input type="checkbox"> 3</label>
-                                    <label class="setup-chk-row"><input type="checkbox"> 4</label>
-                                </div>
-                            </div>
+                <!-- TCU Configuration -->
+                <div class="ov-grp">
+                    <div class="ov-ttl">TCU Configuration</div>
+                    <div class="ov-grp-body">
+                        <div style="display:grid; grid-template-columns:55px 60px 55px 36px; gap:3px 4px; align-items:center; white-space:nowrap; margin-bottom:3px;">
+                            <span class="ov-lbl">TCU Type</span>
+                            <select class="ov-sel" style="grid-column:2/5; width:156px;"><option>default</option><option>40ps step</option><option>10ps step</option></select>
+                            <span class="ov-lbl">Base Unit</span>
+                            <select class="ov-sel tiny"><option>ns</option><option>μs</option><option>m</option></select>
+                            <span class="ov-lbl">Rep. Freq</span>
+                            <select class="ov-sel tiny"><option>kHz</option><option>Hz</option></select>
+                        </div>
+                        <div class="ov-sep"></div>
+                        <div style="display:flex; gap:12px; margin-bottom:4px;">
+                            <label class="setup-chk-row"><input type="checkbox"> Auto PRF</label>
+                            <label class="setup-chk-row"><input type="checkbox"> Auto MCP</label>
+                            <label class="setup-chk-row"><input type="checkbox"> AB Lock</label>
+                        </div>
+                        <div class="ov-sep"></div>
+                        <div style="display:grid; grid-template-columns:50px 30px 40px 20px 35px 32px 20px; gap:3px 4px; align-items:center; white-space:nowrap;">
+                            <span class="ov-lbl" style="width:50px;">Delay</span>
+                            <span class="ov-lbl sub">max</span><input class="ov-inp tiny" value="0"><span class="guru-unit">ns</span>
+                            <span class="ov-lbl sub">offset</span><input class="ov-inp" style="width:32px;" value="0"><span class="guru-unit">ns</span>
+                            <span class="ov-lbl" style="width:50px;">Gate W.</span>
+                            <span class="ov-lbl sub">max</span><input class="ov-inp tiny" value="0"><span class="guru-unit">ns</span>
+                            <span class="ov-lbl sub">offset</span><input class="ov-inp" style="width:32px;" value="0"><span class="guru-unit">ns</span>
+                            <span class="ov-lbl" style="width:50px;">Laser W.</span>
+                            <span class="ov-lbl sub">max</span><input class="ov-inp tiny" value="0"><span class="guru-unit">ns</span>
+                            <span class="ov-lbl sub">offset</span><input class="ov-inp" style="width:32px;" value="0"><span class="guru-unit">ns</span>
+                        </div>
+                        <div class="ov-sep"></div>
+                        <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;font-weight:700;margin-bottom:2px;">PS CONFIG</div>
+                        <div style="display:grid; grid-template-columns:60px 50px 40px 55px 40px; gap:3px 4px; align-items:center; white-space:nowrap;">
+                            <select class="ov-sel"><option>GW_A</option><option>DELAY_A</option><option>GW_B</option><option>DELAY_B</option></select>
+                            <span class="ov-lbl" style="width:50px;">Step (ps)</span><input class="ov-inp tiny" value="0">
+                            <span class="ov-lbl">Max Steps</span><input class="ov-inp tiny" value="0">
+                        </div>
+                        <div class="ov-sep"></div>
+                        <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;font-weight:700;margin-bottom:2px;">LASER TOGGLE</div>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Enable</label>
+                            <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> 1</label>
+                            <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> 2</label>
+                            <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> 3</label>
+                            <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> 4</label>
                         </div>
                     </div>
                 </div>
-            </div> <!-- End Top Grid -->
+
+            </div><!-- End Row 1 -->
+
+            <!-- Row 2: Hardware & Acquisition (shorter groups) -->
+            <div class="setup-row">
+
+                <!-- Devices -->
+                <div class="ov-grp">
+                    <div class="ov-ttl">Devices</div>
+                    <div class="ov-grp-body">
+                        <div style="display:grid; grid-template-columns:55px 90px 55px 90px; gap:3px 8px; align-items:center;">
+                            <span class="ov-lbl">Local IP</span><input class="ov-inp wide" value="127.0.0.1" readonly style="color:var(--readout-dim);">
+                            <span class="ov-lbl">Device IP</span><input class="ov-inp wide" value="192.168.1.159">
+                            <span class="ov-lbl">Pixel Type</span><select class="ov-sel"><option>Mono8</option><option>Mono10</option><option>RGB8</option></select>
+                            <span class="ov-lbl">PTZ Type</span><select class="ov-sel"><option>pelco-p</option><option>usbcan</option><option>udp-scw</option></select>
+                            <span class="ov-lbl">Rotate</span><select class="ov-sel"><option>0°</option><option>90°</option><option>180°</option><option>270°</option></select>
+                            <span class="ov-lbl">Flip</span><select class="ov-sel"><option>None</option><option>Both</option><option>X</option><option>Y</option></select>
+                        </div>
+                        <div style="display:flex; align-items:center; margin-top:4px; gap:8px;">
+                            <span class="ov-lbl">Device</span><select class="ov-sel dev"></select>
+                        </div>
+                        <div class="ov-sep"></div>
+                        <div style="display:flex; gap:16px; margin-top:2px;">
+                            <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Split</label>
+                            <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Underwater</label>
+                            <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> CL</label>
+                            <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> eBUS</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Camera -->
+                <div class="ov-grp">
+                    <div class="ov-ttl">Camera</div>
+                    <div class="ov-grp-body">
+                        <!-- ===== PART 2 A: REGION AND TAPS BUTTONS ADDED HERE ===== -->
+                        <div style="display:flex; gap:4px; margin-bottom:4px;">
+                            <div class="setup-btn" style="width:70px;">Enumerate</div>
+                            <div class="setup-btn primary" style="width:60px;">Turn On</div>
+                            <div class="setup-btn danger" style="width:60px;">Turn Off</div>
+                            <div class="tb-div" style="margin: 0 2px;"></div>
+                            <div class="setup-btn" title="Image Region" style="padding:0 6px;">⛶</div>
+                            <div class="setup-btn" title="Sensor Taps" style="padding:0 6px;">⚄</div>
+                        </div>
+                        <div style="display:grid; grid-template-columns:80px 105px 120px 100px; gap:3px 6px; align-items:center;">
+                            <label class="setup-chk-row" style="margin:0;"><input type="radio" name="grab" checked> Continuous</label>
+                            <div style="display:flex;align-items:center;white-space:nowrap;">
+                                <span class="ov-lbl" style="width:55px;">CMOS Freq</span>
+                                <input class="ov-inp tiny" value="10">
+                            </div>
+                            <div style="display:flex;align-items:center;white-space:nowrap;">
+                                <span class="ov-lbl" style="width:55px;">Time Expo</span>
+                                <input class="ov-inp tiny" value="50"><span class="guru-unit" style="margin-left:4px;">ms</span>
+                            </div>
+                            <div class="setup-btn primary" style="width:100px;">START GRABBING</div>
+                            <label class="setup-chk-row" style="margin:0;"><input type="radio" name="grab"> Trigger</label>
+                            <div class="setup-btn" style="width:70px;">Get Params</div>
+                            <div style="display:flex;align-items:center;">
+                                <span class="ov-lbl" style="width:30px;">Gain</span>
+                                <input class="ov-inp" style="width:32px;" value="23">
+                                <input type="range" style="width:50px;height:3px;margin-left:4px;-webkit-appearance:none;background:var(--bg-elevated);outline:none;" min="0" max="4095" value="23">
+                            </div>
+                            <div class="setup-btn danger" style="width:100px;">STOP GRABBING</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- End Row 2 -->
 
             <!-- BOTTOM: Image Processing (Spans full width of config area) -->
             <div class="ov-grp">
                 <div class="ov-ttl">Image Processing</div>
-                <div class="ov-grp-body" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:10px;">
-                    
+                <div class="ov-grp-body" style="display:grid; grid-template-columns: 120px 120px 120px 175px 165px 310px; gap:10px;">
+
                     <div class="sub-grp">
                         <div class="sub-ttl">Accumulative</div>
-                        <div style="display:grid;grid-template-columns:max-content auto;gap:3px 6px;align-items:center;">
-                            <span class="ov-lbl" style="text-align:right;">Base</span><input class="ov-inp tiny" value="0">
+                        <div style="display:grid;grid-template-columns:50px 40px;gap:3px 6px;align-items:center;">
+                            <span class="ov-lbl" style="width:50px;text-align:right;">Base</span><input class="ov-inp tiny" value="0">
                         </div>
                     </div>
 
                     <div class="sub-grp">
                         <div class="sub-ttl">Adaptive</div>
-                        <div style="display:grid;grid-template-columns:max-content auto;gap:3px 6px;align-items:center;">
-                            <span class="ov-lbl" style="text-align:right;">Gamma</span><input class="ov-inp tiny" value="1">
-                            <span class="ov-lbl" style="text-align:right;">Low in</span><input class="ov-inp tiny" value="0">
-                            <span class="ov-lbl" style="text-align:right;">High in</span><input class="ov-inp tiny" value="255">
-                            <span class="ov-lbl" style="text-align:right;">Low out</span><input class="ov-inp tiny" value="0">
-                            <span class="ov-lbl" style="text-align:right;">High out</span><input class="ov-inp tiny" value="255">
+                        <div style="display:grid;grid-template-columns:50px 40px;gap:3px 6px;align-items:center;">
+                            <span class="ov-lbl" style="width:50px;text-align:right;">Gamma</span><input class="ov-inp tiny" value="1">
+                            <span class="ov-lbl" style="width:50px;text-align:right;">Low in</span><input class="ov-inp tiny" value="0">
+                            <span class="ov-lbl" style="width:50px;text-align:right;">High in</span><input class="ov-inp tiny" value="255">
+                            <span class="ov-lbl" style="width:50px;text-align:right;">Low out</span><input class="ov-inp tiny" value="0">
+                            <span class="ov-lbl" style="width:50px;text-align:right;">High out</span><input class="ov-inp tiny" value="255">
                         </div>
                     </div>
 
                     <div class="sub-grp">
                         <div class="sub-ttl">DCP</div>
-                        <div style="display:grid;grid-template-columns:max-content auto;gap:3px 6px;align-items:center;">
-                            <span class="ov-lbl" style="text-align:right;">Dehaze %</span><input class="ov-inp tiny" value="0">
-                            <span class="ov-lbl" style="text-align:right;">Sky Tol.</span><input class="ov-inp tiny" value="0">
-                            <span class="ov-lbl" style="text-align:right;">Fast GF</span><input class="ov-inp tiny" value="0">
+                        <div style="display:grid;grid-template-columns:50px 40px;gap:3px 6px;align-items:center;">
+                            <span class="ov-lbl" style="width:50px;text-align:right;">Dehaze %</span><input class="ov-inp tiny" value="0">
+                            <span class="ov-lbl" style="width:50px;text-align:right;">Sky Tol.</span><input class="ov-inp tiny" value="0">
+                            <span class="ov-lbl" style="width:50px;text-align:right;">Fast GF</span><input class="ov-inp tiny" value="0">
                         </div>
                     </div>
 
                     <div class="sub-grp">
                         <div class="sub-ttl">3D Mapping</div>
-                        <div style="display:grid;grid-template-columns:max-content max-content auto;gap:3px 6px;align-items:center;">
-                            <span class="ov-lbl" style="margin:0;">Rng</span><div style="grid-column:2/4;display:flex;gap:4px;"><input class="ov-inp tiny" value="0"><input class="ov-inp tiny" value="255"></div>
-                            <label class="setup-chk-row" style="margin:0;white-space:nowrap;"><input type="checkbox"> Trim</label><select class="ov-sel" style="grid-column:2/4;"></select>
-                            <label class="setup-chk-row" style="margin:0;white-space:nowrap;"><input type="checkbox"> Custom</label><span class="ov-lbl" style="text-align:right;margin:0;">Delay</span><div style="display:flex;align-items:center;gap:3px;"><input class="ov-inp tiny" value="0" disabled><span class="guru-unit">ns</span></div>
-                            <span></span><span class="ov-lbl" style="text-align:right;margin:0;">Gate</span><div style="display:flex;align-items:center;gap:3px;"><input class="ov-inp tiny" value="0" disabled><span class="guru-unit">ns</span></div>
+                        <div style="display:grid;grid-template-columns:50px 35px 55px;gap:3px 6px;align-items:center;">
+                            <span class="ov-lbl" style="width:50px;">Rng</span><div style="grid-column:2/4;display:flex;gap:4px;"><input class="ov-inp tiny" value="0"><input class="ov-inp tiny" value="255"></div>
+                            <label class="setup-chk-row" style="margin:0;width:50px;white-space:nowrap;"><input type="checkbox"> Trim</label><select class="ov-sel" style="grid-column:2/4;width:90px;"></select>
+                            <label class="setup-chk-row" style="margin:0;width:50px;white-space:nowrap;"><input type="checkbox"> Custom</label><span class="ov-lbl" style="width:35px;text-align:right;">Delay</span><div style="display:flex;align-items:center;gap:3px;"><input class="ov-inp tiny" value="0" disabled><span class="guru-unit">ns</span></div>
+                            <span style="width:50px;"></span><span class="ov-lbl" style="width:35px;text-align:right;">Gate</span><div style="display:flex;align-items:center;gap:3px;"><input class="ov-inp tiny" value="0" disabled><span class="guru-unit">ns</span></div>
                         </div>
                     </div>
 
                     <div class="sub-grp">
                         <div class="sub-ttl">Fishnet</div>
-                        <div style="display:grid;grid-template-columns:max-content auto;gap:3px 6px;align-items:center;">
-                            <label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Enable</label><select class="ov-sel"><option>01 legacy</option><option>02 pix2pix</option><option>03 maskguided</option></select>
-                            <span class="ov-lbl">Thresh</span><input class="ov-inp tiny" value="0">
+                        <div style="display:grid;grid-template-columns:50px 90px;gap:3px 6px;align-items:center;">
+                            <label class="setup-chk-row" style="margin:0;width:50px;"><input type="checkbox"> Enable</label><select class="ov-sel wide"><option>01 legacy</option><option>02 pix2pix</option><option>03 maskguided</option></select>
+                            <span class="ov-lbl" style="width:50px;">Thresh</span><input class="ov-inp tiny" value="0">
                         </div>
                     </div>
 
-                    <div class="sub-grp" style="grid-column: span 2;">
+                    <div class="sub-grp">
                         <div class="sub-ttl">ECC Denoise</div>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0 12px;">
-                            <div style="display:grid;grid-template-columns:max-content auto;gap:3px 6px;align-items:center;">
-                                <span class="ov-lbl" style="text-align:right;">Window</span><select class="ov-sel"><option>backward</option><option>balanced</option><option>custom</option></select>
-                                <span class="ov-lbl" style="text-align:right;">Warp</span><select class="ov-sel"><option>translate</option><option>euclidean</option><option>affine</option><option>homography</option></select>
-                                <span class="ov-lbl" style="text-align:right;">Fusion</span><select class="ov-sel"><option>mean</option><option>median</option><option>med+trim</option></select>
-                                <span></span><label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Half res reg</label>
-                                <span></span><label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Half res fuse</label>
+                        <div style="display:flex; gap:12px;">
+                            <div style="display:grid;grid-template-columns:50px 80px;gap:3px 6px;align-items:center;">
+                                <span class="ov-lbl" style="width:50px;text-align:right;">Window</span><select class="ov-sel" style="width:80px;"><option>backward</option><option>balanced</option><option>custom</option></select>
+                                <span class="ov-lbl" style="width:50px;text-align:right;">Warp</span><select class="ov-sel" style="width:80px;"><option>translate</option><option>euclidean</option><option>affine</option><option>homography</option></select>
+                                <span class="ov-lbl" style="width:50px;text-align:right;">Fusion</span><select class="ov-sel" style="width:80px;"><option>mean</option><option>median</option><option>med+trim</option></select>
+                                <span style="width:50px;"></span><label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Half res reg</label>
+                                <span style="width:50px;"></span><label class="setup-chk-row" style="margin:0;"><input type="checkbox"> Half res fuse</label>
                             </div>
-                            <div style="display:grid;grid-template-columns:max-content auto;gap:3px 6px;align-items:center;">
-                                <span class="ov-lbl" style="text-align:right;">Backward</span><input class="ov-inp tiny" value="0">
-                                <span class="ov-lbl" style="text-align:right;">Forward</span><input class="ov-inp tiny" value="0">
-                                <span class="ov-lbl" style="text-align:right;">Levels</span><input class="ov-inp tiny" value="0">
-                                <span class="ov-lbl" style="text-align:right;">Max Iter</span><input class="ov-inp tiny" value="0">
-                                <span class="ov-lbl" style="text-align:right;">Epsilon</span><input class="ov-inp tiny" value="0">
+                            <div style="display:grid;grid-template-columns:50px 40px;gap:3px 6px;align-items:center;">
+                                <span class="ov-lbl" style="width:50px;text-align:right;">Backward</span><input class="ov-inp tiny" value="0">
+                                <span class="ov-lbl" style="width:50px;text-align:right;">Forward</span><input class="ov-inp tiny" value="0">
+                                <span class="ov-lbl" style="width:50px;text-align:right;">Levels</span><input class="ov-inp tiny" value="0">
+                                <span class="ov-lbl" style="width:50px;text-align:right;">Max Iter</span><input class="ov-inp tiny" value="0">
+                                <span class="ov-lbl" style="width:50px;text-align:right;">Epsilon</span><input class="ov-inp tiny" value="0">
                             </div>
                         </div>
                     </div>
@@ -1173,84 +1227,70 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
 
     <!-- ===== SCAN OVERLAY ===== -->
     <div class="ov" id="scan-ov" style="align-items:flex-start;">
-        <div style="flex:2;display:flex;flex-direction:column;gap:10px;min-width:0;">
-            <div style="display:flex;gap:10px;align-items:stretch;">
-                
-                <div class="ov-grp" style="flex:1;">
+        <div class="setup-row" style="flex:1; min-width:0; align-items:stretch;">
+
+                <div class="ov-grp">
                     <div class="ov-ttl">Delay</div>
-                    <div class="ov-grp-body" style="align-items:center;">
-                        <div class="guru-row">
-                            <span class="ov-lbl" style="width:52px; text-align:left;">Starting</span>
-                            <input class="guru-inp" style="width:36px;" value="0"><span class="guru-unit">μs</span>
-                            <input class="guru-inp" style="width:36px;" value="0"><span class="guru-unit">ns</span>
-                        </div>
-                        <div class="guru-row">
-                            <span class="ov-lbl" style="width:52px; text-align:left;">Ending</span>
-                            <input class="guru-inp" style="width:36px;" value="0"><span class="guru-unit">μs</span>
-                            <input class="guru-inp" style="width:36px;" value="500"><span class="guru-unit">ns</span>
+                    <div class="ov-grp-body">
+                        <div style="display:grid; grid-template-columns:50px 36px 16px 36px 16px; gap:2px 4px; align-items:center;">
+                            <span class="ov-lbl" style="width:50px;">Starting</span>
+                            <input class="guru-inp" value="0"><span class="guru-unit">μs</span>
+                            <input class="guru-inp" value="0"><span class="guru-unit">ns</span>
+                            <span class="ov-lbl" style="width:50px;">Ending</span>
+                            <input class="guru-inp" value="0"><span class="guru-unit">μs</span>
+                            <input class="guru-inp" value="500"><span class="guru-unit">ns</span>
                         </div>
                         <div class="guru-sep" style="width:100%; margin:4px 0;"></div>
-                        <div class="guru-row">
-                            <span class="ov-lbl" style="width:52px; text-align:left;">Step</span>
+                        <div style="display:grid; grid-template-columns:50px 55px 16px; gap:2px 4px; align-items:center;">
+                            <span class="ov-lbl" style="width:50px;">Step</span>
                             <input class="guru-inp" style="width:55px;" value="10.00"><span class="guru-unit">ns</span>
-                        </div>
-                        <div class="guru-row">
-                            <span class="ov-lbl" style="width:52px; text-align:left;">Rep Freq</span>
+                            <span class="ov-lbl" style="width:50px;">Rep Freq</span>
                             <input class="guru-inp" style="width:55px;" value="10"><span class="guru-unit">kHz</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="ov-grp" style="flex:1;">
+                <div class="ov-grp">
                     <div class="ov-ttl">Gate Width</div>
-                    <div class="ov-grp-body" style="align-items:center;">
-                        <div class="guru-row">
-                            <span class="ov-lbl" style="width:52px; text-align:left;">Starting</span>
-                            <input class="guru-inp" style="width:36px;" value="0"><span class="guru-unit">μs</span>
-                            <input class="guru-inp" style="width:36px;" value="50"><span class="guru-unit">ns</span>
-                        </div>
-                        <div class="guru-row">
-                            <span class="ov-lbl" style="width:52px; text-align:left;">Ending</span>
-                            <input class="guru-inp" style="width:36px;" value="0"><span class="guru-unit">μs</span>
-                            <input class="guru-inp" style="width:36px;" value="50"><span class="guru-unit">ns</span>
+                    <div class="ov-grp-body">
+                        <div style="display:grid; grid-template-columns:50px 36px 16px 36px 16px; gap:2px 4px; align-items:center;">
+                            <span class="ov-lbl" style="width:50px;">Starting</span>
+                            <input class="guru-inp" value="0"><span class="guru-unit">μs</span>
+                            <input class="guru-inp" value="50"><span class="guru-unit">ns</span>
+                            <span class="ov-lbl" style="width:50px;">Ending</span>
+                            <input class="guru-inp" value="0"><span class="guru-unit">μs</span>
+                            <input class="guru-inp" value="50"><span class="guru-unit">ns</span>
                         </div>
                         <div class="guru-sep" style="width:100%; margin:4px 0;"></div>
-                        <div class="guru-row">
-                            <span class="ov-lbl" style="width:52px; text-align:left;">Step</span>
+                        <div style="display:grid; grid-template-columns:50px 55px 16px; gap:2px 4px; align-items:center;">
+                            <span class="ov-lbl" style="width:50px;">Step</span>
                             <input class="guru-inp" style="width:55px;" value="0.00"><span class="guru-unit">ns</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="ov-grp" style="flex:1.2;">
+                <div class="ov-grp">
                     <div class="ov-ttl">PTZ</div>
-                    <div class="ov-grp-body" style="flex-direction:row; justify-content:center; gap:12px;">
-                        <div style="display:flex; flex-direction:column; gap:4px;">
-                            <div class="guru-row" style="margin-bottom:0;">
-                                <span style="width:44px;flex-shrink:0;"></span>
-                                <span style="width:36px;font-size:8px;color:var(--text-dim);text-align:center;flex-shrink:0;">H</span>
-                                <span style="width:36px;font-size:8px;color:var(--text-dim);text-align:center;flex-shrink:0;">V</span>
-                            </div>
-                            <div class="guru-row" style="gap:4px;">
-                                <span class="ov-lbl" style="width:44px; text-align:left;">Starting</span>
-                                <input class="guru-inp" style="width:36px;" value="0.00">
-                                <input class="guru-inp" style="width:36px;" value="0.00">
-                                <span class="guru-unit">°</span>
-                            </div>
-                            <div class="guru-row" style="gap:4px;">
-                                <span class="ov-lbl" style="width:44px; text-align:left;">Ending</span>
-                                <input class="guru-inp" style="width:36px;" value="0.00">
-                                <input class="guru-inp" style="width:36px;" value="0.00">
-                                <span class="guru-unit">°</span>
-                            </div>
-                            <div class="guru-row" style="gap:4px;">
-                                <span class="ov-lbl" style="width:44px; text-align:left;">Step</span>
-                                <input class="guru-inp" style="width:36px;" value="1.00">
-                                <input class="guru-inp" style="width:36px;" value="1.00">
-                                <span class="guru-unit">°</span>
-                            </div>
+                    <div class="ov-grp-body" style="flex-direction:row; gap:12px;">
+                        <div style="display:grid; grid-template-columns:44px 36px 36px 16px; gap:2px 4px; align-items:center;">
+                            <span style="width:44px;"></span>
+                            <span style="width:36px;font-size:8px;color:var(--text-dim);text-align:center;">H</span>
+                            <span style="width:36px;font-size:8px;color:var(--text-dim);text-align:center;">V</span>
+                            <span style="width:16px;"></span>
+                            <span class="ov-lbl" style="width:44px;">Starting</span>
+                            <input class="guru-inp" value="0.00">
+                            <input class="guru-inp" value="0.00">
+                            <span class="guru-unit">°</span>
+                            <span class="ov-lbl" style="width:44px;">Ending</span>
+                            <input class="guru-inp" value="0.00">
+                            <input class="guru-inp" value="0.00">
+                            <span class="guru-unit">°</span>
+                            <span class="ov-lbl" style="width:44px;">Step</span>
+                            <input class="guru-inp" value="1.00">
+                            <input class="guru-inp" value="1.00">
+                            <span class="guru-unit">°</span>
                         </div>
-                        <div style="display:flex;flex-direction:column;gap:8px;padding-top:14px;flex-shrink:0;">
+                        <div style="display:flex;flex-direction:column;gap:8px;padding-top:14px;width:55px;">
                             <div>
                                 <div style="font-size:9px;color:var(--text-dim);margin-bottom:3px;">Direction</div>
                                 <div style="display:flex;gap:6px;">
@@ -1261,62 +1301,59 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
                             <div>
                                 <div style="font-size:9px;color:var(--text-dim);margin-bottom:3px;">Wait</div>
                                 <div style="display:flex;align-items:center;gap:3px;">
-                                    <input class="guru-inp" style="width:36px;" value="0"><span class="guru-unit">s</span>
+                                    <input class="guru-inp" value="0"><span class="guru-unit">s</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="ov-grp" style="flex:1.2;">
+                <div class="ov-grp">
                     <div class="ov-ttl">Capture / Record</div>
-                    <div class="ov-grp-body" style="flex-direction:row; justify-content:center; gap:16px;">
-                        <div style="display:flex; flex-direction:column; justify-content:space-between;">
+                    <div class="ov-grp-body" style="flex-direction:row; gap:16px;">
+                        <div style="display:flex; flex-direction:column; gap:12px; width:65px;">
                             <div>
                                 <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;margin-bottom:4px;font-weight:700;">CAPTURE</div>
-                                <div class="ov-row" style="margin-bottom:2px;"><label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="ip-chk"> Original</label></div>
-                                <div class="ov-row"><label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="ip-chk"> Result</label></div>
+                                <label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;margin-bottom:2px;"><input type="checkbox" class="ip-chk"> Original</label>
+                                <label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="ip-chk"> Result</label>
                             </div>
                             <div>
                                 <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;margin-bottom:4px;font-weight:700;">RECORD</div>
-                                <div class="ov-row" style="margin-bottom:2px;"><label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="ip-chk"> Original</label></div>
-                                <div class="ov-row"><label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="ip-chk"> Result</label></div>
+                                <label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;margin-bottom:2px;"><input type="checkbox" class="ip-chk"> Original</label>
+                                <label style="font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="ip-chk"> Result</label>
                             </div>
                         </div>
-                        <div style="display:flex;flex-direction:column;gap:8px;">
+                        <div style="display:flex;flex-direction:column;gap:8px;width:100px;">
                             <div>
                                 <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;font-weight:700;">PROFILES</div>
                                 <div style="font-size:8px;color:var(--text-ghost);margin-bottom:3px;"># of TCU+PTZ param sets</div>
-                                <input class="guru-inp" style="width:36px;" value="5">
+                                <input class="guru-inp" value="5">
                             </div>
                             <div>
                                 <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;font-weight:700;">IMGS / PROFILE</div>
                                 <div style="font-size:8px;color:var(--text-ghost);margin-bottom:3px;"># of imgs saved per profile</div>
-                                <input class="guru-inp" style="width:36px;" value="1">
+                                <input class="guru-inp" value="1">
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;width:90px;">
+                <div style="display:flex;flex-direction:column;gap:6px;width:90px;">
                     <div class="scan-action-btn start">Start</div>
                     <div class="scan-action-btn">Continue</div>
                     <div class="scan-action-btn">Restart</div>
                     <div style="flex:1;"></div> <div class="scan-action-btn stop">Stop</div>
                 </div>
-            </div>
         </div>
 
-        <div style="flex:0 0 20%;min-width:0;">
+        <div style="flex:0 0 20%; min-width:0; overflow-y:auto;">
             <div class="ov-grp">
                 <div class="ov-ttl">Display Previews</div>
                 <div class="ov-grp-body">
                     <div style="font-size:9px;color:var(--text-dim);margin-bottom:3px;font-weight:700;">Main</div>
                     <div class="ov-prev" style="width:100%;height:auto;aspect-ratio:4/3;background:var(--bg-deepest);border:1px solid var(--border-subtle);"></div>
-
                     <div style="font-size:9px;color:var(--text-dim);margin:8px 0 3px;font-weight:700;">ALT 1</div>
                     <div class="ov-prev" style="width:100%;height:auto;aspect-ratio:4/3;background:var(--bg-deepest);border:1px solid var(--border-subtle);"></div>
-
                     <div style="font-size:9px;color:var(--text-dim);margin:8px 0 3px;font-weight:700;">ALT 2</div>
                     <div class="ov-prev" style="width:100%;height:auto;aspect-ratio:4/3;background:var(--bg-deepest);border:1px solid var(--border-subtle);"></div>
                 </div>
@@ -1336,6 +1373,7 @@ setInterval(() => {
 function layoutWidgets() {
     const win   = document.getElementById('win');
     const md    = document.getElementById('main-display');
+    const pbar  = document.getElementById('pbar');
     const ip    = document.getElementById('imgproc');
     const so    = document.getElementById('save-opts');
     const vs    = document.getElementById('vision');
@@ -1355,7 +1393,8 @@ function layoutWidgets() {
     md.style.top    = dy + 'px';
     md.style.width  = dw + 'px';
     md.style.height = dh + 'px';
-    // save-opts sits below imgproc, vision below save-opts
+    // imgproc sits right below pbar toggle buttons, save-opts sits below imgproc, vision below save-opts
+    ip.style.top = (pbar.offsetTop + pbar.offsetHeight + PAD) + 'px';
     so.style.top = (ip.offsetTop + ip.offsetHeight + PAD) + 'px';
     vs.style.top = (so.offsetTop + so.offsetHeight + PAD) + 'px';
 }
@@ -1532,6 +1571,8 @@ document.querySelectorAll('.rp-tab').forEach(t=>t.addEventListener('click',()=>{
     document.querySelectorAll('.rp-tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');
     document.getElementById('ip-models').style.display=t.dataset.ip==='models'?'block':'none';
     document.getElementById('ip-general').style.display=t.dataset.ip==='general'?'block':'none';
+    // Let the browser naturally adjust DOM heights before recalculating layouts
+    setTimeout(layoutWidgets, 10);
 }));
 
 // ===== CONSOLE TABS =====
