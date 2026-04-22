@@ -2,7 +2,6 @@
 
 Overall plan for porting the GLI_user_panel GUI to match `others/ui_redesign/prototype.html` v3.
 
-**Duration**: ~12 weeks across 7 sprints
 **Prerequisites**: Sprints 11–14 complete (thread safety, pipeline extraction, controller decoupling)
 **Reference**: `others/ui_redesign/UI_REDESIGN_PLAN.md`
 
@@ -10,7 +9,7 @@ Per-sprint progress docs (`sprint-XX-progress.md`) will be created when each spr
 
 ---
 
-## Sprint 15 — Custom Widget Infrastructure (2 weeks)
+## Sprint 15 — Custom Widget Infrastructure
 
 ### Prerequisites
 - Sprint 14 complete
@@ -21,25 +20,26 @@ Per-sprint progress docs (`sprint-XX-progress.md`) will be created when each spr
 Builds the reusable custom widgets that have no Qt equivalent — the foundation for the new UI. Each widget is self-contained, tested in isolation, and ready for composition in Sprint 16.
 
 Widgets to build:
-- **FloatingPanel** — base class for draggable/pinnable/hideable panels (z-order, transparency, bounded drag)
-- **TimingBarWidget** — 4 horizontal draggable timing bars for TCU Normal mode
-- **JoystickWidget** — virtual joystick for PTZ Modern mode
+- **FloatingPanel** — base class for draggable/pinnable/hideable panels (z-order, bounded drag; transparency is optional, drop if it blocks progress)
+- **TimingBarWidget** — 4 horizontal draggable timing bars for TCU Normal mode (delay A / gate A / delay B / gate B, where B follows A with offsets in Normal mode)
+- **JoystickWidget** — virtual joystick for PTZ Modern mode (continuous `(dx, dy)` output; no 8-direction enum — that belongs to classic PTZ wiring, not this widget)
 - **ArcSliderWidget** — vertical arc slider variant for zoom/focus/iris
 - **DotIndicator** — colored status dot with glow for top bar
-- **UnlockBar** — striped safety toggle for laser fire
-- **CenterToolbar** — tool mode selector + info checkbox for display toolbar
+- **UnlockBar** — striped safety toggle for laser fire (only gates the laser-ON transition; turning the laser OFF bypasses the bar)
 
 Plus a gallery test app and unit tests.
 
+The center display toolbar (SEL / ZOOM / PTZ + INFO) is not built as a dedicated widget class — it is composed inline in Sprint 16 from a `QHBoxLayout` + `QButtonGroup`.
+
 ### End state
-- 7 widget classes compile under `src/widgets/` with no warnings
+- 6 widget classes compile under `src/widgets/` with no warnings
 - Gallery app (`tests/widget_gallery/`) visually matches prototype elements
-- FloatingPanel transparency strategy decided (QSS `rgba` vs. `WA_TranslucentBackground`)
+- FloatingPanel transparency implemented via a cross-platform approach (QSS `rgba` preferred); if that turns out to be unreliable, ship opaque panels and revisit in Sprint 20 — do not gate Sprint 15 on this
 - No changes yet to `userpanel.*`, controllers, or `user_panel.ui` — main app still runs as before
 
 ---
 
-## Sprint 16 — TopBar + Display Overlays + Floating Panel Instances (2 weeks)
+## Sprint 16 — TopBar + Display Overlays + Floating Panel Instances
 
 ### Prerequisites
 - Sprint 15 complete (all 7 custom widgets ready)
@@ -66,7 +66,7 @@ Main work:
 
 ---
 
-## Sprint 17 — Right-Side Widget Stack + Side Display + Mapbox (2 weeks)
+## Sprint 17 — Right-Side Widget Stack + Side Display + Mapbox
 
 ### Prerequisites
 - Sprint 16 complete
@@ -93,7 +93,7 @@ Main work:
 
 ---
 
-## Sprint 18 — SETUP Overlay (2 weeks)
+## Sprint 18 — SETUP Overlay
 
 ### Prerequisites
 - Sprints 16, 17 complete
@@ -119,7 +119,7 @@ Main work:
 
 ---
 
-## Sprint 19 — SCAN Overlay + Mode Switching (1 week)
+## Sprint 19 — SCAN Overlay + Mode Switching
 
 ### Prerequisites
 - Sprint 18 complete
@@ -142,7 +142,7 @@ Main work:
 
 ---
 
-## Sprint 20 — QSS Theme + Signal Rewiring (2 weeks)
+## Sprint 20 — QSS Theme + Signal Rewiring
 
 ### Prerequisites
 - Sprints 16–19 complete
@@ -167,7 +167,7 @@ Main work:
 
 ---
 
-## Sprint 21 — Testing, Polish, Release (1 week)
+## Sprint 21 — Testing, Polish, Release
 
 ### Prerequisites
 - Sprint 20 complete
@@ -196,8 +196,7 @@ Main work:
 ## Cross-sprint notes
 
 ### Branching
-- Work on a dedicated `ui-redesign` branch off `refactor`
-- Merge back after Sprint 21
+- All sprint work stays on `refactor`. No separate `ui-redesign` branch.
 
 ### Fallback strategy
 - Preferences and ScanConfig dialogs kept as fallback through Sprint 19

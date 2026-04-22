@@ -156,6 +156,18 @@ set(SOURCE_FILES
     src/widgets/statusbar.cpp
     src/widgets/floatingwindow.h
     src/widgets/floatingwindow.cpp
+    src/widgets/floatingpanel.h
+    src/widgets/floatingpanel.cpp
+    src/widgets/timingbarwidget.h
+    src/widgets/timingbarwidget.cpp
+    src/widgets/joystickwidget.h
+    src/widgets/joystickwidget.cpp
+    src/widgets/arcsliderwidget.h
+    src/widgets/arcsliderwidget.cpp
+    src/widgets/dotindicator.h
+    src/widgets/dotindicator.cpp
+    src/widgets/unlockbar.h
+    src/widgets/unlockbar.cpp
     src/widgets/mywidget.h
     src/widgets/mywidget.cpp
     src/visual/userpanel.h
@@ -511,5 +523,45 @@ if(BUILD_TESTS)
     target_include_directories(test_rangefinder PRIVATE src)
     target_link_libraries(test_rangefinder Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::SerialPort Qt${QT_VERSION_MAJOR}::Network)
     add_test(NAME rangefinder COMMAND test_rangefinder)
+
+    # Tier 3: UI widget tests (Qt::Widgets required)
+
+    add_executable(test_floatingpanel tests/test_floatingpanel.cpp src/widgets/floatingpanel.h src/widgets/floatingpanel.cpp)
+    target_include_directories(test_floatingpanel PRIVATE src)
+    target_link_libraries(test_floatingpanel Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets)
+    add_test(NAME floatingpanel COMMAND test_floatingpanel)
+
+    add_executable(test_timingbarwidget tests/test_timingbarwidget.cpp src/widgets/timingbarwidget.h src/widgets/timingbarwidget.cpp)
+    target_include_directories(test_timingbarwidget PRIVATE src)
+    target_link_libraries(test_timingbarwidget Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets)
+    add_test(NAME timingbarwidget COMMAND test_timingbarwidget)
+
+    add_executable(test_joystickwidget tests/test_joystickwidget.cpp src/widgets/joystickwidget.h src/widgets/joystickwidget.cpp)
+    target_include_directories(test_joystickwidget PRIVATE src)
+    target_link_libraries(test_joystickwidget Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets)
+    add_test(NAME joystickwidget COMMAND test_joystickwidget)
+
+    add_executable(test_arcsliderwidget tests/test_arcsliderwidget.cpp src/widgets/arcsliderwidget.h src/widgets/arcsliderwidget.cpp)
+    target_include_directories(test_arcsliderwidget PRIVATE src)
+    target_link_libraries(test_arcsliderwidget Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets)
+    add_test(NAME arcsliderwidget COMMAND test_arcsliderwidget)
+
+    add_executable(test_unlockbar tests/test_unlockbar.cpp src/widgets/unlockbar.h src/widgets/unlockbar.cpp)
+    target_include_directories(test_unlockbar PRIVATE src)
+    target_link_libraries(test_unlockbar Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets)
+    add_test(NAME unlockbar COMMAND test_unlockbar)
+
+    # Widget gallery — visual smoke test launcher for the Sprint 15 widgets.
+    # Not a ctest target; launch manually when inspecting widget behavior.
+    add_executable(widget_gallery
+        tests/widget_gallery/main.cpp
+        src/widgets/floatingpanel.h    src/widgets/floatingpanel.cpp
+        src/widgets/timingbarwidget.h  src/widgets/timingbarwidget.cpp
+        src/widgets/joystickwidget.h   src/widgets/joystickwidget.cpp
+        src/widgets/arcsliderwidget.h  src/widgets/arcsliderwidget.cpp
+        src/widgets/dotindicator.h     src/widgets/dotindicator.cpp
+        src/widgets/unlockbar.h        src/widgets/unlockbar.cpp)
+    target_include_directories(widget_gallery PRIVATE src)
+    target_link_libraries(widget_gallery Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Gui Qt${QT_VERSION_MAJOR}::Widgets)
 
 endif() # BUILD_TESTS
