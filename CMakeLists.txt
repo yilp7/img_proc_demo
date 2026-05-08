@@ -150,10 +150,6 @@ set(SOURCE_FILES
     src/util/config.cpp
     src/widgets/display.h
     src/widgets/display.cpp
-    src/widgets/titlebar.h
-    src/widgets/titlebar.cpp
-    src/widgets/statusbar.h
-    src/widgets/statusbar.cpp
     src/widgets/floatingwindow.h
     src/widgets/floatingwindow.cpp
     src/widgets/floatingpanel.h
@@ -168,6 +164,14 @@ set(SOURCE_FILES
     src/widgets/dotindicator.cpp
     src/widgets/unlockbar.h
     src/widgets/unlockbar.cpp
+    src/widgets/topbar/topbar.h
+    src/widgets/topbar/topbar.cpp
+    src/widgets/panels/opticspanel.h
+    src/widgets/panels/opticspanel.cpp
+    src/widgets/panels/tcupanel.h
+    src/widgets/panels/tcupanel.cpp
+    src/widgets/panels/consolepanel.h
+    src/widgets/panels/consolepanel.cpp
     src/widgets/mywidget.h
     src/widgets/mywidget.cpp
     src/visual/userpanel.h

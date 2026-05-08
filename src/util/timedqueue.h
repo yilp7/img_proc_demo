@@ -3,9 +3,8 @@
 
 #include <QThread>
 #include <QMutex>
+#include <QLabel>
 #include <queue>
-
-class StatusIcon;
 
 class TimedQueue : public QThread {
     Q_OBJECT
@@ -13,7 +12,7 @@ public:
     TimedQueue(double expiration_time);
     ~TimedQueue();
 
-    void set_display_label(StatusIcon *lbl);
+    void set_display_label(QLabel *lbl);
     void add_to_q();
     void empty_q();
     int count();
@@ -27,7 +26,7 @@ private:
     bool _quit;
     double expiration_time;
     std::queue<struct timespec> q;
-    StatusIcon* fps_status;
+    QLabel* fps_status;
 };
 
 #endif // TIMEDQUEUE_H

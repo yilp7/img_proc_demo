@@ -2,7 +2,7 @@
 #define CONTROLPORTTHREAD_H
 
 #include "util/util.h"
-#include "widgets/statusbar.h"
+#include "widgets/dotindicator.h"
 
 class ScanConfig;
 
@@ -26,7 +26,7 @@ public:
         TCP_CONNECTED    = 0x10,
     };
 
-    ControlPortThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr);
+    ControlPortThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, QObject *parent = nullptr);
     ~ControlPortThread();
 
 signals:
@@ -64,7 +64,7 @@ protected:
 
     QLabel*      lbl;
     QLineEdit*   edt;
-    StatusIcon*  status_icon;
+    DotIndicator* status_icon;
     int          idx; // 0: TCU, 1: lens, 2: laser, 3: ptz, 4: inclinometer
     bool         connected_to_serial;
     bool         connected_to_tcp;
@@ -133,7 +133,7 @@ public:
         NO_PARAM      = 0xFF,
     };
 
-    TCUThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, ScanConfig* sc = nullptr, QObject *parent = nullptr, uint init_width = 100);
+    TCUThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, ScanConfig* sc = nullptr, QObject *parent = nullptr, uint init_width = 100);
 
     int set_user_param(TCUThread::USER_PARAMS param, float val);
     TCUDataGroup get_tcu_params();
@@ -204,7 +204,7 @@ public:
         ADDRESS       = 0x101,
     };
 
-    LensThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr, int init_speed = 32);
+    LensThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, QObject *parent = nullptr, int init_speed = 32);
 
     int lens_control(LensThread::PARAMS command, uint *val = nullptr);
 
@@ -221,7 +221,7 @@ public:
 class LaserThread : public ControlPortThread {
     Q_OBJECT
 public:
-    LaserThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr);
+    LaserThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, QObject *parent = nullptr);
 
 public slots:
     void try_communicate() override;
@@ -249,7 +249,7 @@ public:
         ADDRESS    = 0x101,
     };
 
-    PTZThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr, int init_speed = 16);
+    PTZThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, QObject *parent = nullptr, int init_speed = 16);
 
     int ptz_control(PTZThread::PARAMS param, float *val = nullptr);
 
@@ -268,7 +268,7 @@ public:
 class InclinThread : public ControlPortThread {
     Q_OBJECT
 public:
-    InclinThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon = nullptr, QObject *parent = nullptr);
+    InclinThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, QObject *parent = nullptr);
 
 public slots:
     void try_communicate() override;

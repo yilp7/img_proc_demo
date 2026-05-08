@@ -2,8 +2,7 @@
 #define MYWIDGET_H
 
 #include "display.h"
-#include "titlebar.h"
-#include "statusbar.h"
+#include "topbar/topbar.h"
 #include "floatingwindow.h"
 
 class Ruler : public QLabel
@@ -52,6 +51,13 @@ class Tools : public QRadioButton
     Q_OBJECT
 public:
     explicit Tools(QWidget *parent = 0);
+};
+
+class InfoLabel : public QLabel
+{
+    Q_OBJECT
+public:
+    explicit InfoLabel(QWidget *parent) : QLabel(parent) {}
 };
 
 class Coordinate : public QFrame

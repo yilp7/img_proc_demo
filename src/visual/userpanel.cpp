@@ -49,7 +49,7 @@ TimedQueue::~TimedQueue() {
     while (!q.empty()) q.pop();
 }
 
-inline void TimedQueue::set_display_label(StatusIcon *lbl) { fps_status = lbl; }
+inline void TimedQueue::set_display_label(QLabel *lbl) { fps_status = lbl; }
 
 void TimedQueue::add_to_q() {
     struct timespec t;
@@ -92,7 +92,8 @@ void TimedQueue::run()
         if (diff_timespec(q.front(), t) > expiration_time * 1e3) q.pop();
         static QElapsedTimer et;
         if (et.isValid() && et.elapsed() < 200) { mtx.unlock(); continue; }
-        fps_status->set_text(QString::number(q.size() ? ((q.size() - 1) / diff_timespec(q.front(), q.back())) * 1000 : 0.f, 'f', 2));
+        QMetaObject::invokeMethod(fps_status, "setText", Qt::QueuedConnection,
+                                  Q_ARG(QString, QString::number(q.size() ? ((q.size() - 1) / diff_timespec(q.front(), q.back())) * 1000 : 0.f, 'f', 2) + " fps"));
         mtx.unlock();
         et.restart();
 #endif
@@ -103,7 +104,12 @@ UserPanel::UserPanel(QWidget *parent) :
     QMainWindow(parent),
     mouse_pressed(false),
     ui(new Ui::UserPanel),
-    status_bar(NULL),
+    m_fps_label(nullptr),
+    m_center_toolbar(nullptr),
+    m_pbar(nullptr),
+    m_optics_panel(nullptr),
+    m_tcu_panel(nullptr),
+    m_console_panel(nullptr),
     pref(NULL),
     m_device_mgr(nullptr),
     m_tcu_ctrl(nullptr),
@@ -200,12 +206,60 @@ UserPanel::UserPanel(QWidget *parent) :
     ui->MID->setMouseTracking(true);
     ui->RIGHT->setMouseTracking(true);
     ui->TITLE->setMouseTracking(true);
-    ui->STATUS->setMouseTracking(true);
     setMouseTracking(true);
     setCursor(cursor_curr_pointer);
 
+    m_fps_label = new QLabel("0.00 fps", this);
+    m_fps_label->setObjectName("FPS_LABEL");
+    m_fps_label->setAttribute(Qt::WA_TranslucentBackground);
+    m_fps_label->hide(); // shown once resizeEvent places it
+
+    // center toolbar: reparent existing Tools + INFO_CHECK into a framed row
+    m_center_toolbar = new QFrame(ui->MID);
+    m_center_toolbar->setObjectName("CENTER_TOOLBAR");
+    {
+        auto *tl = new QHBoxLayout(m_center_toolbar);
+        tl->setContentsMargins(4, 2, 4, 2);
+        tl->setSpacing(4);
+        ui->ZOOM_TOOL  ->setParent(m_center_toolbar); tl->addWidget(ui->ZOOM_TOOL);
+        ui->SELECT_TOOL->setParent(m_center_toolbar); tl->addWidget(ui->SELECT_TOOL);
+        ui->PTZ_TOOL   ->setParent(m_center_toolbar); tl->addWidget(ui->PTZ_TOOL);
+        tl->addSpacing(6);
+        ui->INFO_CHECK ->setParent(m_center_toolbar); tl->addWidget(ui->INFO_CHECK);
+        m_center_toolbar->adjustSize();
+    }
+
+    // panel toggle bar: 3 checkable buttons, positioned top-right in resizeEvent
+    m_pbar = new QFrame(this);
+    m_pbar->setObjectName("PANEL_TOGGLE_BAR");
+    {
+        auto *pl = new QHBoxLayout(m_pbar);
+        pl->setContentsMargins(3, 2, 3, 2);
+        pl->setSpacing(3);
+        auto makeToggle = [&](const char *text, const char *name) -> QPushButton * {
+            auto *btn = new QPushButton(text, m_pbar);
+            btn->setObjectName(name);
+            btn->setCheckable(true);
+            btn->setChecked(true);
+            btn->setFixedHeight(20);
+            pl->addWidget(btn);
+            return btn;
+        };
+        auto *optics_btn  = makeToggle("Optics",  "PBAR_OPTICS_BTN");
+        auto *tcu_btn     = makeToggle("TCU",     "PBAR_TCU_BTN");
+        auto *console_btn = makeToggle("Console", "PBAR_CONSOLE_BTN");
+        m_pbar->adjustSize();
+        m_pbar->raise();
+
+        // m_optics_panel etc. are null here; lambdas guard-check at call time.
+        connect(optics_btn,  &QPushButton::toggled, this, [this](bool on) { if (m_optics_panel)  m_optics_panel ->setVisible(on); });
+        connect(tcu_btn,     &QPushButton::toggled, this, [this](bool on) { if (m_tcu_panel)     m_tcu_panel    ->setVisible(on); });
+        connect(console_btn, &QPushButton::toggled, this, [this](bool on) { if (m_console_panel) m_console_panel->setVisible(on); });
+        // hideRequested → uncheck wired in the panel construction block below (after panels exist)
+    }
+
     tp.start();
-    q_fps_calc.set_display_label(ui->STATUS->result_cam_fps);
+    q_fps_calc.set_display_label(m_fps_label);
     q_fps_calc.start();
 
     QFont temp_f(consolas);
@@ -429,17 +483,51 @@ UserPanel::UserPanel(QWidget *parent) :
         ui->MISC_RADIO_1->setChecked(true);
         ui->MISC_DISPLAY->setCurrentIndex(1);
 
-        connect(m_aux_panel, &AuxPanelManager::display_page_changed, this, [this](int page) {
-            ui->MISC_DISPLAY->setCurrentIndex(page);
-        });
+        // display_page_changed re-routed to ConsolePanel tab in setup_panels() below
+    }
+
+    // ----- Floating panels (Sprint 16.7) -----
+    m_optics_panel  = new OpticsPanel(ui->CENTRAL);
+    m_tcu_panel     = new TCUPanel(ui->CENTRAL);
+    m_console_panel = new ConsolePanel(ui->CENTRAL);
+
+    // OpticsPanel: LENS_STATIC + PTZ_GRP (from LEFT/PARAMS_STATIC/PTZ_PAGE)
+    m_optics_panel->setup(ui->LENS_STATIC, ui->PTZ_GRP,
+                          ui->IRIS_OPEN_BTN, ui->IRIS_CLOSE_BTN);
+
+    // TCUPanel: TCU_STATIC + laser buttons
+    m_tcu_panel->setup(ui->TCU_STATIC, ui->LASER_BTN, ui->FIRE_LASER_BTN);
+
+    // ConsolePanel: pull pages from MISC_DISPLAY stacked widget
+    m_console_panel->setup(ui->MISC_DISPLAY);
+    // Replace old MISC_OPTION/MISC_RADIO wiring with tab-widget routing
+    ui->MISC_DISPLAY_GRP->hide();
+    disconnect(m_aux_panel, &AuxPanelManager::display_page_changed, nullptr, nullptr);
+    connect(m_aux_panel, &AuxPanelManager::display_page_changed, this, [this](int page) {
+        m_console_panel->tab_widget()->setCurrentIndex(page);
+    });
+
+    // Initial panel positions (resizeEvent will correct on first paint)
+    m_optics_panel ->resize(280, 400); m_optics_panel ->move(10, 50);
+    m_tcu_panel    ->resize(250, 360); m_tcu_panel    ->move(300, 50);
+    m_console_panel->resize(380, 320); m_console_panel->move(560, 50);
+    m_optics_panel ->show();
+    m_tcu_panel    ->show();
+    m_console_panel->show();
+
+    // Wire panel close-button → uncheck corresponding pbar toggle
+    {
+        auto *ob = m_pbar->findChild<QPushButton*>("PBAR_OPTICS_BTN");
+        auto *tb = m_pbar->findChild<QPushButton*>("PBAR_TCU_BTN");
+        auto *cb = m_pbar->findChild<QPushButton*>("PBAR_CONSOLE_BTN");
+        if (ob) connect(m_optics_panel,  &FloatingPanel::hideRequested, ob, [ob]() { ob->setChecked(false); });
+        if (tb) connect(m_tcu_panel,     &FloatingPanel::hideRequested, tb, [tb]() { tb->setChecked(false); });
+        if (cb) connect(m_console_panel, &FloatingPanel::hideRequested, cb, [cb]() { cb->setChecked(false); });
     }
 
     ui->DATA_EXCHANGE->document()->setMaximumBlockCount(200);
     ui->DATA_EXCHANGE->setFont(temp_f);
     ui->FILE_PATH_EDIT->setFont(consolas);
-
-    // connect status bar to the main window
-    status_bar = ui->STATUS;
 
     m_device_mgr = new DeviceManager(config, this);
     m_device_mgr->init();
@@ -672,11 +760,12 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // LensController → UI
     connect(m_lens_ctrl, &LensController::button_text_changed, this, [this](int id, QString text) {
+        // IRIS_OPEN_BTN / IRIS_CLOSE_BTN (ids 6,7) removed in S16 — duplicate of radius
         QAbstractButton *btns[] = {
             ui->ZOOM_IN_BTN, ui->ZOOM_OUT_BTN, ui->FOCUS_FAR_BTN, ui->FOCUS_NEAR_BTN,
-            ui->RADIUS_INC_BTN, ui->RADIUS_DEC_BTN, ui->IRIS_OPEN_BTN, ui->IRIS_CLOSE_BTN
+            ui->RADIUS_INC_BTN, ui->RADIUS_DEC_BTN
         };
-        if (id >= 0 && id < 8) btns[id]->setText(text);
+        if (id >= 0 && id < 6) btns[id]->setText(text);
     });
     connect(m_lens_ctrl, &LensController::zoom_text_updated, this, [this](QString text) {
         if (!ui->ZOOM_EDIT->hasFocus()) ui->ZOOM_EDIT->setText(text);
@@ -721,6 +810,141 @@ UserPanel::UserPanel(QWidget *parent) :
         ui->CONTINUE_SCAN_BUTTON->setVisible(cont);
         ui->RESTART_SCAN_BUTTON->setVisible(restart);
     });
+
+    // ----- Floating panel mode contents (Sprint 16.8) -----
+
+    // OpticsPanel — Modern mode: JoystickWidget + ZOOM + FOCUS ArcSliders
+    {
+        auto *modern_w = new QWidget;
+        auto *ml = new QHBoxLayout(modern_w);
+        ml->setContentsMargins(4, 4, 4, 4);
+        ml->setSpacing(8);
+
+        auto *joystick     = new JoystickWidget(modern_w);
+        joystick->setMinimumSize(100, 100);
+
+        auto *zoom_slider  = new ArcSliderWidget(modern_w);
+        auto *focus_slider = new ArcSliderWidget(modern_w);
+        zoom_slider ->setRange(0, 1000);
+        focus_slider->setRange(0, 1000);
+        zoom_slider ->setFixedSize(36, 120);
+        focus_slider->setFixedSize(36, 120);
+
+        auto *slider_col   = new QWidget(modern_w);
+        auto *sc_l = new QVBoxLayout(slider_col);
+        sc_l->setContentsMargins(0, 0, 0, 0);
+        sc_l->setSpacing(4);
+        sc_l->addWidget(new QLabel("Z", slider_col));
+        sc_l->addWidget(zoom_slider);
+        sc_l->addWidget(new QLabel("F", slider_col));
+        sc_l->addWidget(focus_slider);
+
+        ml->addWidget(joystick, 1);
+        ml->addWidget(slider_col);
+
+        // 8-direction PTZ via sign of (dx, dy) — dy > 0 means DOWN (screen coords)
+        connect(joystick, &JoystickWidget::directionChanged,
+                this, [this](double dx, double dy) {
+            static int last_id = -1;
+            if (dx == 0.0 && dy == 0.0) {
+                if (last_id >= 0) { m_device_mgr->ptz_button_released(last_id); last_id = -1; }
+                return;
+            }
+            const bool up    = dy < -0.3;
+            const bool down  = dy >  0.3;
+            const bool left  = dx < -0.3;
+            const bool right = dx >  0.3;
+            int id;
+            if      (up   && left)  id = 0;  // UP-LEFT
+            else if (up   && right) id = 2;  // UP-RIGHT
+            else if (up)            id = 1;  // UP
+            else if (down && left)  id = 6;  // DOWN-LEFT
+            else if (down && right) id = 8;  // DOWN-RIGHT
+            else if (down)          id = 7;  // DOWN
+            else if (left)          id = 3;  // LEFT
+            else                    id = 5;  // RIGHT
+            if (id != last_id) {
+                if (last_id >= 0) m_device_mgr->ptz_button_released(last_id);
+                m_device_mgr->ptz_button_pressed(id);
+                last_id = id;
+            }
+        });
+
+        connect(zoom_slider,  &ArcSliderWidget::valueChanged,
+                m_lens_ctrl, &LensController::set_zoom_value);
+        connect(focus_slider, &ArcSliderWidget::valueChanged,
+                m_lens_ctrl, &LensController::set_focus_value);
+
+        m_optics_panel->set_modern_page(modern_w);
+    }
+
+    // TCUPanel — Normal mode: TimingBarWidget + UnlockBar
+    {
+        auto *normal_w = new QWidget;
+        auto *nl = new QVBoxLayout(normal_w);
+        nl->setContentsMargins(4, 4, 4, 4);
+        nl->setSpacing(6);
+
+        auto *timing = new TimingBarWidget(normal_w);
+        timing->setBarLabel(TimingBarWidget::LaserWidth, "Width");
+        timing->setBarUnit (TimingBarWidget::LaserWidth, "ns");
+        timing->setBarScale(TimingBarWidget::LaserWidth, 1000);
+        timing->setBarColor(TimingBarWidget::LaserWidth, QColor(0x3d, 0x8b, 0xff));
+
+        timing->setBarLabel(TimingBarWidget::Distance, "Delay A");
+        timing->setBarUnit (TimingBarWidget::Distance, "ns");
+        timing->setBarScale(TimingBarWidget::Distance, 10000);
+        timing->setBarColor(TimingBarWidget::Distance, QColor(0x4c, 0xc4, 0x77));
+
+        timing->setBarLabel(TimingBarWidget::Dov, "GateW A");
+        timing->setBarUnit (TimingBarWidget::Dov, "ns");
+        timing->setBarScale(TimingBarWidget::Dov, 5000);
+        timing->setBarColor(TimingBarWidget::Dov, QColor(0xff, 0xb0, 0x3a));
+
+        timing->setBarLabel(TimingBarWidget::Mcp, "MCP");
+        timing->setBarUnit (TimingBarWidget::Mcp, "");
+        timing->setBarScale(TimingBarWidget::Mcp, 100);
+        timing->setBarColor(TimingBarWidget::Mcp, QColor(0xee, 0x44, 0x44));
+
+        auto *unlock = new UnlockBar(normal_w);
+        unlock->setFixedHeight(30);
+
+        nl->addWidget(timing, 1);
+        nl->addWidget(unlock);
+
+        connect(m_tcu_ctrl, &TCUController::laser_width_display_updated,
+                this, [timing](QString u, QString n, QString) {
+            timing->setBarValue(TimingBarWidget::LaserWidth,
+                                (quint64)u.toLongLong() * 1000 + (quint64)n.toLongLong());
+        });
+        connect(m_tcu_ctrl, &TCUController::delay_display_updated,
+                this, [timing](QString au, QString an, QString,
+                               QString,    QString,    QString) {
+            timing->setBarValue(TimingBarWidget::Distance,
+                                (quint64)au.toLongLong() * 1000 + (quint64)an.toLongLong());
+        });
+        connect(m_tcu_ctrl, &TCUController::gw_display_updated,
+                this, [timing](QString au, QString an, QString,
+                               QString,    QString,    QString, QString) {
+            timing->setBarValue(TimingBarWidget::Dov,
+                                (quint64)au.toLongLong() * 1000 + (quint64)an.toLongLong());
+        });
+        connect(m_tcu_ctrl, &TCUController::mcp_display_updated,
+                this, [timing](int val, QString) {
+            timing->setBarValue(TimingBarWidget::Mcp, (quint64)qMax(0, val));
+        });
+
+        QPushButton *fire_btn = ui->FIRE_LASER_BTN;
+        connect(unlock, &UnlockBar::unlocked, this, [fire_btn]() { fire_btn->setEnabled(true);  });
+        connect(unlock, &UnlockBar::locked,   this, [fire_btn]() { fire_btn->setEnabled(false); });
+        // Relock when laser is turned off (button text reverts to "ON")
+        connect(m_laser_ctrl, &LaserController::laser_btn_update,
+                this, [unlock](bool, QString text) {
+            if (text == "ON") unlock->relock();
+        });
+
+        m_tcu_panel->set_normal_page(normal_w);
+    }
 
     // PipelineProcessor — all pipeline methods run by GrabThread
     {
@@ -767,8 +991,7 @@ UserPanel::UserPanel(QWidget *parent) :
     }
 
     // Connect PipelineProcessor signals
-    connect(m_pipeline, &PipelineProcessor::packet_lost_updated, this,
-            [this](int packets_lost){ ui->STATUS->packet_lost->set_text("packets lost: " + QString::number(packets_lost)); }, Qt::QueuedConnection);
+    // packet_lost_updated: discarded in UI redesign (Sprint 16)
     connect(m_pipeline, &PipelineProcessor::update_mcp_in_thread, this, &UserPanel::change_mcp, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::set_hist_pixmap, ui->HIST_DISPLAY, &Display::setPixmap, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::finish_scan_signal, m_scan_ctrl, &ScanController::on_SCAN_BUTTON_clicked, Qt::QueuedConnection);
@@ -1542,7 +1765,7 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
 
     // adjust display size according to frame size
     curr_cam->frame_size(true, &w[0], &h[0]);
-    status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
+    ui->TITLE->set_resolution(w[0], h[0]);
     qInfo("frame w: %d, h: %d", w[0], h[0]);
     //    QRect region = ui->SOURCE_DISPLAY->geometry();
     //    region.setHeight(ui->SOURCE_DISPLAY->width() * h / w);
@@ -3173,7 +3396,7 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     QPoint center = ui->SOURCE_DISPLAY->center;
 
     int mid_width = window.width() - 12 - grp_width - 10 - ui->LEFT->width();
-    ui->MID->setGeometry(10 + ui->LEFT->width(), 40, mid_width, window.height() - 40 - ui->STATUS->height());
+    ui->MID->setGeometry(10 + ui->LEFT->width(), 40, mid_width, window.height() - 40);
     int width = mid_width - 20, height = width * hh / ww;
 //    qDebug("width %d, height %d\n", width, height);
     int height_constraint = ui->MID->height() - 30 - 24, // bottom padding 24 pixels
@@ -3189,17 +3412,30 @@ void UserPanel::resizeEvent(QResizeEvent *event)
         region.setRect(10, 40, width, height);
     }
     ui->TITLE->resize(this->width(), 30);
-    ui->STATUS->setGeometry(0, this->height() - 32, this->width(), 32);
-    ui->ZOOM_TOOL->move(region.x(), 15);
-    ui->SELECT_TOOL->move(region.x() + 25, 15);
-    ui->PTZ_TOOL->move(region.x() + 50, 15);
+    // center toolbar: top-center of display region
+    m_center_toolbar->adjustSize();
+    m_center_toolbar->move(region.x() + (region.width() - m_center_toolbar->width()) / 2, 4);
+    m_center_toolbar->raise();
+    m_center_toolbar->show();
 //    ui->CURR_COORD->move(region.x() + 80, 5);
     ui->START_COORD->move(region.x() + 80, 5);
     ui->SHAPE_INFO->move(ui->START_COORD->geometry().right() + 20, 5);
     ui->SHIFT_INFO->move(ui->SHAPE_INFO->geometry().right() + 20, 5);
 
-    ui->INFO_CHECK->move(region.right() - 60, 0);
-    ui->CENTER_CHECK->move(region.right() - 60, 20);
+    // INFO_CHECK is now inside m_center_toolbar — no separate move needed
+    ui->CENTER_CHECK->move(region.right() - 60, 4);
+
+    // panel toggle bar: top-right, just below title bar
+    if (m_pbar) {
+        m_pbar->adjustSize();
+        m_pbar->move(window.width() - m_pbar->width() - 6, 32);
+        m_pbar->raise();
+        m_pbar->show();
+    }
+
+    // FPS overlay: bottom-left of display
+    m_fps_label->move(region.x() + 6, region.bottom() - 20);
+    m_fps_label->show();
     ui->HIDE_BTN->move(ui->MID->geometry().left() - 8, this->geometry().height() / 2 - 10);
 //    ui->HIDE_BTN->move(ui->LEFT->geometry().right() - 10 + (ui->SOURCE_DISPLAY->geometry().left() + ui->MID->geometry().left() - ui->LEFT->geometry().right() + 10) / 2 + 2, this->geometry().height() / 2 - 10);
     ui->RULER_H->setGeometry(region.left(), region.bottom() - 10, region.width(), 32);
@@ -3255,7 +3491,7 @@ void UserPanel::mouseMoveEvent(QMouseEvent *event)
             displacement = event->globalPos() - pos();
             if (ww - displacement.x() >= minimumWidth()) ww -= displacement.x(), xx += displacement.x();
             if (hh - displacement.y() >= minimumHeight()) hh -= displacement.y(), yy += displacement.y();
-            ui->TITLE->pressed = false;
+            ui->TITLE->cancel_drag();
             window()->setGeometry(xx, yy, ww, hh);
             break;
         case 21:
@@ -3272,7 +3508,7 @@ void UserPanel::mouseMoveEvent(QMouseEvent *event)
         case 12:
             displacement = event->globalPos() - pos();
             if (hh - displacement.y() >= minimumHeight()) hh -= displacement.y(), yy += displacement.y();
-            ui->TITLE->pressed = false;
+            ui->TITLE->cancel_drag();
             window()->setGeometry(xx, yy, ww, hh);
             break;
         case 13:
@@ -3758,7 +3994,7 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
 void UserPanel::update_pixel_depth(int depth, int display_idx)
 {
     this->pixel_depth[display_idx] = depth;
-    status_bar->img_pixel_depth->set_text(QString::number(depth) + "-bit");
+    ui->TITLE->set_pixel_depth(depth);
 }
 
 
@@ -3812,7 +4048,7 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
     image_mutex[display_idx].lock();
     w[display_idx] = width;
     h[display_idx] = height;
-    if (display_idx == 0) status_bar->img_resolution->emit set_text(QString::asprintf("%d x %d", width, height));
+    if (display_idx == 0) ui->TITLE->set_resolution(width, height);
     this->is_color[display_idx] = is_color;
 //    pixel_depth = img.depth();
     update_pixel_depth(pixel_depth, display_idx);
@@ -4019,7 +4255,7 @@ void UserPanel::on_BINNING_CHECK_stateChanged(int arg1)
     temp_mvcam->binning(false, &binning);
     temp_mvcam->frame_size(true, &w[0], &h[0]);
     qInfo("frame w: %d, h: %d", w[0], h[0]);
-    status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
+    ui->TITLE->set_resolution(w[0], h[0]);
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
 }
@@ -4286,7 +4522,7 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
             curr_cam->frame_offset(false, &new_x, &new_y);
         }
         if (device_on && curr_cam) curr_cam->frame_size(true, &w[0], &h[0]);
-        status_bar->img_resolution->set_text(QString::asprintf("%d x %d", w[0], h[0]));
+        ui->TITLE->set_resolution(w[0], h[0]);
         QResizeEvent e(this->size(), this->size());
         resizeEvent(&e);
         if (was_playing) ui->START_GRABBING_BUTTON->click();

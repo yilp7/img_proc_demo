@@ -223,16 +223,16 @@ Not shipped — only built when `BUILD_TESTS=ON`.
 ---
 
 ## Task 15.10: Unit test executable wiring
-Status: TODO
+Status: DONE
 
-**Scope:** CMake `BUILD_TESTS` block additions + a single `test_widgets` suite executable (or per-widget executables following existing convention).
+**Scope:** CMake `BUILD_TESTS` block additions + per-widget test executables following existing convention.
 
-**Decision:** follow existing convention of one executable per tested unit (`test_ptz`, `test_lens`, …). So:
-- `test_floatingpanel`
-- `test_timingbarwidget`
-- `test_joystickwidget`
-- `test_arcsliderwidget`
-- `test_unlockbar`
+**Decision:** follow existing convention of one executable per tested unit (`test_ptz`, `test_lens`, …). Each landed alongside its widget in the `Tier 3: UI widget tests (Qt::Widgets required)` block of [CMakeLists.txt](CMakeLists.txt):
+- [test_floatingpanel](tests/test_floatingpanel.cpp) — added in 15.2
+- [test_timingbarwidget](tests/test_timingbarwidget.cpp) — added in 15.3
+- [test_joystickwidget](tests/test_joystickwidget.cpp) — added in 15.4
+- [test_arcsliderwidget](tests/test_arcsliderwidget.cpp) — added in 15.5
+- [test_unlockbar](tests/test_unlockbar.cpp) — added in 15.7
 
 Each links `Qt::Test` + `Qt::Widgets` + the widget source files it tests (no main-app dependency).
 
@@ -249,7 +249,7 @@ DotIndicator intentionally has no test executable — gallery covers it. The cen
 - [x] `widget_gallery` executable launches; each widget renders and responds to input.
 - [x] 5 new `test_*` executables build and pass under `BUILD_TESTS=ON`.
 - [x] FloatingPanel transparency recorded in the header comment — cross-platform QSS `rgba` is the chosen approach; actual styling deferred to Sprint 20.
-- [ ] Sprint 15 work committed on `refactor`; progress doc updated with `Status: DONE` for each task.
+- [x] Sprint 15 work committed on `refactor` (commit `3d76afa`); progress doc updated with `Status: DONE` for each task.
 
 ## Out of scope for Sprint 15
 

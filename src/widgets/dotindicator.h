@@ -30,6 +30,11 @@ public:
     // Sprint 20 QSS can replace them without touching this class.
     void setColorForState(State s, const QColor &color);
 
+public slots:
+    // Maps StatusIcon::STATUS int values (0–4) → State so ControlPortThread can drive this dot.
+    // 0:NONE→Off  1:NOT_CONNECTED→Err  2:DISCONNECTED→Err  3:RECONNECTING→Warn  4:CONNECTED→Ok
+    void update_status(int status);
+
 protected:
     void paintEvent(QPaintEvent *event) override;
 

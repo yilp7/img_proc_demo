@@ -1,7 +1,7 @@
 #include "controlportthread.h"
 // #include "userpanel.h"
 
-ControlPortThread::ControlPortThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent) :
+ControlPortThread::ControlPortThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon, QObject *parent) :
     QThread{parent},
     thread_interrupt(false),
     connected_to_serial(false),
@@ -32,10 +32,10 @@ ControlPortThread::ControlPortThread(QLabel *label, QLineEdit *edit, int index, 
     connect(timer, &QTimer::timeout, this,
         [this](){
             // status: -1: not connected, 0: ok, 1: write successful
-            static StatusIcon::STATUS last_status;
-            last_status = StatusIcon::STATUS::CONNECTED;
-            if (!connected_to_serial && !connected_to_tcp) last_status = StatusIcon::STATUS::NOT_CONNECTED;
-            if (successive_count > 5) successive_count = 5, last_status = write_succeeded ? StatusIcon::STATUS::RECONNECTING : StatusIcon::DISCONNECTED;
+            static int last_status; // 4=CONNECTED 3=RECONNECTING 2=DISCONNECTED 1=NOT_CONNECTED
+            last_status = 4; // CONNECTED
+            if (!connected_to_serial && !connected_to_tcp) last_status = 1; // NOT_CONNECTED
+            if (successive_count > 5) successive_count = 5, last_status = write_succeeded ? 3 : 2; // RECONNECTING : DISCONNECTED
 //            emit port_connected(last_status);
             if (this->status_icon) this->status_icon->update_status(last_status);
         });
@@ -303,7 +303,7 @@ void ControlPortThread::run()
     }
 }
 
-TCUThread::TCUThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, ScanConfig *sc, QObject *parent, uint init_width) :
+TCUThread::TCUThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon, ScanConfig *sc, QObject *parent, uint init_width) :
     ControlPortThread(label, edit, index, status_icon, parent),
     tcu_type(0),
     scan_mode(0),
@@ -566,7 +566,7 @@ void TCUThread::try_communicate()
 //    else                             successive_count = 0;
 }
 
-LensThread::LensThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent, int init_speed) :
+LensThread::LensThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon, QObject *parent, int init_speed) :
     ControlPortThread(label, edit, index, status_icon, parent)
 {
     zoom = focus = laser_radius = 0;
@@ -698,7 +698,7 @@ void LensThread::try_communicate()
 //    else                             successive_count = 0;
 }
 
-LaserThread::LaserThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent) :
+LaserThread::LaserThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon, QObject *parent) :
     ControlPortThread(label, edit, index, status_icon, parent) {}
 
 void LaserThread::try_communicate()
@@ -715,7 +715,7 @@ void LaserThread::try_communicate()
     else                             successive_count = 0;
 }
 
-PTZThread::PTZThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent, int init_speed) :
+PTZThread::PTZThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon, QObject *parent, int init_speed) :
     ControlPortThread(label, edit, index, status_icon, parent)
 {
     angle_h = angle_v = 0;
@@ -843,7 +843,7 @@ void PTZThread::send_ctrl_cmd(uchar dir)
     q.push(PortData{QByteArray((char*)buffer_out, 7), 7, 0, false, false});
 }
 
-InclinThread::InclinThread(QLabel *label, QLineEdit *edit, int index, StatusIcon *status_icon, QObject *parent) :
+InclinThread::InclinThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon, QObject *parent) :
     ControlPortThread(label, edit, index, status_icon, parent)
 {
 //    time_interval = 990;

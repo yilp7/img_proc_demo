@@ -36,6 +36,12 @@ void DotIndicator::setColorForState(State s, const QColor &color)
     if (s == m_state) update();
 }
 
+void DotIndicator::update_status(int status)
+{
+    static const State map[] = { Off, Err, Err, Warn, Ok };
+    setState(status >= 0 && status <= 4 ? map[status] : Off);
+}
+
 void DotIndicator::paintEvent(QPaintEvent *)
 {
     QPainter p(this);

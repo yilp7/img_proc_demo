@@ -35,6 +35,13 @@
 #include "controller/auxpanelmanager.h"
 
 #include "widgets/mywidget.h"
+#include "widgets/panels/opticspanel.h"
+#include "widgets/panels/tcupanel.h"
+#include "widgets/panels/consolepanel.h"
+#include "widgets/joystickwidget.h"
+#include "widgets/arcsliderwidget.h"
+#include "widgets/timingbarwidget.h"
+#include "widgets/unlockbar.h"
 #include "thread/joystick.h"
 #include "util/threadpool.h"
 #include "plugins/plugininterface.h"
@@ -416,7 +423,12 @@ public:
 
 private:
     Ui::UserPanel*  ui;
-    StatusBar*      status_bar;
+    QLabel*         m_fps_label;
+    QFrame*         m_center_toolbar;  // inline center toolbar: SEL/ZOOM/PTZ + INFO
+    QFrame*         m_pbar;           // panel toggle bar: 3 checkable buttons top-right
+    OpticsPanel*    m_optics_panel;
+    TCUPanel*       m_tcu_panel;
+    ConsolePanel*   m_console_panel;
     Preferences*    pref;
     DeviceManager*  m_device_mgr;
     TCUController*  m_tcu_ctrl;
