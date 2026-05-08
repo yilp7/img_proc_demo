@@ -38,6 +38,12 @@
 #include "widgets/panels/opticspanel.h"
 #include "widgets/panels/tcupanel.h"
 #include "widgets/panels/consolepanel.h"
+#include "widgets/sidebar/rightstackcontainer.h"
+#include "widgets/sidebar/imgprocwidget.h"
+#include "widgets/sidebar/saveoptionswidget.h"
+#include "widgets/sidebar/visionwidget.h"
+#include "widgets/sidebar/sidedisplaywidget.h"
+#include "widgets/sidebar/mapboxwidget.h"
 #include "widgets/joystickwidget.h"
 #include "widgets/arcsliderwidget.h"
 #include "widgets/timingbarwidget.h"
@@ -429,6 +435,12 @@ private:
     OpticsPanel*    m_optics_panel;
     TCUPanel*       m_tcu_panel;
     ConsolePanel*   m_console_panel;
+    RightStackContainer* m_right_stack;
+    ImgProcWidget*       m_img_proc;
+    SaveOptionsWidget*   m_save_options;
+    VisionWidget*        m_vision;
+    SideDisplayWidget*   m_side_display;
+    MapboxWidget*        m_mapbox;
     Preferences*    pref;
     DeviceManager*  m_device_mgr;
     TCUController*  m_tcu_ctrl;

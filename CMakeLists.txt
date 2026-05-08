@@ -172,6 +172,18 @@ set(SOURCE_FILES
     src/widgets/panels/tcupanel.cpp
     src/widgets/panels/consolepanel.h
     src/widgets/panels/consolepanel.cpp
+    src/widgets/sidebar/rightstackcontainer.h
+    src/widgets/sidebar/rightstackcontainer.cpp
+    src/widgets/sidebar/imgprocwidget.h
+    src/widgets/sidebar/imgprocwidget.cpp
+    src/widgets/sidebar/saveoptionswidget.h
+    src/widgets/sidebar/saveoptionswidget.cpp
+    src/widgets/sidebar/visionwidget.h
+    src/widgets/sidebar/visionwidget.cpp
+    src/widgets/sidebar/sidedisplaywidget.h
+    src/widgets/sidebar/sidedisplaywidget.cpp
+    src/widgets/sidebar/mapboxwidget.h
+    src/widgets/sidebar/mapboxwidget.cpp
     src/widgets/mywidget.h
     src/widgets/mywidget.cpp
     src/visual/userpanel.h

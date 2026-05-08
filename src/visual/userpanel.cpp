@@ -110,6 +110,12 @@ UserPanel::UserPanel(QWidget *parent) :
     m_optics_panel(nullptr),
     m_tcu_panel(nullptr),
     m_console_panel(nullptr),
+    m_right_stack(nullptr),
+    m_img_proc(nullptr),
+    m_save_options(nullptr),
+    m_vision(nullptr),
+    m_side_display(nullptr),
+    m_mapbox(nullptr),
     pref(NULL),
     m_device_mgr(nullptr),
     m_tcu_ctrl(nullptr),
@@ -524,6 +530,46 @@ UserPanel::UserPanel(QWidget *parent) :
         if (tb) connect(m_tcu_panel,     &FloatingPanel::hideRequested, tb, [tb]() { tb->setChecked(false); });
         if (cb) connect(m_console_panel, &FloatingPanel::hideRequested, cb, [cb]() { cb->setChecked(false); });
     }
+
+    // ----- Right-side widget stack (Sprint 17.5 cutover) -----
+    m_right_stack  = new RightStackContainer(this);
+    m_img_proc     = new ImgProcWidget(m_right_stack);
+    m_save_options = new SaveOptionsWidget(m_right_stack);
+    m_vision       = new VisionWidget(m_right_stack);
+
+    m_img_proc->setup(ui->IMG_ENHANCE_CHECK,   ui->ENHANCE_OPTIONS,
+                      ui->FRAME_AVG_CHECK,     ui->FRAME_AVG_OPTIONS,
+                      ui->IMG_3D_CHECK,        ui->RANGE_THRESH_EDIT,
+                      ui->RESET_3D_BTN,
+                      ui->PSEUDOCOLOR_CHK);
+
+    m_save_options->setup(ui->FILE_PATH_EDIT, ui->FILE_PATH_BROWSE,
+                          ui->SAVE_BMP_BUTTON,    ui->SAVE_FINAL_BUTTON,
+                          ui->SAVE_AVI_BUTTON,    ui->SAVE_RESULT_BUTTON,
+                          ui->CAPTURE_LABEL,      ui->RECORD_LABEL);
+
+    m_right_stack->addSection(m_img_proc);
+    m_right_stack->addSection(m_save_options);
+    m_right_stack->addSection(m_vision, 1);  // vision stretches to fill
+
+    // Hide the legacy RIGHT column — its surviving children (SCAN_GRP) are
+    // hidden along with it. SCAN_GRP will be absorbed into the SCAN overlay
+    // in Sprint 19; the orphaned IMG_PROC_STATIC / IMG_SAVE_STATIC frames
+    // are now empty and stay hidden.
+    ui->RIGHT->hide();
+
+    // ----- Side display + map placeholder (Sprint 17.6 / 17.7) -----
+    // ui->LEFT still holds PARAMS_STATIC + IMG_GRAB_STATIC (gain / start-stop
+    // grabbing) and remains the left zone in S17. SideDisplay + Mapbox are
+    // constructed for layout reservation but stay hidden until LEFT migrates
+    // to the SETUP overlay in Sprint 18.
+    m_side_display = new SideDisplayWidget(this);
+    m_mapbox       = new MapboxWidget(this);
+    m_side_display->hide();
+    m_mapbox      ->hide();
+    m_right_stack ->setGeometry(0, 0, 220, 400);
+    m_right_stack ->raise();
+    m_right_stack ->show();
 
     ui->DATA_EXCHANGE->document()->setMaximumBlockCount(200);
     ui->DATA_EXCHANGE->setFont(temp_f);
@@ -3388,15 +3434,21 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     ww = ui->IMG_3D_CHECK->isChecked() ? ww + 104 : ww;
     QRect window = this->geometry();
 //    qDebug() << window;
-    int grp_width = ui->RIGHT->width();
-
-    ui->RIGHT->move(window.width() - 12 - grp_width, 40);
+    // Sprint 17.8: right zone is the RightStackContainer; left zone still
+    // driven by ui->LEFT until SETUP overlay (S18) absorbs it.
+    const int right_zone_w = 220;
+    const int title_h      = 40;
+    const int side_top     = title_h + 4;
+    const int side_bottom  = window.height() - 4;
+    const int side_h       = side_bottom - side_top;
+    if (m_right_stack)
+        m_right_stack->setGeometry(window.width() - right_zone_w - 6, side_top, right_zone_w, side_h);
 
     QRect region = ui->SOURCE_DISPLAY->geometry();
     QPoint center = ui->SOURCE_DISPLAY->center;
 
-    int mid_width = window.width() - 12 - grp_width - 10 - ui->LEFT->width();
-    ui->MID->setGeometry(10 + ui->LEFT->width(), 40, mid_width, window.height() - 40);
+    int mid_width = window.width() - (right_zone_w + 12) - 10 - ui->LEFT->width();
+    ui->MID->setGeometry(10 + ui->LEFT->width(), title_h, mid_width, window.height() - title_h);
     int width = mid_width - 20, height = width * hh / ww;
 //    qDebug("width %d, height %d\n", width, height);
     int height_constraint = ui->MID->height() - 30 - 24, // bottom padding 24 pixels
