@@ -45,6 +45,7 @@
 #include "widgets/sidebar/sidedisplaywidget.h"
 #include "widgets/sidebar/mapboxwidget.h"
 #include "widgets/overlays/setupoverlay.h"
+#include "widgets/overlays/scanoverlay.h"
 #include "widgets/joystickwidget.h"
 #include "widgets/arcsliderwidget.h"
 #include "widgets/timingbarwidget.h"
@@ -443,6 +444,7 @@ private:
     SideDisplayWidget*   m_side_display;
     MapboxWidget*        m_mapbox;
     SetupOverlay*        m_setup_overlay;
+    ScanOverlay*         m_scan_overlay;
     Preferences*    pref;
     DeviceManager*  m_device_mgr;
     TCUController*  m_tcu_ctrl;

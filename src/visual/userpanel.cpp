@@ -1,6 +1,7 @@
 #include "userpanel.h"
 #include "ui_user_panel.h"
 #include "ui_preferences.h"
+#include "ui_scanconfig.h"
 #include "util/constants.h"
 
 static bool throttle_check(QElapsedTimer &t)
@@ -117,6 +118,7 @@ UserPanel::UserPanel(QWidget *parent) :
     m_side_display(nullptr),
     m_mapbox(nullptr),
     m_setup_overlay(nullptr),
+    m_scan_overlay(nullptr),
     pref(NULL),
     m_device_mgr(nullptr),
     m_tcu_ctrl(nullptr),
@@ -618,32 +620,299 @@ UserPanel::UserPanel(QWidget *parent) :
     }
     m_setup_overlay->hide();  // shown only in SETUP mode
 
-    // Mode-tab wiring: Setup → overlay; Monitor/Scan → hide overlay
+    // ----- SCAN overlay (Sprint 19) -----
+    // Builds 4 titled group cards (Delay / Gate Width / PTZ / Capture+Record)
+    // plus a vertical action column by re-parenting individual scan_config->ui->*
+    // widgets and the scan control buttons. Matches the prototype.html v3 layout.
+    m_scan_overlay = new ScanOverlay(ui->CENTRAL);
+    if (scan_config) {
+        auto *sc     = scan_config->ui;        // shorthand to Ui::ScanConfig
+        auto *cards  = m_scan_overlay->cardsLayout();
+        auto *cw     = m_scan_overlay->contentWidget();
+
+        // Re-parent w to p, show it, and return it for use in addWidget().
+        // setParent() hides the widget; show() makes it visible; addWidget()
+        // skips setParent because pw == mw already, so it stays shown.
+        auto rp = [](QWidget *w, QWidget *p) -> QWidget* {
+            if (!w || !p) return nullptr;
+            w->setParent(p);
+            w->show();
+            return w;
+        };
+
+        // Creates a titled group card, registers it with cardsLayout(), and
+        // returns the body QWidget ready to receive a layout.
+        auto make_card = [&](const char *title) -> QWidget* {
+            auto *card = new QFrame(cw);
+            card->setObjectName(QString("SCAN_CARD_") + title);
+            card->setFrameShape(QFrame::StyledPanel);
+            auto *vl = new QVBoxLayout(card);
+            vl->setContentsMargins(0, 0, 0, 0);
+            vl->setSpacing(0);
+            auto *ttl = new QWidget(card);
+            ttl->setObjectName("SCAN_CARD_TTL");
+            auto *tl = new QHBoxLayout(ttl);
+            tl->setContentsMargins(8, 3, 8, 3);
+            tl->addWidget(new QLabel(title, ttl));
+            vl->addWidget(ttl);
+            auto *body = new QWidget(card);
+            body->setObjectName("SCAN_CARD_BODY");
+            auto *bl = new QVBoxLayout(body);
+            bl->setContentsMargins(8, 6, 8, 8);
+            bl->setSpacing(4);
+            vl->addWidget(body, 1);
+            cards->addWidget(card);
+            return body;
+        };
+
+        // ── Delay ──────────────────────────────────────────────────────────
+        {
+            auto *body = make_card("DELAY");
+            auto *bl   = static_cast<QVBoxLayout*>(body->layout());
+
+            // Starting / Ending rows: [label] [μs edit] [μs unit] [ns edit] [ns unit]
+            auto *grid = new QGridLayout;
+            grid->setHorizontalSpacing(4);
+            grid->setVerticalSpacing(4);
+            grid->setContentsMargins(0, 0, 0, 0);
+            grid->addWidget(new QLabel("Starting", body),      0, 0);
+            grid->addWidget(rp(sc->START_DELAY_EDIT_U, body),  0, 1);
+            grid->addWidget(rp(sc->UNIT_US_1,          body),  0, 2);
+            grid->addWidget(rp(sc->START_DELAY_EDIT_N, body),  0, 3);
+            grid->addWidget(rp(sc->UNIT_NS_1,          body),  0, 4);
+            grid->addWidget(new QLabel("Ending",  body),       1, 0);
+            grid->addWidget(rp(sc->END_DELAY_EDIT_U,   body),  1, 1);
+            grid->addWidget(rp(sc->UNIT_US_2,          body),  1, 2);
+            grid->addWidget(rp(sc->END_DELAY_EDIT_N,   body),  1, 3);
+            grid->addWidget(rp(sc->UNIT_NS_2,          body),  1, 4);
+            bl->addLayout(grid);
+
+            auto *sep = new QFrame(body);
+            sep->setFrameShape(QFrame::HLine);
+            sep->setFrameShadow(QFrame::Sunken);
+            bl->addWidget(sep);
+
+            auto *grid2 = new QGridLayout;
+            grid2->setHorizontalSpacing(4);
+            grid2->setVerticalSpacing(4);
+            grid2->setContentsMargins(0, 0, 0, 0);
+            grid2->addWidget(new QLabel("Step",     body),          0, 0);
+            grid2->addWidget(rp(sc->STEP_SIZE_DELAY_EDIT, body),    0, 1);
+            grid2->addWidget(rp(sc->UNIT_1,               body),    0, 2);
+            grid2->addWidget(new QLabel("Rep Freq", body),          1, 0);
+            grid2->addWidget(rp(sc->REP_FREQ_EDIT,        body),    1, 1);
+            grid2->addWidget(rp(sc->FREQ_UNIT,            body),    1, 2);
+            bl->addLayout(grid2);
+            bl->addStretch(1);
+        }
+
+        // ── Gate Width ─────────────────────────────────────────────────────
+        {
+            auto *body = make_card("GATE WIDTH");
+            auto *bl   = static_cast<QVBoxLayout*>(body->layout());
+
+            auto *grid = new QGridLayout;
+            grid->setHorizontalSpacing(4);
+            grid->setVerticalSpacing(4);
+            grid->setContentsMargins(0, 0, 0, 0);
+            grid->addWidget(new QLabel("Starting", body),     0, 0);
+            grid->addWidget(rp(sc->START_GW_EDIT_U,   body),  0, 1);
+            grid->addWidget(rp(sc->UNIT_US_3,         body),  0, 2);
+            grid->addWidget(rp(sc->START_GW_EDIT_N,   body),  0, 3);
+            grid->addWidget(rp(sc->UNIT_NS_3,         body),  0, 4);
+            grid->addWidget(new QLabel("Ending",  body),      1, 0);
+            grid->addWidget(rp(sc->END_GW_EDIT_U,     body),  1, 1);
+            grid->addWidget(rp(sc->UNIT_US_4,         body),  1, 2);
+            grid->addWidget(rp(sc->END_GW_EDIT_N,     body),  1, 3);
+            grid->addWidget(rp(sc->UNIT_NS_4,         body),  1, 4);
+            bl->addLayout(grid);
+
+            auto *sep = new QFrame(body);
+            sep->setFrameShape(QFrame::HLine);
+            sep->setFrameShadow(QFrame::Sunken);
+            bl->addWidget(sep);
+
+            auto *grid2 = new QGridLayout;
+            grid2->setHorizontalSpacing(4);
+            grid2->setVerticalSpacing(4);
+            grid2->setContentsMargins(0, 0, 0, 0);
+            grid2->addWidget(new QLabel("Step", body),          0, 0);
+            grid2->addWidget(rp(sc->STEP_SIZE_GW_EDIT, body),   0, 1);
+            grid2->addWidget(rp(sc->UNIT_2,            body),   0, 2);
+            bl->addLayout(grid2);
+            bl->addStretch(1);
+        }
+
+        // ── PTZ ────────────────────────────────────────────────────────────
+        {
+            auto *body = make_card("PTZ");
+            auto *bl   = static_cast<QVBoxLayout*>(body->layout());
+
+            auto *row_w = new QWidget(body);
+            auto *hl    = new QHBoxLayout(row_w);
+            hl->setContentsMargins(0, 0, 0, 0);
+            hl->setSpacing(12);
+
+            // Left sub-panel: H/V grid
+            auto *gw  = new QWidget(row_w);
+            auto *g   = new QGridLayout(gw);
+            g->setHorizontalSpacing(4);
+            g->setVerticalSpacing(4);
+            g->setContentsMargins(0, 0, 0, 0);
+            g->addWidget(new QLabel("H", gw), 0, 1, Qt::AlignCenter);
+            g->addWidget(new QLabel("V", gw), 0, 2, Qt::AlignCenter);
+            struct { const char *lbl; QWidget *h; QWidget *v; } ptz_rows[] = {
+                { "Starting", sc->START_ANGLE_H_EDT, sc->START_ANGLE_V_EDT },
+                { "Ending",   sc->END_ANGLE_H_EDT,   sc->END_ANGLE_V_EDT   },
+                { "Step",     sc->STEP_ANGLE_H_EDT,  sc->STEP_ANGLE_V_EDT  },
+                { "Pos count",sc->FRAME_H_EDT,        sc->FRAME_V_EDT       },
+            };
+            for (int r = 0; r < 4; ++r) {
+                g->addWidget(new QLabel(ptz_rows[r].lbl, gw),   r + 1, 0);
+                g->addWidget(rp(ptz_rows[r].h, gw),             r + 1, 1);
+                g->addWidget(rp(ptz_rows[r].v, gw),             r + 1, 2);
+            }
+            for (int r = 0; r < 3; ++r)   // ° labels for start/end/step rows
+                g->addWidget(new QLabel("\xc2\xb0", gw), r + 1, 3);
+            hl->addWidget(gw);
+
+            // Right sub-panel: direction radio + wait
+            auto *rw  = new QWidget(row_w);
+            auto *rvl = new QVBoxLayout(rw);
+            rvl->setContentsMargins(0, 0, 0, 0);
+            rvl->setSpacing(8);
+            rvl->addWidget(new QLabel("Direction", rw));
+            auto *dir_row = new QWidget(rw);
+            auto *drl = new QHBoxLayout(dir_row);
+            drl->setContentsMargins(0, 0, 0, 0);
+            drl->setSpacing(6);
+            drl->addWidget(rp(sc->RADIO_PTZ_DIRECTION_N, dir_row));
+            drl->addWidget(rp(sc->RADIO_PTZ_DIRECTION_Z, dir_row));
+            rvl->addWidget(dir_row);
+            rvl->addWidget(new QLabel("Wait", rw));
+            auto *wait_row = new QWidget(rw);
+            auto *wrl = new QHBoxLayout(wait_row);
+            wrl->setContentsMargins(0, 0, 0, 0);
+            wrl->setSpacing(4);
+            wrl->addWidget(rp(sc->PTZ_WAIT_TIME_EDT, wait_row));
+            wrl->addWidget(new QLabel("s", wait_row));
+            rvl->addWidget(wait_row);
+            rvl->addStretch(1);
+            hl->addWidget(rw);
+
+            bl->addWidget(row_w);
+            bl->addStretch(1);
+        }
+
+        // ── Capture / Record ───────────────────────────────────────────────
+        {
+            auto *body = make_card("CAPTURE / RECORD");
+            auto *bl   = static_cast<QVBoxLayout*>(body->layout());
+
+            auto *row_w = new QWidget(body);
+            auto *hl    = new QHBoxLayout(row_w);
+            hl->setContentsMargins(0, 0, 0, 0);
+            hl->setSpacing(16);
+
+            // Left: CAPTURE + RECORD checkboxes
+            auto *lw  = new QWidget(row_w);
+            auto *lvl = new QVBoxLayout(lw);
+            lvl->setContentsMargins(0, 0, 0, 0);
+            lvl->setSpacing(8);
+            auto add_chk_section = [&](const char *title, QWidget *ori, QWidget *res) {
+                lvl->addWidget(new QLabel(title, lw));
+                lvl->addWidget(rp(ori, lw));
+                lvl->addWidget(rp(res, lw));
+            };
+            add_chk_section("CAPTURE", sc->CAPTURE_SCAN_ORI_CHK, sc->CAPTURE_SCAN_RES_CHK);
+            add_chk_section("RECORD",  sc->RECORD_SCAN_ORI_CHK,  sc->RECORD_SCAN_RES_CHK);
+            lvl->addStretch(1);
+            hl->addWidget(lw);
+
+            // Right: Profiles + Imgs/Profile
+            auto *rw  = new QWidget(row_w);
+            auto *rvl = new QVBoxLayout(rw);
+            rvl->setContentsMargins(0, 0, 0, 0);
+            rvl->setSpacing(6);
+            auto add_inp_section = [&](const char *title, const char *sub, QWidget *edit) {
+                rvl->addWidget(new QLabel(title, rw));
+                auto *sl = new QLabel(sub, rw);
+                sl->setWordWrap(true);
+                rvl->addWidget(sl);
+                rvl->addWidget(rp(edit, rw));
+            };
+            add_inp_section("PROFILES",        "# of TCU+PTZ param sets", sc->FRAME_COUNT_EDIT);
+            add_inp_section("IMGS / PROFILE",  "# of imgs per profile",   sc->NUM_SINGLE_POS_EDT);
+            rvl->addStretch(1);
+            hl->addWidget(rw);
+
+            bl->addWidget(row_w);
+            bl->addStretch(1);
+        }
+
+        // ── Action column (90 px) ──────────────────────────────────────────
+        // SCAN_BUTTON acts as both Start (text "Scan") and Stop (text "Stop")
+        // based on ScanController state. CONTINUE/RESTART visibility managed
+        // by ScanController::scan_options_changed; don't force show() on them.
+        {
+            auto *ac  = new QWidget(cw);
+            ac->setObjectName("SCAN_ACTION_COL");
+            ac->setFixedWidth(90);
+            auto *vl  = new QVBoxLayout(ac);
+            vl->setContentsMargins(4, 4, 4, 4);
+            vl->setSpacing(6);
+
+            rp(ui->SCAN_BUTTON, ac);
+            vl->addWidget(ui->SCAN_BUTTON);
+
+            // Re-parent but don't force visible — ScanController owns visibility.
+            ui->CONTINUE_SCAN_BUTTON->setParent(ac);
+            vl->addWidget(ui->CONTINUE_SCAN_BUTTON);
+            ui->RESTART_SCAN_BUTTON->setParent(ac);
+            vl->addWidget(ui->RESTART_SCAN_BUTTON);
+
+            vl->addStretch(1);
+            cards->addWidget(ac);
+        }
+
+        cards->addStretch(1);
+    }
+    m_scan_overlay->hide();  // shown only in SCAN mode
+
+    // Mode-tab wiring: overlays are mutually exclusive; MONITOR hides both.
     connect(ui->TITLE, &TopBar::modeChanged, this, [this](TopBar::Mode mode) {
-        const bool setup_mode = (mode == TopBar::Mode::Setup);
+        const bool setup_mode   = (mode == TopBar::Mode::Setup);
+        const bool scan_mode    = (mode == TopBar::Mode::Scan);
+        const bool overlay_mode = setup_mode || scan_mode;
         if (m_setup_overlay) m_setup_overlay->setVisible(setup_mode);
-        if (m_right_stack)   m_right_stack  ->setVisible(!setup_mode);
-        if (m_pbar)          m_pbar         ->setVisible(!setup_mode);
-        // Floating panels follow their pbar toggle state when MONITOR mode is active
+        if (m_scan_overlay)  m_scan_overlay ->setVisible(scan_mode);
+        if (m_right_stack)   m_right_stack  ->setVisible(!overlay_mode);
+        if (m_pbar)          m_pbar         ->setVisible(!overlay_mode);
+        if (m_fps_label)     m_fps_label    ->setVisible(!overlay_mode);
+        // Floating panels follow their pbar toggle state when not in an overlay mode.
         auto pbar_checked = [this](const char *name) -> bool {
             if (!m_pbar) return true;
             auto *b = m_pbar->findChild<QPushButton*>(name);
             return b ? b->isChecked() : true;
         };
-        if (m_optics_panel)  m_optics_panel ->setVisible(!setup_mode && pbar_checked("PBAR_OPTICS_BTN"));
-        if (m_tcu_panel)     m_tcu_panel    ->setVisible(!setup_mode && pbar_checked("PBAR_TCU_BTN"));
-        if (m_console_panel) m_console_panel->setVisible(!setup_mode && pbar_checked("PBAR_CONSOLE_BTN"));
+        if (m_optics_panel)  m_optics_panel ->setVisible(!overlay_mode && pbar_checked("PBAR_OPTICS_BTN"));
+        if (m_tcu_panel)     m_tcu_panel    ->setVisible(!overlay_mode && pbar_checked("PBAR_TCU_BTN"));
+        if (m_console_panel) m_console_panel->setVisible(!overlay_mode && pbar_checked("PBAR_CONSOLE_BTN"));
         // Panels must sit above side-zone widgets (siblings in CENTRAL's z-order).
-        if (!setup_mode) {
+        if (!overlay_mode) {
             if (m_optics_panel)  m_optics_panel ->raise();
             if (m_tcu_panel)     m_tcu_panel    ->raise();
             if (m_console_panel) m_console_panel->raise();
         }
         if (setup_mode && m_setup_overlay) {
             m_setup_overlay->raise();
-            // Position below TopBar so its mode tabs stay clickable.
             const QRect c = ui->CENTRAL->rect();
             m_setup_overlay->setGeometry(c.x(), 40, c.width(), c.height() - 40);
+        }
+        if (scan_mode && m_scan_overlay) {
+            m_scan_overlay->raise();
+            const QRect c = ui->CENTRAL->rect();
+            m_scan_overlay->setGeometry(c.x(), 40, c.width(), c.height() - 40);
         }
     });
 
@@ -3538,6 +3807,10 @@ void UserPanel::resizeEvent(QResizeEvent *event)
         const QRect c = ui->CENTRAL->rect();
         m_setup_overlay->setGeometry(c.x(), 40, c.width(), c.height() - 40);
     }
+    if (m_scan_overlay && m_scan_overlay->isVisible()) {
+        const QRect c = ui->CENTRAL->rect();
+        m_scan_overlay->setGeometry(c.x(), 40, c.width(), c.height() - 40);
+    }
 
     QRect region = ui->SOURCE_DISPLAY->geometry();
     QPoint center = ui->SOURCE_DISPLAY->center;
@@ -3580,9 +3853,11 @@ void UserPanel::resizeEvent(QResizeEvent *event)
         m_pbar->show();
     }
 
-    // FPS overlay: bottom-left of display
+    // FPS overlay: bottom-left of display — hidden in overlay modes
     m_fps_label->move(region.x() + 6, region.bottom() - 20);
-    m_fps_label->show();
+    const bool any_overlay = (m_setup_overlay && m_setup_overlay->isVisible())
+                          || (m_scan_overlay  && m_scan_overlay ->isVisible());
+    m_fps_label->setVisible(!any_overlay);
     ui->HIDE_BTN->move(ui->MID->geometry().left() - 8, this->geometry().height() / 2 - 10);
 //    ui->HIDE_BTN->move(ui->LEFT->geometry().right() - 10 + (ui->SOURCE_DISPLAY->geometry().left() + ui->MID->geometry().left() - ui->LEFT->geometry().right() + 10) / 2 + 2, this->geometry().height() / 2 - 10);
     ui->RULER_H->setGeometry(region.left(), region.bottom() - 10, region.width(), 32);
