@@ -141,9 +141,18 @@ int TimingBarWidget::endHandleAt(const QPoint &pos) const
 
 void TimingBarWidget::paintEvent(QPaintEvent *)
 {
+    // Theme tokens — match prototype v3 and resources/style_dark.qss.
+    // Custom-painted widget: QSS background-color does not apply, so we
+    // paint with the same hex literals the QSS uses for sibling widgets.
+    static const QColor kBg        (0x12, 0x10, 0x0E);  // bg-raised
+    static const QColor kTrackBg   (0x04, 0x03, 0x03);  // bg-deepest
+    static const QColor kTrackEdge (0x38, 0x2D, 0x25);  // border-default
+    static const QColor kHandle    (0xE0, 0x92, 0x4A);  // accent
+    static const QColor kText      (0xCD, 0xB2, 0x99);  // text-secondary
+
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, false);
-    p.fillRect(rect(), palette().window());
+    p.fillRect(rect(), kBg);
 
     const int tw = trackWidth();
     const int rh = rowHeight();
@@ -161,13 +170,13 @@ void TimingBarWidget::paintEvent(QPaintEvent *)
         QString label_text = b.unit.isEmpty()
             ? QStringLiteral("%1: %2").arg(b.label).arg(b.value)
             : QStringLiteral("%1: %2 %3").arg(b.label).arg(b.value).arg(b.unit);
-        p.setPen(palette().text().color());
+        p.setPen(kText);
         p.drawText(label_rect,
                    Qt::AlignLeft | Qt::AlignVCenter,
                    fm.elidedText(label_text, Qt::ElideRight, label_rect.width()));
 
         // Track background.
-        p.fillRect(track_rect, QColor(0x22, 0x22, 0x22));
+        p.fillRect(track_rect, kTrackBg);
 
         // Filled bar from track-left to the current value.
         const int ex = trackLeft() + valueToPixel(b.value, tw, b.scale);
@@ -176,12 +185,12 @@ void TimingBarWidget::paintEvent(QPaintEvent *)
         p.fillRect(seg_rect, b.color);
 
         // Track outline.
-        p.setPen(QColor(0xff, 0xff, 0xff));
+        p.setPen(kTrackEdge);
         p.setBrush(Qt::NoBrush);
         p.drawRect(track_rect.adjusted(0, 0, -1, -1));
 
-        // End handle marker (small vertical tick).
-        p.setPen(QPen(QColor(0xff, 0xff, 0xff), 2.0));
+        // End handle marker (small vertical tick) — accent-colored.
+        p.setPen(QPen(kHandle, 2.0));
         p.drawLine(ex, top + 2, ex, top + rh - 2);
     }
 }

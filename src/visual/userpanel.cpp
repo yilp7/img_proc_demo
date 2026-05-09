@@ -218,7 +218,10 @@ UserPanel::UserPanel(QWidget *parent) :
     setMouseTracking(true);
     setCursor(cursor_curr_pointer);
 
-    m_fps_label = new QLabel("0.00 fps", this);
+    // FPS overlay lives in CENTRAL so it shares z-order with the floating
+    // panels (Sprint 18 fix). Otherwise QMainWindow direct children paint
+    // above CENTRAL's children and intercept clicks.
+    m_fps_label = new QLabel("0.00 fps", ui->CENTRAL);
     m_fps_label->setObjectName("FPS_LABEL");
     m_fps_label->setAttribute(Qt::WA_TranslucentBackground);
     m_fps_label->hide(); // shown once resizeEvent places it
@@ -644,19 +647,22 @@ UserPanel::UserPanel(QWidget *parent) :
         // returns the body QWidget ready to receive a layout.
         auto make_card = [&](const char *title) -> QWidget* {
             auto *card = new QFrame(cw);
-            card->setObjectName(QString("SCAN_CARD_") + title);
+            card->setObjectName("SCAN_CARD");
+            card->setProperty("scan_card_title", title);  // for diagnostics
             card->setFrameShape(QFrame::StyledPanel);
             auto *vl = new QVBoxLayout(card);
             vl->setContentsMargins(0, 0, 0, 0);
             vl->setSpacing(0);
             auto *ttl = new QWidget(card);
             ttl->setObjectName("SCAN_CARD_TTL");
+            ttl->setAttribute(Qt::WA_StyledBackground, true);
             auto *tl = new QHBoxLayout(ttl);
             tl->setContentsMargins(8, 3, 8, 3);
             tl->addWidget(new QLabel(title, ttl));
             vl->addWidget(ttl);
             auto *body = new QWidget(card);
             body->setObjectName("SCAN_CARD_BODY");
+            body->setAttribute(Qt::WA_StyledBackground, true);
             auto *bl = new QVBoxLayout(body);
             bl->setContentsMargins(8, 6, 8, 8);
             bl->setSpacing(4);
@@ -688,8 +694,9 @@ UserPanel::UserPanel(QWidget *parent) :
             bl->addLayout(grid);
 
             auto *sep = new QFrame(body);
-            sep->setFrameShape(QFrame::HLine);
-            sep->setFrameShadow(QFrame::Sunken);
+            sep->setObjectName("SCAN_CARD_SEP");
+            sep->setAttribute(Qt::WA_StyledBackground, true);
+            sep->setFixedHeight(1);
             bl->addWidget(sep);
 
             auto *grid2 = new QGridLayout;
@@ -728,8 +735,9 @@ UserPanel::UserPanel(QWidget *parent) :
             bl->addLayout(grid);
 
             auto *sep = new QFrame(body);
-            sep->setFrameShape(QFrame::HLine);
-            sep->setFrameShadow(QFrame::Sunken);
+            sep->setObjectName("SCAN_CARD_SEP");
+            sep->setAttribute(Qt::WA_StyledBackground, true);
+            sep->setFixedHeight(1);
             bl->addWidget(sep);
 
             auto *grid2 = new QGridLayout;
@@ -878,6 +886,55 @@ UserPanel::UserPanel(QWidget *parent) :
         cards->addStretch(1);
     }
     m_scan_overlay->hide();  // shown only in SCAN mode
+
+    // ----- Preview sidebars (Sprint 20.4) -----
+    // 3 thumbnail QLabels per overlay, mirroring displays[0..2]. Each Display
+    // already emits set_pixmap when the pipeline pushes a new frame; thumbnails
+    // listen and scale-to-fit. No pipeline changes needed.
+    for (int i = 0; i < 3; ++i) { m_setup_thumb[i] = nullptr; m_scan_thumb[i] = nullptr; }
+    auto populate_thumbs = [this](QVBoxLayout *layout, QLabel *thumbs[3]) {
+        if (!layout) return;
+        // Clear placeholder + stretch from the constructor.
+        while (auto *item = layout->takeAt(0)) {
+            if (auto *w = item->widget()) w->deleteLater();
+            delete item;
+        }
+        QWidget *parent_w = layout->parentWidget();
+        static const char *names[3] = { "MAIN", "ALT 1", "ALT 2" };
+        for (int i = 0; i < 3; ++i) {
+            auto *lbl = new QLabel(names[i], parent_w);
+            lbl->setObjectName("PREVIEW_THUMB_LBL");
+            lbl->setStyleSheet("font-weight: 700; color: #E0924A; background: transparent;");
+            layout->addWidget(lbl);
+            thumbs[i] = new QLabel(parent_w);
+            thumbs[i]->setObjectName("PREVIEW_THUMB");
+            thumbs[i]->setFixedHeight(150);
+            thumbs[i]->setMinimumWidth(180);
+            thumbs[i]->setAlignment(Qt::AlignCenter);
+            thumbs[i]->setStyleSheet("background-color: #040303; border: 1px solid #382D25;");
+            layout->addWidget(thumbs[i]);
+        }
+        layout->addStretch(1);
+    };
+    if (m_setup_overlay) populate_thumbs(m_setup_overlay->previewSidebarLayout(), m_setup_thumb);
+    if (m_scan_overlay)  populate_thumbs(m_scan_overlay ->previewLayout(),        m_scan_thumb);
+
+    // Wire each thumbnail to its source Display's set_pixmap signal. The
+    // signal fires queued from the GrabThread; we scale-to-fit on the GUI
+    // thread. When the source Display is empty (no camera), thumbs stay dark.
+    for (int i = 0; i < 3; ++i) {
+        if (!displays[i]) continue;
+        auto scaler = [](QLabel *thumb) {
+            return [thumb](const QPixmap &pm) {
+                if (!thumb || pm.isNull()) return;
+                thumb->setPixmap(pm.scaled(thumb->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            };
+        };
+        if (m_setup_thumb[i])
+            connect(displays[i], &Display::set_pixmap, m_setup_thumb[i], scaler(m_setup_thumb[i]), Qt::QueuedConnection);
+        if (m_scan_thumb[i])
+            connect(displays[i], &Display::set_pixmap, m_scan_thumb[i], scaler(m_scan_thumb[i]), Qt::QueuedConnection);
+    }
 
     // Mode-tab wiring: overlays are mutually exclusive; MONITOR hides both.
     connect(ui->TITLE, &TopBar::modeChanged, this, [this](TopBar::Mode mode) {
@@ -3853,11 +3910,18 @@ void UserPanel::resizeEvent(QResizeEvent *event)
         m_pbar->show();
     }
 
-    // FPS overlay: bottom-left of display — hidden in overlay modes
-    m_fps_label->move(region.x() + 6, region.bottom() - 20);
+    // FPS overlay: bottom-left of display, in CENTRAL coords — hidden in overlay modes
+    const QPoint fps_pos = ui->SOURCE_DISPLAY->mapTo(ui->CENTRAL, QPoint(6, region.height() - 20));
+    m_fps_label->move(fps_pos);
     const bool any_overlay = (m_setup_overlay && m_setup_overlay->isVisible())
                           || (m_scan_overlay  && m_scan_overlay ->isVisible());
     m_fps_label->setVisible(!any_overlay);
+    // Floating panels live in CENTRAL; raise above the fps label to keep their headers clickable.
+    if (!any_overlay) {
+        if (m_optics_panel)  m_optics_panel ->raise();
+        if (m_tcu_panel)     m_tcu_panel    ->raise();
+        if (m_console_panel) m_console_panel->raise();
+    }
     ui->HIDE_BTN->move(ui->MID->geometry().left() - 8, this->geometry().height() / 2 - 10);
 //    ui->HIDE_BTN->move(ui->LEFT->geometry().right() - 10 + (ui->SOURCE_DISPLAY->geometry().left() + ui->MID->geometry().left() - ui->LEFT->geometry().right() + 10) / 2 + 2, this->geometry().height() / 2 - 10);
     ui->RULER_H->setGeometry(region.left(), region.bottom() - 10, region.width(), 32);

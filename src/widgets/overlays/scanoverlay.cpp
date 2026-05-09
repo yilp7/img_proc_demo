@@ -38,6 +38,7 @@ ScanOverlay::ScanOverlay(QWidget *parent)
     // Right: fixed preview sidebar
     m_preview_sidebar = new QWidget(this);
     m_preview_sidebar->setObjectName("SCAN_PREVIEW_SIDEBAR");
+    m_preview_sidebar->setAttribute(Qt::WA_StyledBackground, true);
     m_preview_sidebar->setFixedWidth(220);
     m_preview_layout = new QVBoxLayout(m_preview_sidebar);
     m_preview_layout->setContentsMargins(0, 0, 0, 0);

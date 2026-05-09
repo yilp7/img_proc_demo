@@ -445,6 +445,8 @@ private:
     MapboxWidget*        m_mapbox;
     SetupOverlay*        m_setup_overlay;
     ScanOverlay*         m_scan_overlay;
+    QLabel*              m_setup_thumb[3];   // SETUP preview thumbnails (MAIN/ALT1/ALT2)
+    QLabel*              m_scan_thumb[3];    // SCAN preview thumbnails (MAIN/ALT1/ALT2)
     Preferences*    pref;
     DeviceManager*  m_device_mgr;
     TCUController*  m_tcu_ctrl;

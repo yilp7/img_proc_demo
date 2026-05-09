@@ -49,6 +49,7 @@ SetupOverlay::SetupOverlay(QWidget *parent)
     // Fixed preview sidebar (right)
     m_preview_sidebar = new QWidget(this);
     m_preview_sidebar->setObjectName("SETUP_PREVIEW_SIDEBAR");
+    m_preview_sidebar->setAttribute(Qt::WA_StyledBackground, true);
     m_preview_sidebar->setFixedWidth(220);
     m_preview_layout = new QVBoxLayout(m_preview_sidebar);
     m_preview_layout->setContentsMargins(0, 0, 0, 0);
