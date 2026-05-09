@@ -184,6 +184,8 @@ set(SOURCE_FILES
     src/widgets/sidebar/sidedisplaywidget.cpp
     src/widgets/sidebar/mapboxwidget.h
     src/widgets/sidebar/mapboxwidget.cpp
+    src/widgets/overlays/setupoverlay.h
+    src/widgets/overlays/setupoverlay.cpp
     src/widgets/mywidget.h
     src/widgets/mywidget.cpp
     src/visual/userpanel.h

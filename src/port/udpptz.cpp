@@ -207,8 +207,8 @@ void UDPPTZ::ptz_move(int direction, int speed)
 void UDPPTZ::ptz_stop()
 {
     set_velocities(0, 0);
-    emit transmit(MANUAL_SEARCH); // for 500
-//    emit transmit(STANDBY); // for 530
+//    emit transmit(MANUAL_SEARCH); // for 500
+    emit transmit(STANDBY); // for 530
 }
 
 void UDPPTZ::ptz_set_angle(float h, float v)

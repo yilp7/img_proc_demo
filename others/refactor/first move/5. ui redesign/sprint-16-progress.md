@@ -135,6 +135,8 @@ Status: DONE
 
 **Follow-up fix (caught at compile after 16.9):** `InfoLabel` was defined in the deleted `titlebar.h` and used by `Coordinate` in [mywidget.h](src/widgets/mywidget.h). Re-defined inline in `mywidget.h` as a trivial `QLabel` subclass (its only original behavior was an empty constructor).
 
+**Follow-up fix (runtime crash surfaced during S18):** [OpticsPanel::setup()](src/widgets/panels/opticspanel.cpp) originally called `delete iris_open; delete iris_close` to remove the IRIS buttons. But the auto-generated `Ui_UserPanel::retranslateUi()` (called from `UserPanel::switch_language` at startup) still walks `ui->IRIS_OPEN_BTN->setText(...)` and `ui->IRIS_CLOSE_BTN->setText(...)` — use-after-free crash. Sprint 17's heap layout left the freed memory un-clobbered so the bug was latent; Sprint 18's extra allocations exposed it. Fix: hide the buttons (`->hide()`) instead of deleting; pointer stays valid for `retranslateUi`.
+
 ---
 
 ## Task 16.6: Display overlay layer + center toolbar

@@ -44,6 +44,7 @@
 #include "widgets/sidebar/visionwidget.h"
 #include "widgets/sidebar/sidedisplaywidget.h"
 #include "widgets/sidebar/mapboxwidget.h"
+#include "widgets/overlays/setupoverlay.h"
 #include "widgets/joystickwidget.h"
 #include "widgets/arcsliderwidget.h"
 #include "widgets/timingbarwidget.h"
@@ -441,6 +442,7 @@ private:
     VisionWidget*        m_vision;
     SideDisplayWidget*   m_side_display;
     MapboxWidget*        m_mapbox;
+    SetupOverlay*        m_setup_overlay;
     Preferences*    pref;
     DeviceManager*  m_device_mgr;
     TCUController*  m_tcu_ctrl;

@@ -52,9 +52,11 @@ OpticsPanel::OpticsPanel(QWidget *parent)
 void OpticsPanel::setup(QWidget *lens_static, QWidget *ptz_grp,
                         QWidget *iris_open, QWidget *iris_close)
 {
-    // iris buttons are duplicates of radius — delete them per sprint plan
-    delete iris_open;
-    delete iris_close;
+    // iris buttons are duplicates of radius — hide instead of delete.
+    // Ui_UserPanel::retranslateUi() (auto-generated) still references their
+    // pointers, so deleting causes a use-after-free at language-switch time.
+    if (iris_open)  iris_open->hide();
+    if (iris_close) iris_close->hide();
 
     auto *page_layout = new QVBoxLayout(m_classic_page);
     page_layout->setContentsMargins(4, 4, 4, 4);

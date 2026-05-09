@@ -116,6 +116,7 @@ UserPanel::UserPanel(QWidget *parent) :
     m_vision(nullptr),
     m_side_display(nullptr),
     m_mapbox(nullptr),
+    m_setup_overlay(nullptr),
     pref(NULL),
     m_device_mgr(nullptr),
     m_tcu_ctrl(nullptr),
@@ -236,7 +237,7 @@ UserPanel::UserPanel(QWidget *parent) :
     }
 
     // panel toggle bar: 3 checkable buttons, positioned top-right in resizeEvent
-    m_pbar = new QFrame(this);
+    m_pbar = new QFrame(ui->CENTRAL);
     m_pbar->setObjectName("PANEL_TOGGLE_BAR");
     {
         auto *pl = new QHBoxLayout(m_pbar);
@@ -532,7 +533,7 @@ UserPanel::UserPanel(QWidget *parent) :
     }
 
     // ----- Right-side widget stack (Sprint 17.5 cutover) -----
-    m_right_stack  = new RightStackContainer(this);
+    m_right_stack  = new RightStackContainer(ui->CENTRAL);
     m_img_proc     = new ImgProcWidget(m_right_stack);
     m_save_options = new SaveOptionsWidget(m_right_stack);
     m_vision       = new VisionWidget(m_right_stack);
@@ -563,13 +564,100 @@ UserPanel::UserPanel(QWidget *parent) :
     // grabbing) and remains the left zone in S17. SideDisplay + Mapbox are
     // constructed for layout reservation but stay hidden until LEFT migrates
     // to the SETUP overlay in Sprint 18.
-    m_side_display = new SideDisplayWidget(this);
-    m_mapbox       = new MapboxWidget(this);
+    m_side_display = new SideDisplayWidget(ui->CENTRAL);
+    m_mapbox       = new MapboxWidget(ui->CENTRAL);
     m_side_display->hide();
     m_mapbox      ->hide();
     m_right_stack ->setGeometry(0, 0, 220, 400);
     m_right_stack ->raise();
     m_right_stack ->show();
+
+    // ----- SETUP overlay (Sprint 18) -----
+    // Re-parents 5 top-level groups out of the legacy Preferences dialog plus
+    // PARAMS_STATIC + IMG_GRAB_STATIC out of ui->LEFT. Widget identity is
+    // preserved → all existing pref->ui->* accessors and signal connections
+    // remain valid after re-parent.
+    m_setup_overlay = new SetupOverlay(ui->CENTRAL);
+    {
+        auto *r0 = m_setup_overlay->rowLayout(0);
+        auto *r1 = m_setup_overlay->rowLayout(1);
+        auto *r2 = m_setup_overlay->rowLayout(2);
+
+        auto add_card = [](QHBoxLayout *row, QWidget *card, QWidget *parent_w) {
+            if (!row || !card) return;
+            const QSize orig_size = card->size();  // capture before setParent may resize
+            card->setParent(parent_w);
+            card->move(0, 0);                      // clear .ui-baked position
+            // Widgets without a QLayout report sizeHint(-1,-1); the row layout
+            // would collapse them to zero. Set a minimum so the original size is kept.
+            if (!card->layout())
+                card->setMinimumSize(orig_size);
+            card->show();
+            row->addWidget(card);
+        };
+
+        // Row 1 — Save / Load, Serial Ports, TCU Configuration
+        if (pref) {
+            add_card(r0, pref->ui->SAVE_LOAD_GRP,    m_setup_overlay->contentRow(0));
+            add_card(r0, pref->ui->SERIAL_PORTS_GRP, m_setup_overlay->contentRow(0));
+            add_card(r0, pref->ui->TCU_GRP,          m_setup_overlay->contentRow(0));
+            r0->addStretch(1);
+
+            // Row 2 — Devices + Camera (PARAMS_STATIC + IMG_GRAB_STATIC)
+            add_card(r1, pref->ui->DEVICES_GRP, m_setup_overlay->contentRow(1));
+        }
+        add_card(r1, ui->PARAMS_STATIC,   m_setup_overlay->contentRow(1));
+        add_card(r1, ui->IMG_GRAB_STATIC, m_setup_overlay->contentRow(1));
+        r1->addStretch(1);
+
+        // Row 3 — Image Processing config groups
+        if (pref) {
+            add_card(r2, pref->ui->IMG_PROC_GRP, m_setup_overlay->contentRow(2));
+        }
+        r2->addStretch(1);
+    }
+    m_setup_overlay->hide();  // shown only in SETUP mode
+
+    // Mode-tab wiring: Setup → overlay; Monitor/Scan → hide overlay
+    connect(ui->TITLE, &TopBar::modeChanged, this, [this](TopBar::Mode mode) {
+        const bool setup_mode = (mode == TopBar::Mode::Setup);
+        if (m_setup_overlay) m_setup_overlay->setVisible(setup_mode);
+        if (m_right_stack)   m_right_stack  ->setVisible(!setup_mode);
+        if (m_pbar)          m_pbar         ->setVisible(!setup_mode);
+        // Floating panels follow their pbar toggle state when MONITOR mode is active
+        auto pbar_checked = [this](const char *name) -> bool {
+            if (!m_pbar) return true;
+            auto *b = m_pbar->findChild<QPushButton*>(name);
+            return b ? b->isChecked() : true;
+        };
+        if (m_optics_panel)  m_optics_panel ->setVisible(!setup_mode && pbar_checked("PBAR_OPTICS_BTN"));
+        if (m_tcu_panel)     m_tcu_panel    ->setVisible(!setup_mode && pbar_checked("PBAR_TCU_BTN"));
+        if (m_console_panel) m_console_panel->setVisible(!setup_mode && pbar_checked("PBAR_CONSOLE_BTN"));
+        // Panels must sit above side-zone widgets (siblings in CENTRAL's z-order).
+        if (!setup_mode) {
+            if (m_optics_panel)  m_optics_panel ->raise();
+            if (m_tcu_panel)     m_tcu_panel    ->raise();
+            if (m_console_panel) m_console_panel->raise();
+        }
+        if (setup_mode && m_setup_overlay) {
+            m_setup_overlay->raise();
+            // Position below TopBar so its mode tabs stay clickable.
+            const QRect c = ui->CENTRAL->rect();
+            m_setup_overlay->setGeometry(c.x(), 40, c.width(), c.height() - 40);
+        }
+    });
+
+    // ui->LEFT permanent hide: PARAMS_STATIC + IMG_GRAB_STATIC migrated above;
+    // remaining LASER_STATIC widgets are already in TCUPanel (16.7) or unused.
+    ui->LEFT->hide();
+    // SideDisplay + Mapbox can now occupy the freed left zone.
+    if (m_side_display) m_side_display->show();
+    if (m_mapbox)       m_mapbox      ->show();
+    // All four side widgets are now CENTRAL children; raise floating panels so
+    // they remain above the side-zone widgets in CENTRAL's z-order.
+    if (m_optics_panel)  m_optics_panel ->raise();
+    if (m_tcu_panel)     m_tcu_panel    ->raise();
+    if (m_console_panel) m_console_panel->raise();
 
     ui->DATA_EXCHANGE->document()->setMaximumBlockCount(200);
     ui->DATA_EXCHANGE->setFont(temp_f);
@@ -3434,21 +3522,28 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     ww = ui->IMG_3D_CHECK->isChecked() ? ww + 104 : ww;
     QRect window = this->geometry();
 //    qDebug() << window;
-    // Sprint 17.8: right zone is the RightStackContainer; left zone still
-    // driven by ui->LEFT until SETUP overlay (S18) absorbs it.
+    // Sprint 18: ui->LEFT is permanently hidden; left zone now belongs to
+    // SideDisplayWidget (top) + MapboxWidget (bottom). Right zone is the
+    // RightStackContainer.
+    const int left_zone_w  = 220;
     const int right_zone_w = 220;
     const int title_h      = 40;
     const int side_top     = title_h + 4;
     const int side_bottom  = window.height() - 4;
     const int side_h       = side_bottom - side_top;
-    if (m_right_stack)
-        m_right_stack->setGeometry(window.width() - right_zone_w - 6, side_top, right_zone_w, side_h);
+    if (m_side_display) m_side_display->setGeometry(6,                                     side_top,                       left_zone_w,  side_h / 2 - 4);
+    if (m_mapbox)       m_mapbox      ->setGeometry(6,                                     side_top + side_h / 2 + 4,      left_zone_w,  side_h / 2 - 8);
+    if (m_right_stack)  m_right_stack ->setGeometry(window.width() - right_zone_w - 6,     side_top,                       right_zone_w, side_h);
+    if (m_setup_overlay && m_setup_overlay->isVisible()) {
+        const QRect c = ui->CENTRAL->rect();
+        m_setup_overlay->setGeometry(c.x(), 40, c.width(), c.height() - 40);
+    }
 
     QRect region = ui->SOURCE_DISPLAY->geometry();
     QPoint center = ui->SOURCE_DISPLAY->center;
 
-    int mid_width = window.width() - (right_zone_w + 12) - 10 - ui->LEFT->width();
-    ui->MID->setGeometry(10 + ui->LEFT->width(), title_h, mid_width, window.height() - title_h);
+    int mid_width = window.width() - (right_zone_w + 12) - (left_zone_w + 12);
+    ui->MID->setGeometry(left_zone_w + 12, title_h, mid_width, window.height() - title_h);
     int width = mid_width - 20, height = width * hh / ww;
 //    qDebug("width %d, height %d\n", width, height);
     int height_constraint = ui->MID->height() - 30 - 24, // bottom padding 24 pixels
