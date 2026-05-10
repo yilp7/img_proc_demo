@@ -75,6 +75,13 @@ double JoystickWidget::baseRadius() const
 
 void JoystickWidget::paintEvent(QPaintEvent *)
 {
+    // Theme tokens — match prototype v3 / style_dark.qss. Custom paint, no QSS.
+    static const QColor kBaseFill   (0x04, 0x03, 0x03);  // bg-deepest
+    static const QColor kBaseEdge   (0x38, 0x2D, 0x25);  // border-default
+    static const QColor kDeadzone   (0x5C, 0x4A, 0x3D);  // text-dim
+    static const QColor kStickFill  (0xE0, 0x92, 0x4A);  // accent (joy-handle)
+    static const QColor kStickEdge  (0x8F, 0x6B, 0x4D);  // border-strong
+
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
 
@@ -83,21 +90,21 @@ void JoystickWidget::paintEvent(QPaintEvent *)
     if (r <= 0.0) return;
 
     // Base ring.
-    p.setPen(QPen(QColor(0xff, 0xff, 0xff), 2.0));
-    p.setBrush(QColor(0x22, 0x22, 0x22));
+    p.setPen(QPen(kBaseEdge, 1.5));
+    p.setBrush(kBaseFill);
     p.drawEllipse(c, r, r);
 
     // Deadzone guide (faint).
     if (m_deadzone_frac > 0.0) {
-        p.setPen(QPen(QColor(0x55, 0x55, 0x55), 1.0, Qt::DashLine));
+        p.setPen(QPen(kDeadzone, 1.0, Qt::DashLine));
         p.setBrush(Qt::NoBrush);
         p.drawEllipse(c, r * m_deadzone_frac, r * m_deadzone_frac);
     }
 
     // Stick cap.
     const double stick_r = r * kStickRadiusFrac;
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0x3d, 0x8b, 0xff));
+    p.setPen(QPen(kStickEdge, 1.0));
+    p.setBrush(kStickFill);
     p.drawEllipse(m_stick_local, stick_r, stick_r);
 }
 

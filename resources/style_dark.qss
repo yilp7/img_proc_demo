@@ -202,20 +202,24 @@ Ruler {
 }
 
 /* === Group box ========================================= */
+/* Flat — matches plain-QFrame look used by the re-parented Preferences
+   groups in SETUP overlay. Title remains as accent-colored label. */
 QGroupBox {
     color: #F5E1CE;
-    border: 1px solid #382D25;
-    border-radius: 3px;
-    margin-top: 6px;
-    padding-top: 4px;
+    border: none;
+    margin-top: 14px;
+    padding-top: 0;
+    background: transparent;
 }
 
 QGroupBox::title {
-    left: 8px;
-    bottom: 5px;
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 4px;
     color: #E0924A;
     background: transparent;
     padding: 0 4px;
+    font-weight: 700;
 }
 
 /* === Tabs ============================================== */
@@ -715,10 +719,11 @@ TopButton:pressed {
 }
 
 /* === Pbar (panel-toggle bar) =========================== */
+/* Transparent container so the buttons read as a chip cluster, not as a
+   "box inserted into the panel". Each button still has its own border. */
 #PANEL_TOGGLE_BAR {
-    background-color: #12100EEE;
-    border: 1px solid #241E1A;
-    border-radius: 3px;
+    background: transparent;
+    border: none;
 }
 
 #PBAR_OPTICS_BTN, #PBAR_TCU_BTN, #PBAR_CONSOLE_BTN {
@@ -872,18 +877,32 @@ TopButton:pressed {
     border-color: #8F6B4D;
 }
 
-/* SCAN_BUTTON shows "Scan" (start) / "Stop" — start styling by default;
-   running state visual change is a Sprint 21 polish (needs a property hook). */
+/* SCAN_BUTTON dual state — start (positive-green) vs running (warning-amber).
+   The `scanning` dynamic property is set in userpanel.cpp's lambda hooked to
+   ScanController::scan_button_text_changed. QSS attribute selectors pick up
+   the value after unpolish + polish. */
 #SCAN_ACTION_COL > #SCAN_BUTTON {
-    background-color: #0b1b19;
-    color: #579972;
-    border: 1px solid #113c29;
+    background-color: #0b1b19;        /* positive-bg */
+    color: #579972;                   /* readout */
+    border: 1px solid #113c29;        /* positive-border */
 }
 
 #SCAN_ACTION_COL > #SCAN_BUTTON:hover {
-    background-color: #10251e;
-    color: #81e0a9;
-    border: 1px solid #215c39;
+    background-color: #10251e;        /* positive-hover-bg */
+    color: #81e0a9;                   /* positive-hover-text */
+    border: 1px solid #215c39;        /* positive-hover-border */
+}
+
+#SCAN_ACTION_COL > #SCAN_BUTTON[scanning="true"] {
+    background-color: #33270F;        /* warning-bg */
+    color: #EFC670;                   /* warning-hover-text */
+    border: 1px solid #664E1E;        /* warning-border */
+}
+
+#SCAN_ACTION_COL > #SCAN_BUTTON[scanning="true"]:hover {
+    background-color: #4D3B16;        /* warning-hover-bg */
+    color: #E6B345;                   /* warning */
+    border: 1px solid #806226;        /* warning-hover-border */
 }
 
 /* === SCAN preview sidebar ============================== */

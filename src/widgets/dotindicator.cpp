@@ -16,10 +16,11 @@ DotIndicator::DotIndicator(QWidget *parent) :
     setAttribute(Qt::WA_StyledBackground, true);
     setFixedSize(kDefaultSize, kDefaultSize);
 
-    m_colors[Off]  = QColor(0x55, 0x55, 0x55);
-    m_colors[Ok]   = QColor(0x4c, 0xd9, 0x64);
-    m_colors[Warn] = QColor(0xff, 0xc1, 0x07);
-    m_colors[Err]  = QColor(0xe5, 0x3e, 0x3e);
+    // Theme tokens — prototype v3 dot-{x,g,y,r} colors.
+    m_colors[Off]  = QColor(0x24, 0x1E, 0x1A);  // dot-off
+    m_colors[Ok]   = QColor(0x00, 0xff, 0x7f);  // positive
+    m_colors[Warn] = QColor(0xE0, 0x92, 0x4A);  // accent (yellow dot)
+    m_colors[Err]  = QColor(0xE6, 0x45, 0x5D);  // negative
 }
 
 void DotIndicator::setState(State s)
@@ -51,11 +52,13 @@ void DotIndicator::paintEvent(QPaintEvent *)
     const QPointF c = r.center();
     const double dot_r = qMin(r.width(), r.height()) / 2.0;
 
-    // Soft glow when Ok.
-    if (m_state == Ok) {
+    // Soft glow under all live states (matches prototype `box-shadow: 0 0 5px`).
+    // Off has no glow.
+    if (m_state != Off) {
         QRadialGradient g(c, dot_r * 1.8);
-        QColor glow = m_colors[Ok];
-        glow.setAlpha(140);
+        QColor glow = m_colors[m_state];
+        // Alpha matches prototype: positive-glow / accent-glow-33 / negative-glow.
+        glow.setAlpha(m_state == Warn ? 0x55 : 0x88);
         g.setColorAt(0.0, glow);
         glow.setAlpha(0);
         g.setColorAt(1.0, glow);

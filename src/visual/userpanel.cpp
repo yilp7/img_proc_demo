@@ -3,6 +3,7 @@
 #include "ui_preferences.h"
 #include "ui_scanconfig.h"
 #include "util/constants.h"
+#include <QStyle>
 
 static bool throttle_check(QElapsedTimer &t)
 {
@@ -254,7 +255,8 @@ UserPanel::UserPanel(QWidget *parent) :
             btn->setCheckable(true);
             btn->setChecked(true);
             btn->setFixedHeight(20);
-            pl->addWidget(btn);
+            // stretch=1 so the 3 buttons spread evenly across the pbar row.
+            pl->addWidget(btn, 1);
             return btn;
         };
         auto *optics_btn  = makeToggle("Optics",  "PBAR_OPTICS_BTN");
@@ -422,6 +424,15 @@ UserPanel::UserPanel(QWidget *parent) :
 //    connect(ui->SOURCE_DISPLAY, SIGNAL(shape_size(QPoint)), ui->SHAPE_INFO, SLOT(display_pos(QPoint)));
     ui->SHIFT_INFO->setup("shift");
     ui->SHIFT_INFO->hide();
+    // Sprint 21 polish: legacy display-overlay labels not in prototype v3.
+    // Keep the widgets alive (display_pos slots still wire) but hide them by
+    // default — re-enable in a future patch if the workflow needs coordinates.
+    ui->START_COORD->hide();
+    ui->SHAPE_INFO->hide();
+    // HIDE_BTN was the legacy left-panel toggle. ui->LEFT is permanently
+    // hidden post-S18, so the button is purposeless; click() calls elsewhere
+    // still work and just toggle the unused hide_left flag.
+    ui->HIDE_BTN->hide();
     connect(ui->SOURCE_DISPLAY, &Display::updated_pos, this,
         [this](int idx, QPoint pos) {
             static QPoint converted_pos(0, 0);
@@ -1264,8 +1275,20 @@ UserPanel::UserPanel(QWidget *parent) :
     // RFController → UI
     connect(m_rf_ctrl, &RFController::distance_text_updated, ui->DISTANCE, &QLabel::setText);
 
-    // ScanController → UI
-    connect(m_scan_ctrl, &ScanController::scan_button_text_changed, ui->SCAN_BUTTON, &QPushButton::setText);
+    // ScanController → UI. Side-effect: drive a `scanning` dynamic property on
+    // SCAN_BUTTON so QSS can swap the visual state (positive-green idle ↔
+    // warning-amber running). Qt requires unpolish + polish to re-apply QSS
+    // when a property selector value changes.
+    connect(m_scan_ctrl, &ScanController::scan_button_text_changed,
+            this, [this](const QString &text) {
+        ui->SCAN_BUTTON->setText(text);
+        const bool scanning = (text != tr("Scan"));
+        if (ui->SCAN_BUTTON->property("scanning").toBool() != scanning) {
+            ui->SCAN_BUTTON->setProperty("scanning", scanning);
+            ui->SCAN_BUTTON->style()->unpolish(ui->SCAN_BUTTON);
+            ui->SCAN_BUTTON->style()->polish(ui->SCAN_BUTTON);
+        }
+    });
     connect(m_scan_ctrl, &ScanController::scan_options_changed, this, [this](bool cont, bool restart) {
         ui->CONTINUE_SCAN_BUTTON->setVisible(cont);
         ui->RESTART_SCAN_BUTTON->setVisible(restart);
@@ -3855,11 +3878,14 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     const int right_zone_w = 220;
     const int title_h      = 40;
     const int side_top     = title_h + 4;
+    const int pbar_h       = 26;
+    const int right_top    = side_top + pbar_h + 4;     // pbar sits above right-stack
     const int side_bottom  = window.height() - 4;
     const int side_h       = side_bottom - side_top;
+    const int right_h      = side_bottom - right_top;
     if (m_side_display) m_side_display->setGeometry(6,                                     side_top,                       left_zone_w,  side_h / 2 - 4);
     if (m_mapbox)       m_mapbox      ->setGeometry(6,                                     side_top + side_h / 2 + 4,      left_zone_w,  side_h / 2 - 8);
-    if (m_right_stack)  m_right_stack ->setGeometry(window.width() - right_zone_w - 6,     side_top,                       right_zone_w, side_h);
+    if (m_right_stack)  m_right_stack ->setGeometry(window.width() - right_zone_w - 6,     right_top,                      right_zone_w, right_h);
     if (m_setup_overlay && m_setup_overlay->isVisible()) {
         const QRect c = ui->CENTRAL->rect();
         m_setup_overlay->setGeometry(c.x(), 40, c.width(), c.height() - 40);
@@ -3902,10 +3928,14 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     // INFO_CHECK is now inside m_center_toolbar — no separate move needed
     ui->CENTER_CHECK->move(region.right() - 60, 4);
 
-    // panel toggle bar: top-right, just below title bar
+    // panel toggle bar: tab-row, aligned with right-stack column at side_top.
+    // Width matches right-stack so the 3 toggle buttons spread evenly across
+    // the same column instead of floating with content-only width.
     if (m_pbar) {
-        m_pbar->adjustSize();
-        m_pbar->move(window.width() - m_pbar->width() - 6, 32);
+        m_pbar->setGeometry(window.width() - right_zone_w - 6,
+                            side_top,
+                            right_zone_w,
+                            pbar_h);
         m_pbar->raise();
         m_pbar->show();
     }

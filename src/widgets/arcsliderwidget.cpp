@@ -107,21 +107,27 @@ void ArcSliderWidget::paintEvent(QPaintEvent *)
     const double t = th > 0 ? (thumb_y - top) / double(th) : 0.0;
     const double thumb_x = cx + 3.0 * t * (1.0 - t) * kArcBulge;
 
+    // Theme tokens — match prototype v3. Custom paint, no QSS.
+    static const QColor kInactiveTrack(0x38, 0x2D, 0x25);  // border-default
+    static const QColor kActiveTrack  (0xE0, 0x92, 0x4A);  // accent
+    static const QColor kThumbFill    (0xE0, 0x92, 0x4A);  // accent
+    static const QColor kThumbEdge    (0x26, 0x1B, 0x14);  // bg-header (dark contrast)
+
     // Inactive (above thumb): dim track.
-    p.setPen(QPen(QColor(0x55, 0x55, 0x55), kTrackWidthPx, Qt::SolidLine, Qt::RoundCap));
+    p.setPen(QPen(kInactiveTrack, kTrackWidthPx, Qt::SolidLine, Qt::RoundCap));
     p.drawPath(path);
 
     // Active (from bottom up to thumb): accent color, drawn by re-stroking
     // the full path under a clip that excludes everything above thumb_y.
     p.save();
     p.setClipRect(QRectF(0, thumb_y, double(width()), bottom - thumb_y + kTrackWidthPx));
-    p.setPen(QPen(QColor(0x3d, 0x8b, 0xff), kTrackWidthPx, Qt::SolidLine, Qt::RoundCap));
+    p.setPen(QPen(kActiveTrack, kTrackWidthPx, Qt::SolidLine, Qt::RoundCap));
     p.drawPath(path);
     p.restore();
 
-    // Thumb positioned on the arc, with white outline for contrast.
-    p.setPen(QPen(QColor(0xff, 0xff, 0xff), 2.0));
-    p.setBrush(QColor(0x3d, 0x8b, 0xff));
+    // Thumb positioned on the arc.
+    p.setPen(QPen(kThumbEdge, 1.5));
+    p.setBrush(kThumbFill);
     p.drawEllipse(QPointF(thumb_x, thumb_y), kThumbRadius, kThumbRadius);
 }
 

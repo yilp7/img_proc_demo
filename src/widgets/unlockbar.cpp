@@ -90,6 +90,16 @@ void UnlockBar::onRelockTimeout()
 
 void UnlockBar::paintEvent(QPaintEvent *)
 {
+    // Theme tokens — match prototype v3 and resources/style_dark.qss.
+    // Custom-painted widget: QSS background-color does not apply.
+    static const QColor kTrackBg     (0x12, 0x10, 0x0E);  // bg-raised (stripe gap)
+    static const QColor kStripeAmber (0xE6, 0xB3, 0x45);  // warning — safety stripe
+    static const QColor kTrackEdge   (0x38, 0x2D, 0x25);  // border-default
+    static const QColor kThumbLocked (0x1C, 0x18, 0x15);  // bg-elevated
+    static const QColor kThumbUnlocked(0x00,0xff, 0x7f);  // positive
+    static const QColor kThumbEdgeArmed(0x8F,0x6B, 0x4D); // border-strong (locked, "grab me")
+    static const QColor kThumbEdgePass (0x57,0x99, 0x72); // readout (unlocked, "passed")
+
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
 
@@ -97,12 +107,12 @@ void UnlockBar::paintEvent(QPaintEvent *)
                            trackWidth(), height() - 2 * kMarginV);
     if (track_rect.isEmpty()) return;
 
-    // Striped background (black + amber, 45° stripes).
+    // Striped background (bg-raised + warning-amber, 45° stripes).
     p.save();
     p.setClipRect(track_rect);
-    p.fillRect(track_rect, QColor(0x1a, 0x1a, 0x1a));
+    p.fillRect(track_rect, kTrackBg);
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0xff, 0xc1, 0x07));
+    p.setBrush(kStripeAmber);
     const int stripe_w = 10;
     for (int x = track_rect.left() - track_rect.height();
          x < track_rect.right();
@@ -119,12 +129,12 @@ void UnlockBar::paintEvent(QPaintEvent *)
     // Thumb.
     const QRect thumb_rect(m_thumb_x, kMarginV,
                            thumbWidth(), height() - 2 * kMarginV);
-    p.setPen(QPen(QColor(0xff, 0xff, 0xff), 1.5));
-    p.setBrush(m_unlocked ? QColor(0x4c, 0xd9, 0x64) : QColor(0x2b, 0x2b, 0x2b));
+    p.setPen(QPen(m_unlocked ? kThumbEdgePass : kThumbEdgeArmed, 1.5));
+    p.setBrush(m_unlocked ? kThumbUnlocked : kThumbLocked);
     p.drawRoundedRect(thumb_rect, 4, 4);
 
     // Border around the track.
-    p.setPen(QPen(QColor(0xff, 0xff, 0xff), 1.0));
+    p.setPen(QPen(kTrackEdge, 1.0));
     p.setBrush(Qt::NoBrush);
     p.drawRect(track_rect);
 }
