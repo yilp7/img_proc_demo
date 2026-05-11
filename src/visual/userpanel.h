@@ -15,8 +15,6 @@
 #include "image/imageio.h"
 #include "image/imageproc.h"
 
-#include "visual/preferences.h"
-#include "visual/scanconfig.h"
 #include "visual/lasercontrol.h"
 #ifdef DISTANCE_3D_VIEW
 #include "visual/distance3dview.h"
@@ -445,9 +443,9 @@ private:
     MapboxWidget*        m_mapbox;
     SetupOverlay*        m_setup_overlay;
     ScanOverlay*         m_scan_overlay;
+    ScanOverlay::Widgets m_scan_overlay_widgets;  // cached until m_scan_ctrl is alive
     QLabel*              m_setup_thumb[3];   // SETUP preview thumbnails (MAIN/ALT1/ALT2)
     QLabel*              m_scan_thumb[3];    // SCAN preview thumbnails (MAIN/ALT1/ALT2)
-    Preferences*    pref;
     DeviceManager*  m_device_mgr;
     TCUController*  m_tcu_ctrl;
     LensController* m_lens_ctrl;
@@ -455,7 +453,6 @@ private:
     RFController*    m_rf_ctrl;
     ScanController*  m_scan_ctrl;
     AuxPanelManager* m_aux_panel;
-    ScanConfig*     scan_config;
     LaserControl*   laser_settings;
     Config*         config;
 #ifdef DISTANCE_3D_VIEW

@@ -4,9 +4,6 @@
 #include "util/util.h"
 #include "widgets/dotindicator.h"
 
-class Preferences;
-class ScanConfig;
-
 class TopButton : public QPushButton
 {
     Q_OBJECT
@@ -62,10 +59,6 @@ public:
     TopButton* min;
     TopButton* max;
     TopButton* exit;
-
-    // owned dialogs (preserved from TitleBar)
-    Preferences* preferences;
-    ScanConfig*  scan_config;
 
     bool is_maximized;
 

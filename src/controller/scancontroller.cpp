@@ -1,7 +1,6 @@
 #include "controller/scancontroller.h"
 #include "controller/tcucontroller.h"
 #include "controller/devicemanager.h"
-#include "visual/scanconfig.h"
 #include "port/tcu.h"
 
 #include <QDir>
@@ -13,7 +12,6 @@ ScanController::ScanController(TCUController *tcu_ctrl, DeviceManager *device_mg
     : QObject(parent),
       m_tcu_ctrl(tcu_ctrl),
       m_device_mgr(device_mgr),
-      m_scan_config(nullptr),
       m_save_location(nullptr),
       m_w(nullptr),
       m_h(nullptr),
@@ -28,10 +26,8 @@ ScanController::ScanController(TCUController *tcu_ctrl, DeviceManager *device_mg
 {
 }
 
-void ScanController::init(ScanConfig *scan_config,
-                           QString *save_location, int *w, int *h)
+void ScanController::init(QString *save_location, int *w, int *h)
 {
-    m_scan_config = scan_config;
     m_save_location = save_location;
     m_w = w;
     m_h = h;
@@ -52,15 +48,15 @@ void ScanController::on_SCAN_BUTTON_clicked()
             scan_idx = 0;
             scan_ptz_idx = -1;
             scan_tcu_idx = -1;
-            scan_ptz_route = m_scan_config->get_ptz_route();
-            scan_tcu_route = m_scan_config->get_tcu_route();
-            scan_step = m_scan_config->step_size_delay * m_tcu_ctrl->get_dist_ns();
+            scan_ptz_route = get_ptz_route(m_params);
+            scan_tcu_route = get_tcu_route(m_params);
+            scan_step = m_params.step_size_delay * m_tcu_ctrl->get_dist_ns();
         }
 
-        m_tcu_ctrl->set_rep_freq(m_scan_config->rep_freq);
-        m_tcu_ctrl->set_delay_dist(m_scan_config->starting_delay * m_tcu_ctrl->get_dist_ns());
+        m_tcu_ctrl->set_rep_freq(m_params.rep_freq);
+        m_tcu_ctrl->set_delay_dist(m_params.starting_delay * m_tcu_ctrl->get_dist_ns());
 
-        if (m_scan_config->capture_scan_ori || m_scan_config->capture_scan_res) {
+        if (m_params.capture_scan_ori || m_params.capture_scan_res) {
             QString name = "scan_" + QDateTime::currentDateTime().toString("MMdd_hhmmss");
             { QMutexLocker lk(&m_scan_mutex); scan_name = name; }
             if (!QDir(*m_save_location + "/" + name).exists()) {
@@ -77,7 +73,7 @@ void ScanController::on_SCAN_BUTTON_clicked()
                                            "laser width:        %06d ns\n"
                                            "gate width:         %06d ns\n"
                                            "MCP:                %04d",
-                                           m_scan_config->starting_delay, m_scan_config->ending_delay, m_scan_config->frame_count, m_scan_config->step_size_delay,
+                                           m_params.starting_delay, m_params.ending_delay, m_params.frame_count, m_params.step_size_delay,
                                            (int)(m_tcu_ctrl->get_rep_freq() * 1000), (int)m_tcu_ctrl->get_laser_width(), std::round(m_device_mgr->tcu()->get(TCU::GATE_WIDTH_A)), std::round(m_device_mgr->tcu()->get(TCU::MCP))).toUtf8());
             qDebug() << "scan param" << m_device_mgr->tcu()->get(TCU::DELAY_A) << std::round(m_device_mgr->tcu()->get(TCU::DELAY_A));
             qDebug() << "scan param" << m_device_mgr->tcu()->get(TCU::GATE_WIDTH_A) << std::round(m_device_mgr->tcu()->get(TCU::GATE_WIDTH_A));
@@ -111,13 +107,10 @@ void ScanController::on_RESTART_SCAN_BUTTON_clicked()
 
 void ScanController::on_SCAN_CONFIG_BTN_clicked()
 {
-    if (m_scan_config->isVisible()) {
-        m_scan_config->hide();
-    }
-    else {
-        m_scan_config->show();
-        m_scan_config->raise();
-    }
+    // No-op post-S22: scan config is now embedded in the SCAN overlay
+    // (always visible when the SCAN tab is active). The SCAN_CONFIG_BTN
+    // itself is hidden in userpanel.cpp; this slot only remains to
+    // preserve the existing signal connection on the (hidden) button.
 }
 
 void ScanController::enable_scan_options(bool show)

@@ -193,12 +193,7 @@ set(SOURCE_FILES
     src/visual/userpanel.h
     src/visual/userpanel.cpp
     src/visual/user_panel.ui
-    src/visual/preferences.h
-    src/visual/preferences.cpp
     src/visual/preferences.ui
-    src/visual/scanconfig.h
-    src/visual/scanconfig.cpp
-    src/visual/scanconfig.ui
     src/visual/lasercontrol.cpp
     src/visual/lasercontrol.h
     src/visual/laser_control.ui
@@ -255,6 +250,8 @@ set(SOURCE_FILES
     src/pipeline/pipelineconfig.h
     src/pipeline/pipelineprocessor.h
     src/pipeline/pipelineprocessor.cpp
+    src/pipeline/scanparams.h
+    src/pipeline/scanparams.cpp
     src/controller/devicemanager.h
     src/controller/devicemanager.cpp
     src/controller/tcucontroller.h

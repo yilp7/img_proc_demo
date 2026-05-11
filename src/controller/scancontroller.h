@@ -9,7 +9,8 @@
 #include <vector>
 #include <utility>
 
-class ScanConfig;
+#include "pipeline/scanparams.h"
+
 class TCUController;
 class DeviceManager;
 
@@ -21,8 +22,12 @@ public:
     explicit ScanController(TCUController *tcu_ctrl, DeviceManager *device_mgr,
                             QObject *parent = nullptr);
 
-    void init(ScanConfig *scan_config,
-              QString *save_location, int *w, int *h);
+    void init(QString *save_location, int *w, int *h);
+
+    // Scan parameters — single source of truth post-S22. ScanOverlay writes
+    // here from widget edits; pipeline reads via SharedState::scan_params.
+    const ScanParams& params() const { return m_params; }
+    ScanParams&       params()       { return m_params; }
 
     // Getters (mutex-protected for cross-thread access)
     bool is_scanning() const { QMutexLocker lk(&m_scan_mutex); return scan; }
@@ -65,7 +70,7 @@ signals:
 private:
     mutable QMutex m_scan_mutex;
 
-    ScanConfig*    m_scan_config;
+    ScanParams     m_params;           // S22: scan data lives here
     TCUController* m_tcu_ctrl;
     DeviceManager* m_device_mgr;
     QString*       m_save_location;

@@ -1,10 +1,17 @@
 #include "scanoverlay.h"
 
+#include "controller/scancontroller.h"
+
+#include <QCheckBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
+#include <QRadioButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
 #include <QWidget>
+
+#include <cmath>
 
 ScanOverlay::ScanOverlay(QWidget *parent)
     : QFrame(parent),
@@ -12,7 +19,8 @@ ScanOverlay::ScanOverlay(QWidget *parent)
       m_cards_container(nullptr),
       m_cards_layout(nullptr),
       m_preview_sidebar(nullptr),
-      m_preview_layout(nullptr)
+      m_preview_layout(nullptr),
+      m_ctrl(nullptr)
 {
     setObjectName("SCAN_OVERLAY");
 
@@ -51,4 +59,302 @@ ScanOverlay::ScanOverlay(QWidget *parent)
 
     root->addWidget(m_scroll, 1);
     root->addWidget(m_preview_sidebar);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// S22: ScanConfig replacement — bind widgets + controller, set up connections,
+// implement the same widget-sync slots ScanConfig used to provide.
+// ─────────────────────────────────────────────────────────────────────────────
+
+void ScanOverlay::bind(ScanController *ctrl, const Widgets &w)
+{
+    m_ctrl = ctrl;
+    m_w = w;
+
+    auto tcu_edits = {
+        m_w.start_delay_u, m_w.start_delay_n, m_w.start_delay_m,
+        m_w.end_delay_u,   m_w.end_delay_n,   m_w.end_delay_m,
+        m_w.start_gw_u,    m_w.start_gw_n,    m_w.start_gw_m,
+        m_w.end_gw_u,      m_w.end_gw_n,      m_w.end_gw_m,
+        m_w.frame_count,   m_w.step_delay,    m_w.step_gw
+    };
+    for (auto *e : tcu_edits)
+        if (e) connect(e, &QLineEdit::editingFinished, this, &ScanOverlay::on_tcu_edit);
+
+    auto ptz_edits = {
+        m_w.start_h, m_w.start_v, m_w.end_h, m_w.end_v,
+        m_w.step_h,  m_w.step_v,  m_w.frame_h, m_w.frame_v
+    };
+    for (auto *e : ptz_edits)
+        if (e) connect(e, &QLineEdit::editingFinished, this, &ScanOverlay::on_ptz_edit);
+
+    if (m_w.capture_ori) connect(m_w.capture_ori, &QCheckBox::stateChanged, this, &ScanOverlay::on_capture_ori);
+    if (m_w.capture_res) connect(m_w.capture_res, &QCheckBox::stateChanged, this, &ScanOverlay::on_capture_res);
+    if (m_w.record_ori)  connect(m_w.record_ori,  &QCheckBox::stateChanged, this, &ScanOverlay::on_record_ori);
+    if (m_w.record_res)  connect(m_w.record_res,  &QCheckBox::stateChanged, this, &ScanOverlay::on_record_res);
+
+    if (m_w.dir_n) connect(m_w.dir_n, &QRadioButton::clicked, this, &ScanOverlay::on_dir_n);
+    if (m_w.dir_z) connect(m_w.dir_z, &QRadioButton::clicked, this, &ScanOverlay::on_dir_z);
+    if (m_w.dir_n) m_w.dir_n->setChecked(true);
+
+    if (m_w.ptz_wait)       connect(m_w.ptz_wait,       &QLineEdit::editingFinished, this, &ScanOverlay::on_ptz_wait_edit);
+    if (m_w.num_single_pos) connect(m_w.num_single_pos, &QLineEdit::editingFinished, this, &ScanOverlay::on_num_single_pos_edit);
+
+    loadFromParams();
+    setup_hz(0);
+    setup_unit(0);
+}
+
+void ScanOverlay::loadFromParams()
+{
+    if (!m_ctrl) return;
+    const ScanParams &p = m_ctrl->params();
+
+    auto setT = [](QLineEdit *e, const QString &s) { if (e) e->setText(s); };
+    auto setI = [&setT](QLineEdit *e, int v)       { setT(e, QString::number(v)); };
+    auto setF = [&setT](QLineEdit *e, double v, int prec = 2) {
+        setT(e, QString::number(v, 'f', prec));
+    };
+
+    switch (p.base_unit) {
+    case 0: case 1: // ns / μs
+        setI(m_w.start_delay_u, p.starting_delay / 1000);
+        setI(m_w.start_delay_n, p.starting_delay % 1000);
+        setI(m_w.end_delay_u,   p.ending_delay / 1000);
+        setI(m_w.end_delay_n,   p.ending_delay % 1000);
+        setI(m_w.start_gw_u,    p.starting_gw / 1000);
+        setI(m_w.start_gw_n,    p.starting_gw % 1000);
+        setI(m_w.end_gw_u,      p.ending_gw / 1000);
+        setI(m_w.end_gw_n,      p.ending_gw % 1000);
+        break;
+    case 2: // m
+        // legacy quirk preserved: M edits get gw values overwriting delay values
+        setI(m_w.start_gw_m, (int)(p.starting_gw * p.dist_ns));
+        setI(m_w.end_gw_m,   (int)(p.ending_gw   * p.dist_ns));
+        break;
+    }
+    setI(m_w.frame_count, p.frame_count);
+    setF(m_w.step_delay,  p.step_size_delay);
+    setF(m_w.step_gw,     p.step_size_gw);
+    if (m_w.rep_freq) m_w.rep_freq->setText(QString::number(p.rep_freq));
+
+    if (m_w.capture_ori) m_w.capture_ori->setChecked(p.capture_scan_ori);
+    if (m_w.capture_res) m_w.capture_res->setChecked(p.capture_scan_res);
+    if (m_w.record_ori)  m_w.record_ori ->setChecked(p.record_scan_ori);
+    if (m_w.record_res)  m_w.record_res ->setChecked(p.record_scan_res);
+
+    setF(m_w.start_h, p.starting_h);
+    setF(m_w.start_v, p.starting_v);
+    setF(m_w.end_h,   p.ending_h);
+    setF(m_w.end_v,   p.ending_v);
+    setF(m_w.step_h,  p.step_h);
+    setF(m_w.step_v,  p.step_v);
+    setI(m_w.frame_h, p.count_h);
+    setI(m_w.frame_v, p.count_v);
+    setI(m_w.ptz_wait,       p.ptz_wait_time);
+    setI(m_w.num_single_pos, p.num_single_pos);
+}
+
+void ScanOverlay::setup_hz(int idx)
+{
+    if (!m_ctrl) return;
+    ScanParams &p = m_ctrl->params();
+    p.hz_unit = idx;
+    switch (idx) {
+    case 0: if (m_w.rep_freq)  m_w.rep_freq->setText(QString::number((int)p.rep_freq));
+            if (m_w.freq_unit) m_w.freq_unit->setText("kHz"); break;
+    case 1: if (m_w.rep_freq)  m_w.rep_freq->setText(QString::number((int)(p.rep_freq * 1000)));
+            if (m_w.freq_unit) m_w.freq_unit->setText("Hz");  break;
+    default: break;
+    }
+}
+
+void ScanOverlay::setup_unit(int idx)
+{
+    if (!m_ctrl) return;
+    ScanParams &p = m_ctrl->params();
+    p.base_unit = idx;
+
+    auto sv = [](QWidget *w, bool v) { if (w) w->setVisible(v); };
+
+    const bool m_mode = (idx == 2);
+    sv(m_w.start_delay_m, m_mode); sv(m_w.end_delay_m, m_mode);
+    sv(m_w.start_gw_m,    m_mode); sv(m_w.end_gw_m,    m_mode);
+    sv(m_w.unit_m_1, m_mode); sv(m_w.unit_m_2, m_mode);
+    sv(m_w.unit_m_3, m_mode); sv(m_w.unit_m_4, m_mode);
+    sv(m_w.start_delay_u, !m_mode); sv(m_w.start_delay_n, !m_mode);
+    sv(m_w.end_delay_u,   !m_mode); sv(m_w.end_delay_n,   !m_mode);
+    sv(m_w.start_gw_u,    !m_mode); sv(m_w.start_gw_n,    !m_mode);
+    sv(m_w.end_gw_u,      !m_mode); sv(m_w.end_gw_n,      !m_mode);
+    sv(m_w.unit_us_1, !m_mode); sv(m_w.unit_us_2, !m_mode);
+    sv(m_w.unit_us_3, !m_mode); sv(m_w.unit_us_4, !m_mode);
+    sv(m_w.unit_ns_1, !m_mode); sv(m_w.unit_ns_2, !m_mode);
+    sv(m_w.unit_ns_3, !m_mode); sv(m_w.unit_ns_4, !m_mode);
+
+    if (m_w.step_delay) m_w.step_delay->setText(QString::number(
+        m_mode ? p.step_size_delay * p.dist_ns : p.step_size_delay, 'f', 2));
+    if (m_w.step_gw)    m_w.step_gw->setText(QString::number(
+        m_mode ? p.step_size_gw * p.dist_ns : p.step_size_gw, 'f', 2));
+    if (m_w.unit_1) m_w.unit_1->setText(m_mode ? "m" : "ns");
+    if (m_w.unit_2) m_w.unit_2->setText(m_mode ? "m" : "ns");
+}
+
+void ScanOverlay::on_tcu_edit()
+{
+    if (!m_ctrl) return;
+    ScanParams &p = m_ctrl->params();
+
+    auto txt = [](QLineEdit *e) { return e ? e->text().toInt()   : 0; };
+    auto txtf= [](QLineEdit *e) { return e ? e->text().toFloat() : 0.f; };
+
+    switch (p.base_unit) {
+    case 0: case 1: // ns / μs
+        p.starting_delay = txt(m_w.start_delay_n) > 999
+            ? txt(m_w.start_delay_n)
+            : txt(m_w.start_delay_u) * 1000 + txt(m_w.start_delay_n);
+        p.ending_delay = txt(m_w.end_delay_n) > 999
+            ? txt(m_w.end_delay_n)
+            : txt(m_w.end_delay_u) * 1000 + txt(m_w.end_delay_n);
+        p.starting_gw = txt(m_w.start_gw_n) > 999
+            ? txt(m_w.start_gw_n)
+            : txt(m_w.start_gw_u) * 1000 + txt(m_w.start_gw_n);
+        p.ending_gw = txt(m_w.end_gw_n) > 999
+            ? txt(m_w.end_gw_n)
+            : txt(m_w.end_gw_u) * 1000 + txt(m_w.end_gw_n);
+        break;
+    case 2: // m  (legacy uses GW_EDIT_M for both delay and gw — quirk preserved)
+        p.starting_delay = txt(m_w.start_gw_m);
+        p.ending_delay   = txt(m_w.end_gw_m);
+        p.starting_gw    = txt(m_w.start_gw_m);
+        p.ending_gw      = txt(m_w.end_gw_m);
+        break;
+    }
+
+    if (m_w.rep_freq) p.rep_freq = txtf(m_w.rep_freq);
+
+    QLineEdit *src = qobject_cast<QLineEdit*>(sender());
+    if (src == m_w.step_delay) {
+        p.step_size_delay = txtf(m_w.step_delay);
+        if (std::fabs(p.step_size_delay) < 1e-4f) {
+            p.step_size_delay = 0;
+            p.frame_count = 1;
+        } else {
+            p.step_size_gw  = 1.0f * (p.ending_gw - p.starting_gw) / (p.frame_count - 1);
+            p.frame_count   = 1.0f * (p.ending_delay - p.starting_delay) / p.step_size_delay + 1;
+        }
+    }
+    else if (src == m_w.step_gw) {
+        p.step_size_gw = txtf(m_w.step_gw);
+        if (std::fabs(p.step_size_gw) < 1e-4f) {
+            p.frame_count = 1;
+            p.step_size_gw = 0;
+        } else {
+            p.frame_count     = 1.0f * (p.ending_delay - p.starting_delay) / p.step_size_delay + 1;
+            p.step_size_delay = 1.0f * (p.ending_delay - p.starting_delay) / (p.frame_count - 1);
+        }
+    }
+    else {
+        p.frame_count = txt(m_w.frame_count);
+        if (p.frame_count <= 1) {
+            p.frame_count = 1;
+            p.step_size_delay = 0;
+            p.step_size_gw    = 0;
+        } else {
+            p.step_size_delay = 1.0f * (p.ending_delay - p.starting_delay) / (p.frame_count - 1);
+            p.step_size_gw    = 1.0f * (p.ending_gw    - p.starting_gw)    / (p.frame_count - 1);
+            if (std::fabs(p.step_size_delay) < 1e-4f) p.step_size_delay = 1;
+            if (std::fabs(p.step_size_gw)    < 1e-4f) p.step_size_gw    = 1;
+        }
+    }
+
+    if (m_w.frame_count) m_w.frame_count->setText(QString::number(p.frame_count));
+    const bool m_mode = (p.base_unit == 2);
+    if (m_w.step_delay) m_w.step_delay->setText(QString::number(
+        m_mode ? p.step_size_delay * p.dist_ns : p.step_size_delay, 'f', 2));
+    if (m_w.step_gw)    m_w.step_gw->setText(QString::number(
+        m_mode ? p.step_size_gw * p.dist_ns : p.step_size_gw, 'f', 2));
+}
+
+void ScanOverlay::on_ptz_edit()
+{
+    if (!m_ctrl) return;
+    ScanParams &p = m_ctrl->params();
+    auto txtf = [](QLineEdit *e) { return e ? e->text().toFloat() : 0.f; };
+    auto txti = [](QLineEdit *e) { return e ? e->text().toInt()   : 0; };
+
+    p.starting_h = txtf(m_w.start_h);
+    p.starting_v = txtf(m_w.start_v);
+    p.ending_h   = txtf(m_w.end_h);
+    p.ending_v   = txtf(m_w.end_v);
+
+    QLineEdit *src = qobject_cast<QLineEdit*>(sender());
+    if (src == m_w.step_h) {
+        p.step_h = txtf(m_w.step_h);
+        if (p.step_h == 0) { p.count_h = 1; p.step_h = 0; }
+        else {
+            p.count_h = std::ceil(1.0f * (p.ending_h - p.starting_h) / p.step_h) + 1;
+            p.step_h  = 1.0f * (p.ending_h - p.starting_h) / (p.count_h - 1);
+        }
+        if (m_w.step_h)  m_w.step_h->setText(QString::number(p.step_h, 'f', 2));
+        if (m_w.frame_h) m_w.frame_h->setText(QString::number(p.count_h));
+    }
+    else if (src == m_w.step_v) {
+        p.step_v = txtf(m_w.step_v);
+        if (p.step_v == 0) { p.count_v = 1; p.step_v = 0; }
+        else {
+            p.count_v = std::ceil(1.0f * (p.ending_v - p.starting_v) / p.step_v) + 1;
+            p.step_v  = 1.0f * (p.ending_v - p.starting_v) / (p.count_v - 1);
+        }
+        if (m_w.step_v)  m_w.step_v->setText(QString::number(p.step_v, 'f', 2));
+        if (m_w.frame_v) m_w.frame_v->setText(QString::number(p.count_v));
+    }
+    else if (src == m_w.frame_h || src == m_w.start_h || src == m_w.end_h) {
+        p.count_h = txti(m_w.frame_h);
+        if (p.count_h <= 1) { p.count_h = 1; p.step_h = 0; }
+        else { p.step_h = 1.0f * (p.ending_h - p.starting_h) / (p.count_h - 1); }
+        if (m_w.step_h) m_w.step_h->setText(QString::number(p.step_h, 'f', 2));
+    }
+    else if (src == m_w.frame_v || src == m_w.start_v || src == m_w.end_v) {
+        p.count_v = txti(m_w.frame_v);
+        if (p.count_v <= 1) { p.count_v = 1; p.step_v = 0; }
+        else { p.step_v = 1.0f * (p.ending_v - p.starting_v) / (p.count_v - 1); }
+        if (m_w.step_v) m_w.step_v->setText(QString::number(p.step_v, 'f', 2));
+    }
+}
+
+void ScanOverlay::on_capture_ori(int s) { if (m_ctrl) m_ctrl->params().capture_scan_ori = s; }
+void ScanOverlay::on_capture_res(int s) { if (m_ctrl) m_ctrl->params().capture_scan_res = s; }
+void ScanOverlay::on_record_ori (int s) { if (m_ctrl) m_ctrl->params().record_scan_ori  = s; }
+void ScanOverlay::on_record_res (int s) { if (m_ctrl) m_ctrl->params().record_scan_res  = s; }
+
+void ScanOverlay::on_dir_n()
+{
+    if (m_w.dir_z) m_w.dir_z->setChecked(false);
+    if (m_ctrl) m_ctrl->params().ptz_direction = 0;
+}
+
+void ScanOverlay::on_dir_z()
+{
+    if (m_w.dir_n) m_w.dir_n->setChecked(false);
+    if (m_ctrl) m_ctrl->params().ptz_direction = 1;
+}
+
+void ScanOverlay::on_ptz_wait_edit()
+{
+    if (!m_ctrl || !m_w.ptz_wait) return;
+    int v = m_w.ptz_wait->text().toInt();
+    if (v < 0)  v = 0;
+    if (v > 20) v = 20;
+    m_ctrl->params().ptz_wait_time = v;
+    m_w.ptz_wait->setText(QString::number(v));
+}
+
+void ScanOverlay::on_num_single_pos_edit()
+{
+    if (!m_ctrl || !m_w.num_single_pos) return;
+    int v = m_w.num_single_pos->text().toInt();
+    if (v < 1)  v = 1;
+    if (v > 20) v = 20;
+    m_ctrl->params().num_single_pos = v;
+    m_w.num_single_pos->setText(QString::number(v));
 }

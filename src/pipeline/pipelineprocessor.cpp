@@ -3,7 +3,7 @@
 #include "controller/scancontroller.h"
 #include "controller/devicemanager.h"
 #include "controller/auxpanelmanager.h"
-#include "visual/scanconfig.h"
+#include "pipeline/scanparams.h"
 #include "widgets/display.h"
 #include "widgets/floatingwindow.h"
 #include "image/imageio.h"
@@ -686,7 +686,7 @@ void PipelineProcessor::advance_scan(int thread_idx, bool updated, const Pipelin
     scan_img_count -= 1;
     if (scan_img_count < 0) scan_img_count = 0;
 
-    int save_img_num = m_s.scan_config->num_single_pos;
+    int save_img_num = m_s.scan_params->num_single_pos;
     if (scan_img_count > 0 && scan_img_count <= save_img_num) {
         save_scan_img(scan_save_path, QString::number(save_img_num - scan_img_count + 1) + ".bmp", pcfg);
     }
@@ -695,7 +695,7 @@ void PipelineProcessor::advance_scan(int thread_idx, bool updated, const Pipelin
     }
 
     if (!scan_img_count) {
-        scan_img_count = *m_s.frame_rate_edit * (m_s.scan_config->ptz_wait_time + save_img_num / *m_s.frame_rate_edit);
+        scan_img_count = *m_s.frame_rate_edit * (m_s.scan_params->ptz_wait_time + save_img_num / *m_s.frame_rate_edit);
 
         int tcu_idx = m_s.scan_ctrl->get_scan_tcu_idx();
         int ptz_idx = m_s.scan_ctrl->get_scan_ptz_idx();
@@ -853,7 +853,7 @@ void PipelineProcessor::save_to_file(bool save_result, int idx, const Processing
 }
 
 void PipelineProcessor::save_scan_img(QString path, QString name, const PipelineConfig& pcfg) {
-    if (m_s.scan_config->capture_scan_ori) {
+    if (m_s.scan_params->capture_scan_ori) {
         if (pcfg.integrate_info) {
             QString tcu_note = QString::fromStdString(m_s.device_mgr->tcu()->to_json().dump());
             m_s.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), m_s.img_mem[0].clone(), path + "/ori_bmp/" + name, tcu_note));
@@ -861,7 +861,7 @@ void PipelineProcessor::save_scan_img(QString path, QString name, const Pipeline
             m_s.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), m_s.img_mem[0].clone(), path + "/ori_bmp/" + name));
         }
     }
-    if (m_s.scan_config->capture_scan_res) {
+    if (m_s.scan_params->capture_scan_res) {
         if (pcfg.integrate_info) {
             QString tcu_note = QString::fromStdString(m_s.device_mgr->tcu()->to_json().dump());
             m_s.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), m_s.modified_result[0].clone(), path + "/res_bmp/" + name, tcu_note));

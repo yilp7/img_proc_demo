@@ -24,7 +24,7 @@ class TCUController;
 class ScanController;
 class DeviceManager;
 class AuxPanelManager;
-class ScanConfig;
+struct ScanParams;
 class Display;
 class FloatingWindow;
 class ThreadPool;
@@ -115,7 +115,7 @@ public:
         FloatingWindow*     secondary_display;
 
         // Other
-        ScanConfig*         scan_config;
+        ScanParams*         scan_params;
         QString*            save_location;
         ThreadPool*         tp;
         int*                device_type;

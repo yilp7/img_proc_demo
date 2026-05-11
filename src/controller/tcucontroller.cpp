@@ -1,6 +1,5 @@
 #include "controller/tcucontroller.h"
 #include "controller/devicemanager.h"
-#include "visual/scanconfig.h"
 #include "visual/aliasing.h"
 #include "util/constants.h"
 
@@ -19,7 +18,6 @@ TCUController::TCUController(Config *config, DeviceManager *device_mgr, QObject 
     : QObject(parent),
       m_config(config),
       m_device_mgr(device_mgr),
-      m_scan_config(nullptr),
       m_aliasing(nullptr),
       stepping(10),
       hz_unit(0),
@@ -40,9 +38,8 @@ TCUController::TCUController(Config *config, DeviceManager *device_mgr, QObject 
     dist_ns = c * 1e-9 / 2;
 }
 
-void TCUController::init(ScanConfig *scan_config, Aliasing *aliasing)
+void TCUController::init(Aliasing *aliasing)
 {
-    m_scan_config = scan_config;
     m_aliasing = aliasing;
 }
 
@@ -341,7 +338,8 @@ void TCUController::update_light_speed(bool uw)
 {
     c = uw ? 3e8 * 0.75 : 3e8;
     dist_ns = c * 1e-9 / 2;
-    m_scan_config->dist_ns = dist_ns;
+    // dist_ns propagates to ScanController::params().dist_ns and
+    // Preferences::dist_ns via the dist_ns_changed signal (see userpanel.cpp).
     emit dist_ns_changed(dist_ns);
     emit update_distance_display_requested();
     emit send_double_tcu_msg(TCU::LIGHT_SPEED, dist_ns);

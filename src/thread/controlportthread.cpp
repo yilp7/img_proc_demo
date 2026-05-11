@@ -303,7 +303,7 @@ void ControlPortThread::run()
     }
 }
 
-TCUThread::TCUThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon, ScanConfig *sc, QObject *parent, uint init_width) :
+TCUThread::TCUThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon, ScanParams *sp, QObject *parent, uint init_width) :
     ControlPortThread(label, edit, index, status_icon, parent),
     tcu_type(0),
     scan_mode(0),
@@ -334,7 +334,7 @@ TCUThread::TCUThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *st
     gate_width_offset(0),
     ps_step{40, 40, 40, 40},
     use_gw_lut(false),
-    scan_config(sc)
+    scan_params(sp)
 {
 
 }
@@ -385,7 +385,7 @@ int TCUThread::set_user_param(TCUThread::USER_PARAMS cmd, float val)
             delay_a = delay_dist / dist_ns;
             delay_b = delay_a + delay_n;
 
-            if (scan_mode) rep_freq = scan_config->rep_freq;
+            if (scan_mode) rep_freq = scan_params->rep_freq;
             else if (auto_rep_freq) {
                 // change repeated frequency according to delay: rep frequency (kHz) <= 1s / delay (μs)
                 rep_freq = delay_dist ? 1e6 / (delay_dist / dist_ns + depth_of_view / dist_ns + 1000) : 30;

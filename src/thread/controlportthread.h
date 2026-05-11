@@ -4,7 +4,7 @@
 #include "util/util.h"
 #include "widgets/dotindicator.h"
 
-class ScanConfig;
+struct ScanParams;
 
 struct PortData {
     QByteArray write;
@@ -133,7 +133,7 @@ public:
         NO_PARAM      = 0xFF,
     };
 
-    TCUThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, ScanConfig* sc = nullptr, QObject *parent = nullptr, uint init_width = 100);
+    TCUThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, ScanParams* sp = nullptr, QObject *parent = nullptr, uint init_width = 100);
 
     int set_user_param(TCUThread::USER_PARAMS param, float val);
     TCUDataGroup get_tcu_params();
@@ -180,7 +180,7 @@ public:
     int   gw_lut[100];                // lookup table for gatewidth config by serial
 
 private:
-    ScanConfig *scan_config;
+    ScanParams *scan_params;
 };
 
 class LensThread : public ControlPortThread {

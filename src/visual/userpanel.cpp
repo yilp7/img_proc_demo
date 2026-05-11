@@ -1,8 +1,10 @@
 #include "userpanel.h"
 #include "ui_user_panel.h"
 #include "ui_preferences.h"
-#include "ui_scanconfig.h"
 #include "util/constants.h"
+#include <QCheckBox>
+#include <QLineEdit>
+#include <QRadioButton>
 #include <QStyle>
 
 static bool throttle_check(QElapsedTimer &t)
@@ -120,7 +122,6 @@ UserPanel::UserPanel(QWidget *parent) :
     m_mapbox(nullptr),
     m_setup_overlay(nullptr),
     m_scan_overlay(nullptr),
-    pref(NULL),
     m_device_mgr(nullptr),
     m_tcu_ctrl(nullptr),
     m_lens_ctrl(nullptr),
@@ -131,7 +132,6 @@ UserPanel::UserPanel(QWidget *parent) :
     m_rf_ctrl(nullptr),
     m_scan_ctrl(nullptr),
     m_aux_panel(nullptr),
-    scan_config(NULL),
     laser_settings(NULL),
     config(NULL),
     aliasing(NULL),
@@ -281,13 +281,42 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // connect title bar to the main window (UserPanel*)
     ui->TITLE->setup(this);
-    pref = ui->TITLE->preferences;
-    pref->init();
-    scan_config = ui->TITLE->scan_config;
 
     // initialize config system
     config = new Config(this);
-    pref->set_config(config);
+
+    // SETUP overlay -- owns the legacy Preferences widgets (built via
+    // Ui::Preferences::setupUi on a hidden form root, then re-parented into
+    // the overlay's row cards). Must be alive before any setup-widget access.
+    m_setup_overlay = new SetupOverlay(ui->CENTRAL);
+    m_setup_overlay->set_config(config);
+    m_setup_overlay->setup_form();
+    m_setup_overlay->bind();
+
+    connect(m_setup_overlay, SIGNAL(search_for_devices()),               this, SLOT(search_for_devices()));
+    connect(m_setup_overlay, SIGNAL(query_dev_ip()),                     this, SLOT(update_dev_ip()));
+    connect(m_setup_overlay, SIGNAL(set_dev_ip(int, int)),               this, SLOT(set_dev_ip(int, int)));
+    connect(m_setup_overlay, SIGNAL(change_pixel_format(int)),           this, SLOT(change_pixel_format(int)));
+    connect(m_setup_overlay, SIGNAL(rotate_image(int)),                  this, SLOT(rotate(int)));
+    connect(m_setup_overlay, SIGNAL(device_underwater(bool)),            this, SLOT(update_light_speed(bool)));
+    connect(m_setup_overlay, SIGNAL(get_port_info(int)),                 this, SLOT(display_port_info(int)));
+    connect(m_setup_overlay, SIGNAL(change_baudrate(int, int)),          this, SLOT(set_baudrate(int, int)));
+    connect(m_setup_overlay, SIGNAL(set_tcp_status(int, bool)),          this, SLOT(set_tcp_status_on_port(int, bool)));
+    connect(m_setup_overlay, SIGNAL(share_tcu_port(bool)),               this, SLOT(set_tcu_as_shared_port(bool)));
+    connect(m_setup_overlay, SIGNAL(com_write(int, QByteArray)),         this, SLOT(com_write_data(int, QByteArray)));
+    connect(m_setup_overlay, SIGNAL(tcu_type_changed(int)),              this, SLOT(set_tcu_type(int)));
+    connect(m_setup_overlay, SIGNAL(set_auto_mcp(bool)),                 this, SLOT(set_auto_mcp(bool)));
+    connect(m_setup_overlay, SIGNAL(rep_freq_unit_changed(int)),         this, SLOT(setup_hz(int)));
+    connect(m_setup_overlay, SIGNAL(base_unit_changed(int)),             this, SLOT(setup_stepping(int)));
+    connect(m_setup_overlay, SIGNAL(max_dist_changed(float)),            this, SLOT(setup_max_dist(float)));
+    connect(m_setup_overlay, SIGNAL(max_dov_changed(float)),             this, SLOT(setup_max_dov(float)));
+    connect(m_setup_overlay, SIGNAL(delay_offset_changed(float)),        this, SLOT(update_delay_offset(float)));
+    connect(m_setup_overlay, SIGNAL(gate_width_offset_changed(float)),   this, SLOT(update_gate_width_offset(float)));
+    connect(m_setup_overlay, SIGNAL(laser_offset_changed(float)),        this, SLOT(update_laser_offset(float)));
+    connect(m_setup_overlay, SIGNAL(ps_config_updated(bool, int, uint)), this, SLOT(update_ps_config(bool, int, uint)));
+    connect(m_setup_overlay, SIGNAL(laser_toggled(int)),                 this, SLOT(setup_laser(int)));
+    connect(m_setup_overlay, SIGNAL(lower_3d_thresh_updated()),          this, SLOT(update_lower_3d_thresh()));
+    connect(m_setup_overlay, SIGNAL(query_tcu_param()),                  this, SLOT(reset_custom_3d_params()));
 
 //    SerialServer *s = new SerialServer();
 //    s->show();
@@ -378,7 +407,7 @@ UserPanel::UserPanel(QWidget *parent) :
     connect(ui->RANGE_THRESH_EDIT, &QLineEdit::textChanged, this,
             [this](QString arg1){
                 config->get_data().image_proc.lower_3d_thresh = arg1.toFloat() / (1 << pixel_depth[0]);
-                pref->ui->LOWER_3D_THRESH_EDT->setText(QString::number(config->get_data().image_proc.lower_3d_thresh, 'f', 3));
+                m_setup_overlay->w()->LOWER_3D_THRESH_EDT->setText(QString::number(config->get_data().image_proc.lower_3d_thresh, 'f', 3));
     });
 
     setup_slider(ui->BRIGHTNESS_SLIDER, -5, 5, 1, 2, 0);
@@ -407,9 +436,9 @@ UserPanel::UserPanel(QWidget *parent) :
     // MCP slider focus changes (also picks up hasFocus on any focus switch)
     connect(qApp, &QApplication::focusChanged, this, [this](QWidget*, QWidget*){ update_processing_params(); });
     // Pref text field changes
-    connect(pref->ui->CUSTOM_3D_DELAY_EDT, &QLineEdit::textChanged, this, [this](const QString&){ update_processing_params(); });
-    connect(pref->ui->CUSTOM_3D_GW_EDT, &QLineEdit::textChanged, this, [this](const QString&){ update_processing_params(); });
-    connect(pref->ui->CUSTOM_INFO_EDT, &QLineEdit::textChanged, this, [this](const QString&){ update_processing_params(); });
+    connect(m_setup_overlay->w()->CUSTOM_3D_DELAY_EDT, &QLineEdit::textChanged, this, [this](const QString&){ update_processing_params(); });
+    connect(m_setup_overlay->w()->CUSTOM_3D_GW_EDT, &QLineEdit::textChanged, this, [this](const QString&){ update_processing_params(); });
+    connect(m_setup_overlay->w()->CUSTOM_INFO_EDT, &QLineEdit::textChanged, this, [this](const QString&){ update_processing_params(); });
     // packet_lost_updated connection moved to PipelineProcessor signal wiring below
     // initial snapshot
     update_processing_params();
@@ -460,7 +489,7 @@ UserPanel::UserPanel(QWidget *parent) :
     // PTZ button group, VID camera buttons, VID toggle buttons → DeviceManager
 
     ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
-    pref->ui->REFRESH_AVAILABLE_PORTS_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
+    m_setup_overlay->w()->REFRESH_AVAILABLE_PORTS_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
     ui->SWITCH_TCU_UI_BTN->setIcon(QIcon(":/tools/" + QString(app_theme ? "light" : "dark") + "/switch"));
 
     // PTZ speed slider → DeviceManager
@@ -588,70 +617,52 @@ UserPanel::UserPanel(QWidget *parent) :
     m_right_stack ->raise();
     m_right_stack ->show();
 
-    // ----- SETUP overlay (Sprint 18) -----
-    // Re-parents 5 top-level groups out of the legacy Preferences dialog plus
-    // PARAMS_STATIC + IMG_GRAB_STATIC out of ui->LEFT. Widget identity is
-    // preserved → all existing pref->ui->* accessors and signal connections
-    // remain valid after re-parent.
-    m_setup_overlay = new SetupOverlay(ui->CENTRAL);
+    // ----- SETUP overlay extras -----
+    // The 5 Ui::Preferences groups (SAVE_LOAD_GRP, SERIAL_PORTS_GRP, TCU_GRP,
+    // DEVICES_GRP, IMG_PROC_GRP) are populated by SetupOverlay::setup_form().
+    // PARAMS_STATIC + IMG_GRAB_STATIC still come from ui->LEFT — re-parent
+    // them here into row 2 next to DEVICES_GRP.
     {
-        auto *r0 = m_setup_overlay->rowLayout(0);
         auto *r1 = m_setup_overlay->rowLayout(1);
-        auto *r2 = m_setup_overlay->rowLayout(2);
-
         auto add_card = [](QHBoxLayout *row, QWidget *card, QWidget *parent_w) {
             if (!row || !card) return;
-            const QSize orig_size = card->size();  // capture before setParent may resize
+            const QSize orig_size = card->size();
             card->setParent(parent_w);
-            card->move(0, 0);                      // clear .ui-baked position
-            // Widgets without a QLayout report sizeHint(-1,-1); the row layout
-            // would collapse them to zero. Set a minimum so the original size is kept.
-            if (!card->layout())
-                card->setMinimumSize(orig_size);
+            card->move(0, 0);
+            if (!card->layout()) card->setMinimumSize(orig_size);
             card->show();
             row->addWidget(card);
         };
-
-        // Row 1 — Save / Load, Serial Ports, TCU Configuration
-        if (pref) {
-            add_card(r0, pref->ui->SAVE_LOAD_GRP,    m_setup_overlay->contentRow(0));
-            add_card(r0, pref->ui->SERIAL_PORTS_GRP, m_setup_overlay->contentRow(0));
-            add_card(r0, pref->ui->TCU_GRP,          m_setup_overlay->contentRow(0));
-            r0->addStretch(1);
-
-            // Row 2 — Devices + Camera (PARAMS_STATIC + IMG_GRAB_STATIC)
-            add_card(r1, pref->ui->DEVICES_GRP, m_setup_overlay->contentRow(1));
-        }
         add_card(r1, ui->PARAMS_STATIC,   m_setup_overlay->contentRow(1));
         add_card(r1, ui->IMG_GRAB_STATIC, m_setup_overlay->contentRow(1));
         r1->addStretch(1);
-
-        // Row 3 — Image Processing config groups
-        if (pref) {
-            add_card(r2, pref->ui->IMG_PROC_GRP, m_setup_overlay->contentRow(2));
-        }
-        r2->addStretch(1);
+        m_setup_overlay->rowLayout(0)->addStretch(1);
+        m_setup_overlay->rowLayout(2)->addStretch(1);
     }
     m_setup_overlay->hide();  // shown only in SETUP mode
 
-    // ----- SCAN overlay (Sprint 19) -----
+    // ----- SCAN overlay (Sprint 19, rewritten S22) -----
     // Builds 4 titled group cards (Delay / Gate Width / PTZ / Capture+Record)
-    // plus a vertical action column by re-parenting individual scan_config->ui->*
-    // widgets and the scan control buttons. Matches the prototype.html v3 layout.
+    // plus a vertical action column. Widgets are hand-created (was previously
+    // re-parented from the legacy ScanConfig dialog; that class is gone in S22)
+    // and bound to ScanOverlay, which owns the widget→ScanController::params()
+    // sync. Matches the prototype.html v3 layout.
     m_scan_overlay = new ScanOverlay(ui->CENTRAL);
-    if (scan_config) {
-        auto *sc     = scan_config->ui;        // shorthand to Ui::ScanConfig
+    {
         auto *cards  = m_scan_overlay->cardsLayout();
         auto *cw     = m_scan_overlay->contentWidget();
 
-        // Re-parent w to p, show it, and return it for use in addWidget().
-        // setParent() hides the widget; show() makes it visible; addWidget()
-        // skips setParent because pw == mw already, so it stays shown.
-        auto rp = [](QWidget *w, QWidget *p) -> QWidget* {
-            if (!w || !p) return nullptr;
-            w->setParent(p);
-            w->show();
-            return w;
+        // Helpers — small widget factories with the alignment/style the
+        // legacy ScanConfig .ui used to set.
+        auto le = [](QWidget *parent, const QString &init = QString()) -> QLineEdit* {
+            auto *e = new QLineEdit(parent);
+            e->setAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
+            e->setFixedWidth(36);
+            if (!init.isEmpty()) e->setText(init);
+            return e;
+        };
+        auto lbl = [](QWidget *parent, const QString &text) {
+            return new QLabel(text, parent);
         };
 
         // Creates a titled group card, registers it with cardsLayout(), and
@@ -682,26 +693,29 @@ UserPanel::UserPanel(QWidget *parent) :
             return body;
         };
 
+        ScanOverlay::Widgets sw;
+
         // ── Delay ──────────────────────────────────────────────────────────
         {
             auto *body = make_card("DELAY");
             auto *bl   = static_cast<QVBoxLayout*>(body->layout());
 
-            // Starting / Ending rows: [label] [μs edit] [μs unit] [ns edit] [ns unit]
+            sw.start_delay_u = le(body); sw.start_delay_n = le(body); sw.start_delay_m = le(body);
+            sw.end_delay_u   = le(body); sw.end_delay_n   = le(body); sw.end_delay_m   = le(body);
+            sw.unit_us_1 = lbl(body, "\xCE\xBCs"); sw.unit_ns_1 = lbl(body, "ns"); sw.unit_m_1 = lbl(body, "m");
+            sw.unit_us_2 = lbl(body, "\xCE\xBCs"); sw.unit_ns_2 = lbl(body, "ns"); sw.unit_m_2 = lbl(body, "m");
+
             auto *grid = new QGridLayout;
-            grid->setHorizontalSpacing(4);
-            grid->setVerticalSpacing(4);
+            grid->setHorizontalSpacing(4); grid->setVerticalSpacing(4);
             grid->setContentsMargins(0, 0, 0, 0);
-            grid->addWidget(new QLabel("Starting", body),      0, 0);
-            grid->addWidget(rp(sc->START_DELAY_EDIT_U, body),  0, 1);
-            grid->addWidget(rp(sc->UNIT_US_1,          body),  0, 2);
-            grid->addWidget(rp(sc->START_DELAY_EDIT_N, body),  0, 3);
-            grid->addWidget(rp(sc->UNIT_NS_1,          body),  0, 4);
-            grid->addWidget(new QLabel("Ending",  body),       1, 0);
-            grid->addWidget(rp(sc->END_DELAY_EDIT_U,   body),  1, 1);
-            grid->addWidget(rp(sc->UNIT_US_2,          body),  1, 2);
-            grid->addWidget(rp(sc->END_DELAY_EDIT_N,   body),  1, 3);
-            grid->addWidget(rp(sc->UNIT_NS_2,          body),  1, 4);
+            grid->addWidget(lbl(body, "Starting"), 0, 0);
+            grid->addWidget(sw.start_delay_u, 0, 1); grid->addWidget(sw.unit_us_1, 0, 2);
+            grid->addWidget(sw.start_delay_n, 0, 3); grid->addWidget(sw.unit_ns_1, 0, 4);
+            grid->addWidget(sw.start_delay_m, 0, 5); grid->addWidget(sw.unit_m_1,  0, 6);
+            grid->addWidget(lbl(body, "Ending"),   1, 0);
+            grid->addWidget(sw.end_delay_u, 1, 1); grid->addWidget(sw.unit_us_2, 1, 2);
+            grid->addWidget(sw.end_delay_n, 1, 3); grid->addWidget(sw.unit_ns_2, 1, 4);
+            grid->addWidget(sw.end_delay_m, 1, 5); grid->addWidget(sw.unit_m_2,  1, 6);
             bl->addLayout(grid);
 
             auto *sep = new QFrame(body);
@@ -710,16 +724,17 @@ UserPanel::UserPanel(QWidget *parent) :
             sep->setFixedHeight(1);
             bl->addWidget(sep);
 
+            sw.step_delay = le(body); sw.unit_1 = lbl(body, "ns");
+            sw.rep_freq = le(body); sw.freq_unit = lbl(body, "kHz");
             auto *grid2 = new QGridLayout;
-            grid2->setHorizontalSpacing(4);
-            grid2->setVerticalSpacing(4);
+            grid2->setHorizontalSpacing(4); grid2->setVerticalSpacing(4);
             grid2->setContentsMargins(0, 0, 0, 0);
-            grid2->addWidget(new QLabel("Step",     body),          0, 0);
-            grid2->addWidget(rp(sc->STEP_SIZE_DELAY_EDIT, body),    0, 1);
-            grid2->addWidget(rp(sc->UNIT_1,               body),    0, 2);
-            grid2->addWidget(new QLabel("Rep Freq", body),          1, 0);
-            grid2->addWidget(rp(sc->REP_FREQ_EDIT,        body),    1, 1);
-            grid2->addWidget(rp(sc->FREQ_UNIT,            body),    1, 2);
+            grid2->addWidget(lbl(body, "Step"),     0, 0);
+            grid2->addWidget(sw.step_delay,         0, 1);
+            grid2->addWidget(sw.unit_1,             0, 2);
+            grid2->addWidget(lbl(body, "Rep Freq"), 1, 0);
+            grid2->addWidget(sw.rep_freq,           1, 1);
+            grid2->addWidget(sw.freq_unit,          1, 2);
             bl->addLayout(grid2);
             bl->addStretch(1);
         }
@@ -729,20 +744,22 @@ UserPanel::UserPanel(QWidget *parent) :
             auto *body = make_card("GATE WIDTH");
             auto *bl   = static_cast<QVBoxLayout*>(body->layout());
 
+            sw.start_gw_u = le(body); sw.start_gw_n = le(body); sw.start_gw_m = le(body);
+            sw.end_gw_u   = le(body); sw.end_gw_n   = le(body); sw.end_gw_m   = le(body);
+            sw.unit_us_3 = lbl(body, "\xCE\xBCs"); sw.unit_ns_3 = lbl(body, "ns"); sw.unit_m_3 = lbl(body, "m");
+            sw.unit_us_4 = lbl(body, "\xCE\xBCs"); sw.unit_ns_4 = lbl(body, "ns"); sw.unit_m_4 = lbl(body, "m");
+
             auto *grid = new QGridLayout;
-            grid->setHorizontalSpacing(4);
-            grid->setVerticalSpacing(4);
+            grid->setHorizontalSpacing(4); grid->setVerticalSpacing(4);
             grid->setContentsMargins(0, 0, 0, 0);
-            grid->addWidget(new QLabel("Starting", body),     0, 0);
-            grid->addWidget(rp(sc->START_GW_EDIT_U,   body),  0, 1);
-            grid->addWidget(rp(sc->UNIT_US_3,         body),  0, 2);
-            grid->addWidget(rp(sc->START_GW_EDIT_N,   body),  0, 3);
-            grid->addWidget(rp(sc->UNIT_NS_3,         body),  0, 4);
-            grid->addWidget(new QLabel("Ending",  body),      1, 0);
-            grid->addWidget(rp(sc->END_GW_EDIT_U,     body),  1, 1);
-            grid->addWidget(rp(sc->UNIT_US_4,         body),  1, 2);
-            grid->addWidget(rp(sc->END_GW_EDIT_N,     body),  1, 3);
-            grid->addWidget(rp(sc->UNIT_NS_4,         body),  1, 4);
+            grid->addWidget(lbl(body, "Starting"), 0, 0);
+            grid->addWidget(sw.start_gw_u, 0, 1); grid->addWidget(sw.unit_us_3, 0, 2);
+            grid->addWidget(sw.start_gw_n, 0, 3); grid->addWidget(sw.unit_ns_3, 0, 4);
+            grid->addWidget(sw.start_gw_m, 0, 5); grid->addWidget(sw.unit_m_3,  0, 6);
+            grid->addWidget(lbl(body, "Ending"),   1, 0);
+            grid->addWidget(sw.end_gw_u, 1, 1); grid->addWidget(sw.unit_us_4, 1, 2);
+            grid->addWidget(sw.end_gw_n, 1, 3); grid->addWidget(sw.unit_ns_4, 1, 4);
+            grid->addWidget(sw.end_gw_m, 1, 5); grid->addWidget(sw.unit_m_4,  1, 6);
             bl->addLayout(grid);
 
             auto *sep = new QFrame(body);
@@ -751,13 +768,13 @@ UserPanel::UserPanel(QWidget *parent) :
             sep->setFixedHeight(1);
             bl->addWidget(sep);
 
+            sw.step_gw = le(body); sw.unit_2 = lbl(body, "ns");
             auto *grid2 = new QGridLayout;
-            grid2->setHorizontalSpacing(4);
-            grid2->setVerticalSpacing(4);
+            grid2->setHorizontalSpacing(4); grid2->setVerticalSpacing(4);
             grid2->setContentsMargins(0, 0, 0, 0);
-            grid2->addWidget(new QLabel("Step", body),          0, 0);
-            grid2->addWidget(rp(sc->STEP_SIZE_GW_EDIT, body),   0, 1);
-            grid2->addWidget(rp(sc->UNIT_2,            body),   0, 2);
+            grid2->addWidget(lbl(body, "Step"), 0, 0);
+            grid2->addWidget(sw.step_gw,        0, 1);
+            grid2->addWidget(sw.unit_2,         0, 2);
             bl->addLayout(grid2);
             bl->addStretch(1);
         }
@@ -772,49 +789,50 @@ UserPanel::UserPanel(QWidget *parent) :
             hl->setContentsMargins(0, 0, 0, 0);
             hl->setSpacing(12);
 
-            // Left sub-panel: H/V grid
-            auto *gw  = new QWidget(row_w);
-            auto *g   = new QGridLayout(gw);
-            g->setHorizontalSpacing(4);
-            g->setVerticalSpacing(4);
+            auto *gw_w = new QWidget(row_w);
+            auto *g    = new QGridLayout(gw_w);
+            g->setHorizontalSpacing(4); g->setVerticalSpacing(4);
             g->setContentsMargins(0, 0, 0, 0);
-            g->addWidget(new QLabel("H", gw), 0, 1, Qt::AlignCenter);
-            g->addWidget(new QLabel("V", gw), 0, 2, Qt::AlignCenter);
-            struct { const char *lbl; QWidget *h; QWidget *v; } ptz_rows[] = {
-                { "Starting", sc->START_ANGLE_H_EDT, sc->START_ANGLE_V_EDT },
-                { "Ending",   sc->END_ANGLE_H_EDT,   sc->END_ANGLE_V_EDT   },
-                { "Step",     sc->STEP_ANGLE_H_EDT,  sc->STEP_ANGLE_V_EDT  },
-                { "Pos count",sc->FRAME_H_EDT,        sc->FRAME_V_EDT       },
+            g->addWidget(lbl(gw_w, "H"), 0, 1, Qt::AlignCenter);
+            g->addWidget(lbl(gw_w, "V"), 0, 2, Qt::AlignCenter);
+            sw.start_h = le(gw_w); sw.start_v = le(gw_w);
+            sw.end_h   = le(gw_w); sw.end_v   = le(gw_w);
+            sw.step_h  = le(gw_w); sw.step_v  = le(gw_w);
+            sw.frame_h = le(gw_w); sw.frame_v = le(gw_w);
+            struct { const char *lbl; QLineEdit *h; QLineEdit *v; } rows[] = {
+                { "Starting",  sw.start_h, sw.start_v },
+                { "Ending",    sw.end_h,   sw.end_v   },
+                { "Step",      sw.step_h,  sw.step_v  },
+                { "Pos count", sw.frame_h, sw.frame_v },
             };
             for (int r = 0; r < 4; ++r) {
-                g->addWidget(new QLabel(ptz_rows[r].lbl, gw),   r + 1, 0);
-                g->addWidget(rp(ptz_rows[r].h, gw),             r + 1, 1);
-                g->addWidget(rp(ptz_rows[r].v, gw),             r + 1, 2);
+                g->addWidget(lbl(gw_w, rows[r].lbl), r + 1, 0);
+                g->addWidget(rows[r].h,              r + 1, 1);
+                g->addWidget(rows[r].v,              r + 1, 2);
             }
-            for (int r = 0; r < 3; ++r)   // ° labels for start/end/step rows
-                g->addWidget(new QLabel("\xc2\xb0", gw), r + 1, 3);
-            hl->addWidget(gw);
+            for (int r = 0; r < 3; ++r)
+                g->addWidget(lbl(gw_w, "\xc2\xb0"), r + 1, 3);
+            hl->addWidget(gw_w);
 
-            // Right sub-panel: direction radio + wait
             auto *rw  = new QWidget(row_w);
             auto *rvl = new QVBoxLayout(rw);
-            rvl->setContentsMargins(0, 0, 0, 0);
-            rvl->setSpacing(8);
-            rvl->addWidget(new QLabel("Direction", rw));
+            rvl->setContentsMargins(0, 0, 0, 0); rvl->setSpacing(8);
+            rvl->addWidget(lbl(rw, "Direction"));
             auto *dir_row = new QWidget(rw);
             auto *drl = new QHBoxLayout(dir_row);
-            drl->setContentsMargins(0, 0, 0, 0);
-            drl->setSpacing(6);
-            drl->addWidget(rp(sc->RADIO_PTZ_DIRECTION_N, dir_row));
-            drl->addWidget(rp(sc->RADIO_PTZ_DIRECTION_Z, dir_row));
+            drl->setContentsMargins(0, 0, 0, 0); drl->setSpacing(6);
+            sw.dir_n = new QRadioButton("N", dir_row);
+            sw.dir_z = new QRadioButton("Z", dir_row);
+            drl->addWidget(sw.dir_n);
+            drl->addWidget(sw.dir_z);
             rvl->addWidget(dir_row);
-            rvl->addWidget(new QLabel("Wait", rw));
+            rvl->addWidget(lbl(rw, "Wait"));
             auto *wait_row = new QWidget(rw);
             auto *wrl = new QHBoxLayout(wait_row);
-            wrl->setContentsMargins(0, 0, 0, 0);
-            wrl->setSpacing(4);
-            wrl->addWidget(rp(sc->PTZ_WAIT_TIME_EDT, wait_row));
-            wrl->addWidget(new QLabel("s", wait_row));
+            wrl->setContentsMargins(0, 0, 0, 0); wrl->setSpacing(4);
+            sw.ptz_wait = le(wait_row);
+            wrl->addWidget(sw.ptz_wait);
+            wrl->addWidget(lbl(wait_row, "s"));
             rvl->addWidget(wait_row);
             rvl->addStretch(1);
             hl->addWidget(rw);
@@ -830,38 +848,35 @@ UserPanel::UserPanel(QWidget *parent) :
 
             auto *row_w = new QWidget(body);
             auto *hl    = new QHBoxLayout(row_w);
-            hl->setContentsMargins(0, 0, 0, 0);
-            hl->setSpacing(16);
+            hl->setContentsMargins(0, 0, 0, 0); hl->setSpacing(16);
 
-            // Left: CAPTURE + RECORD checkboxes
             auto *lw  = new QWidget(row_w);
             auto *lvl = new QVBoxLayout(lw);
-            lvl->setContentsMargins(0, 0, 0, 0);
-            lvl->setSpacing(8);
-            auto add_chk_section = [&](const char *title, QWidget *ori, QWidget *res) {
-                lvl->addWidget(new QLabel(title, lw));
-                lvl->addWidget(rp(ori, lw));
-                lvl->addWidget(rp(res, lw));
-            };
-            add_chk_section("CAPTURE", sc->CAPTURE_SCAN_ORI_CHK, sc->CAPTURE_SCAN_RES_CHK);
-            add_chk_section("RECORD",  sc->RECORD_SCAN_ORI_CHK,  sc->RECORD_SCAN_RES_CHK);
+            lvl->setContentsMargins(0, 0, 0, 0); lvl->setSpacing(8);
+            sw.capture_ori = new QCheckBox("original", lw);
+            sw.capture_res = new QCheckBox("result",   lw);
+            sw.record_ori  = new QCheckBox("original", lw);
+            sw.record_res  = new QCheckBox("result",   lw);
+            lvl->addWidget(lbl(lw, "CAPTURE"));
+            lvl->addWidget(sw.capture_ori);
+            lvl->addWidget(sw.capture_res);
+            lvl->addWidget(lbl(lw, "RECORD"));
+            lvl->addWidget(sw.record_ori);
+            lvl->addWidget(sw.record_res);
             lvl->addStretch(1);
             hl->addWidget(lw);
 
-            // Right: Profiles + Imgs/Profile
             auto *rw  = new QWidget(row_w);
             auto *rvl = new QVBoxLayout(rw);
-            rvl->setContentsMargins(0, 0, 0, 0);
-            rvl->setSpacing(6);
-            auto add_inp_section = [&](const char *title, const char *sub, QWidget *edit) {
-                rvl->addWidget(new QLabel(title, rw));
-                auto *sl = new QLabel(sub, rw);
-                sl->setWordWrap(true);
-                rvl->addWidget(sl);
-                rvl->addWidget(rp(edit, rw));
-            };
-            add_inp_section("PROFILES",        "# of TCU+PTZ param sets", sc->FRAME_COUNT_EDIT);
-            add_inp_section("IMGS / PROFILE",  "# of imgs per profile",   sc->NUM_SINGLE_POS_EDT);
+            rvl->setContentsMargins(0, 0, 0, 0); rvl->setSpacing(6);
+            sw.frame_count    = le(rw);
+            sw.num_single_pos = le(rw);
+            rvl->addWidget(lbl(rw, "PROFILES"));
+            { auto *s = lbl(rw, "# of TCU+PTZ param sets"); s->setWordWrap(true); rvl->addWidget(s); }
+            rvl->addWidget(sw.frame_count);
+            rvl->addWidget(lbl(rw, "IMGS / PROFILE"));
+            { auto *s = lbl(rw, "# of imgs per profile"); s->setWordWrap(true); rvl->addWidget(s); }
+            rvl->addWidget(sw.num_single_pos);
             rvl->addStretch(1);
             hl->addWidget(rw);
 
@@ -870,31 +885,29 @@ UserPanel::UserPanel(QWidget *parent) :
         }
 
         // ── Action column (90 px) ──────────────────────────────────────────
-        // SCAN_BUTTON acts as both Start (text "Scan") and Stop (text "Stop")
-        // based on ScanController state. CONTINUE/RESTART visibility managed
-        // by ScanController::scan_options_changed; don't force show() on them.
         {
             auto *ac  = new QWidget(cw);
             ac->setObjectName("SCAN_ACTION_COL");
             ac->setFixedWidth(90);
             auto *vl  = new QVBoxLayout(ac);
-            vl->setContentsMargins(4, 4, 4, 4);
-            vl->setSpacing(6);
-
-            rp(ui->SCAN_BUTTON, ac);
+            vl->setContentsMargins(4, 4, 4, 4); vl->setSpacing(6);
+            ui->SCAN_BUTTON->setParent(ac); ui->SCAN_BUTTON->show();
             vl->addWidget(ui->SCAN_BUTTON);
-
             // Re-parent but don't force visible — ScanController owns visibility.
             ui->CONTINUE_SCAN_BUTTON->setParent(ac);
             vl->addWidget(ui->CONTINUE_SCAN_BUTTON);
             ui->RESTART_SCAN_BUTTON->setParent(ac);
             vl->addWidget(ui->RESTART_SCAN_BUTTON);
-
             vl->addStretch(1);
             cards->addWidget(ac);
         }
 
         cards->addStretch(1);
+
+        // Bind ScanController so widget edits update ScanController::params().
+        // Note: m_scan_ctrl is created further down in init(); bind is called
+        // there instead. We capture sw for that later call.
+        m_scan_overlay_widgets = sw;
     }
     m_scan_overlay->hide();  // shown only in SCAN mode
 
@@ -1005,7 +1018,7 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // Create TCUController
     m_tcu_ctrl = new TCUController(config, m_device_mgr, this);
-    m_tcu_ctrl->init(scan_config, aliasing);
+    m_tcu_ctrl->init(aliasing);
 
     // Forward DeviceManager signals
     connect(m_device_mgr, &DeviceManager::tcu_param_updated, m_tcu_ctrl, &TCUController::update_tcu_params);
@@ -1035,7 +1048,12 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // ScanController
     m_scan_ctrl = new ScanController(m_tcu_ctrl, m_device_mgr, this);
-    m_scan_ctrl->init(scan_config, &save_location, &w[0], &h[0]);
+    m_scan_ctrl->init(&save_location, &w[0], &h[0]);
+
+    // S22: bind the SCAN overlay widgets to ScanController now that the
+    // controller exists. The widgets were created in the scan-overlay block
+    // earlier in init() and cached on m_scan_overlay_widgets.
+    if (m_scan_overlay) m_scan_overlay->bind(m_scan_ctrl, m_scan_overlay_widgets);
 
     // --- Wire controller UI signals ---
     // DeviceManager → UI
@@ -1083,18 +1101,18 @@ UserPanel::UserPanel(QWidget *parent) :
         ui->IR_POWER_BTN->setChecked(!ui->IR_POWER_BTN->isChecked());
     });
     connect(m_device_mgr, &DeviceManager::ptz_type_enable_changed, this, [this](bool enabled) {
-        pref->set_ptz_type_enabled(enabled);
+        m_setup_overlay->set_ptz_type_enabled(enabled);
     });
     connect(m_device_mgr, &DeviceManager::baudrate_display_requested, this, [this](int idx, int baud) {
-        pref->display_baudrate(idx, baud);
+        m_setup_overlay->display_baudrate(idx, baud);
     });
     connect(m_device_mgr, &DeviceManager::tcp_server_chk_update, this, [this](bool enabled, bool checked) {
-        pref->ui->TCP_SERVER_CHK->setEnabled(enabled);
-        pref->ui->TCP_SERVER_CHK->setChecked(checked);
+        m_setup_overlay->w()->TCP_SERVER_CHK->setEnabled(enabled);
+        m_setup_overlay->w()->TCP_SERVER_CHK->setChecked(checked);
     });
     connect(m_device_mgr, &DeviceManager::tcp_server_connect_failed, this, [this]() {
-        pref->ui->TCP_SERVER_CHK->setEnabled(true);
-        pref->ui->TCP_SERVER_CHK->setChecked(false);
+        m_setup_overlay->w()->TCP_SERVER_CHK->setEnabled(true);
+        m_setup_overlay->w()->TCP_SERVER_CHK->setChecked(false);
     });
     connect(m_device_mgr, &DeviceManager::get_lens_param_requested, m_lens_ctrl, &LensController::on_GET_LENS_PARAM_BTN_clicked);
 
@@ -1212,8 +1230,8 @@ UserPanel::UserPanel(QWidget *parent) :
         ui->GATE_WIDTH_DIFF_GRP->setVisible(show);
     });
     connect(m_tcu_ctrl, &TCUController::ps_config_display_updated, this, [this](QString stepping, QString max_step) {
-        pref->ui->PS_STEPPING_EDT->setText(stepping);
-        pref->ui->MAX_PS_STEP_EDT->setText(max_step);
+        m_setup_overlay->w()->PS_STEPPING_EDT->setText(stepping);
+        m_setup_overlay->w()->MAX_PS_STEP_EDT->setText(max_step);
     });
     connect(m_tcu_ctrl, &TCUController::auto_mcp_chk_click_requested, this, [this]() {
         ui->AUTO_MCP_CHK->click();
@@ -1222,12 +1240,13 @@ UserPanel::UserPanel(QWidget *parent) :
         ui->FIRE_LASER_BTN->click();
     });
     connect(m_tcu_ctrl, &TCUController::laser_chk_click_requested, this, [this]() {
-        pref->ui->LASER_ENABLE_CHK->click();
+        m_setup_overlay->w()->LASER_ENABLE_CHK->click();
     });
     connect(m_tcu_ctrl, &TCUController::dist_ns_changed, this, [this](float dist_ns) {
-        pref->dist_ns = dist_ns;
+        m_setup_overlay->set_dist_ns(dist_ns);
+        if (m_scan_ctrl) m_scan_ctrl->params().dist_ns = dist_ns;
     });
-    connect(m_tcu_ctrl, &TCUController::update_distance_display_requested, pref, &Preferences::update_distance_display);
+    connect(m_tcu_ctrl, &TCUController::update_distance_display_requested, m_setup_overlay, &SetupOverlay::update_distance_display);
 
     // LensController → UI
     connect(m_lens_ctrl, &LensController::button_text_changed, this, [this](int id, QString text) {
@@ -1266,7 +1285,7 @@ UserPanel::UserPanel(QWidget *parent) :
         else if (state == 2) ui->SIMPLE_LASER_CHK->click();
     });
     connect(m_laser_ctrl, &LaserController::laser_enable_requested, this, [this](bool enable) {
-        pref->ui->LASER_ENABLE_CHK->setChecked(enable);
+        m_setup_overlay->w()->LASER_ENABLE_CHK->setChecked(enable);
     });
     connect(m_laser_ctrl, &LaserController::update_current_requested, this, [this]() {
         update_current();
@@ -1465,7 +1484,7 @@ UserPanel::UserPanel(QWidget *parent) :
         ss.aux_panel = m_aux_panel;
         ss.displays = displays;
         ss.secondary_display = secondary_display;
-        ss.scan_config = scan_config;
+        ss.scan_params = &m_scan_ctrl->params();
         ss.save_location = &save_location;
         ss.tp = &tp;
         ss.device_type = &device_type;
@@ -1492,7 +1511,7 @@ UserPanel::UserPanel(QWidget *parent) :
     connect(m_pipeline, &PipelineProcessor::task_queue_full, this, &UserPanel::stop_image_writing, Qt::UniqueConnection);
 #ifdef LVTONG
     connect(m_pipeline, &PipelineProcessor::set_model_list_enabled, this, [this](bool enabled) {
-        pref->ui->MODEL_LIST->setEnabled(enabled);
+        m_setup_overlay->w()->MODEL_LIST->setEnabled(enabled);
     }, Qt::QueuedConnection);
 #endif
 
@@ -1522,8 +1541,8 @@ UserPanel::UserPanel(QWidget *parent) :
 //        }, Qt::QueuedConnection);
 
     // update enumerated device-list
-    connect(this, SIGNAL(update_device_list(int, QStringList)), pref, SLOT(update_device_list(int, QStringList)));
-    connect(this, SIGNAL(device_connection_status_changed(int, QStringList)), pref, SLOT(update_device_list(int, QStringList)));
+    connect(this, SIGNAL(update_device_list(int, QStringList)), m_setup_overlay, SLOT(update_device_list(int, QStringList)));
+    connect(this, SIGNAL(device_connection_status_changed(int, QStringList)), m_setup_overlay, SLOT(update_device_list(int, QStringList)));
 
     // process post-video stuff
     connect(this, &UserPanel::video_stopped, this,
@@ -1557,9 +1576,8 @@ UserPanel::UserPanel(QWidget *parent) :
 //    ptr_ptz->start();
     qDebug() << "main" << QThread::currentThread();
 
-//    connect(pref, &Preferences::set_auto_rep_freq, ptr_tcu, [this](bool arg1){ ptr_tcu->auto_rep_freq = arg1;});
-    connect(pref, &Preferences::set_auto_rep_freq, m_device_mgr->tcu(), [this](bool arg1){ emit send_uint_tcu_msg(TCU::AUTO_PRF, arg1); });
-    connect(pref, &Preferences::set_ab_lock, m_device_mgr->tcu(), [this](bool arg1){ emit send_uint_tcu_msg(TCU::AB_LOCK, arg1); });
+    connect(m_setup_overlay, &SetupOverlay::set_auto_rep_freq, m_device_mgr->tcu(), [this](bool arg1){ emit send_uint_tcu_msg(TCU::AUTO_PRF, arg1); });
+    connect(m_setup_overlay, &SetupOverlay::set_ab_lock,        m_device_mgr->tcu(), [this](bool arg1){ emit send_uint_tcu_msg(TCU::AB_LOCK, arg1); });
 
 #ifdef DISTANCE_3D_VIEW
     view_3d = new Distance3DView(nullptr, this, &list_roi);
@@ -1637,7 +1655,7 @@ void UserPanel::init()
     }
 
     // Set default PTZ type to udp-scw
-    pref->ui->PTZ_TYPE_LIST->setCurrentIndex(2);
+    m_setup_overlay->w()->PTZ_TYPE_LIST->setCurrentIndex(2);
 
     // Initialize YOLO comboboxes from config
     ui->MAIN_MODEL_LIST->setCurrentIndex(config->get_data().yolo.main_display_model);
@@ -1675,13 +1693,13 @@ void UserPanel::init()
     update_delay();
     update_gate_width();
     update_laser_width();
-    pref->ui->AUTO_MCP_CHK->click();
-    pref->ui->UNIT_LIST->setCurrentIndex(2);
-    pref->ui->MAX_DIST_EDT->setText("1800.00");
-    pref->ui->MAX_DOV_EDT->setText("150.00");
-    pref->data_exchange(false);
-    pref->ui->MAX_DIST_EDT->emit editingFinished();
-    pref->ui->MAX_DOV_EDT->emit editingFinished();
+    m_setup_overlay->w()->AUTO_MCP_CHK->click();
+    m_setup_overlay->w()->UNIT_LIST->setCurrentIndex(2);
+    m_setup_overlay->w()->MAX_DIST_EDT->setText("1800.00");
+    m_setup_overlay->w()->MAX_DOV_EDT->setText("150.00");
+    m_setup_overlay->data_exchange(false);
+    m_setup_overlay->w()->MAX_DIST_EDT->emit editingFinished();
+    m_setup_overlay->w()->MAX_DOV_EDT->emit editingFinished();
     ui->TITLE->process_maximize();
 
     ui->FRAME_AVG_CHECK->setText("Filter");
@@ -1704,15 +1722,15 @@ void UserPanel::init()
     ui->PSEUDOCOLOR_CHK->show();
 
 #ifdef LVTONG
-    pref->ui->UNDERWATER_CHK->click();
+    m_setup_overlay->w()->UNDERWATER_CHK->click();
 
     ui->DISTANCE->hide();
     ui->DIST_BTN->hide();
     ui->CURRENT_EDIT->setText("18");
     ui->SIMPLE_LASER_CHK->setEnabled(false);
 
-    pref->ui->SHARE_CHK->click();
-    pref->ui->IMG_FORMAT_LST->setCurrentIndex(1);
+    m_setup_overlay->w()->SHARE_CHK->click();
+    m_setup_overlay->w()->IMG_FORMAT_LST->setCurrentIndex(1);
 
     connect(this, SIGNAL(update_fishnet_result(int)),
             SLOT(display_fishnet_result(int)), Qt::QueuedConnection);
@@ -1726,9 +1744,9 @@ void UserPanel::init()
     m_tcu_ctrl->set_depth_of_view(2.25);
     update_delay();
     update_gate_width();
-    pref->ui->UNIT_LIST->setCurrentIndex(2);
-    pref->ui->AUTO_MCP_CHK->click();
-    pref->data_exchange(false);
+    m_setup_overlay->w()->UNIT_LIST->setCurrentIndex(2);
+    m_setup_overlay->w()->AUTO_MCP_CHK->click();
+    m_setup_overlay->data_exchange(false);
 #else //LVTONG
     ui->FIRE_LASER_BTN->hide();
     ui->FISHNET_RESULT->hide();
@@ -1739,9 +1757,9 @@ void UserPanel::init()
 //    ui->PLUGIN_DISPLAY_1->hide();
 
 #ifdef USING_CAMERALINK
-    pref->ui->CAMERALINK_CHK->click();
+    m_setup_overlay->w()->CAMERALINK_CHK->click();
 #else //USING_CAMERALINK
-    pref->ui->CAMERALINK_CHK->hide();
+    m_setup_overlay->w()->CAMERALINK_CHK->hide();
 #endif //USING_CAMERALINK
     ui->SENSOR_TAPS_BTN->hide();
 
@@ -1912,7 +1930,7 @@ void UserPanel::set_theme()
     ui->DOWN_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down"));
     ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down_right"));
     ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
-    pref->ui->REFRESH_AVAILABLE_PORTS_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
+    m_setup_overlay->w()->REFRESH_AVAILABLE_PORTS_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
     ui->SWITCH_TCU_UI_BTN->setIcon(QIcon(":/tools/" + QString(app_theme ? "light" : "dark") + "/switch"));
 
 //    for (int i = 0 ; i < 5; i++) if (serial_port_connected[i]) com_label[i]->setStyleSheet(app_theme ? "color: #180D1C;" : "color: #B0C4DE;");
@@ -1957,9 +1975,7 @@ void UserPanel::switch_language()
     lang ? QApplication::installTranslator(&trans) : QApplication::removeTranslator(&trans);
 //    lang ? QApplication::setFont(consolas) : QApplication::setFont(monaco);
     ui->retranslateUi(this);
-//    ui->TITLE->prog_settings->switch_language(en, &trans);
-    pref->ui->retranslateUi(pref);
-//    pref->switch_language(en, &trans);
+    m_setup_overlay->switch_language(lang == 0, &trans);
 //    int idx = ui->ENHANCE_OPTIONS->currentIndex();
 //    ui->ENHANCE_OPTIONS->clear();
 //    ui->ENHANCE_OPTIONS->addItem(tr("None"));
@@ -1994,10 +2010,7 @@ void UserPanel::closeEvent(QCloseEvent *event)
 {
     shut_down();
     event->accept();
-//    ui->TITLE->prog_settings->reject();
-    pref->reject();
     laser_settings->reject();
-    scan_config->reject();
     for (FloatingWindow* &w: fw_display) w->close();
     secondary_display->close();
     if (QFile::exists("HQVSDK.xml")) QFile::remove("HQVSDK.xml");
@@ -2092,7 +2105,7 @@ void UserPanel::on_ENUM_BUTTON_clicked()
     if (curr_cam) delete curr_cam;
 #ifdef WIN32
 #ifdef USING_CAMERALINK
-    if (pref->cameralink)    curr_cam = new EuresysCam;
+    if (m_setup_overlay->cameralink())    curr_cam = new EuresysCam;
     else if (config->get_data().device.ebus) curr_cam = new EbusCam;
     else                     curr_cam = new MvCam;
 #else
@@ -2103,7 +2116,7 @@ void UserPanel::on_ENUM_BUTTON_clicked()
     curr_cam = new MvCam;
 #endif
 //    if (ui->TITLE->prog_settings->cameralink) curr_cam->cameralink = true;
-    enable_controls(device_type = (curr_cam->search_for_devices() ?  (pref->cameralink ? 3 : (config->get_data().device.ebus ? 2 : 1)) : 0));
+    enable_controls(device_type = (curr_cam->search_for_devices() ?  (m_setup_overlay->cameralink() ? 3 : (config->get_data().device.ebus ? 2 : 1)) : 0));
     update_dev_ip();
     emit update_device_list(1, curr_cam->get_device_list());
 }
@@ -2153,7 +2166,7 @@ void UserPanel::on_START_BUTTON_clicked()
 #endif
 
 //    ui->TITLE->prog_settings->set_pixel_format(0);
-    pref->set_pixel_format(0);
+    m_setup_overlay->set_pixel_format(0);
     emit device_connection_status_changed(0, QStringList());
 }
 
@@ -2328,7 +2341,7 @@ void UserPanel::on_SAVE_BMP_BUTTON_clicked()
     else{
         save_original[0] = !save_original[0];
         ui->SAVE_BMP_BUTTON->setText(save_original[0] ? tr("STOP") : tr("ORI"));
-        pref->ui->CONSECUTIVE_CAPTURE_CHK->setEnabled(!save_original[0]);
+        m_setup_overlay->w()->CONSECUTIVE_CAPTURE_CHK->setEnabled(!save_original[0]);
     }
 }
 
@@ -2443,12 +2456,12 @@ void UserPanel::clean()
 void UserPanel::update_dev_ip()
 {
 //    ui->TITLE->prog_settings->enable_ip_editing(device_type == 1);
-    pref->enable_ip_editing(device_type > 0 && config->get_data().tcu.type < curr_cam->gige_device_num());
+    m_setup_overlay->enable_ip_editing(device_type > 0 && config->get_data().tcu.type < curr_cam->gige_device_num());
     if (device_type > 0) {
         int ip, gateway, nic_address;
         curr_cam->ip_address(true, config->get_data().tcu.type, &ip, &gateway, &nic_address);
 //        ui->TITLE->prog_settings->config_ip(true, ip, gateway);
-        pref->config_ip(true, ip, gateway, nic_address);
+        m_setup_overlay->config_ip(true, ip, gateway, nic_address);
     }
 }
 
@@ -2486,10 +2499,10 @@ void UserPanel::update_lower_3d_thresh()
 
 void UserPanel::reset_custom_3d_params()
 {
-//    pref->ui->CUSTOM_3D_DELAY_EDT->setText(QString::number((int)std::round(ptr_tcu->delay_a)));
-//    pref->ui->CUSTOM_3D_GW_EDT->setText(QString::number((int)std::round(ptr_tcu->gate_width_a)));
-    pref->ui->CUSTOM_3D_DELAY_EDT->setText(QString::number((int)std::round(m_device_mgr->tcu()->get(TCU::DELAY_A))));
-    pref->ui->CUSTOM_3D_GW_EDT->setText(QString::number((int)std::round(m_device_mgr->tcu()->get(TCU::GATE_WIDTH_A))));
+//    m_setup_overlay->w()->CUSTOM_3D_DELAY_EDT->setText(QString::number((int)std::round(ptr_tcu->delay_a)));
+//    m_setup_overlay->w()->CUSTOM_3D_GW_EDT->setText(QString::number((int)std::round(ptr_tcu->gate_width_a)));
+    m_setup_overlay->w()->CUSTOM_3D_DELAY_EDT->setText(QString::number((int)std::round(m_device_mgr->tcu()->get(TCU::DELAY_A))));
+    m_setup_overlay->w()->CUSTOM_3D_GW_EDT->setText(QString::number((int)std::round(m_device_mgr->tcu()->get(TCU::GATE_WIDTH_A))));
 }
 
 struct frame_process_parameters {
@@ -2879,7 +2892,7 @@ void UserPanel::load_config(QString config_name)
     syncConfigToPreferences();
 
     // Update UI elements
-    pref->data_exchange(false);
+    m_setup_overlay->data_exchange(false);
     update_delay();
     update_gate_width();
     update_laser_width();
@@ -2906,8 +2919,8 @@ void UserPanel::update_processing_params()
     m_processing_params.dual_display         = ui->DUAL_DISPLAY_CHK->isChecked();
     m_processing_params.mcp_slider_focused   = ui->MCP_SLIDER->hasFocus();
     m_processing_params.hist_display_size    = ui->HIST_DISPLAY->size();
-    m_processing_params.split                = pref->split;
-    m_processing_params.custom_info_text     = pref->ui->CUSTOM_INFO_EDT->text();
+    m_processing_params.split                = m_setup_overlay->split();
+    m_processing_params.custom_info_text     = m_setup_overlay->w()->CUSTOM_INFO_EDT->text();
     m_processing_params.image_rotate         = image_rotate[0];
     m_processing_params.pseudocolor          = pseudocolor[0];
     m_processing_params.image_3d             = image_3d[0];
@@ -2985,8 +2998,8 @@ void UserPanel::syncPreferencesToConfig()
 #endif
 
     // Sync network settings
-    if (pref->ui->TCP_SERVER_IP_EDIT) {
-        data.network.tcp_server_address = pref->ui->TCP_SERVER_IP_EDIT->text();
+    if (m_setup_overlay->w()->TCP_SERVER_IP_EDIT) {
+        data.network.tcp_server_address = m_setup_overlay->w()->TCP_SERVER_IP_EDIT->text();
     }
 
     // Sync UI settings
@@ -3001,7 +3014,7 @@ void UserPanel::syncPreferencesToConfig()
     data.camera.gain = gain_analog_edit;
 
     // Read pending Preferences UI changes (text fields) into Config
-    pref->data_exchange(true);
+    m_setup_overlay->data_exchange(true);
 }
 
 void UserPanel::syncConfigToPreferences()
@@ -3024,8 +3037,8 @@ void UserPanel::syncConfigToPreferences()
 #endif
 
     // Sync network settings
-    if (pref->ui->TCP_SERVER_IP_EDIT) {
-        pref->ui->TCP_SERVER_IP_EDIT->setText(data.network.tcp_server_address);
+    if (m_setup_overlay->w()->TCP_SERVER_IP_EDIT) {
+        m_setup_overlay->w()->TCP_SERVER_IP_EDIT->setText(data.network.tcp_server_address);
     }
     m_device_mgr->udpptz()->set_target(QHostAddress(data.network.udp_target_ip), data.network.udp_target_port);
     m_device_mgr->udpptz()->set_listen(QHostAddress(data.network.udp_listen_ip), data.network.udp_listen_port);
@@ -3044,9 +3057,9 @@ void UserPanel::syncConfigToPreferences()
     time_exposure_edit = data.camera.time_exposure;
     gain_analog_edit = data.camera.gain;
 
-    // TCU, device, save, and image_proc widgets are now populated by pref->data_exchange(false)
+    // TCU, device, save, and image_proc widgets are now populated by m_setup_overlay->data_exchange(false)
     data_exchange(false);
-    pref->data_exchange(false);
+    m_setup_overlay->data_exchange(false);
 }
 
 void UserPanel::generate_preset_data(int idx)
@@ -3321,11 +3334,13 @@ void UserPanel::convert_write(QDataStream &out, const int TYPE)
     case SCAN:
     {
         out << "SCAN" << uchar('.');
-//        out << ps->start_pos << ps->end_pos << ps->frame_count << ps->step_size << ps->rep_freq << (int)(ps->save_scan_ori) << (int)(ps->save_scan_res);
-        out << scan_config->starting_delay << scan_config->ending_delay << scan_config->starting_gw << scan_config->ending_gw
-            << scan_config->frame_count << scan_config->step_size_delay << scan_config->step_size_gw << scan_config->rep_freq
-            << (int)(scan_config->capture_scan_ori) << (int)(scan_config->capture_scan_res)
-            << (int)(scan_config->record_scan_ori) << (int)(scan_config->record_scan_res);
+        // Read from ScanController::params() — the single source of truth.
+        // Widget edits propagate into m_params via ScanOverlay's slots.
+        const ScanParams& sp = m_scan_ctrl ? m_scan_ctrl->params() : ScanParams{};
+        out << sp.starting_delay << sp.ending_delay << sp.starting_gw << sp.ending_gw
+            << sp.frame_count << sp.step_size_delay << sp.step_size_gw << sp.rep_freq
+            << (int)(sp.capture_scan_ori) << (int)(sp.capture_scan_res)
+            << (int)(sp.record_scan_ori) << (int)(sp.record_scan_res);
     }
     case IMG:
     {
@@ -3376,21 +3391,17 @@ bool UserPanel::convert_read(QDataStream &out, const int TYPE)
         out >> temp_str; if (std::strcmp(temp_str, "SCAN")) return false;
         out >> temp_uchar; if (temp_uchar != 0x2E /* '.' */) return false;
         int temp_bool;
-//        out >> ps->start_pos >> ps->end_pos >> ps->frame_count >> ps->step_size >> ps->rep_freq >> temp_bool;
-//        ps->save_scan_ori = temp_bool;
-//        out >> temp_bool;
-//        ps->save_scan_res = temp_bool;
-        out >> scan_config->starting_delay >> scan_config->ending_delay >> scan_config->starting_gw >> scan_config->ending_gw
-            >> scan_config->frame_count >> scan_config->step_size_delay >> scan_config->step_size_gw >> scan_config->rep_freq;
-        out >> temp_bool;
-        scan_config->capture_scan_ori = temp_bool;
-        out >> temp_bool;
-        scan_config->capture_scan_res = temp_bool;
-        out >> temp_bool;
-        scan_config->record_scan_ori = temp_bool;
-        out >> temp_bool;
-        scan_config->record_scan_res = temp_bool;
-        scan_config->data_exchange(false);
+        // Deserialize into ScanController::params() (canonical store);
+        // ScanOverlay::loadFromParams() below pushes the values to widgets.
+        ScanParams& sp = m_scan_ctrl->params();
+        out >> sp.starting_delay >> sp.ending_delay >> sp.starting_gw >> sp.ending_gw
+            >> sp.frame_count >> sp.step_size_delay >> sp.step_size_gw >> sp.rep_freq;
+        out >> temp_bool; sp.capture_scan_ori = temp_bool;
+        out >> temp_bool; sp.capture_scan_res = temp_bool;
+        out >> temp_bool; sp.record_scan_ori  = temp_bool;
+        out >> temp_bool; sp.record_scan_res  = temp_bool;
+        // Push the freshly-deserialized params into the SCAN overlay widgets.
+        if (m_scan_overlay) m_scan_overlay->loadFromParams();
     }
     case IMG:
     {
@@ -3480,7 +3491,7 @@ void UserPanel::on_IMG_3D_CHECK_stateChanged(int arg1)
 
     if (simple_ui) {
         emit send_double_tcu_msg(TCU::DELAY_N, arg1 ? m_tcu_ctrl->get_depth_of_view() / m_tcu_ctrl->get_dist_ns() : 0);
-        if (pref->ui->AUTO_MCP_CHK->isChecked()) pref->ui->AUTO_MCP_CHK->click();
+        if (m_setup_overlay->w()->AUTO_MCP_CHK->isChecked()) m_setup_overlay->w()->AUTO_MCP_CHK->click();
     }
 }
 
@@ -3789,10 +3800,7 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
 //            goto_laser_preset(1 << (event->key() - Qt::Key_1));
             break;
         case Qt::Key_S:
-//            ui->TITLE->prog_settings->show();
-//            ui->TITLE->prog_settings->raise();
-            pref->show();
-            pref->raise();
+            // SETUP overlay shown via TopBar mode switch
             break;
         case Qt::Key_Q:
 //            std::accumulate(use_tcp, use_tcp + 5, 0) ? m_device_mgr->disconnect_from_serial_server_tcp() : m_device_mgr->connect_to_serial_server_tcp();
@@ -3805,7 +3813,7 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             (m_device_mgr->lens()->get_port_status() & ControlPort::TCP_CONNECTED) ||
             (m_device_mgr->laser()->get_port_status() & ControlPort::TCP_CONNECTED) ||
             (m_device_mgr->ptz()->get_port_status() & ControlPort::TCP_CONNECTED) ?
-                m_device_mgr->disconnect_from_serial_server_tcp() : m_device_mgr->connect_to_serial_server_tcp(pref->ui->TCP_SERVER_IP_EDIT->text());
+                m_device_mgr->disconnect_from_serial_server_tcp() : m_device_mgr->connect_to_serial_server_tcp(m_setup_overlay->w()->TCP_SERVER_IP_EDIT->text());
             break;
         case Qt::Key_L:
             laser_settings->show();
@@ -4655,7 +4663,7 @@ void UserPanel::on_SAVE_RESULT_BUTTON_clicked()
     else{
         save_modified[0] = !save_modified[0];
         ui->SAVE_RESULT_BUTTON->setText(save_modified[0] ? tr("STOP") : tr("RES"));
-        pref->ui->CONSECUTIVE_CAPTURE_CHK->setEnabled(!save_modified[0]);
+        m_setup_overlay->w()->CONSECUTIVE_CAPTURE_CHK->setEnabled(!save_modified[0]);
     }
 }
 

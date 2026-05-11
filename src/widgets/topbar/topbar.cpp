@@ -1,8 +1,5 @@
 #include "topbar.h"
 
-#include "visual/preferences.h"
-#include "visual/scanconfig.h"
-
 // ----- TopButton -----
 
 TopButton::TopButton(QString icon, QWidget *parent)
@@ -21,7 +18,6 @@ TopBar::TopBar(QWidget *parent)
       url(nullptr), settings(nullptr), capture(nullptr),
       cls(nullptr), lang(nullptr), theme(nullptr),
       min(nullptr), max(nullptr), exit(nullptr),
-      preferences(nullptr), scan_config(nullptr),
       is_maximized(false),
       m_left_slot(nullptr), m_center_slot(nullptr), m_right_slot(nullptr),
       m_mode_group(nullptr), m_system_selector(nullptr),
@@ -153,9 +149,6 @@ void TopBar::setup(QObject *ptr)
 {
     m_signal_receiver = ptr;
 
-    preferences = new Preferences();
-    scan_config = new ScanConfig();
-
     auto *rl = qobject_cast<QHBoxLayout*>(m_right_slot->layout());
 
     // build the action cluster (URL / SETTINGS / CAP / CLS / LANG / THEME) and insert before min/max/exit
@@ -184,37 +177,6 @@ void TopBar::setup(QObject *ptr)
     // settings menu — port from TitleBar::setup verbatim
     QMenu *settings_menu = new QMenu(settings);
     settings_menu->setFont(monaco);
-
-    QAction *pref = new QAction("-- preferences", this);
-    settings_menu->addAction(pref);
-    pref->setShortcut(QKeySequence(Qt::ALT + Qt::Key_S));
-    connect(pref, SIGNAL(triggered()), preferences, SLOT(show()));
-    connect(pref, SIGNAL(triggered()), preferences, SLOT(raise()));
-
-    connect(preferences, SIGNAL(search_for_devices()),               m_signal_receiver, SLOT(search_for_devices()));
-    connect(preferences, SIGNAL(query_dev_ip()),                     m_signal_receiver, SLOT(update_dev_ip()));
-    connect(preferences, SIGNAL(set_dev_ip(int, int)),               m_signal_receiver, SLOT(set_dev_ip(int, int)));
-    connect(preferences, SIGNAL(change_pixel_format(int)),           m_signal_receiver, SLOT(change_pixel_format(int)));
-    connect(preferences, SIGNAL(rotate_image(int)),                  m_signal_receiver, SLOT(rotate(int)));
-    connect(preferences, SIGNAL(device_underwater(bool)),            m_signal_receiver, SLOT(update_light_speed(bool)));
-    connect(preferences, SIGNAL(get_port_info(int)),                 m_signal_receiver, SLOT(display_port_info(int)));
-    connect(preferences, SIGNAL(change_baudrate(int, int)),          m_signal_receiver, SLOT(set_baudrate(int, int)));
-    connect(preferences, SIGNAL(set_tcp_status(int, bool)),          m_signal_receiver, SLOT(set_tcp_status_on_port(int, bool)));
-    connect(preferences, SIGNAL(share_tcu_port(bool)),               m_signal_receiver, SLOT(set_tcu_as_shared_port(bool)));
-    connect(preferences, SIGNAL(com_write(int, QByteArray)),         m_signal_receiver, SLOT(com_write_data(int, QByteArray)));
-    connect(preferences, SIGNAL(tcu_type_changed(int)),              m_signal_receiver, SLOT(set_tcu_type(int)));
-    connect(preferences, SIGNAL(set_auto_mcp(bool)),                 m_signal_receiver, SLOT(set_auto_mcp(bool)));
-    connect(preferences, SIGNAL(rep_freq_unit_changed(int)),         m_signal_receiver, SLOT(setup_hz(int)));
-    connect(preferences, SIGNAL(base_unit_changed(int)),             m_signal_receiver, SLOT(setup_stepping(int)));
-    connect(preferences, SIGNAL(max_dist_changed(float)),            m_signal_receiver, SLOT(setup_max_dist(float)));
-    connect(preferences, SIGNAL(max_dov_changed(float)),             m_signal_receiver, SLOT(setup_max_dov(float)));
-    connect(preferences, SIGNAL(delay_offset_changed(float)),        m_signal_receiver, SLOT(update_delay_offset(float)));
-    connect(preferences, SIGNAL(gate_width_offset_changed(float)),   m_signal_receiver, SLOT(update_gate_width_offset(float)));
-    connect(preferences, SIGNAL(laser_offset_changed(float)),        m_signal_receiver, SLOT(update_laser_offset(float)));
-    connect(preferences, SIGNAL(ps_config_updated(bool, int, uint)), m_signal_receiver, SLOT(update_ps_config(bool, int, uint)));
-    connect(preferences, SIGNAL(laser_toggled(int)),                 m_signal_receiver, SLOT(setup_laser(int)));
-    connect(preferences, SIGNAL(lower_3d_thresh_updated()),          m_signal_receiver, SLOT(update_lower_3d_thresh()));
-    connect(preferences, SIGNAL(query_tcu_param()),                  m_signal_receiver, SLOT(reset_custom_3d_params()));
 
     QMenu *pref_export = settings_menu->addMenu(">> export pref.");
     pref_export->addAction("to file",   m_signal_receiver, SLOT(save_config_to_file()));

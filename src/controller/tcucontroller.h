@@ -8,7 +8,6 @@
 #include "util/config.h"
 
 class DeviceManager;
-class ScanConfig;
 class Aliasing;
 
 class TCUController : public QObject
@@ -18,7 +17,7 @@ class TCUController : public QObject
 public:
     explicit TCUController(Config *config, DeviceManager *device_mgr, QObject *parent = nullptr);
 
-    void init(ScanConfig *scan_config, Aliasing *aliasing);
+    void init(Aliasing *aliasing);
 
     // Getters for state accessed by other components
     float get_stepping() const      { return stepping; }
@@ -99,7 +98,7 @@ signals:
     void send_uint_tcu_msg(qint32 tcu_param, uint val);
     void send_laser_msg(QString msg);
 
-    // For UserPanel to forward to scan_config / preferences
+    // UserPanel forwards to ScanController::params().dist_ns + Preferences::dist_ns
     void dist_ns_changed(float dist_ns);
     void update_distance_display_requested();
 
@@ -139,7 +138,6 @@ private:
 
     Config*         m_config;
     DeviceManager*  m_device_mgr;
-    ScanConfig*     m_scan_config;
     Aliasing*       m_aliasing;
 
     float           stepping;
