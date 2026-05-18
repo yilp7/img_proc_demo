@@ -363,6 +363,39 @@ void DeviceManager::set_ptz_speed(int speed)
     emit ptz_speed_display_changed(ptz_speed, QString::number(ptz_speed));
 }
 
+void DeviceManager::ptz_move_hv(int id, int h_speed, int v_speed)
+{
+    if (h_speed < 0) h_speed = 0;
+    if (v_speed < 0) v_speed = 0;
+    if (h_speed > 64) h_speed = 64;
+    if (v_speed > 64) v_speed = 64;
+    const int ptz_type = m_config->get_data().device.ptz_type;
+    if (ptz_type == 0) {
+        // Pelco-D: two independent speed bytes. SPEED_H / SPEED_V update
+        // pan_speed / tilt_speed in the PTZ port; the direction packet
+        // then embeds them as command[4] (pan) and command[5] (tilt).
+        emit send_ptz_msg(PTZ::SPEED_H, h_speed);
+        emit send_ptz_msg(PTZ::SPEED_V, v_speed);
+        emit send_ptz_msg(id + 1);
+    } else if (active_ptz) {
+        // UDPPTZ overrides ptz_move_2d to use its native h_vel/v_vel.
+        // USBCAN falls back to the IPTZController default (single-speed
+        // max(h, v)) until/unless its protocol gains a 2D variant.
+        // Deliberately do NOT update DeviceManager::ptz_speed here —
+        // that field is the user's slider value and is read back by
+        // ptz_button_pressed for Classic-panel direction buttons. The
+        // joystick path uses its own independent speeds and shouldn't
+        // overwrite the slider.
+        active_ptz->ptz_move_2d(id, h_speed, v_speed);
+    }
+    // Deliberately do NOT emit ptz_speed_display_changed here. That would
+    // drive the PTZ_SPEED_SLIDER, whose valueChanged is wired back to
+    // set_ptz_speed → PTZ::SPEED, which clobbers pan_speed/tilt_speed
+    // with a single scalar and ruins the per-axis independence on the
+    // next direction command. The slider stays at whatever the user set
+    // it to manually (its role here is a "max speed" override).
+}
+
 void DeviceManager::set_ptz_angle()
 {
     if (m_config->get_data().device.ptz_type == 0) {

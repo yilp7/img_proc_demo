@@ -3,12 +3,14 @@
 
 #include "util/config.h"
 #include "util/util.h"
+#include "widgets/flowlayout.h"
 
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
 #include <QEvent>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -129,7 +131,45 @@ void SetupOverlay::setup_form()
     move_card(m_row_layout[0], m_ui->SERIAL_PORTS_GRP, m_row[0]);
     move_card(m_row_layout[0], m_ui->TCU_GRP,          m_row[0]);
     move_card(m_row_layout[1], m_ui->DEVICES_GRP,      m_row[1]);
-    move_card(m_row_layout[2], m_ui->IMG_PROC_GRP,     m_row[2]);
+
+    // Row 3 — Image Processing as a single full-width card whose body is a
+    // FlowLayout. The 6 sub-groups (ACCUMULATIVE / ADAPTIVE / DCP / IMAGE_3D /
+    // FISHNET / ECC) re-parent out of the legacy IMG_PROC_GRP into the flow,
+    // tiling left-to-right and wrapping when total width exceeds the card.
+    // IMG_PROC_GRP itself stays under m_form_root as an empty husk.
+    auto *img_proc_card = new QGroupBox(tr("Image Processing"), m_row[2]);
+    img_proc_card->setObjectName("IMG_PROC_FLOW");
+    auto *flow = new FlowLayout(img_proc_card, 8, 8, 8);
+    auto move_into_flow = [&img_proc_card, flow](QWidget *w) {
+        if (!w) return;
+        // Capture original .ui geometry BEFORE re-parent; the sub-groups
+        // have no layouts (absolute-positioned children) so without an
+        // explicit minimumSize the FlowLayout would collapse them to ~30px.
+        const QSize orig_size = w->size();
+        w->setParent(img_proc_card);
+        w->setGeometry(0, 0, orig_size.width(), orig_size.height());
+        if (!w->layout()) w->setMinimumSize(orig_size);
+        flow->addWidget(w);
+        w->show();
+    };
+    move_into_flow(m_ui->ACCUMULATIVE_GRP);
+    move_into_flow(m_ui->ADAPTIVE_GRP);
+    move_into_flow(m_ui->DCP_GRP);
+    move_into_flow(m_ui->IMAGE_3D_GRP);
+    move_into_flow(m_ui->FISHNET);
+    move_into_flow(m_ui->ECC_GRP);
+    QSizePolicy sp = img_proc_card->sizePolicy();
+    sp.setHorizontalPolicy(QSizePolicy::Expanding);
+    sp.setVerticalPolicy(QSizePolicy::MinimumExpanding);
+    sp.setHeightForWidth(true);
+    img_proc_card->setSizePolicy(sp);
+    // Backstop minimum height: tallest sub-group (ECC=205) + groupbox title +
+    // margins. Guarantees the card shows full content even when the parent
+    // QVBoxLayout doesn't propagate heightForWidth. If sub-groups wrap to
+    // multiple rows on narrow displays, heightForWidth bumps this up further.
+    img_proc_card->setMinimumHeight(240);
+    img_proc_card->show();
+    m_row_layout[2]->addWidget(img_proc_card, 1);  // stretch factor: span full width
 }
 
 void SetupOverlay::bind()

@@ -161,7 +161,7 @@ bool PipelineProcessor::acquire_frame(int thread_idx, cv::Mat& prev_img, bool& u
         if (packets_lost_frame) emit packet_lost_updated(packets_lost);
         updated = true;
         if (*m_s.device_type == -1) m_s.q_img[thread_idx].push(m_s.img_mem[thread_idx].clone());
-        m_s.q_fps_calc->add_to_q();
+        m_s.q_fps_calc[thread_idx]->add_to_q();
     }
     return true;
 }
@@ -628,8 +628,14 @@ void PipelineProcessor::render_and_display(int thread_idx, int display_idx,
         emit set_hist_pixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(params.hist_display_size, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     }
 
-    // crop the region to display
-    cv::Rect region = cv::Rect(params.display_region.tl() * ww / params.display_width, params.display_region.br() * ww / params.display_width);
+    // Map widget-space display_region to source-space using per-axis ratios.
+    // Legacy code used ww/display_width for both axes — that crops one
+    // dimension when widget aspect ≠ source aspect (causes the "stretch /
+    // top-left only" fullscreen artifact when source 5:3 → display 16:9).
+    cv::Rect region(cv::Point(params.display_region.tl().x * ww / params.display_width,
+                              params.display_region.tl().y * hh / params.display_height),
+                    cv::Point(params.display_region.br().x * ww / params.display_width,
+                              params.display_region.br().y * hh / params.display_height));
     if (region.height + region.y > m_s.modified_result[thread_idx].rows) region.height = m_s.modified_result[thread_idx].rows - region.y;
     if (region.width + region.x > m_s.modified_result[thread_idx].cols) region.width = m_s.modified_result[thread_idx].cols - region.x;
     m_s.modified_result[thread_idx] = m_s.modified_result[thread_idx](region);
@@ -637,7 +643,8 @@ void PipelineProcessor::render_and_display(int thread_idx, int display_idx,
 
     // put info (dist, dov, time) as text on image
     if (params.show_info) {
-        cv::putText(m_s.modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+        // Distance is rendered by the standalone DISTANCE QLabel (top-right
+        // of source-display widget) — don't burn it into the live image too.
         cv::putText(m_s.modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
 #ifdef LVTONG
         int baseline = 0;
@@ -647,9 +654,24 @@ void PipelineProcessor::render_and_display(int thread_idx, int display_idx,
 #endif
     }
 
-    // resize to display size
+    // Letterbox/pillarbox to display size while preserving source aspect.
+    // Plain cv::resize to display dims stretches when widget aspect ≠ source
+    // aspect (e.g. 5:3 source on 16:9 fullscreen). The black bars fill the
+    // unused area; info_mask + overlays below stay at display dims.
     cv::Mat img_display;
-    cv::resize(m_s.modified_result[thread_idx], img_display, cv::Size(params.display_width, params.display_height), 0, 0, cv::INTER_AREA);
+    {
+        const int src_w = m_s.modified_result[thread_idx].cols;
+        const int src_h = m_s.modified_result[thread_idx].rows;
+        const int disp_w = params.display_width;
+        const int disp_h = params.display_height;
+        const double r = std::min((double)disp_w / src_w, (double)disp_h / src_h);
+        const int fit_w = (int)std::round(src_w * r);
+        const int fit_h = (int)std::round(src_h * r);
+        const int chans = m_s.modified_result[thread_idx].channels();
+        img_display = cv::Mat::zeros(disp_h, disp_w, CV_MAKETYPE(CV_8U, chans));
+        cv::Mat fit_roi = img_display(cv::Rect((disp_w - fit_w) / 2, (disp_h - fit_h) / 2, fit_w, fit_h));
+        cv::resize(m_s.modified_result[thread_idx], fit_roi, cv::Size(fit_w, fit_h), 0, 0, cv::INTER_AREA);
+    }
     bool use_mask = m_s.modified_result[thread_idx].channels() == 1;
     cv::Mat info_mask(cv::Size(params.display_width, params.display_height), CV_8U, cv::Scalar(0)), thresh_result;
     if (use_mask) cv::threshold(img_display, thresh_result, 128, 255, cv::THRESH_BINARY);
@@ -769,7 +791,7 @@ void PipelineProcessor::record_frame(int thread_idx, int display_idx, bool updat
         cv::Mat temp = m_s.modified_result[thread_idx].clone();
         if (!params.image_3d && !params.show_info) {
             if (pcfg.save_info) {
-                cv::putText(m_s.modified_result[thread_idx], info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
+                // Distance rendered by the DISTANCE QLabel — skip the burn-in.
                 cv::putText(m_s.modified_result[thread_idx], info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
 #ifdef LVTONG
                 int baseline = 0;

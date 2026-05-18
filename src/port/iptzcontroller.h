@@ -24,6 +24,13 @@ public:
     };
 
     virtual void ptz_move(int direction, int speed) = 0;
+    // Joystick path: independent pan/tilt speeds. Backends that natively
+    // support two-axis speeds (UDPPTZ, Pelco-D) should override. The
+    // default falls back to single-speed move using the larger axis so
+    // older backends keep working.
+    virtual void ptz_move_2d(int direction, int h_speed, int v_speed) {
+        ptz_move(direction, (h_speed > v_speed) ? h_speed : v_speed);
+    }
     virtual void ptz_stop() = 0;
     virtual void ptz_set_angle(float h, float v) = 0;
     virtual void ptz_set_angle_h(float h) = 0;

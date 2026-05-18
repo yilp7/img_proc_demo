@@ -163,6 +163,19 @@ void Display::wheelEvent(QWheelEvent *event)
     //    selection_v2 *= scale[curr_scale];
 }
 
+void Display::resizeEvent(QResizeEvent *event)
+{
+    QLabel::resizeEvent(event);
+    // Keep display_region in sync with widget size so the pipeline's crop
+    // at pipelineprocessor.cpp:632 maps to the full source. Otherwise after
+    // a resize (e.g. fullscreen toggle) the pipeline crops to the stale
+    // pre-resize region and stretches that small area to fill the widget.
+    QPoint roi_center = lefttop + QPoint((int)(scale[curr_scale] * width() / 2),
+                                         (int)(scale[curr_scale] * height() / 2));
+    update_roi(roi_center);
+    emit widget_resized();
+}
+
 void Display::mouseDoubleClickEvent(QMouseEvent *event)
 {
     QLabel::mouseDoubleClickEvent(event);

@@ -164,6 +164,8 @@ set(SOURCE_FILES
     src/widgets/dotindicator.cpp
     src/widgets/unlockbar.h
     src/widgets/unlockbar.cpp
+    src/widgets/flowlayout.h
+    src/widgets/flowlayout.cpp
     src/widgets/topbar/topbar.h
     src/widgets/topbar/topbar.cpp
     src/widgets/panels/opticspanel.h
@@ -509,6 +511,11 @@ if(BUILD_TESTS)
     target_include_directories(test_imageproc PRIVATE src)
     target_link_libraries(test_imageproc Qt${QT_VERSION_MAJOR}::Test ImgProc)
     add_test(NAME imageproc COMMAND test_imageproc)
+
+    add_executable(test_scanparams tests/test_scanparams.cpp src/pipeline/scanparams.h src/pipeline/scanparams.cpp)
+    target_include_directories(test_scanparams PRIVATE src)
+    target_link_libraries(test_scanparams Qt${QT_VERSION_MAJOR}::Test)
+    add_test(NAME scanparams COMMAND test_scanparams)
 
     add_executable(test_imageio tests/test_imageio.cpp src/image/imageio.h src/image/imageio.cpp)
     target_include_directories(test_imageio PRIVATE src)

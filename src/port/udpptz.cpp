@@ -204,6 +204,30 @@ void UDPPTZ::ptz_move(int direction, int speed)
     emit transmit(MANUAL_SEARCH);
 }
 
+void UDPPTZ::ptz_move_2d(int direction, int h_speed, int v_speed)
+{
+    // Independent per-axis magnitudes from the joystick projection. The
+    // direction enum only contributes signs; magnitudes come from h_speed
+    // and v_speed independently instead of being collapsed to a single
+    // velocity. Same units as ptz_move (vel = speed / 2.0f).
+    const float h_mag = h_speed / 2.0f;
+    const float v_mag = v_speed / 2.0f;
+    float h_vel = 0, v_vel = 0;
+    switch (direction) {
+    case DIR_UP_LEFT:    h_vel = -h_mag; v_vel =  v_mag; break;
+    case DIR_UP:                          v_vel =  v_mag; break;
+    case DIR_UP_RIGHT:   h_vel =  h_mag; v_vel =  v_mag; break;
+    case DIR_LEFT:       h_vel = -h_mag;                  break;
+    case DIR_RIGHT:      h_vel =  h_mag;                  break;
+    case DIR_DOWN_LEFT:  h_vel = -h_mag; v_vel = -v_mag; break;
+    case DIR_DOWN:                        v_vel = -v_mag; break;
+    case DIR_DOWN_RIGHT: h_vel =  h_mag; v_vel = -v_mag; break;
+    default: return;
+    }
+    set_velocities(h_vel, v_vel);
+    emit transmit(MANUAL_SEARCH);
+}
+
 void UDPPTZ::ptz_stop()
 {
     set_velocities(0, 0);

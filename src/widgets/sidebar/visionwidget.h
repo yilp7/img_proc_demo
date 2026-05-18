@@ -6,15 +6,22 @@
 class QCheckBox;
 class QLabel;
 
-// Right-stack vision widget. 3 channel rows (MAIN / ALT1 / ALT2). Each row
-// has an enable checkbox and a placeholder slot for future detection
-// configuration (threshold slider etc.). ALT rows auto-hide when their
-// enable checkbox is off — until wired up to camera-active state in a
-// later sprint, the toggle is the only visibility driver.
+// UNDER CONSTRUCTION — currently not shown in the right stack.
 //
-// Detection model selection still lives in the Console panel's YOLO tab
-// (re-parented in 16.7). This widget is the *control surface*, not the model
-// picker.
+// As of Sprint 23 the right stack only shows IMG PROC + Save Options.
+// Detection RESULTS are drawn as overlays on the displays themselves
+// (draw_yolo_boxes at pipelineprocessor.cpp:606), and Side Display already
+// mirrors MAIN, so a plain thumbnail/result panel here would be redundant.
+//
+// Kept around for a future role — candidates:
+//   - per-channel inference enable toggle (skip YOLO on a display to save GPU)
+//   - per-channel confidence-threshold override
+//   - class filter (which detected classes get drawn / counted)
+//   - detection statistics tally
+//
+// Current shape: 3 channel rows (MAIN / ALT1 / ALT2), each with an enable
+// checkbox. ALT rows hidden by default; setAlt1Visible / setAlt2Visible
+// expose them when an ALT channel is active.
 class VisionWidget : public QFrame
 {
     Q_OBJECT

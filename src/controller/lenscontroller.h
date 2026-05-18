@@ -60,9 +60,11 @@ public slots:
     void update_lens_params(qint32 lens_param, uint val);
     void lens_stop();
 
-    // Set zoom/focus from value (previously read from UI)
+    // Set zoom/focus/iris from value (previously read from UI). "Iris" maps
+    // to Lens::SET_RADIUS — same protocol path as the IRIS_*/RADIUS_* buttons.
     void set_zoom_value(uint val);
     void set_focus_value(uint val);
+    void set_iris_value(uint val);
 
     // Inline helpers for auto-focus
     void focus_far();

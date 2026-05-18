@@ -87,7 +87,7 @@ public:
         // Queues
         std::queue<cv::Mat>* q_img;          // size 3
         std::queue<int>*    q_frame_info;
-        TimedQueue*         q_fps_calc;
+        TimedQueue*         q_fps_calc[3];   // per-display FPS counters (main / alt1 / alt2)
         QMutex*             frame_info_mutex;
 
         // Snapshot state

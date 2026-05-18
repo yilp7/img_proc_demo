@@ -38,7 +38,11 @@ void TimingBarWidget::setBarValue(BarId id, quint64 value)
     if (value > m_bars[id].scale) value = m_bars[id].scale;
     if (m_bars[id].value == value) return;
     m_bars[id].value = value;
-    emit barValueChanged(id, value);
+    // External setter: do NOT emit barValueChanged. That signal is reserved
+    // for user-driven changes (mouse press/move handlers). Emitting here
+    // would loop when the controller drives the bar from its own state
+    // update — e.g. drag → barValueChanged → controller setter →
+    // *_display_updated → setBarValue → barValueChanged again.
     update();
 }
 
@@ -54,10 +58,8 @@ void TimingBarWidget::setBarScale(BarId id, quint64 maxValue)
     if (maxValue == 0) return;
     if (m_bars[id].scale == maxValue) return;
     m_bars[id].scale = maxValue;
-    if (m_bars[id].value > maxValue) {
-        m_bars[id].value = maxValue;
-        emit barValueChanged(id, maxValue);
-    }
+    if (m_bars[id].value > maxValue) m_bars[id].value = maxValue;
+    // Scale change is configuration, not a user-driven value change.
     update();
 }
 

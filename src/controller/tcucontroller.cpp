@@ -99,9 +99,13 @@ void TCUController::setup_laser(int laser_on)
 
 void TCUController::set_tcu_type(int idx)
 {
+    int prev_type = m_device_mgr->tcu()->type();
     int diff = 0;
-    if (m_device_mgr->tcu()->type() == 0 && idx) diff = 1;
-    if (m_device_mgr->tcu()->type() && idx == 0) diff = -1;
+    int laser_diff = 0;
+    if (prev_type == 0 && idx) diff = 1;
+    if (prev_type && idx == 0) diff = -1;
+    if (idx == 2 && prev_type != 2) laser_diff = 1;
+    if (prev_type == 2 && idx != 2) laser_diff = -1;
     m_device_mgr->tcu()->set_type(idx);
 
     switch (idx) {
@@ -111,7 +115,7 @@ void TCUController::set_tcu_type(int idx)
     default: break;
     }
 
-    emit tcu_type_layout_changed(idx, diff);
+    emit tcu_type_layout_changed(idx, diff, laser_diff);
     emit mcp_slider_max_changed(mcp_max);
 }
 
@@ -343,8 +347,13 @@ void TCUController::update_light_speed(bool uw)
     emit dist_ns_changed(dist_ns);
     emit update_distance_display_requested();
     emit send_double_tcu_msg(TCU::LIGHT_SPEED, dist_ns);
-    update_delay();
-    update_gate_width();
+    // Re-push EST_DIST / EST_DOV directly so the port reconverts meters→ns
+    // using the new dist_ns. Bypasses the slider-debounce throttle in
+    // update_delay()/update_gate_width(), which would otherwise drop the
+    // re-push on rapid underwater toggles and leave the device with stale
+    // register values.
+    emit send_double_tcu_msg(TCU::EST_DIST, delay_dist.load());
+    emit send_double_tcu_msg(TCU::EST_DOV, depth_of_view);
 }
 
 void TCUController::update_current(float current_value)

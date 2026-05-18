@@ -151,6 +151,11 @@ void LensController::set_focus_value(uint val)
     emit send_lens_msg(Lens::SET_FOCUS, focus);
 }
 
+void LensController::set_iris_value(uint val)
+{
+    emit send_lens_msg(Lens::SET_RADIUS, val);
+}
+
 void LensController::change_focus_speed(int val)
 {
     if (val < 1)  val = 1;

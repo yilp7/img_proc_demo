@@ -3,9 +3,15 @@
 #include "ui_preferences.h"
 #include "util/constants.h"
 #include <QCheckBox>
+#include <QGridLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QRadioButton>
 #include <QStyle>
+#include <QVBoxLayout>
 
 static bool throttle_check(QElapsedTimer &t)
 {
@@ -108,7 +114,7 @@ UserPanel::UserPanel(QWidget *parent) :
     QMainWindow(parent),
     mouse_pressed(false),
     ui(new Ui::UserPanel),
-    m_fps_label(nullptr),
+    m_fps_label{nullptr, nullptr, nullptr},
     m_center_toolbar(nullptr),
     m_pbar(nullptr),
     m_optics_panel(nullptr),
@@ -147,8 +153,8 @@ UserPanel::UserPanel(QWidget *parent) :
     curr_cam(NULL),
     time_exposure_edit(95000),
     gain_analog_edit(0),
-    frame_rate_edit(10),
-    q_fps_calc(5),
+    frame_rate_edit{10.0f, 10.0f, 10.0f},
+    q_fps_calc{nullptr, nullptr, nullptr},
     device_type(0),
     device_on(false),
     start_grabbing(false),
@@ -219,13 +225,27 @@ UserPanel::UserPanel(QWidget *parent) :
     setMouseTracking(true);
     setCursor(cursor_curr_pointer);
 
-    // FPS overlay lives in CENTRAL so it shares z-order with the floating
-    // panels (Sprint 18 fix). Otherwise QMainWindow direct children paint
-    // above CENTRAL's children and intercept clicks.
-    m_fps_label = new QLabel("0.00 fps", ui->CENTRAL);
-    m_fps_label->setObjectName("FPS_LABEL");
-    m_fps_label->setAttribute(Qt::WA_TranslucentBackground);
-    m_fps_label->hide(); // shown once resizeEvent places it
+    // FPS overlays — main lives in CENTRAL (shares z-order with floating
+    // panels per Sprint 18 fix); alt1/alt2 are children of their respective
+    // Display widgets inside the FloatingWindows.
+    m_fps_label[0] = new QLabel("0.00 fps", ui->CENTRAL);
+    m_fps_label[0]->setObjectName("FPS_LABEL");
+    m_fps_label[0]->setAttribute(Qt::WA_TranslucentBackground);
+    m_fps_label[0]->hide(); // shown once resizeEvent places it
+    for (int i = 1; i < 3; i++) {
+        m_fps_label[i] = new QLabel("0.00 fps", displays[i]);
+        m_fps_label[i]->setObjectName("FPS_LABEL");
+        m_fps_label[i]->setAttribute(Qt::WA_TranslucentBackground);
+        m_fps_label[i]->move(6, displays[i]->height() - 20);
+        displays[i]->installEventFilter(this); // reposition on Display resize
+    }
+    // Resnapshot ProcessingParams whenever any Display widget resizes — keeps
+    // display_region / display_width / display_height in sync with the widget,
+    // so the pipeline's crop+scale (pipelineprocessor.cpp:632/652) targets the
+    // current widget size. Without this, fullscreen toggle stretches the
+    // stale pre-resize crop to fill the new widget.
+    for (int i = 0; i < 3; i++)
+        connect(displays[i], &Display::widget_resized, this, [this]() { update_processing_params(); });
 
     // center toolbar: reparent existing Tools + INFO_CHECK into a framed row
     m_center_toolbar = new QFrame(ui->MID);
@@ -273,8 +293,11 @@ UserPanel::UserPanel(QWidget *parent) :
     }
 
     tp.start();
-    q_fps_calc.set_display_label(m_fps_label);
-    q_fps_calc.start();
+    for (int i = 0; i < 3; i++) {
+        q_fps_calc[i] = new TimedQueue(5);
+        q_fps_calc[i]->set_display_label(m_fps_label[i]);
+        q_fps_calc[i]->start();
+    }
 
     QFont temp_f(consolas);
     temp_f.setPixelSize(11);
@@ -552,11 +575,30 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // ConsolePanel: pull pages from MISC_DISPLAY stacked widget
     m_console_panel->setup(ui->MISC_DISPLAY);
-    // Replace old MISC_OPTION/MISC_RADIO wiring with tab-widget routing
+    // Replace old MISC_OPTION/MISC_RADIO wiring with tab-widget routing.
+    // MISC_DISPLAY_GRP and its combos/radios are no longer the driver — tab
+    // clicks set alt_display_option directly. Master used combo_index → option
+    // 1..7 over [DATA, HIST, PTZ, ALT, ADDON, VID, YOLO]; with PTZ now in the
+    // OpticsPanel that index is dropped, giving the map below.
     ui->MISC_DISPLAY_GRP->hide();
     disconnect(m_aux_panel, &AuxPanelManager::display_page_changed, nullptr, nullptr);
-    connect(m_aux_panel, &AuxPanelManager::display_page_changed, this, [this](int page) {
-        m_console_panel->tab_widget()->setCurrentIndex(page);
+    // tab index → master alt_display_option value (preserving HIST==2 so the
+    // pipeline histogram check at pipelineprocessor.cpp:610 still fires).
+    // YOLO tab dropped — its content moved to IMG PROC MODELS tab.
+    static const int tab_to_alt_opt[] = {
+        1,  // DATA
+        2,  // HIST
+        4,  // ALT  (master combo_index 3 → option 4)
+        5,  // ADDON
+        6,  // VID
+        0,  // 3D placeholder — no aux-panel option
+    };
+    connect(m_console_panel->tab_widget(), &QTabWidget::currentChanged,
+            this, [this](int idx) {
+        if (idx < 0 || idx >= (int)(sizeof(tab_to_alt_opt) / sizeof(tab_to_alt_opt[0]))) return;
+        // select_display takes combo_index and stores combo_index + 1, so pass
+        // (option - 1) here to land at the desired alt_display_option value.
+        m_aux_panel->select_display(tab_to_alt_opt[idx] - 1);
     });
 
     // Initial panel positions (resizeEvent will correct on first paint)
@@ -583,7 +625,11 @@ UserPanel::UserPanel(QWidget *parent) :
     m_save_options = new SaveOptionsWidget(m_right_stack);
     m_vision       = new VisionWidget(m_right_stack);
 
-    m_img_proc->setup(ui->IMG_ENHANCE_CHECK,   ui->ENHANCE_OPTIONS,
+    m_img_proc->setup(// MODELS tab — 3 per-display model selectors (from YOLO_PAGE)
+                      ui->MAIN_MODEL_LIST, ui->ALT1_MODEL_LIST, ui->ALT2_MODEL_LIST,
+                      ui->YOLO_MAIN_LABEL, ui->YOLO_ALT1_LABEL, ui->YOLO_ALT2_LABEL,
+                      // GENERAL tab — image-processing toggles (from IMG_PROC_STATIC)
+                      ui->IMG_ENHANCE_CHECK,   ui->ENHANCE_OPTIONS,
                       ui->FRAME_AVG_CHECK,     ui->FRAME_AVG_OPTIONS,
                       ui->IMG_3D_CHECK,        ui->RANGE_THRESH_EDIT,
                       ui->RESET_3D_BTN,
@@ -596,7 +642,13 @@ UserPanel::UserPanel(QWidget *parent) :
 
     m_right_stack->addSection(m_img_proc);
     m_right_stack->addSection(m_save_options);
-    m_right_stack->addSection(m_vision, 1);  // vision stretches to fill
+    // Vision widget dropped from the right stack — detection results are
+    // already drawn as overlays on the displays themselves (draw_yolo_boxes
+    // at pipelineprocessor.cpp:606), and the Side Display already mirrors
+    // MAIN. VisionWidget kept as code under construction for future use
+    // (per-channel inference toggle / threshold / class filter).
+    m_vision->hide();
+    m_right_stack->contentLayout()->addStretch(1);
 
     // Hide the legacy RIGHT column — its surviving children (SCAN_GRP) are
     // hidden along with it. SCAN_GRP will be absorbed into the SCAN overlay
@@ -605,39 +657,179 @@ UserPanel::UserPanel(QWidget *parent) :
     ui->RIGHT->hide();
 
     // ----- Side display + map placeholder (Sprint 17.6 / 17.7) -----
-    // ui->LEFT still holds PARAMS_STATIC + IMG_GRAB_STATIC (gain / start-stop
-    // grabbing) and remains the left zone in S17. SideDisplay + Mapbox are
-    // constructed for layout reservation but stay hidden until LEFT migrates
-    // to the SETUP overlay in Sprint 18.
+    // Side display: live ALT1 / ALT2 thumbnails (same pattern as SETUP / SCAN
+    // preview sidebars). Mapbox stays a placeholder until the external
+    // library lands.
     m_side_display = new SideDisplayWidget(ui->CENTRAL);
     m_mapbox       = new MapboxWidget(ui->CENTRAL);
-    m_side_display->hide();
+    m_side_display->setup(displays[1], displays[2]);
     m_mapbox      ->hide();
     m_right_stack ->setGeometry(0, 0, 220, 400);
     m_right_stack ->raise();
     m_right_stack ->show();
 
     // ----- SETUP overlay extras -----
-    // The 5 Ui::Preferences groups (SAVE_LOAD_GRP, SERIAL_PORTS_GRP, TCU_GRP,
-    // DEVICES_GRP, IMG_PROC_GRP) are populated by SetupOverlay::setup_form().
-    // PARAMS_STATIC + IMG_GRAB_STATIC still come from ui->LEFT — re-parent
-    // them here into row 2 next to DEVICES_GRP.
+    // SetupOverlay::setup_form() handles the 5 legacy Preferences groups +
+    // the IMG_PROC FlowLayout card. The rest of the prototype's SETUP layout
+    // (Presets, Ports, Camera) is built here because the widgets live in
+    // ui->LEFT (Ui::UserPanel), not Ui::Preferences.
+    //
+    // Layout (per prototype):
+    //   Row 1: [Presets+Ports stack] | SAVE_LOAD_GRP | SERIAL_PORTS_GRP | TCU_GRP
+    //   Row 2: DEVICES_GRP | Camera (composed)
+    //   Row 3: Image Processing (FlowLayout, handled by SetupOverlay)
     {
+        auto *r0 = m_setup_overlay->rowLayout(0);
         auto *r1 = m_setup_overlay->rowLayout(1);
-        auto add_card = [](QHBoxLayout *row, QWidget *card, QWidget *parent_w) {
-            if (!row || !card) return;
-            const QSize orig_size = card->size();
-            card->setParent(parent_w);
-            card->move(0, 0);
-            if (!card->layout()) card->setMinimumSize(orig_size);
-            card->show();
-            row->addWidget(card);
+        auto *r0_parent = m_setup_overlay->contentRow(0);
+        auto *r1_parent = m_setup_overlay->contentRow(1);
+
+        auto take = [](QWidget *w, QWidget *new_parent) {
+            if (!w) return;
+            w->setParent(new_parent);
+            w->setGeometry(0, 0, w->width(), w->height());
+            w->show();
         };
-        add_card(r1, ui->PARAMS_STATIC,   m_setup_overlay->contentRow(1));
-        add_card(r1, ui->IMG_GRAB_STATIC, m_setup_overlay->contentRow(1));
+
+        // ----- Row 1: Presets + Ports vertical stack (leftmost) -----
+        auto *stack = new QWidget(r0_parent);
+        stack->setObjectName("PRESETS_PORTS_STACK");
+        auto *sv = new QVBoxLayout(stack);
+        sv->setContentsMargins(0, 0, 0, 0);
+        sv->setSpacing(8);
+
+        auto *presets = new QGroupBox(tr("Presets"), stack);
+        presets->setObjectName("PRESETS_GRP");
+        auto *pg = new QGridLayout(presets);
+        pg->setContentsMargins(8, 18, 8, 8);
+        pg->setSpacing(4);
+        auto *export_btn = new QPushButton(tr("Export"), presets);
+        auto *import_btn = new QPushButton(tr("Import"), presets);
+        export_btn->setObjectName("EXPORT_PREF_BTN");
+        import_btn->setObjectName("IMPORT_PREF_BTN");
+        pg->addWidget(export_btn, 0, 0);
+        pg->addWidget(import_btn, 0, 1);
+        connect(export_btn, &QPushButton::clicked, this, &UserPanel::save_config_to_file);
+        connect(import_btn, &QPushButton::clicked, this, &UserPanel::prompt_for_config_file);
+        sv->addWidget(presets);
+
+        auto *ports = new QGroupBox(tr("Ports"), stack);
+        ports->setObjectName("PORTS_GRP");
+        auto *pl = new QGridLayout(ports);
+        pl->setContentsMargins(8, 18, 8, 8);
+        pl->setHorizontalSpacing(8);
+        pl->setVerticalSpacing(4);
+        auto add_port_row = [&](int row, QLabel *lbl, QLineEdit *edt) {
+            take(lbl, ports);
+            take(edt, ports);
+            pl->addWidget(lbl, row, 0);
+            pl->addWidget(edt, row, 1);
+        };
+        add_port_row(0, ui->TCU_COM,   ui->TCU_COM_EDIT);
+        add_port_row(1, ui->RANGE_COM, ui->RANGE_COM_EDIT);
+        add_port_row(2, ui->LENS_COM,  ui->LENS_COM_EDIT);
+        add_port_row(3, ui->LASER_COM, ui->LASER_COM_EDIT);
+        add_port_row(4, ui->PTZ_COM,   ui->PTZ_COM_EDIT);
+        sv->addWidget(ports);
+        sv->addStretch(1);
+
+        stack->show();
+        r0->insertWidget(0, stack);  // leftmost position in Row 1
+
+        // ----- Row 2: Camera (composed) — replaces PARAMS_STATIC + IMG_GRAB_STATIC -----
+        // Prototype layout:
+        //   [Enumerate] [Turn On] [Turn Off] | [⛶] [⚄]
+        //   ○ Continuous   CMOS Freq [N] Hz   Time Expo [N] ms   [START GRABBING]
+        //   ○ Trigger      [Get Params]       Gain [N] ━●━━━━     [STOP GRABBING]
+        auto *camera = new QGroupBox(tr("Camera"), r1_parent);
+        camera->setObjectName("CAMERA_GRP");
+        auto *cv = new QVBoxLayout(camera);
+        cv->setContentsMargins(8, 18, 8, 8);
+        cv->setSpacing(4);
+
+        // Top button row
+        auto *btn_row = new QHBoxLayout;
+        btn_row->setSpacing(4);
+        take(ui->ENUM_BUTTON,     camera);
+        take(ui->START_BUTTON,    camera);
+        take(ui->SHUTDOWN_BUTTON, camera);
+        take(ui->IMG_REGION_BTN,  camera);
+        take(ui->SENSOR_TAPS_BTN, camera);
+        btn_row->addWidget(ui->ENUM_BUTTON);
+        btn_row->addWidget(ui->START_BUTTON);
+        btn_row->addWidget(ui->SHUTDOWN_BUTTON);
+        btn_row->addSpacing(8);
+        btn_row->addWidget(ui->IMG_REGION_BTN);
+        btn_row->addWidget(ui->SENSOR_TAPS_BTN);
+        btn_row->addStretch(1);
+        cv->addLayout(btn_row);
+
+        // Acquisition grid (2 rows × 4 columns)
+        auto *acq = new QGridLayout;
+        acq->setHorizontalSpacing(6);
+        acq->setVerticalSpacing(4);
+
+        // CMOS Freq compound block: label + edit + unit
+        take(ui->CCD_FREQ,      camera);
+        take(ui->CCD_FREQ_EDIT, camera);
+        take(ui->CCD_FREQ_UNIT, camera);
+        auto *freq_block = new QWidget(camera);
+        auto *fl = new QHBoxLayout(freq_block);
+        fl->setContentsMargins(0, 0, 0, 0);
+        fl->setSpacing(2);
+        fl->addWidget(ui->CCD_FREQ);
+        fl->addWidget(ui->CCD_FREQ_EDIT);
+        fl->addWidget(ui->CCD_FREQ_UNIT);
+
+        // Time Expo compound block: label + edit + unit
+        take(ui->DUTY,      camera);
+        take(ui->DUTY_EDIT, camera);
+        take(ui->DUTY_UNIT, camera);
+        auto *expo_block = new QWidget(camera);
+        auto *el = new QHBoxLayout(expo_block);
+        el->setContentsMargins(0, 0, 0, 0);
+        el->setSpacing(2);
+        el->addWidget(ui->DUTY);
+        el->addWidget(ui->DUTY_EDIT);
+        el->addWidget(ui->DUTY_UNIT);
+
+        // Gain compound block: label + edit + slider
+        take(ui->GAIN_STATIC, camera);
+        take(ui->GAIN_EDIT,   camera);
+        take(ui->GAIN_SLIDER, camera);
+        auto *gain_block = new QWidget(camera);
+        auto *gl = new QHBoxLayout(gain_block);
+        gl->setContentsMargins(0, 0, 0, 0);
+        gl->setSpacing(4);
+        gl->addWidget(ui->GAIN_STATIC);
+        gl->addWidget(ui->GAIN_EDIT);
+        gl->addWidget(ui->GAIN_SLIDER, 1);
+
+        // Remaining standalone widgets
+        take(ui->CONTINUOUS_RADIO,      camera);
+        take(ui->TRIGGER_RADIO,         camera);
+        take(ui->GET_PARAMS_BUTTON,     camera);
+        take(ui->START_GRABBING_BUTTON, camera);
+        take(ui->STOP_GRABBING_BUTTON,  camera);
+
+        acq->addWidget(ui->CONTINUOUS_RADIO,        0, 0);
+        acq->addWidget(freq_block,                  0, 1);
+        acq->addWidget(expo_block,                  0, 2);
+        acq->addWidget(ui->START_GRABBING_BUTTON,   0, 3);
+        acq->addWidget(ui->TRIGGER_RADIO,           1, 0);
+        acq->addWidget(ui->GET_PARAMS_BUTTON,       1, 1);
+        acq->addWidget(gain_block,                  1, 2);
+        acq->addWidget(ui->STOP_GRABBING_BUTTON,    1, 3);
+        cv->addLayout(acq);
+        cv->addStretch(1);
+
+        camera->show();
+        r1->addWidget(camera);
+
+        r0->addStretch(1);
         r1->addStretch(1);
-        m_setup_overlay->rowLayout(0)->addStretch(1);
-        m_setup_overlay->rowLayout(2)->addStretch(1);
+        // Row 2 (index 2) gets its full-width Image Processing card from
+        // SetupOverlay::setup_form(); no extra stretch needed here.
     }
     m_setup_overlay->hide();  // shown only in SETUP mode
 
@@ -689,7 +881,9 @@ UserPanel::UserPanel(QWidget *parent) :
             bl->setContentsMargins(8, 6, 8, 8);
             bl->setSpacing(4);
             vl->addWidget(body, 1);
-            cards->addWidget(card);
+            // Top-align so cards size to their content height instead of
+            // stretching to fill the overlay's vertical viewport.
+            cards->addWidget(card, 0, Qt::AlignTop);
             return body;
         };
 
@@ -871,12 +1065,41 @@ UserPanel::UserPanel(QWidget *parent) :
             rvl->setContentsMargins(0, 0, 0, 0); rvl->setSpacing(6);
             sw.frame_count    = le(rw);
             sw.num_single_pos = le(rw);
+
+            // Each description is a self-sized 2-row container:
+            //   [first part of label                ]
+            //   [last part            ][input]
+            // Container is sized to its content; both containers are then
+            // equalized to the wider of the two so the two descriptions line
+            // up consistently.
+            auto desc_row = [&rw](const QString &first_part, const QString &last_part, QLineEdit *edit) -> QWidget* {
+                auto *c = new QWidget(rw);
+                c->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
+                auto *vbox = new QVBoxLayout(c);
+                vbox->setContentsMargins(0, 0, 0, 0);
+                vbox->setSpacing(0);
+                vbox->addWidget(new QLabel(first_part, c));
+                auto *r2 = new QHBoxLayout;
+                r2->setContentsMargins(0, 0, 0, 0);
+                r2->setSpacing(4);
+                r2->addWidget(new QLabel(last_part, c));
+                r2->addStretch(1);
+                r2->addWidget(edit);
+                vbox->addLayout(r2);
+                return c;
+            };
+
+            // More balanced splits (smaller first line, more on the second).
+            auto *d1 = desc_row("# of TCU+PTZ", "param sets", sw.frame_count);
+            auto *d2 = desc_row("# of imgs",    "per profile", sw.num_single_pos);
+            const int unified_w = qMax(d1->sizeHint().width(), d2->sizeHint().width());
+            d1->setFixedWidth(unified_w);
+            d2->setFixedWidth(unified_w);
+
             rvl->addWidget(lbl(rw, "PROFILES"));
-            { auto *s = lbl(rw, "# of TCU+PTZ param sets"); s->setWordWrap(true); rvl->addWidget(s); }
-            rvl->addWidget(sw.frame_count);
+            rvl->addWidget(d1);
             rvl->addWidget(lbl(rw, "IMGS / PROFILE"));
-            { auto *s = lbl(rw, "# of imgs per profile"); s->setWordWrap(true); rvl->addWidget(s); }
-            rvl->addWidget(sw.num_single_pos);
+            rvl->addWidget(d2);
             rvl->addStretch(1);
             hl->addWidget(rw);
 
@@ -969,7 +1192,8 @@ UserPanel::UserPanel(QWidget *parent) :
         if (m_scan_overlay)  m_scan_overlay ->setVisible(scan_mode);
         if (m_right_stack)   m_right_stack  ->setVisible(!overlay_mode);
         if (m_pbar)          m_pbar         ->setVisible(!overlay_mode);
-        if (m_fps_label)     m_fps_label    ->setVisible(!overlay_mode);
+        if (m_fps_label[0]) m_fps_label[0]->setVisible(!overlay_mode);
+        // Alt FPS labels (1/2) live inside FloatingWindows — visibility tracks parent.
         // Floating panels follow their pbar toggle state when not in an overlay mode.
         auto pbar_checked = [this](const char *name) -> bool {
             if (!m_pbar) return true;
@@ -999,6 +1223,13 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // ui->LEFT permanent hide: PARAMS_STATIC + IMG_GRAB_STATIC migrated above;
     // remaining LASER_STATIC widgets are already in TCUPanel (16.7) or unused.
+    // Reparent DISTANCE label out of LASER_STATIC before LEFT goes hidden —
+    // it lives at the top-right of SOURCE_DISPLAY (positioned in resizeEvent)
+    // and reads TCUController::distance_text_updated (wired at line 1423).
+    ui->DISTANCE->setParent(ui->CENTRAL);
+    ui->DISTANCE->setGeometry(QRect());
+    ui->DISTANCE->show();
+    ui->DISTANCE->raise();
     ui->LEFT->hide();
     // SideDisplay + Mapbox can now occupy the freed left zone.
     if (m_side_display) m_side_display->show();
@@ -1213,19 +1444,27 @@ UserPanel::UserPanel(QWidget *parent) :
         ui->GATE_WIDTH_B_EDIT_U->setText(bu); ui->GATE_WIDTH_B_EDIT_N->setText(bn); ui->GATE_WIDTH_B_EDIT_P->setText(bp);
         if (!gw.isEmpty()) ui->GATE_WIDTH->setText(gw);
     });
-    connect(m_tcu_ctrl, &TCUController::tcu_type_layout_changed, this, [this](int idx, int diff) {
-        // Show/hide picosecond fields and diff group based on TCU type
-        bool show_ps = (idx >= 2);
-        ui->LASER_WIDTH_EDIT_P->setVisible(show_ps);
-        ui->DELAY_A_EDIT_P->setVisible(show_ps);
-        ui->DELAY_B_EDIT_P->setVisible(show_ps);
-        ui->GATE_WIDTH_A_EDIT_P->setVisible(show_ps);
-        ui->GATE_WIDTH_B_EDIT_P->setVisible(show_ps);
-        bool show_diff = (diff != 0);
-        ui->DELAY_DIFF_GRP->setVisible(show_diff);
-        ui->GATE_WIDTH_DIFF_GRP->setVisible(show_diff);
+    connect(m_tcu_ctrl, &TCUController::tcu_type_layout_changed, this, [this](int idx, int diff, int laser_diff) {
+        // Restored from pre-Sprint-9 set_tcu_type — type switch must reflow
+        // U/N/P labels and shift edits, not just toggle _P visibility.
+        if (laser_diff)
+            update_tcu_param_pos(laser_diff, ui->LASER_WIDTH_UNIT_U, ui->LASER_WIDTH_EDIT_N, ui->LASER_WIDTH_UNIT_N, ui->LASER_WIDTH_EDIT_P);
+        if (diff) {
+            ui->DELAY_A->resize(ui->DELAY_A->width() + 12 * diff, ui->DELAY_A->height());
+            ui->DELAY_B->resize(ui->DELAY_B->width() + 12 * diff, ui->DELAY_B->height());
+            ui->GATE_WIDTH_A->resize(ui->GATE_WIDTH_A->width() + 12 * diff, ui->GATE_WIDTH_A->height());
+            ui->GATE_WIDTH_B->resize(ui->GATE_WIDTH_B->width() + 12 * diff, ui->GATE_WIDTH_B->height());
+            update_tcu_param_pos(diff, ui->DELAY_A_UNIT_U, ui->DELAY_A_EDIT_N, ui->DELAY_A_UNIT_N, ui->DELAY_A_EDIT_P);
+            update_tcu_param_pos(diff, ui->DELAY_B_UNIT_U, ui->DELAY_B_EDIT_N, ui->DELAY_B_UNIT_N, ui->DELAY_B_EDIT_P);
+            update_tcu_param_pos(diff, ui->GATE_WIDTH_A_UNIT_U, ui->GATE_WIDTH_A_EDIT_N, ui->GATE_WIDTH_A_UNIT_N, ui->GATE_WIDTH_A_EDIT_P);
+            update_tcu_param_pos(diff, ui->GATE_WIDTH_B_UNIT_U, ui->GATE_WIDTH_B_EDIT_N, ui->GATE_WIDTH_B_UNIT_N, ui->GATE_WIDTH_B_EDIT_P);
+        }
+        ui->DELAY_GRP->move(idx ? -6 : 0, 100);
+        ui->GATE_WIDTH_GRP->move(idx ? -6 : 0, 180);
     });
     connect(m_tcu_ctrl, &TCUController::tcu_diff_view_toggled, this, [this](bool show) {
+        ui->DELAY_B_GRP->setVisible(!show);
+        ui->GATE_WIDTH_B_GRP->setVisible(!show);
         ui->DELAY_DIFF_GRP->setVisible(show);
         ui->GATE_WIDTH_DIFF_GRP->setVisible(show);
     });
@@ -1327,10 +1566,13 @@ UserPanel::UserPanel(QWidget *parent) :
 
         auto *zoom_slider  = new ArcSliderWidget(modern_w);
         auto *focus_slider = new ArcSliderWidget(modern_w);
+        auto *iris_slider  = new ArcSliderWidget(modern_w);
         zoom_slider ->setRange(0, 1000);
         focus_slider->setRange(0, 1000);
+        iris_slider ->setRange(0, 1000);
         zoom_slider ->setFixedSize(36, 120);
         focus_slider->setFixedSize(36, 120);
+        iris_slider ->setFixedSize(36, 120);
 
         auto *slider_col   = new QWidget(modern_w);
         auto *sc_l = new QVBoxLayout(slider_col);
@@ -1340,35 +1582,68 @@ UserPanel::UserPanel(QWidget *parent) :
         sc_l->addWidget(zoom_slider);
         sc_l->addWidget(new QLabel("F", slider_col));
         sc_l->addWidget(focus_slider);
+        sc_l->addWidget(new QLabel("I", slider_col));
+        sc_l->addWidget(iris_slider);
 
         ml->addWidget(joystick, 1);
         ml->addWidget(slider_col);
 
-        // 8-direction PTZ via sign of (dx, dy) — dy > 0 means DOWN (screen coords)
+        // Joystick → PTZ with independent pan/tilt speeds. Each axis's speed
+        // is |dx| / |dy| scaled to PTZ range; direction byte is composed
+        // from the sign of each axis (no 8-sector snap), so moving into a
+        // corner no longer causes a 0→full jump on either speed byte.
+        // dy > 0 is DOWN in screen coords.
+        // id grid: {0:UL,1:U,2:UR, 3:L,5:R, 6:DL,7:D,8:DR} → DeviceManager
+        // adds 1 to map to PTZ::PARAMS enum.
         connect(joystick, &JoystickWidget::directionChanged,
                 this, [this](double dx, double dy) {
             static int last_id = -1;
+            static int last_h = -1, last_v = -1;
+
             if (dx == 0.0 && dy == 0.0) {
-                if (last_id >= 0) { m_device_mgr->ptz_button_released(last_id); last_id = -1; }
+                if (last_id >= 0) m_device_mgr->ptz_button_released(last_id);
+                last_id = -1;
+                last_h = last_v = -1;
                 return;
             }
-            const bool up    = dy < -0.3;
-            const bool down  = dy >  0.3;
-            const bool left  = dx < -0.3;
-            const bool right = dx >  0.3;
-            int id;
-            if      (up   && left)  id = 0;  // UP-LEFT
-            else if (up   && right) id = 2;  // UP-RIGHT
-            else if (up)            id = 1;  // UP
-            else if (down && left)  id = 6;  // DOWN-LEFT
-            else if (down && right) id = 8;  // DOWN-RIGHT
-            else if (down)          id = 7;  // DOWN
-            else if (left)          id = 3;  // LEFT
-            else                    id = 5;  // RIGHT
-            if (id != last_id) {
+
+            const int h_speed = qBound(0, static_cast<int>(std::round(qMin(std::abs(dx), 1.0) * 64.0)), 64);
+            const int v_speed = qBound(0, static_cast<int>(std::round(qMin(std::abs(dy), 1.0) * 64.0)), 64);
+
+            // Per-axis deadzone in speed space — below this the axis is
+            // inactive and the direction byte stays cardinal. The widget's
+            // own deadzone gates total magnitude; this only governs how
+            // close to cardinal the sign-based picker latches.
+            const int kAxisDz = 3;   // 3/64 ≈ 4.7%
+            const bool h_active = h_speed >= kAxisDz;
+            const bool v_active = v_speed >= kAxisDz;
+            if (!h_active && !v_active) {
                 if (last_id >= 0) m_device_mgr->ptz_button_released(last_id);
-                m_device_mgr->ptz_button_pressed(id);
+                last_id = -1;
+                last_h = last_v = -1;
+                return;
+            }
+
+            int id;
+            if (h_active && v_active) {
+                if      (dy < 0 && dx < 0) id = 0;  // UP_LEFT
+                else if (dy < 0 && dx > 0) id = 2;  // UP_RIGHT
+                else if (dy > 0 && dx < 0) id = 6;  // DOWN_LEFT
+                else                       id = 8;  // DOWN_RIGHT
+            } else if (v_active) {
+                id = (dy < 0) ? 1 : 7;              // UP : DOWN
+            } else {
+                id = (dx < 0) ? 3 : 5;              // LEFT : RIGHT
+            }
+
+            if (h_speed != last_h || v_speed != last_v || id != last_id) {
+                if (id != last_id && last_id >= 0) {
+                    m_device_mgr->ptz_button_released(last_id);
+                }
+                m_device_mgr->ptz_move_hv(id, h_speed, v_speed);
                 last_id = id;
+                last_h = h_speed;
+                last_v = v_speed;
             }
         });
 
@@ -1376,6 +1651,8 @@ UserPanel::UserPanel(QWidget *parent) :
                 m_lens_ctrl, &LensController::set_zoom_value);
         connect(focus_slider, &ArcSliderWidget::valueChanged,
                 m_lens_ctrl, &LensController::set_focus_value);
+        connect(iris_slider,  &ArcSliderWidget::valueChanged,
+                m_lens_ctrl, &LensController::set_iris_value);
 
         m_optics_panel->set_modern_page(modern_w);
     }
@@ -1436,6 +1713,30 @@ UserPanel::UserPanel(QWidget *parent) :
             timing->setBarValue(TimingBarWidget::Mcp, (quint64)qMax(0, val));
         });
 
+        // Bar → controller: user drag updates TCU params. All four bars
+        // carry nanoseconds (LaserWidth / Distance=Delay / Dov=GW) except
+        // Mcp which is the raw slider unit. setBarValue no longer re-emits,
+        // so the controller→bar path above is loop-safe.
+        connect(timing, &TimingBarWidget::barValueChanged, this,
+                [this](TimingBarWidget::BarId id, quint64 value) {
+            switch (id) {
+            case TimingBarWidget::LaserWidth:
+                m_tcu_ctrl->set_laser_width(static_cast<float>(value));
+                m_tcu_ctrl->update_laser_width();
+                break;
+            case TimingBarWidget::Distance:
+                m_tcu_ctrl->change_delay(static_cast<int>(value));
+                break;
+            case TimingBarWidget::Dov:
+                m_tcu_ctrl->change_gatewidth(static_cast<int>(value));
+                break;
+            case TimingBarWidget::Mcp:
+                m_tcu_ctrl->change_mcp(static_cast<int>(value));
+                break;
+            default: break;
+            }
+        });
+
         QPushButton *fire_btn = ui->FIRE_LASER_BTN;
         connect(unlock, &UnlockBar::unlocked, this, [fire_btn]() { fire_btn->setEnabled(true);  });
         connect(unlock, &UnlockBar::locked,   this, [fire_btn]() { fire_btn->setEnabled(false); });
@@ -1468,7 +1769,7 @@ UserPanel::UserPanel(QWidget *parent) :
         ss.grab_thread_state = grab_thread_state;
         ss.q_img = q_img;
         ss.q_frame_info = &q_frame_info;
-        ss.q_fps_calc = &q_fps_calc;
+        for (int i = 0; i < 3; i++) ss.q_fps_calc[i] = q_fps_calc[i];
         ss.frame_info_mutex = &frame_info_mutex;
         ss.m_params_mutex = &m_params_mutex;
         ss.m_processing_params = &m_processing_params;
@@ -1488,7 +1789,7 @@ UserPanel::UserPanel(QWidget *parent) :
         ss.save_location = &save_location;
         ss.tp = &tp;
         ss.device_type = &device_type;
-        ss.frame_rate_edit = &frame_rate_edit;
+        ss.frame_rate_edit = frame_rate_edit; // array decays to pointer; pipeline indexes by [thread_idx] / [0]
         m_pipeline = new PipelineProcessor(ss, this);
     }
 
@@ -1616,7 +1917,13 @@ UserPanel::UserPanel(QWidget *parent) :
 
 UserPanel::~UserPanel()
 {
-    if (q_fps_calc.isRunning()) q_fps_calc.stop();
+    for (int i = 0; i < 3; i++) {
+        if (q_fps_calc[i]) {
+            if (q_fps_calc[i]->isRunning()) q_fps_calc[i]->stop();
+            delete q_fps_calc[i];
+            q_fps_calc[i] = nullptr;
+        }
+    }
 
     for (int i = 0; i < 3; i++) {
         grab_image[i] = false;
@@ -1645,9 +1952,9 @@ UserPanel::~UserPanel()
 
 void UserPanel::init()
 {
-    // auto-load default config if it exists
-//    QString default_config_path = QCoreApplication::applicationDirPath() + "/default.json";
-    QString default_config_path = "default.json";
+    // auto-load default config if it exists. Path matches Config::auto_save
+    // (config.cpp:627) so save+load round-trip across runs regardless of CWD.
+    QString default_config_path = QCoreApplication::applicationDirPath() + "/default.json";
     if (QFile::exists(default_config_path)) {
         if (config->load_from_file(default_config_path)) {
             syncConfigToPreferences();
@@ -1700,7 +2007,6 @@ void UserPanel::init()
     m_setup_overlay->data_exchange(false);
     m_setup_overlay->w()->MAX_DIST_EDT->emit editingFinished();
     m_setup_overlay->w()->MAX_DOV_EDT->emit editingFinished();
-    ui->TITLE->process_maximize();
 
     ui->FRAME_AVG_CHECK->setText("Filter");
 #else //SIMPLE_UI
@@ -1722,14 +2028,19 @@ void UserPanel::init()
     ui->PSEUDOCOLOR_CHK->show();
 
 #ifdef LVTONG
-    m_setup_overlay->w()->UNDERWATER_CHK->click();
+    // Conditional click: idempotent against a persisted-true config (so we
+    // don't toggle it back off), and immune to future .ui default flips
+    // (setChecked(true) would silently no-op if the default were already true).
+    if (!m_setup_overlay->w()->UNDERWATER_CHK->isChecked())
+        m_setup_overlay->w()->UNDERWATER_CHK->click();
 
     ui->DISTANCE->hide();
     ui->DIST_BTN->hide();
     ui->CURRENT_EDIT->setText("18");
     ui->SIMPLE_LASER_CHK->setEnabled(false);
 
-    m_setup_overlay->w()->SHARE_CHK->click();
+    if (!m_setup_overlay->w()->SHARE_CHK->isChecked())
+        m_setup_overlay->w()->SHARE_CHK->click();
     m_setup_overlay->w()->IMG_FORMAT_LST->setCurrentIndex(1);
 
     connect(this, SIGNAL(update_fishnet_result(int)),
@@ -1769,6 +2080,9 @@ void UserPanel::init()
 
     if (m_device_mgr->serial(0)->isOpen() && m_device_mgr->serial(3)->isOpen()) on_LASER_BTN_clicked();
 
+    // Start maximized so the SETUP overlay shows full content (the FlowLayout
+    // in IMG_PROC wraps narrowly without enough viewport width).
+    ui->TITLE->process_maximize();
 }
 
 void UserPanel::data_exchange(bool read){
@@ -1781,7 +2095,7 @@ void UserPanel::data_exchange(bool read){
 
         gain_analog_edit = ui->GAIN_EDIT->text().toFloat();
         time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
-        frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
+        frame_rate_edit[0] = ui->CCD_FREQ_EDIT->text().toFloat();
         save_location = ui->FILE_PATH_EDIT->text();
 
         switch (m_tcu_ctrl->get_hz_unit()) {
@@ -1828,7 +2142,7 @@ void UserPanel::data_exchange(bool read){
 
         ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)std::round(gain_analog_edit)));
         ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
-        ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
+        ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit[0]));
         ui->FILE_PATH_EDIT->setText(save_location);
 
 //        ptr_tcu->gate_width_a = depth_of_view / dist_ns;
@@ -2150,11 +2464,11 @@ void UserPanel::on_START_BUTTON_clicked()
 
     curr_cam->time_exposure(true, &time_exposure_edit);
     curr_cam->gain_analog(true, &gain_analog_edit);
-    curr_cam->frame_rate(true, &frame_rate_edit);
+    curr_cam->frame_rate(true, &frame_rate_edit[0]);
     ui->GAIN_SLIDER->setValue((int)gain_analog_edit);
     ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)std::round(gain_analog_edit)));
     ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
-    ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
+    ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit[0]));
 
 #ifdef LVTONG
     int new_w = 1024;
@@ -2245,7 +2559,7 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
 //    ptr_tcu->duty = time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
 //    ptr_tcu->ccd_freq = frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
     emit send_double_tcu_msg(TCU::DUTY, time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000);
-    emit send_double_tcu_msg(TCU::CCD_FREQ, frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat());
+    emit send_double_tcu_msg(TCU::CCD_FREQ, frame_rate_edit[0] = ui->CCD_FREQ_EDIT->text().toFloat());
 
     int main_thread_idx = display_thread_idx[0];
     if (display_thread_idx[0] == -1) main_thread_idx = 0;
@@ -2366,7 +2680,7 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
             QMutexLocker locker(&image_mutex[0]);
             res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.mp4");
 //            vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || image_3d[0]);
-            vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || pseudocolor[0]);
+            vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit[0], cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || pseudocolor[0]);
         }
     }
     record_modified[0] = !record_modified[0];
@@ -2377,12 +2691,12 @@ void UserPanel::on_SET_PARAMS_BUTTON_clicked()
 {
     gain_analog_edit = ui->GAIN_EDIT->text().toFloat();
     time_exposure_edit = ui->DUTY_EDIT->text().toFloat() * 1000;
-    frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat();
+    frame_rate_edit[0] = ui->CCD_FREQ_EDIT->text().toFloat();
 
     // CCD FREQUENCY
 //    ptr_tcu->communicate_display(convert_to_send_tcu(0x06, 1.25e8 / fps), 7, 1, false);
 //    ptr_tcu->set_user_param(TCUThread::CCD_FREQ, frame_rate_edit);
-    emit send_double_tcu_msg(TCU::CCD_FREQ, frame_rate_edit = ui->CCD_FREQ_EDIT->text().toFloat());
+    emit send_double_tcu_msg(TCU::CCD_FREQ, frame_rate_edit[0] = ui->CCD_FREQ_EDIT->text().toFloat());
 
     // DUTY RATIO -> EXPO. TIME
 //    ptr_tcu->communicate_display(convert_to_send_tcu(0x07, duty * 1.25e2), 7, 1, false);
@@ -2393,15 +2707,15 @@ void UserPanel::on_SET_PARAMS_BUTTON_clicked()
 //    frame_rate_edit = ptr_tcu->fps;
     if (device_on) {
         curr_cam->time_exposure(false, &time_exposure_edit);
-        curr_cam->frame_rate(false, &frame_rate_edit);
+        curr_cam->frame_rate(false, &frame_rate_edit[0]);
 //        curr_cam->gain_analog(false, &gain_analog_edit);
         change_gain(gain_analog_edit);
     }
     ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)std::round(gain_analog_edit)));
     ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
-    ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
+    ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit[0]));
 
-    q_fps_calc.empty_q();
+    for (int i = 0; i < 3; i++) q_fps_calc[i]->empty_q();
 }
 
 void UserPanel::on_GET_PARAMS_BUTTON_clicked()
@@ -2413,11 +2727,11 @@ void UserPanel::on_GET_PARAMS_BUTTON_clicked()
 
     curr_cam->time_exposure(true, &time_exposure_edit);
     curr_cam->gain_analog(true, &gain_analog_edit);
-    curr_cam->frame_rate(true, &frame_rate_edit);
+    curr_cam->frame_rate(true, &frame_rate_edit[0]);
 
     ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)std::round(gain_analog_edit)));
     ui->DUTY_EDIT->setText(QString::asprintf("%.3f", (time_exposure_edit) / 1000));
-    ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit));
+    ui->CCD_FREQ_EDIT->setText(QString::asprintf("%.3f", frame_rate_edit[0]));
 }
 
 void UserPanel::on_FILE_PATH_BROWSE_clicked()
@@ -2522,7 +2836,7 @@ void UserPanel::export_current_video()
 
     srand(time(NULL));
     temp_output_filename = TEMP_SAVE_LOCATION + "/" + QString::number(rand(), 16) + ".mp4";
-    vid_out_proc.open(temp_output_filename.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit, cv::Size(w[0], h[0]), true);
+    vid_out_proc.open(temp_output_filename.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit[0], cv::Size(w[0], h[0]), true);
     // TODO update enhance function parameters; add support for frame average
     int enhance_option = 0;
     if (ui->IMG_ENHANCE_CHECK->isChecked()) enhance_option = ui->ENHANCE_OPTIONS->currentIndex();
@@ -3009,7 +3323,7 @@ void UserPanel::syncPreferencesToConfig()
 
     // Sync camera settings
     data.camera.continuous_mode = !trigger_mode_on;
-    data.camera.frequency = static_cast<int>(frame_rate_edit);
+    data.camera.frequency = static_cast<int>(frame_rate_edit[0]);
     data.camera.time_exposure = time_exposure_edit;
     data.camera.gain = gain_analog_edit;
 
@@ -3053,7 +3367,7 @@ void UserPanel::syncConfigToPreferences()
 
     // Sync camera settings
     trigger_mode_on = !data.camera.continuous_mode;
-    frame_rate_edit = static_cast<float>(data.camera.frequency);
+    frame_rate_edit[0] = static_cast<float>(data.camera.frequency);
     time_exposure_edit = data.camera.time_exposure;
     gain_analog_edit = data.camera.gain;
 
@@ -3936,6 +4250,11 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     // INFO_CHECK is now inside m_center_toolbar — no separate move needed
     ui->CENTER_CHECK->move(region.right() - 60, 4);
 
+    // DISTANCE: top-right of the source-display region (TCU-driven value via
+    // TCUController::distance_text_updated wired at line 1423).
+    ui->DISTANCE->adjustSize();
+    ui->DISTANCE->move(region.right() - ui->DISTANCE->width() - 10, 5);
+
     // panel toggle bar: tab-row, aligned with right-stack column at side_top.
     // Width matches right-stack so the 3 toggle buttons spread evenly across
     // the same column instead of floating with content-only width.
@@ -3948,12 +4267,14 @@ void UserPanel::resizeEvent(QResizeEvent *event)
         m_pbar->show();
     }
 
-    // FPS overlay: bottom-left of display, in CENTRAL coords — hidden in overlay modes
+    // FPS overlay (main): bottom-left of display, in CENTRAL coords — hidden in overlay modes
     const QPoint fps_pos = ui->SOURCE_DISPLAY->mapTo(ui->CENTRAL, QPoint(6, region.height() - 20));
-    m_fps_label->move(fps_pos);
+    m_fps_label[0]->move(fps_pos);
     const bool any_overlay = (m_setup_overlay && m_setup_overlay->isVisible())
                           || (m_scan_overlay  && m_scan_overlay ->isVisible());
-    m_fps_label->setVisible(!any_overlay);
+    m_fps_label[0]->setVisible(!any_overlay);
+    // Alt FPS labels are children of displays[1/2]; their visibility follows
+    // the parent FloatingWindow visibility automatically.
     // Floating panels live in CENTRAL; raise above the fps label to keep their headers clickable.
     if (!any_overlay) {
         if (m_optics_panel)  m_optics_panel ->raise();
@@ -4373,7 +4694,19 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
             // point the codec parameter to the first stream's
             codec_param = format_context->streams[video_stream_idx]->codecpar;
 
-            if (display) emit send_double_tcu_msg(TCU::CCD_FREQ, frame_rate_edit = std::round(format_context->streams[video_stream_idx]->r_frame_rate.num / format_context->streams[video_stream_idx]->r_frame_rate.den));
+            if (display) {
+                // avg_frame_rate is the actual playback rate; r_frame_rate can
+                // be a multiple (LCM of all PTS deltas) — using it would double
+                // the reported fps for some files. Fall back to r_frame_rate
+                // only if the container doesn't carry an avg.
+                AVRational fr = format_context->streams[video_stream_idx]->avg_frame_rate;
+                if (fr.num == 0 || fr.den == 0)
+                    fr = format_context->streams[video_stream_idx]->r_frame_rate;
+                frame_rate_edit[display_idx] = std::round(av_q2d(fr));
+                // Only the main display drives the camera-sync TCU register.
+                if (display_idx == 0)
+                    emit send_double_tcu_msg(TCU::CCD_FREQ, frame_rate_edit[0]);
+            }
 
             codec = avcodec_find_decoder(codec_param->codec_id);
             if (codec == NULL) return cleanup_and_return(-3);
@@ -4473,14 +4806,20 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
                         }
                         else {
-                            if (is_local_file && display && sw_frame->pts != AV_NOPTS_VALUE) {
+                            // Use frame->pts (decoder output) not sw_frame->pts:
+                            // av_hwframe_transfer_data does not copy metadata,
+                            // so under HW decoding sw_frame->pts is unset (0),
+                            // making the throttle a no-op and the video play at
+                            // decode rate (~2× source).
+                            // av_rescale_q returns µs (target = {1,AV_TIME_BASE});
+                            // nsecsElapsed/1000 = µs to match.
+                            if (is_local_file && display && frame->pts != AV_NOPTS_VALUE) {
                                 if (last_pts != AV_NOPTS_VALUE) {
-                                    delay = av_rescale_q(sw_frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1e6;
-//                                    qDebug() << av_rescale_q(sw_frame->pts - last_pts, time_base, time_base_q) << elapsed_timer.nsecsElapsed() / 1000;
+                                    delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1000;
                                     if (delay > 0 && delay < 1000000) av_usleep(delay);
                                     elapsed_timer.restart();
                                 }
-                                last_pts = sw_frame->pts;
+                                last_pts = frame->pts;
                             }
                             // lazily create/recreate sws_context on first frame or format change
                             if (sws_src_fmt != (AVPixelFormat)sw_frame->format) {
@@ -4632,7 +4971,7 @@ void UserPanel::on_SAVE_AVI_BUTTON_clicked()
         image_mutex[0].lock();
         raw_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw.mp4");
 //        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w[0], h[0]), is_color[0]);
-        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit, cv::Size(w[0], h[0]), is_color[0]);
+        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit[0], cv::Size(w[0], h[0]), is_color[0]);
         image_mutex[0].unlock();
     }
     record_original[0] = !record_original[0];
@@ -4885,7 +5224,7 @@ void UserPanel::alt_display_control(int cmd)
             image_mutex[display_idx].lock();
             raw_avi[display_idx - 1] = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw_alt" + QString::number(display_idx) + ".mp4");
 //            vid_out[display_idx + 1].open(raw_avi[display_idx - 1].toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w[display_idx], h[display_idx]), is_color[display_idx]);
-            vid_out[display_idx + 1].open(raw_avi[display_idx - 1].toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit, cv::Size(w[display_idx], h[display_idx]), is_color[display_idx]);
+            vid_out[display_idx + 1].open(raw_avi[display_idx - 1].toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit[display_idx], cv::Size(w[display_idx], h[display_idx]), is_color[display_idx]);
             image_mutex[display_idx].unlock();
         }
         record_modified[display_idx] = !record_modified[display_idx];
@@ -5077,4 +5416,37 @@ void UserPanel::on_PSEUDOCOLOR_CHK_stateChanged(int arg1)
     update_processing_params();
 }
 
+bool UserPanel::eventFilter(QObject *obj, QEvent *event)
+{
+    if (event->type() == QEvent::Resize) {
+        for (int i = 1; i < 3; i++) {
+            if (obj == displays[i] && m_fps_label[i])
+                m_fps_label[i]->move(6, displays[i]->height() - 20);
+        }
+    }
+    return QMainWindow::eventFilter(obj, event);
+}
+
+void UserPanel::update_tcu_param_pos(int dir, QLabel *u_unit, QLineEdit *n_input,
+                                     QLabel *n_unit, QLineEdit *p_input)
+{
+    switch (dir) {
+    case -1:
+        u_unit->setText("μs");
+        n_unit->setText("ns");
+        u_unit->move(u_unit->pos() + QPoint(3, 0));
+        n_input->move(n_input->pos() + QPoint(14, 0));
+        n_unit->move(n_unit->pos() + QPoint(17, 0));
+        p_input->hide();
+        break;
+    case 1:
+        u_unit->setText(",");
+        n_unit->setText(".");
+        u_unit->move(u_unit->pos() - QPoint(3, 0));
+        n_input->move(n_input->pos() - QPoint(14, 0));
+        n_unit->move(n_unit->pos() - QPoint(17, 0));
+        p_input->show();
+        break;
+    }
+}
 

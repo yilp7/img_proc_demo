@@ -75,6 +75,11 @@ public slots:
     void ptz_button_pressed(int id);
     void ptz_button_released(int id);
     void set_ptz_speed(int speed);
+    // Joystick path: independent pan/tilt speeds. For Pelco, emits SPEED_H
+    // and SPEED_V before the direction so the protocol's two speed bytes
+    // carry the actual joystick-projection components. For non-Pelco types
+    // that take a single speed, falls back to max(h, v).
+    void ptz_move_hv(int id, int h_speed, int v_speed);
 
     // VID camera control slots
     void vid_camera_pressed(int operation);

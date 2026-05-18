@@ -141,6 +141,15 @@ void JoystickWidget::mouseReleaseEvent(QMouseEvent *event)
     QWidget::mouseReleaseEvent(event);
 }
 
+void JoystickWidget::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    // Constructor sets m_stick_local = baseCenter() before layout, when
+    // width()/height() are still 0 — handle would render at (0, 0).
+    // Re-snap on every resize when idle so the handle tracks the true center.
+    if (!m_pressed) m_stick_local = baseCenter();
+}
+
 void JoystickWidget::updateStick(const QPointF &stickLocal)
 {
     const QPointF c = baseCenter();

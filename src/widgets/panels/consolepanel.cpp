@@ -17,21 +17,30 @@ ConsolePanel::ConsolePanel(QWidget *parent)
 
 void ConsolePanel::setup(QStackedWidget *misc_display)
 {
-    // Tab names matching the prototype and the old radio labels
-    static const char *names[] = { "DATA", "HIST", "ALT", "ADDON", "VID", "YOLO" };
-    const int count = qMin(misc_display->count(), 6);
+    // Map tab labels to source pages by objectName. Index-based extraction
+    // is brittle: MISC_DISPLAY has 8 pages (NULL_PAGE placeholder at [0],
+    // plus PTZ_PAGE at [3] whose PTZ_GRP has been reparented to OpticsPanel),
+    // so the first six by index do NOT line up with the desired tabs.
+    // YOLO_PAGE is skipped — its model lists were relocated to the IMG PROC
+    // right-stack MODELS tab (same way PTZ_PAGE's PTZ_GRP went to OpticsPanel).
+    struct TabSpec { const char *label; const char *pageName; };
+    static const TabSpec specs[] = {
+        { "DATA",  "DATA_PAGE"     },
+        { "HIST",  "HIST_PAGE"     },
+        { "ALT",   "ALT_CTRL_PAGE" },
+        { "ADDON", "ADDON_PAGE"    },
+        { "VID",   "VID_PAGE"      },
+    };
 
-    // Extract pages front-to-back. After the first removeWidget the indices shift,
-    // so always take widget(0) after removing it.
-    QList<QWidget*> pages;
-    for (int i = 0; i < count; ++i)
-        pages.append(misc_display->widget(0)),
-        misc_display->removeWidget(misc_display->widget(0));
+    for (const auto &s : specs) {
+        QWidget *page = misc_display->findChild<QWidget*>(
+            QString::fromLatin1(s.pageName), Qt::FindDirectChildrenOnly);
+        if (!page) continue;
+        misc_display->removeWidget(page);
+        m_tabs->addTab(page, s.label);
+    }
 
-    for (int i = 0; i < pages.size(); ++i)
-        m_tabs->addTab(pages[i], names[i]);
-
-    // 3D placeholder tab
+    // 3D placeholder tab — actual point cloud rendering deferred.
     m_tabs->addTab(new QLabel("3D point cloud — placeholder"), "3D");
 
     adjustSize();

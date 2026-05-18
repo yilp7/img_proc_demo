@@ -25,6 +25,8 @@ public:
         SET_V      = 0x0D,
         SPEED      = 0x100,
         ADDRESS    = 0x101,
+        SPEED_H    = 0x102,    // independent pan speed (joystick path)
+        SPEED_V    = 0x103,    // independent tilt speed (joystick path)
         NO_PARAM   = 0xFFFF,
     };
 
@@ -71,8 +73,10 @@ private:
     uchar  address;
     double angle_h;
     double angle_v;
-    uchar  ptz_speed;
-    
+    uchar  ptz_speed;       // legacy: set via SPEED, mirrored to pan/tilt
+    uchar  pan_speed;       // command[4] for pan-active directions
+    uchar  tilt_speed;      // command[5] for tilt-active directions
+
     QByteArray query[2];
 };
 

@@ -23,9 +23,11 @@ protected:
     void wheelEvent(QWheelEvent *event);
     void mouseDoubleClickEvent(QMouseEvent *event);
     void closeEvent(QCloseEvent *event);
+    void resizeEvent(QResizeEvent *event) override;
 
 signals:
     void set_pixmap(const QPixmap& pm);
+    void widget_resized();   // emitted after resize; UserPanel re-snapshots ProcessingParams
     // idx: 0: curr_pos, 1: start_pos, 2: shape_size, 3: ptz_target
     void updated_pos(int idx, QPoint pos);
     void curr_pos(QPoint pos);

@@ -16,6 +16,11 @@ FloatingWindow::FloatingWindow() :
     frame = new QFrame(this);
 //    frame->setObjectName("FRAME");
     frame->resize(this->size());
+    // Override the dark theme's .QFrame { background-color: #12100E } rule
+    // (style_dark.qss:57) so the chrome overlay doesn't paint opaque over
+    // the Display content below. The frame only hosts corner widgets
+    // (exit button + QSizeGrip); its surface was never meant to be visible.
+    frame->setStyleSheet("background: transparent; border: none;");
     QGridLayout *layout = new QGridLayout(frame);
     layout->setContentsMargins(0, 0, 0, 0);
 

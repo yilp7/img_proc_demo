@@ -6,7 +6,9 @@ PTZ::PTZ(int index, uchar address, uint speed) :
     address(address),
     angle_h(0),
     angle_v(0),
-    ptz_speed(speed)
+    ptz_speed(speed),
+    pan_speed(speed),
+    tilt_speed(speed)
 {
     uchar q0[] = {SYNC_BYTE, address, 0x00, PTZ_QUERY_H, 0x00, 0x00, 0x00};
     query[0] = QByteArray((char*)q0, 7);
@@ -152,15 +154,15 @@ int PTZ::ptz_control(qint32 ptz_param, double val)
     switch(ptz_param)
     {
         case STOP:       { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_STOP,       0x00,                  0x00,                  0x00}; command = QByteArray((char*)buf, 7); break; }
-        case UP_LEFT:    { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_UP_LEFT,    ptz_speed,             ptz_speed,             0x00}; command = QByteArray((char*)buf, 7); break; }
-        case UP:         { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_UP,         0x00,                  ptz_speed,             0x00}; command = QByteArray((char*)buf, 7); break; }
-        case UP_RIGHT:   { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_UP_RIGHT,   ptz_speed,             ptz_speed,             0x00}; command = QByteArray((char*)buf, 7); break; }
-        case LEFT:       { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_LEFT,       ptz_speed,             0x00,                  0x00}; command = QByteArray((char*)buf, 7); break; }
+        case UP_LEFT:    { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_UP_LEFT,    pan_speed,             tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
+        case UP:         { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_UP,         0x00,                  tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
+        case UP_RIGHT:   { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_UP_RIGHT,   pan_speed,             tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
+        case LEFT:       { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_LEFT,       pan_speed,             0x00,                  0x00}; command = QByteArray((char*)buf, 7); break; }
         case SELF_CHECK: { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_SELF_CHECK, 0x00,                  PTZ_SELF_CHECK_DATA, 0x00}; command = QByteArray((char*)buf, 7); break; }
-        case RIGHT:      { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_RIGHT,      ptz_speed,             0x00,                  0x00}; command = QByteArray((char*)buf, 7); break; }
-        case DOWN_LEFT:  { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_DOWN_LEFT,  ptz_speed,             ptz_speed,             0x00}; command = QByteArray((char*)buf, 7); break; }
-        case DOWN:       { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_DOWN,       0x00,                  ptz_speed,             0x00}; command = QByteArray((char*)buf, 7); break; }
-        case DOWN_RIGHT: { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_DOWN_RIGHT, ptz_speed,             ptz_speed,             0x00}; command = QByteArray((char*)buf, 7); break; }
+        case RIGHT:      { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_RIGHT,      pan_speed,             0x00,                  0x00}; command = QByteArray((char*)buf, 7); break; }
+        case DOWN_LEFT:  { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_DOWN_LEFT,  pan_speed,             tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
+        case DOWN:       { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_DOWN,       0x00,                  tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
+        case DOWN_RIGHT: { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_DOWN_RIGHT, pan_speed,             tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
         case ANGLE_H:
         case ANGLE_V:
         {
@@ -203,7 +205,9 @@ int PTZ::ptz_control(qint32 ptz_param, double val)
             command = QByteArray((char*)buffer_out, 7);
             break;
         }
-        case SPEED: ptz_speed = std::min(std::max((uchar)val, uchar(MIN_SPEED)), uchar(MAX_SPEED)); return 0;
+        case SPEED:   ptz_speed = pan_speed = tilt_speed = std::min(std::max((uchar)val, uchar(MIN_SPEED)), uchar(MAX_SPEED)); return 0;
+        case SPEED_H: pan_speed  = std::min(std::max((uchar)val, uchar(MIN_SPEED)), uchar(MAX_SPEED)); return 0;
+        case SPEED_V: tilt_speed = std::min(std::max((uchar)val, uchar(MIN_SPEED)), uchar(MAX_SPEED)); return 0;
         case ADDRESS: address = val; return 0;
         default: return -11111;
     }

@@ -123,8 +123,9 @@ signals:
                             QString bu, QString bn, QString bp,
                             QString gw_text);
 
-    // Layout changes
-    void tcu_type_layout_changed(int idx, int diff);
+    // Layout changes. diff = transition for delay/GW reflow (0↔non-0).
+    // laser_diff = transition for LASER_WIDTH (only shown at 40ps step / idx 2).
+    void tcu_type_layout_changed(int idx, int diff, int laser_diff);
     void tcu_diff_view_toggled(bool show_diff);
 
     // Preferences forwarding

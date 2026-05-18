@@ -58,6 +58,7 @@
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class UserPanel; }
+class QLineEdit;
 QT_END_NAMESPACE
 
 class UserPanel;
@@ -357,11 +358,16 @@ protected:
     void dragEnterEvent(QDragEnterEvent *event);
     void dropEvent(QDropEvent *event);
     void showEvent(QShowEvent *event);
+    bool eventFilter(QObject *obj, QEvent *event) override;  // tracks alt-display Resize for FPS labels
 
 // control functions
 private:
     void data_exchange(bool read);
-    
+
+    // dir = +1 enter ps mode (relabels U/N to ",/." and inserts P),
+    //       -1 leave. Restored from pre-Sprint-9 helper.
+    void update_tcu_param_pos(int dir, QLabel *u_unit, QLineEdit *n_input,
+                              QLabel *n_unit, QLineEdit *p_input);
 
     // shut the cam down
     int shut_down();
@@ -429,7 +435,7 @@ public:
 
 private:
     Ui::UserPanel*  ui;
-    QLabel*         m_fps_label;
+    QLabel*         m_fps_label[3];   // per-display FPS readout (main + 2 alts)
     QFrame*         m_center_toolbar;  // inline center toolbar: SEL/ZOOM/PTZ + INFO
     QFrame*         m_pbar;           // panel toggle bar: 3 checkable buttons top-right
     OpticsPanel*    m_optics_panel;
@@ -474,7 +480,7 @@ private:
     Cam*            curr_cam;                   // current camera
     float           time_exposure_edit;
     float           gain_analog_edit;
-    float           frame_rate_edit;
+    float           frame_rate_edit[3]; // per-display playback / camera rate
     QString         save_location;              // where to save the image
     QString         TEMP_SAVE_LOCATION;         // temp location to save the image
     cv::VideoWriter vid_out[4];                 // video writer for ORI/RES/alt-display1/2
@@ -485,7 +491,7 @@ private:
     
     std::queue<cv::Mat>        q_img[3];                   // image queue in grab_thread
     std::queue<int>            q_frame_info;
-    TimedQueue                 q_fps_calc;
+    TimedQueue*                q_fps_calc[3];
 //    bool                    updated[3];                 // whether the program get a new image from stream
     // TODO add other scan features
 //    std::vector<TCUDataGroup>  q_scan;                   // targets' tcu param found while scanning
