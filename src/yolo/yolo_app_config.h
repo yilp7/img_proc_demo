@@ -2,7 +2,7 @@
 
 #include <string>
 #include <vector>
-#include <fstream>
+#include <istream>
 #include <sstream>
 #include <iostream>
 #include <map>
@@ -71,52 +71,33 @@ public:
     }
 
     /**
-     * @brief Load configuration from INI file
-     * @param filename Configuration file path
-     * @return Whether load was successful
+     * @brief Load configuration from an already-opened stream of INI content.
+     *        Callers handle file I/O (so they can use platform-appropriate APIs
+     *        such as QFile, which supports non-ASCII paths on Windows).
      */
-    bool loadFromFile(const std::string& filename) {
-        std::ifstream file(filename);
-        if (!file.is_open()) {
-            std::cerr << "Warning: Could not open config file: " << filename << std::endl;
-            std::cerr << "Using default configuration." << std::endl;
-            return false;
-        }
-
+    bool loadFromStream(std::istream& stream) {
         std::string line;
         std::string currentSection;
 
-        while (std::getline(file, line)) {
-            // Remove whitespace
+        while (std::getline(stream, line)) {
             line = trim(line);
+            if (line.empty() || line[0] == ';' || line[0] == '#') continue;
 
-            // Skip empty lines and comments
-            if (line.empty() || line[0] == ';' || line[0] == '#') {
-                continue;
-            }
-
-            // Parse section header
             if (line[0] == '[' && line[line.length() - 1] == ']') {
                 currentSection = line.substr(1, line.length() - 2);
                 continue;
             }
 
-            // Parse key-value pair
             size_t pos = line.find('=');
             if (pos != std::string::npos) {
                 std::string key = trim(line.substr(0, pos));
                 std::string value = trim(line.substr(pos + 1));
-
-                // Remove quotes from value
                 if (value.length() >= 2 && value[0] == '"' && value[value.length() - 1] == '"') {
                     value = value.substr(1, value.length() - 2);
                 }
-
                 parseValue(key, value);
             }
         }
-
-        file.close();
         return true;
     }
 

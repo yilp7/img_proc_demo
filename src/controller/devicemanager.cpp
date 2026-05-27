@@ -354,6 +354,17 @@ void DeviceManager::ptz_button_released(int id)
         active_ptz->ptz_stop();
 }
 
+void DeviceManager::ptz_stop_btn_clicked()
+{
+    if (m_config->get_data().device.ptz_type == 2) {
+        // UDPPTZ STANDBY (0x01) — explicit STOP. Joystick-release still uses
+        // ptz_stop() which sends MANUAL_SEARCH (0x04) with zero velocity.
+        if (p_udpptz) p_udpptz->emit transmit(UDPPTZ::STANDBY);
+    } else if (active_ptz) {
+        active_ptz->ptz_stop();
+    }
+}
+
 void DeviceManager::set_ptz_speed(int speed)
 {
     if (speed > 64) speed = 64;
@@ -586,11 +597,17 @@ void DeviceManager::connect_to_serial_server_tcp(QString server_ip)
     QTimer::singleShot(1000,
     [this]()
     {
-        if (ControlPort::TCP_CONNECTED & p_tcu->get_port_status())
-        {
+        const bool tcu_ok  = ControlPort::TCP_CONNECTED & p_tcu->get_port_status();
+        const bool lens_ok = ControlPort::TCP_CONNECTED & p_lens->get_port_status();
+        const bool rf_ok   = ControlPort::TCP_CONNECTED & p_rf->get_port_status();
+        if (tcu_ok && lens_ok && rf_ok) {
             emit tcp_server_chk_update(true, true);
         }
-        else emit tcp_server_connect_failed();
+        else {
+            qDebug() << "TCP server connect failed: tcu=" << tcu_ok
+                     << "lens=" << lens_ok << "rf=" << rf_ok;
+            emit tcp_server_connect_failed();
+        }
     });
 }
 

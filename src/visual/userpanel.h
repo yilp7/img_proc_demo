@@ -381,6 +381,7 @@ private:
     void lens_stop() { m_lens_ctrl->lens_stop(); }
     void set_zoom();
     void set_focus();
+    void set_iris();
     void focus_far() { m_lens_ctrl->focus_far(); }
     void focus_near() { m_lens_ctrl->focus_near(); }
 

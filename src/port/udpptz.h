@@ -8,6 +8,17 @@ class UDPPTZ : public QObject, public IPTZController
 {
     Q_OBJECT
 public:
+    // Device-protocol variant. The 14-byte frame layout and op codes are
+    // shared across vendors, but a few details differ per device family.
+    // For now this controls how the scan-range bytes (8-9) are populated;
+    // the stop semantics are not yet protocol-gated (see ptz_stop).
+    enum Protocol {
+        PROTOCOL_500 = 500, // bytes 8-9 carry scan_range (0x00 unless SCAN
+                            // populates it); 20 ms TX cadence.
+        PROTOCOL_530 = 530, // bytes 8-9 always 0x7F7F regardless of op;
+                            // 10 ms TX cadence.
+    };
+
     enum OPERATION {
         // PTZ operations
         STOP            = 0x00,
@@ -61,6 +72,8 @@ public:
 
     void set_target(QHostAddress target, quint16 port);
     void set_listen(QHostAddress listen, quint16 port);
+    void set_protocol(Protocol p);
+    Protocol get_protocol() const { return protocol; }
     bool is_connected() const {
         return connected && udp_socket != nullptr;
         // TODO: Implement real-time connection check based on received data
@@ -140,6 +153,8 @@ private:
     // Connection monitoring
     qint64 last_received_time;
     static const qint64 CONNECTION_TIMEOUT_MS = 3000; // 3 seconds timeout
+
+    Protocol protocol;
 };
 
 #endif // UDPPTZ_H

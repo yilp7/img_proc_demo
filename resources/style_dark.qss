@@ -222,6 +222,14 @@ QGroupBox::title {
     font-weight: 700;
 }
 
+/* Setup overlay card titles — small labels above Save/Comm/TCU/Device cards.
+   Color-only; weight intentionally normal to match how QGroupBox::title
+   actually renders (its font-weight: 700 doesn't bold the subcontrol). */
+#SETUP_CARD_TITLE {
+    color: #E0924A;
+    padding-left: 4px;
+}
+
 /* === Tabs ============================================== */
 QTabWidget::pane {
     border: 1px solid #382D25;
@@ -403,7 +411,8 @@ QSlider::handle:vertical:hover {
 
 /* === Tools (display image overlay) ===================== */
 Tools {
-    border-style: none;
+    background-color: #12100E;
+    border: 1px solid #241E1A;
     border-radius: 2px;
 }
 
@@ -412,16 +421,17 @@ Tools {
 #PTZ_TOOL::indicator {
     width: 16px;
     height: 16px;
-    margin-left: 2px;
+    /* QRadioButton anchors ::indicator left-of-text by default; with no
+       text the indicator still hugs the left edge. Force center. */
+    subcontrol-position: center;
 }
 
 #ZOOM_TOOL::indicator   { image: url(:/tools/dark/move); }
 #SELECT_TOOL::indicator { image: url(:/tools/dark/select); }
 #PTZ_TOOL::indicator    { image: url(:/tools/dark/ptz); }
 
-Tools::checked   { background-color: #2E221A; }
-Tools::unchecked { background-color: transparent; }
-Tools::hover     { background-color: #261B14; }
+Tools::checked { background-color: #2E221A; border-color: #E0924A55; }
+Tools::hover   { background-color: #261B14; }
 
 /* === Coordinate / info labels ========================== */
 Coordinate InfoLabel {
@@ -712,10 +722,12 @@ TopButton:pressed {
 }
 
 /* === Center display toolbar (SEL / ZOOM / PTZ + INFO) === */
+/* Transparent container so the chip-style Tools buttons sit cleanly over
+   the display; the warm-border outline used to read cool/blue against the
+   surrounding panels. Matches PANEL_TOGGLE_BAR. */
 #CENTER_TOOLBAR {
-    background-color: #12100EEE;
-    border: 1px solid #241E1A;
-    border-radius: 3px;
+    background: transparent;
+    border: none;
 }
 
 /* === Pbar (panel-toggle bar) =========================== */
@@ -778,6 +790,22 @@ TopButton:pressed {
     color: #5C4A3D;
     background: transparent;
     font-size: 10px;
+}
+
+#SIDE_DISPLAY_SWAP_BTN {
+    background-color: #1A1612;
+    border: 1px solid #382D25;
+    border-radius: 3px;
+    padding: 0px;
+}
+
+#SIDE_DISPLAY_SWAP_BTN:hover {
+    background-color: #2A2018;
+    border-color: #5C4A3D;
+}
+
+#SIDE_DISPLAY_SWAP_BTN:pressed {
+    background-color: #3A2C20;
 }
 
 /* === SETUP overlay ===================================== */
@@ -915,4 +943,61 @@ TopButton:pressed {
 #SCAN_PREVIEW_PH {
     color: #5C4A3D;
     background: transparent;
+}
+
+/* === Modern PTZ labels (joystick + arc sliders) ======== */
+#JoyLabel {
+    font-size: 9px;
+    color: #5C4A3D;             /* text-dim */
+    background: transparent;
+}
+
+#ArcLabel {
+    font-size: 8px;
+    color: #5C4A3D;             /* text-dim */
+    background: transparent;
+}
+
+#ArcValue {
+    font-family: "Consolas";
+    font-size: 9px;
+    color: #CDB299;             /* readout */
+    background: transparent;
+}
+
+/* === TCU Normal-mode DIST readout ======================= */
+#TcuDistLabel {
+    font-family: "Consolas";
+    font-size: 10px;
+    color: #8F6B4D;             /* readout-dim */
+    background: transparent;
+}
+
+/* === TCU Normal-mode FIRE LASER button =================== */
+#FireLaserBtn {
+    background-color: #2A1217;  /* negative-bg */
+    color: #E6455D;             /* negative */
+    border: 1px solid #4D161E;  /* negative-dim */
+    border-radius: 3px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+#FireLaserBtn:hover {
+    background-color: #4D161E;
+    color: #FF7589;
+}
+
+#FireLaserBtn:pressed,
+#FireLaserBtn:checked {
+    background-color: #6A1A23;
+    color: #FFFFFF;
+    border-color: #E6455D;
+}
+
+#FireLaserBtn:disabled {
+    background-color: #1C0E10;
+    color: #5C2A30;
+    border-color: #2E1418;
 }

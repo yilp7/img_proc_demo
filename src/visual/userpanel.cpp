@@ -254,9 +254,13 @@ UserPanel::UserPanel(QWidget *parent) :
         auto *tl = new QHBoxLayout(m_center_toolbar);
         tl->setContentsMargins(4, 2, 4, 2);
         tl->setSpacing(4);
-        ui->ZOOM_TOOL  ->setParent(m_center_toolbar); tl->addWidget(ui->ZOOM_TOOL);
-        ui->SELECT_TOOL->setParent(m_center_toolbar); tl->addWidget(ui->SELECT_TOOL);
-        ui->PTZ_TOOL   ->setParent(m_center_toolbar); tl->addWidget(ui->PTZ_TOOL);
+        // Uniform 24×24 so the three tool buttons read as a row, not as
+        // QRadioButton sizeHints (which differ per indicator style).
+        for (auto *t : { ui->ZOOM_TOOL, ui->SELECT_TOOL, ui->PTZ_TOOL }) {
+            t->setParent(m_center_toolbar);
+            t->setFixedSize(24, 24);
+            tl->addWidget(t);
+        }
         tl->addSpacing(6);
         ui->INFO_CHECK ->setParent(m_center_toolbar); tl->addWidget(ui->INFO_CHECK);
         m_center_toolbar->adjustSize();
@@ -601,10 +605,9 @@ UserPanel::UserPanel(QWidget *parent) :
         m_aux_panel->select_display(tab_to_alt_opt[idx] - 1);
     });
 
-    // Initial panel positions (resizeEvent will correct on first paint)
-    m_optics_panel ->resize(280, 400); m_optics_panel ->move(10, 50);
-    m_tcu_panel    ->resize(250, 360); m_tcu_panel    ->move(300, 50);
-    m_console_panel->resize(380, 320); m_console_panel->move(560, 50);
+    m_optics_panel ->resize(240, 390); m_optics_panel ->move(0, 0);
+    m_tcu_panel    ->resize(250, 360); m_tcu_panel    ->move(0, 0);
+    m_console_panel->resize(208, 220); m_console_panel->move(0, 0);
     m_optics_panel ->show();
     m_tcu_panel    ->show();
     m_console_panel->show();
@@ -635,9 +638,15 @@ UserPanel::UserPanel(QWidget *parent) :
                       ui->RESET_3D_BTN,
                       ui->PSEUDOCOLOR_CHK);
 
+    // SaveOptionsWidget slots are (capture ORI, capture RES, record ORI, record RES).
+    // The action handlers (on_SAVE_*_clicked) define the real semantic:
+    //   SAVE_BMP   → capture ORI    SAVE_RESULT → capture RES
+    //   SAVE_AVI   → record  ORI    SAVE_FINAL  → record  RES
+    // Earlier wiring swapped the two RES buttons, putting the capture-RES
+    // toggle in the record row and vice versa.
     m_save_options->setup(ui->FILE_PATH_EDIT, ui->FILE_PATH_BROWSE,
-                          ui->SAVE_BMP_BUTTON,    ui->SAVE_FINAL_BUTTON,
-                          ui->SAVE_AVI_BUTTON,    ui->SAVE_RESULT_BUTTON,
+                          ui->SAVE_BMP_BUTTON,    ui->SAVE_RESULT_BUTTON,
+                          ui->SAVE_AVI_BUTTON,    ui->SAVE_FINAL_BUTTON,
                           ui->CAPTURE_LABEL,      ui->RECORD_LABEL);
 
     m_right_stack->addSection(m_img_proc);
@@ -663,6 +672,13 @@ UserPanel::UserPanel(QWidget *parent) :
     m_side_display = new SideDisplayWidget(ui->CENTRAL);
     m_mapbox       = new MapboxWidget(ui->CENTRAL);
     m_side_display->setup(displays[1], displays[2]);
+    // ALT 1/2 thumbnail "⇆" buttons swap their stream with the main display.
+    // alt_idx == 1 → swap displays[0] with displays[1]; idx == 2 → with [2].
+    connect(m_side_display, &SideDisplayWidget::swap_requested,
+            this, [this](int alt_idx) {
+        if (alt_idx == 1 || alt_idx == 2)
+            swap_grab_thread_display(0, alt_idx);
+    });
     m_mapbox      ->hide();
     m_right_stack ->setGeometry(0, 0, 220, 400);
     m_right_stack ->raise();
@@ -773,6 +789,7 @@ UserPanel::UserPanel(QWidget *parent) :
         take(ui->CCD_FREQ,      camera);
         take(ui->CCD_FREQ_EDIT, camera);
         take(ui->CCD_FREQ_UNIT, camera);
+        ui->CCD_FREQ_EDIT->setMaximumWidth(60);
         auto *freq_block = new QWidget(camera);
         auto *fl = new QHBoxLayout(freq_block);
         fl->setContentsMargins(0, 0, 0, 0);
@@ -780,11 +797,13 @@ UserPanel::UserPanel(QWidget *parent) :
         fl->addWidget(ui->CCD_FREQ);
         fl->addWidget(ui->CCD_FREQ_EDIT);
         fl->addWidget(ui->CCD_FREQ_UNIT);
+        fl->addStretch(1);
 
         // Time Expo compound block: label + edit + unit
         take(ui->DUTY,      camera);
         take(ui->DUTY_EDIT, camera);
         take(ui->DUTY_UNIT, camera);
+        ui->DUTY_EDIT->setMaximumWidth(60);
         auto *expo_block = new QWidget(camera);
         auto *el = new QHBoxLayout(expo_block);
         el->setContentsMargins(0, 0, 0, 0);
@@ -792,11 +811,13 @@ UserPanel::UserPanel(QWidget *parent) :
         el->addWidget(ui->DUTY);
         el->addWidget(ui->DUTY_EDIT);
         el->addWidget(ui->DUTY_UNIT);
+        el->addStretch(1);
 
         // Gain compound block: label + edit + slider
         take(ui->GAIN_STATIC, camera);
         take(ui->GAIN_EDIT,   camera);
         take(ui->GAIN_SLIDER, camera);
+        ui->GAIN_EDIT->setMaximumWidth(60);
         auto *gain_block = new QWidget(camera);
         auto *gl = new QHBoxLayout(gain_block);
         gl->setContentsMargins(0, 0, 0, 0);
@@ -1188,6 +1209,16 @@ UserPanel::UserPanel(QWidget *parent) :
         const bool setup_mode   = (mode == TopBar::Mode::Setup);
         const bool scan_mode    = (mode == TopBar::Mode::Scan);
         const bool overlay_mode = setup_mode || scan_mode;
+
+        // Leaving Setup: read pending UI edits into Config and persist to default.json
+        // so values entered in the setup panel survive next launch (matches user
+        // expectation that "modified values are updated to the default.json").
+        const bool was_setup_mode = m_setup_overlay && m_setup_overlay->isVisible();
+        if (was_setup_mode && !setup_mode) {
+            syncPreferencesToConfig();
+            if (config) config->auto_save();
+        }
+
         if (m_setup_overlay) m_setup_overlay->setVisible(setup_mode);
         if (m_scan_overlay)  m_scan_overlay ->setVisible(scan_mode);
         if (m_right_stack)   m_right_stack  ->setVisible(!overlay_mode);
@@ -1293,8 +1324,10 @@ UserPanel::UserPanel(QWidget *parent) :
         if (idx >= 0 && idx < 5) labels[idx]->setStyleSheet(style);
     });
     connect(m_device_mgr, &DeviceManager::angle_display_updated, this, [this](QString h, QString v) {
-        ui->ANGLE_H_EDIT->setText(h);
-        ui->ANGLE_V_EDIT->setText(v);
+        // Skip when the field has focus — device status frames arrive every
+        // few ms and would clobber the user's keystrokes mid-edit.
+        if (!ui->ANGLE_H_EDIT->hasFocus()) ui->ANGLE_H_EDIT->setText(h);
+        if (!ui->ANGLE_V_EDIT->hasFocus()) ui->ANGLE_V_EDIT->setText(v);
     });
     connect(m_device_mgr, &DeviceManager::ptz_speed_display_changed, this, [this](int val, QString text) {
         ui->PTZ_SPEED_SLIDER->setValue(val);
@@ -1315,10 +1348,13 @@ UserPanel::UserPanel(QWidget *parent) :
         if (btn) btn->setText(text);
     });
     connect(m_device_mgr, &DeviceManager::vid_camera_buttons_reset, this, [this]() {
-        ui->VL_ZOOM_IN_BTN->setText(""); ui->VL_ZOOM_OUT_BTN->setText("");
-        ui->VL_FOCUS_FAR_BTN->setText(""); ui->VL_FOCUS_NEAR_BTN->setText("");
-        ui->IR_ZOOM_IN_BTN->setText(""); ui->IR_ZOOM_OUT_BTN->setText("");
-        ui->IR_FOCUS_FAR_BTN->setText(""); ui->IR_FOCUS_NEAR_BTN->setText("");
+        // Restore the original "+" / "-" glyphs after a press shows "x". The
+        // previous version cleared to "" which left the buttons blank for the
+        // rest of the session.
+        ui->VL_ZOOM_IN_BTN   ->setText("+"); ui->VL_ZOOM_OUT_BTN  ->setText("-");
+        ui->VL_FOCUS_NEAR_BTN->setText("+"); ui->VL_FOCUS_FAR_BTN ->setText("-");
+        ui->IR_ZOOM_IN_BTN   ->setText("+"); ui->IR_ZOOM_OUT_BTN  ->setText("-");
+        ui->IR_FOCUS_NEAR_BTN->setText("+"); ui->IR_FOCUS_FAR_BTN ->setText("-");
     });
     connect(m_device_mgr, &DeviceManager::vid_btn_style_changed, this, [this](QString name, QString style) {
         QWidget *w = findChild<QWidget*>(name);
@@ -1347,6 +1383,13 @@ UserPanel::UserPanel(QWidget *parent) :
     });
     connect(m_device_mgr, &DeviceManager::get_lens_param_requested, m_lens_ctrl, &LensController::on_GET_LENS_PARAM_BTN_clicked);
 
+    // Lens relay on/off (next to Iris in Classic optics box). Checked = relay
+    // ON, label flips to 'x'; unchecked = OFF, label 'o'.
+    connect(ui->LENS_ON_BTN, &QPushButton::toggled, this, [this](bool on) {
+        ui->LENS_ON_BTN->setText(on ? "x" : "o");
+        m_lens_ctrl->on_LENS_ON_BTN_toggled(on);
+    });
+
     // DeviceManager UI setup (PTZ button group, VID buttons, PTZ speed slider)
     {
         QString theme_dir = app_theme ? "light" : "dark";
@@ -1371,6 +1414,7 @@ UserPanel::UserPanel(QWidget *parent) :
         ptz_grp->addButton(ui->DOWN_RIGHT_BTN, 8);
         connect(ptz_grp, QOverload<int>::of(&QButtonGroup::buttonPressed), m_device_mgr, &DeviceManager::ptz_button_pressed);
         connect(ptz_grp, QOverload<int>::of(&QButtonGroup::buttonReleased), m_device_mgr, &DeviceManager::ptz_button_released);
+        connect(ui->STOP_BTN, &QPushButton::clicked, m_device_mgr, &DeviceManager::ptz_stop_btn_clicked);
 
         QButtonGroup *vid_grp = new QButtonGroup(this);
         vid_grp->addButton(ui->VL_ZOOM_OUT_BTN, UDPPTZ::VL_ZOOM_OUT);
@@ -1496,6 +1540,9 @@ UserPanel::UserPanel(QWidget *parent) :
         };
         if (id >= 0 && id < 6) btns[id]->setText(text);
     });
+    connect(m_lens_ctrl, &LensController::iris_text_updated, this, [this](QString text) {
+        if (!ui->IRIS_EDIT->hasFocus()) ui->IRIS_EDIT->setText(text);
+    });
     connect(m_lens_ctrl, &LensController::zoom_text_updated, this, [this](QString text) {
         if (!ui->ZOOM_EDIT->hasFocus()) ui->ZOOM_EDIT->setText(text);
     });
@@ -1512,10 +1559,8 @@ UserPanel::UserPanel(QWidget *parent) :
         ui->LASER_BTN->setEnabled(enabled);
         if (!text.isEmpty()) ui->LASER_BTN->setText(text);
     });
-    connect(m_laser_ctrl, &LaserController::fire_btn_update, this, [this](bool enabled, QString text) {
-        ui->FIRE_LASER_BTN->setEnabled(enabled);
-        if (!text.isEmpty()) ui->FIRE_LASER_BTN->setText(text);
-    });
+    // FIRE_LASER_BTN's gating (text + enabled) is wired up in
+    // setup_floating_panels(), where the UnlockBar is available.
     connect(m_laser_ctrl, &LaserController::current_edit_enabled, ui->CURRENT_EDIT, &QWidget::setEnabled);
     connect(m_laser_ctrl, &LaserController::simple_laser_chk_update, this, [this](bool enabled, int state) {
         ui->SIMPLE_LASER_CHK->setEnabled(enabled);
@@ -1524,7 +1569,15 @@ UserPanel::UserPanel(QWidget *parent) :
         else if (state == 2) ui->SIMPLE_LASER_CHK->click();
     });
     connect(m_laser_ctrl, &LaserController::laser_enable_requested, this, [this](bool enable) {
+        // FIRE/STOP must drive both the master "enable laser" command
+        // (LASER_ENABLE_CHK → 0x88 0x1F …) and the channel-1 select command
+        // (LASER_CHK_1 → toggle_laser → TCU::LASER_ON). Both checkboxes' own
+        // stateChanged / buttonToggled handlers send the wire commands; we
+        // just set their state here. setChecked is a no-op when the box is
+        // already in the requested state, so this is safe to call on every
+        // FIRE/STOP transition.
         m_setup_overlay->w()->LASER_ENABLE_CHK->setChecked(enable);
+        m_setup_overlay->w()->LASER_CHK_1->setChecked(enable);
     });
     connect(m_laser_ctrl, &LaserController::update_current_requested, this, [this]() {
         update_current();
@@ -1557,36 +1610,79 @@ UserPanel::UserPanel(QWidget *parent) :
     // OpticsPanel — Modern mode: JoystickWidget + ZOOM + FOCUS ArcSliders
     {
         auto *modern_w = new QWidget;
-        auto *ml = new QHBoxLayout(modern_w);
+        auto *ml = new QVBoxLayout(modern_w);
         ml->setContentsMargins(4, 4, 4, 4);
         ml->setSpacing(8);
 
-        auto *joystick     = new JoystickWidget(modern_w);
-        joystick->setMinimumSize(100, 100);
+        // Joystick column (joystick + "PTZ" label below). Centered horizontally
+        // when added to ml so it sits at the top of the modern page.
+        auto *joy_col = new QWidget(modern_w);
+        auto *joy_l = new QVBoxLayout(joy_col);
+        joy_l->setContentsMargins(0, 0, 0, 0);
+        joy_l->setSpacing(2);
+        auto *joystick = new JoystickWidget(joy_col);
+        joystick->setFixedSize(120, 120);
+        auto *joy_lbl = new QLabel("PTZ", joy_col);
+        joy_lbl->setObjectName("JoyLabel");
+        joy_lbl->setAlignment(Qt::AlignCenter);
+        joy_l->addWidget(joystick, 0, Qt::AlignHCenter);
+        joy_l->addWidget(joy_lbl);
 
         auto *zoom_slider  = new ArcSliderWidget(modern_w);
         auto *focus_slider = new ArcSliderWidget(modern_w);
         auto *iris_slider  = new ArcSliderWidget(modern_w);
-        zoom_slider ->setRange(0, 1000);
-        focus_slider->setRange(0, 1000);
-        iris_slider ->setRange(0, 1000);
-        zoom_slider ->setFixedSize(36, 120);
-        focus_slider->setFixedSize(36, 120);
-        iris_slider ->setFixedSize(36, 120);
+        zoom_slider ->setFixedSize(54, 120);
+        focus_slider->setFixedSize(54, 120);
+        iris_slider ->setFixedSize(54, 120);
+        // Speed/joystick mode: drag from midpoint = signed speed (1..63),
+        // quantized in steps of 4. Release snaps back to midpoint = STOP.
+        zoom_slider ->setSpeedMode(63);
+        focus_slider->setSpeedMode(63);
+        iris_slider ->setSpeedMode(63);
+        // Per-slider colours match prototype v3 lens tokens.
+        zoom_slider ->setActiveColor(QColor(0xE6, 0x45, 0x5D)); // lens-zoom  (pink)
+        focus_slider->setActiveColor(QColor(0xE0, 0x92, 0x4A)); // lens-focus (orange)
+        iris_slider ->setActiveColor(QColor(0x4D, 0xA6, 0xE6)); // lens-iris  (blue)
 
-        auto *slider_col   = new QWidget(modern_w);
-        auto *sc_l = new QVBoxLayout(slider_col);
-        sc_l->setContentsMargins(0, 0, 0, 0);
-        sc_l->setSpacing(4);
-        sc_l->addWidget(new QLabel("Z", slider_col));
-        sc_l->addWidget(zoom_slider);
-        sc_l->addWidget(new QLabel("F", slider_col));
-        sc_l->addWidget(focus_slider);
-        sc_l->addWidget(new QLabel("I", slider_col));
-        sc_l->addWidget(iris_slider);
+        // Helper: wrap an ArcSliderWidget in a vertical sub-column
+        // [slider][label][value]. Each sub-column sits side-by-side in slider_row.
+        auto makeArcCol = [&](ArcSliderWidget *slider, const char *lbl) {
+            auto *col = new QWidget(modern_w);
+            auto *cl  = new QVBoxLayout(col);
+            cl->setContentsMargins(0, 0, 0, 0);
+            cl->setSpacing(2);
 
-        ml->addWidget(joystick, 1);
-        ml->addWidget(slider_col);
+            auto *name = new QLabel(lbl, col);
+            name->setObjectName("ArcLabel");
+            name->setAlignment(Qt::AlignCenter);
+
+            auto *val = new QLabel("00", col);
+            val->setObjectName("ArcValue");
+            val->setAlignment(Qt::AlignCenter);
+            // In speed mode the value is signed speed; show absolute speed
+            // (the up/down direction is already conveyed by the thumb).
+            connect(slider, &ArcSliderWidget::valueChanged, val, [val](int v) {
+                val->setText(QString::number(qAbs(v)).rightJustified(2, '0'));
+            });
+
+            cl->addWidget(slider, 0, Qt::AlignHCenter);
+            cl->addWidget(name);
+            cl->addWidget(val);
+            cl->addStretch(1);          // keep slider+labels packed at the top
+            return col;
+        };
+
+        auto *slider_row = new QWidget(modern_w);
+        auto *sr_l = new QHBoxLayout(slider_row);
+        sr_l->setContentsMargins(0, 0, 0, 0);
+        sr_l->setSpacing(5);
+        sr_l->addWidget(makeArcCol(zoom_slider,  "ZOOM"));
+        sr_l->addWidget(makeArcCol(focus_slider, "FOCUS"));
+        sr_l->addWidget(makeArcCol(iris_slider,  "IRIS"));
+
+        ml->addWidget(joy_col,    0, Qt::AlignHCenter);
+        ml->addWidget(slider_row, 0, Qt::AlignHCenter);
+        ml->addStretch(1);
 
         // Joystick → PTZ with independent pan/tilt speeds. Each axis's speed
         // is |dx| / |dy| scaled to PTZ range; direction byte is composed
@@ -1647,66 +1743,148 @@ UserPanel::UserPanel(QWidget *parent) :
             }
         });
 
-        connect(zoom_slider,  &ArcSliderWidget::valueChanged,
-                m_lens_ctrl, &LensController::set_zoom_value);
-        connect(focus_slider, &ArcSliderWidget::valueChanged,
-                m_lens_ctrl, &LensController::set_focus_value);
-        connect(iris_slider,  &ArcSliderWidget::valueChanged,
-                m_lens_ctrl, &LensController::set_iris_value);
+        connect(zoom_slider,  &ArcSliderWidget::speedChanged, this, [this](int s) {
+            m_lens_ctrl->set_modern_speed(LensController::Zoom, s);
+        });
+        connect(focus_slider, &ArcSliderWidget::speedChanged, this, [this](int s) {
+            m_lens_ctrl->set_modern_speed(LensController::Focus, s);
+        });
+        connect(iris_slider,  &ArcSliderWidget::speedChanged, this, [this](int s) {
+            m_lens_ctrl->set_modern_speed(LensController::Iris, s);
+        });
+
+        // Mode switch: when leaving modern -> classic, force-release all arcs
+        // (covers the edge case where the mode toggle steals focus mid-drag)
+        // and re-send classic's FOCUS_SPEED_SLIDER value so the device's
+        // STEPPING register matches what classic shows.
+        connect(m_optics_panel, &OpticsPanel::modeChanged, this,
+                [this, zoom_slider, focus_slider, iris_slider](OpticsPanel::Mode mode) {
+            if (mode == OpticsPanel::Mode::Classic) {
+                zoom_slider ->setValue(0);
+                focus_slider->setValue(0);
+                iris_slider ->setValue(0);
+                m_lens_ctrl->set_modern_speed(LensController::Zoom,  0);
+                m_lens_ctrl->set_modern_speed(LensController::Focus, 0);
+                m_lens_ctrl->set_modern_speed(LensController::Iris,  0);
+                m_lens_ctrl->restore_classic_stepping(ui->FOCUS_SPEED_SLIDER->value());
+            }
+        });
 
         m_optics_panel->set_modern_page(modern_w);
     }
 
-    // TCUPanel — Normal mode: TimingBarWidget + UnlockBar
+    // TCUPanel — Normal mode: DIST readout + UnlockBar + TimingBarWidget
     {
         auto *normal_w = new QWidget;
         auto *nl = new QVBoxLayout(normal_w);
         nl->setContentsMargins(4, 4, 4, 4);
         nl->setSpacing(6);
 
+        // Top row: DIST readout (left) + UnlockBar (right, fixed width).
+        auto *top_row   = new QWidget(normal_w);
+        auto *tr_l      = new QHBoxLayout(top_row);
+        tr_l->setContentsMargins(0, 0, 0, 0);
+        tr_l->setSpacing(7);
+
+        auto *dist_lbl  = new QLabel("DIST: <b>--</b>", top_row);
+        dist_lbl->setObjectName("TcuDistLabel");
+        dist_lbl->setTextFormat(Qt::RichText);
+
+        auto *unlock = new UnlockBar(top_row);
+        unlock->setFixedSize(140, 24);
+
+        tr_l->addWidget(dist_lbl, 1);
+        tr_l->addWidget(unlock);
+
+        connect(m_tcu_ctrl, &TCUController::distance_text_updated,
+                this, [dist_lbl](QString t) {
+            dist_lbl->setText("DIST: <b>" + t + "</b>");
+        });
+
+        // Reparent the global FIRE_LASER_BTN into Normal page so it appears
+        // between the DIST row and the timing bars (matches prototype v3).
+        // The button keeps its existing click signal / controller wiring;
+        // only its parent/position changes.
+        //
+        // FIRE must stay disabled until the user drags the UnlockBar — the
+        // bar only emits locked() on transitions, so the initial state must
+        // be set explicitly here (the .ui default leaves it enabled).
+        ui->FIRE_LASER_BTN->setParent(normal_w);
+        ui->FIRE_LASER_BTN->setVisible(true);
+        ui->FIRE_LASER_BTN->setEnabled(false);
+        ui->FIRE_LASER_BTN->setObjectName("FireLaserBtn"); // QSS hook
+
         auto *timing = new TimingBarWidget(normal_w);
-        timing->setBarLabel(TimingBarWidget::LaserWidth, "Width");
+        timing->setBarLabel(TimingBarWidget::LaserWidth, "LASER");
         timing->setBarUnit (TimingBarWidget::LaserWidth, "ns");
-        timing->setBarScale(TimingBarWidget::LaserWidth, 1000);
+        timing->setBarScale(TimingBarWidget::LaserWidth,
+                            (quint64)qMax(1, (int)config->get_data().tcu.max_laser_width));
         timing->setBarColor(TimingBarWidget::LaserWidth, QColor(0x3d, 0x8b, 0xff));
 
-        timing->setBarLabel(TimingBarWidget::Distance, "Delay A");
-        timing->setBarUnit (TimingBarWidget::Distance, "ns");
-        timing->setBarScale(TimingBarWidget::Distance, 10000);
+        // Distance and Dov bars use the same units as DELAY_SLIDER /
+        // GW_SLIDER — meters, with the scale (slider max) driven by
+        // max_dist / max_dov from config. Their initial scale comes from
+        // the same delay_slider_max_changed / gw_slider_max_changed signals
+        // the legacy sliders listen to.
+        timing->setBarLabel(TimingBarWidget::Distance, "DISTANCE");
+        timing->setBarUnit (TimingBarWidget::Distance, "m");
+        timing->setBarScale(TimingBarWidget::Distance,
+                            (quint64)qMax(1, (int)config->get_data().tcu.max_dist));
         timing->setBarColor(TimingBarWidget::Distance, QColor(0x4c, 0xc4, 0x77));
 
-        timing->setBarLabel(TimingBarWidget::Dov, "GateW A");
-        timing->setBarUnit (TimingBarWidget::Dov, "ns");
-        timing->setBarScale(TimingBarWidget::Dov, 5000);
+        timing->setBarLabel(TimingBarWidget::Dov, "DEPTH");
+        timing->setBarUnit (TimingBarWidget::Dov, "m");
+        timing->setBarScale(TimingBarWidget::Dov,
+                            (quint64)qMax(1, (int)config->get_data().tcu.max_dov));
         timing->setBarColor(TimingBarWidget::Dov, QColor(0xff, 0xb0, 0x3a));
 
         timing->setBarLabel(TimingBarWidget::Mcp, "MCP");
         timing->setBarUnit (TimingBarWidget::Mcp, "");
-        timing->setBarScale(TimingBarWidget::Mcp, 100);
+        timing->setBarScale(TimingBarWidget::Mcp,
+                            (quint64)qMax(1, m_tcu_ctrl->get_mcp_max()));
         timing->setBarColor(TimingBarWidget::Mcp, QColor(0xee, 0x44, 0x44));
 
-        auto *unlock = new UnlockBar(normal_w);
-        unlock->setFixedHeight(30);
-
+        nl->addWidget(top_row);
+        nl->addWidget(ui->FIRE_LASER_BTN);
         nl->addWidget(timing, 1);
-        nl->addWidget(unlock);
 
         connect(m_tcu_ctrl, &TCUController::laser_width_display_updated,
                 this, [timing](QString u, QString n, QString) {
             timing->setBarValue(TimingBarWidget::LaserWidth,
                                 (quint64)u.toLongLong() * 1000 + (quint64)n.toLongLong());
         });
-        connect(m_tcu_ctrl, &TCUController::delay_display_updated,
-                this, [timing](QString au, QString an, QString,
-                               QString,    QString,    QString) {
-            timing->setBarValue(TimingBarWidget::Distance,
-                                (quint64)au.toLongLong() * 1000 + (quint64)an.toLongLong());
+        // Distance / Dov bars are driven by the same meters-domain signals
+        // as the legacy DELAY_SLIDER / GW_SLIDER. Using the ns-split display
+        // signals here mixed units: change_delay() interprets its arg as
+        // meters and clamps to max_dist, but delay_display_updated returns
+        // nanoseconds — the round-trip pinned the bar to its scale.
+        connect(m_tcu_ctrl, &TCUController::delay_slider_value_changed,
+                this, [timing](int val) {
+            timing->setBarValue(TimingBarWidget::Distance, (quint64)qMax(0, val));
         });
-        connect(m_tcu_ctrl, &TCUController::gw_display_updated,
-                this, [timing](QString au, QString an, QString,
-                               QString,    QString,    QString, QString) {
-            timing->setBarValue(TimingBarWidget::Dov,
-                                (quint64)au.toLongLong() * 1000 + (quint64)an.toLongLong());
+        connect(m_tcu_ctrl, &TCUController::gw_slider_value_changed,
+                this, [timing](int val) {
+            timing->setBarValue(TimingBarWidget::Dov, (quint64)qMax(0, val));
+        });
+        // Track max-dist / max-dov / max-laser / mcp-max changes (Setup
+        // overlay edits and TCU-type switches) so each bar's scale stays in
+        // sync with the corresponding legacy slider's maximum.
+        connect(m_tcu_ctrl, &TCUController::delay_slider_max_changed,
+                this, [timing](int max) {
+            timing->setBarScale(TimingBarWidget::Distance, (quint64)qMax(1, max));
+        });
+        connect(m_tcu_ctrl, &TCUController::gw_slider_max_changed,
+                this, [timing](int max) {
+            timing->setBarScale(TimingBarWidget::Dov, (quint64)qMax(1, max));
+        });
+        connect(m_tcu_ctrl, &TCUController::mcp_slider_max_changed,
+                this, [timing](int max) {
+            timing->setBarScale(TimingBarWidget::Mcp, (quint64)qMax(1, max));
+        });
+        connect(m_setup_overlay, &SetupOverlay::max_laser_changed,
+                this, [timing](float max_ns) {
+            timing->setBarScale(TimingBarWidget::LaserWidth,
+                                (quint64)qMax(1, (int)max_ns));
         });
         connect(m_tcu_ctrl, &TCUController::mcp_display_updated,
                 this, [timing](int val, QString) {
@@ -1737,9 +1915,24 @@ UserPanel::UserPanel(QWidget *parent) :
             }
         });
 
+        // FIRE_LASER_BTN gating:
+        //   text="FIRE" → only clickable while the UnlockBar is unlocked
+        //   text="STOP" → always clickable (so the user can halt firing
+        //                 even after the bar auto-relocks)
         QPushButton *fire_btn = ui->FIRE_LASER_BTN;
-        connect(unlock, &UnlockBar::unlocked, this, [fire_btn]() { fire_btn->setEnabled(true);  });
-        connect(unlock, &UnlockBar::locked,   this, [fire_btn]() { fire_btn->setEnabled(false); });
+        auto refreshFireEnabled = [fire_btn, unlock]() {
+            const bool is_stop = fire_btn->text() == "STOP";
+            fire_btn->setEnabled(is_stop || unlock->isUnlocked());
+        };
+        connect(unlock, &UnlockBar::unlocked, this, refreshFireEnabled);
+        connect(unlock, &UnlockBar::locked,   this, refreshFireEnabled);
+        // Controller updates text on every FIRE↔STOP transition; recompute
+        // enabled after applying the new text so the unlock gate is honored.
+        connect(m_laser_ctrl, &LaserController::fire_btn_update,
+                this, [fire_btn, refreshFireEnabled](bool, QString text) {
+            if (!text.isEmpty()) fire_btn->setText(text);
+            refreshFireEnabled();
+        });
         // Relock when laser is turned off (button text reverts to "ON")
         connect(m_laser_ctrl, &LaserController::laser_btn_update,
                 this, [unlock](bool, QString text) {
@@ -2016,8 +2209,9 @@ void UserPanel::init()
 
     ui->FOCUS_SPEED_LABEL->hide();
 
-    ui->RADIUS_INC_BTN->hide();
-    ui->RADIUS_DEC_BTN->hide();
+    // Iris (RADIUS_INC/DEC) is now part of the unified Lens column layout —
+    // the new IRIS_LABEL in the .ui serves as its column header. Keep the
+    // legacy LASER_RADIUS_LABEL hidden (overlaps the new speed row).
     ui->LASER_RADIUS_LABEL->hide();
 
     ui->FRAME_AVG_CHECK->setText("Avg");
@@ -2059,7 +2253,13 @@ void UserPanel::init()
     m_setup_overlay->w()->AUTO_MCP_CHK->click();
     m_setup_overlay->data_exchange(false);
 #else //LVTONG
-    ui->FIRE_LASER_BTN->hide();
+    // FIRE_LASER_BTN now lives inside TCUPanel's Normal page (reparented in
+    // setup_floating_panels) — visible by default; the laser controller
+    // continues to drive its enabled/text state.
+    // LASER_BTN is hidden because FIRE_LASER_BTN already sends laser ON/OFF
+    // commands on every fire/stop transition (see LaserController::on_FIRE_
+    // LASER_BTN_clicked), so the separate power toggle is redundant.
+    ui->LASER_BTN->hide();
     ui->FISHNET_RESULT->hide();
 #endif //LVTONG
 
@@ -2161,6 +2361,7 @@ void UserPanel::data_exchange(bool read){
 
         ui->ZOOM_EDIT->setText(QString::asprintf("%d", m_device_mgr->lens()->get(Lens::ZOOM_POS)));
         ui->FOCUS_EDIT->setText(QString::asprintf("%d", m_device_mgr->lens()->get(Lens::FOCUS_POS)));
+        ui->IRIS_EDIT->setText(QString::asprintf("%d", m_device_mgr->lens()->get(Lens::LASER_RADIUS)));
 
         ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", m_device_mgr->ptz()->get(PTZ::ANGLE_H)));
         ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", m_device_mgr->ptz()->get(PTZ::ANGLE_V)));
@@ -2175,7 +2376,7 @@ void UserPanel::swap_grab_thread_display(int display_idx1, int display_idx2)
         thread_idx2 = display_thread_idx[display_idx2];
     qDebug() << "swap thread" << thread_idx1 << thread_idx2;
 
-    if (thread_idx1 != -1 && thread_idx1 != -1) {
+    if (thread_idx1 != -1 && thread_idx2 != -1) {
         image_mutex[thread_idx1].lock();
         image_mutex[thread_idx2].lock();
 
@@ -2246,6 +2447,7 @@ void UserPanel::set_theme()
     ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
     m_setup_overlay->w()->REFRESH_AVAILABLE_PORTS_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
     ui->SWITCH_TCU_UI_BTN->setIcon(QIcon(":/tools/" + QString(app_theme ? "light" : "dark") + "/switch"));
+    if (m_side_display) m_side_display->apply_theme(app_theme);
 
 //    for (int i = 0 ; i < 5; i++) if (serial_port_connected[i]) com_label[i]->setStyleSheet(app_theme ? "color: #180D1C;" : "color: #B0C4DE;");
 //    ptr_tcu->set_theme();
@@ -2623,8 +2825,12 @@ void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
     if (record_original[0]) on_SAVE_AVI_BUTTON_clicked();
     if (record_modified[0]) on_SAVE_FINAL_BUTTON_clicked();
 
+    // display_thread_idx[0] is -1 after an alt1↔main swap (main slot is empty,
+    // alt1 slot now hosts the original main-camera thread). Fall back to the
+    // main camera's home thread (index 0) so we operate on a valid slot
+    // instead of indexing the per-thread arrays with -1 (the prior crash).
     int main_thread_idx = display_thread_idx[0];
-//    if (display_thread_idx[0] != -1) main_thread_idx = 0;
+    if (main_thread_idx == -1) main_thread_idx = 0;
 
     if (!q_img[main_thread_idx].empty()) std::queue<cv::Mat>().swap(q_img[main_thread_idx]);
 
@@ -2680,7 +2886,25 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
             QMutexLocker locker(&image_mutex[0]);
             res_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_res.mp4");
 //            vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || image_3d[0]);
-            vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit[0], cv::Size(image_3d[0] ? w[0] + 104 : w[0], h[0]), is_color[0] || pseudocolor[0]);
+            {
+                const int vw_w = image_3d[0] ? w[0] + 104 : w[0];
+                const int vw_h = h[0];
+                const bool vw_color = is_color[0] || pseudocolor[0];
+                // Real-time fps: prefer the TimedQueue measured arrival rate
+                // (count over the 5 s window). Fall back to frame_rate_edit
+                // only if the window is too sparse to be meaningful (e.g.
+                // record was triggered immediately after stream connect).
+                const double measured_fps = q_fps_calc[0] ? q_fps_calc[0]->count() / 5.0 : 0.0;
+                const double vw_fps = (measured_fps >= 1.0) ? measured_fps : frame_rate_edit[0];
+                qDebug() << "[vid_out RES] open" << res_avi
+                         << "size=" << vw_w << "x" << vw_h
+                         << "fps=" << vw_fps
+                         << "(measured=" << measured_fps
+                         << "commanded=" << frame_rate_edit[0] << ")"
+                         << "color=" << vw_color;
+                vid_out[1].open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), vw_fps, cv::Size(vw_w, vw_h), vw_color);
+                qDebug() << "[vid_out RES] isOpened=" << vid_out[1].isOpened();
+            }
         }
     }
     record_modified[0] = !record_modified[0];
@@ -2836,7 +3060,12 @@ void UserPanel::export_current_video()
 
     srand(time(NULL));
     temp_output_filename = TEMP_SAVE_LOCATION + "/" + QString::number(rand(), 16) + ".mp4";
+    qDebug() << "[vid_out PROC] open" << temp_output_filename
+             << "size=" << w[0] << "x" << h[0]
+             << "fps=" << frame_rate_edit[0]
+             << "color=" << true;
     vid_out_proc.open(temp_output_filename.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit[0], cv::Size(w[0], h[0]), true);
+    qDebug() << "[vid_out PROC] isOpened=" << vid_out_proc.isOpened();
     // TODO update enhance function parameters; add support for frame average
     int enhance_option = 0;
     if (ui->IMG_ENHANCE_CHECK->isChecked()) enhance_option = ui->ENHANCE_OPTIONS->currentIndex();
@@ -3356,6 +3585,7 @@ void UserPanel::syncConfigToPreferences()
     }
     m_device_mgr->udpptz()->set_target(QHostAddress(data.network.udp_target_ip), data.network.udp_target_port);
     m_device_mgr->udpptz()->set_listen(QHostAddress(data.network.udp_listen_ip), data.network.udp_listen_port);
+    m_device_mgr->udpptz()->set_protocol(static_cast<UDPPTZ::Protocol>(data.network.udpptz_protocol));
 
     // Sync UI settings
     bool simplify_ui = data.ui.simplified;
@@ -3823,6 +4053,7 @@ void UserPanel::on_IMG_3D_CHECK_stateChanged(int arg1)
 
 void UserPanel::change_gain(int val)
 {
+    if (!curr_cam) return;
     if (val < 0) val = 0;
     switch (curr_cam->device_type) {
     case 1:
@@ -3835,10 +4066,15 @@ void UserPanel::change_gain(int val)
 
     gain_analog_edit = val;
     curr_cam->gain_analog(false, &gain_analog_edit);
-    curr_cam->gain_analog(true, &gain_analog_edit);
-    // qDebug() << "gain set" << gain_analog_edit << (int)std::round(gain_analog_edit);
-    ui->GAIN_EDIT->setText(QString::number((int)std::round(gain_analog_edit)));
-    ui->GAIN_SLIDER->setValue((int)std::round(gain_analog_edit));
+    // Deliberately NOT reading back here. The MV SDK / vendor serial paths
+    // sometimes return 0 on read (uninitialized MVCC_FLOATVALUE on failure,
+    // unsupported feature, timing). Reading into gain_analog_edit then
+    // calling setValue(0) re-fires valueChanged → re-enters change_gain(0)
+    // and the slider stuck at 0 forever. The user-requested value is already
+    // clamped to the device's range above, so trust it for the UI.
+    ui->GAIN_EDIT->setText(QString::number(val));
+    // slider is already at `val` (it triggered this slot via valueChanged),
+    // so no setValue needed — and skipping it removes the recursion risk.
 }
 
 // change_delay → TCUController (inline delegation in header)
@@ -4039,6 +4275,9 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             }
             else if (edit == ui->FOCUS_EDIT) {
                 set_focus();
+            }
+            else if (edit == ui->IRIS_EDIT) {
+                set_iris();
             }
             else if (edit == ui->CCD_FREQ_EDIT || edit == ui->DUTY_EDIT || edit == ui->GAIN_EDIT) {
                 on_SET_PARAMS_BUTTON_clicked();
@@ -4275,11 +4514,35 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     m_fps_label[0]->setVisible(!any_overlay);
     // Alt FPS labels are children of displays[1/2]; their visibility follows
     // the parent FloatingWindow visibility automatically.
-    // Floating panels live in CENTRAL; raise above the fps label to keep their headers clickable.
+    // Floating panels live in CENTRAL; raise above the fps label to keep
+    // their headers clickable. Anchor them per prototype v3:
+    //   Optics + TCU → bottom-left  (Optics at x=10, TCU just to its right)
+    //   Console      → bottom-right (right-aligned in CENTRAL)
     if (!any_overlay) {
-        if (m_optics_panel)  m_optics_panel ->raise();
-        if (m_tcu_panel)     m_tcu_panel    ->raise();
-        if (m_console_panel) m_console_panel->raise();
+        const int central_w = ui->CENTRAL->width();
+        const int central_h = ui->CENTRAL->height();
+        const int bottom_pad = 10;
+        const int left_pad   = 10;
+        const int right_pad  = 10;
+        const int panel_gap  = 12;  // gap between Optics and TCU
+        if (m_optics_panel) {
+            const int y = central_h - m_optics_panel->height() - bottom_pad;
+            m_optics_panel->move(left_pad, y);
+            m_optics_panel->raise();
+        }
+        if (m_tcu_panel) {
+            const int x = (m_optics_panel ? m_optics_panel->x() + m_optics_panel->width() + panel_gap
+                                          : left_pad);
+            const int y = central_h - m_tcu_panel->height() - bottom_pad;
+            m_tcu_panel->move(x, y);
+            m_tcu_panel->raise();
+        }
+        if (m_console_panel) {
+            const int x = central_w - m_console_panel->width() - right_pad;
+            const int y = central_h - m_console_panel->height() - bottom_pad;
+            m_console_panel->move(x, y);
+            m_console_panel->raise();
+        }
     }
     ui->HIDE_BTN->move(ui->MID->geometry().left() - 8, this->geometry().height() / 2 - 10);
 //    ui->HIDE_BTN->move(ui->LEFT->geometry().right() - 10 + (ui->SOURCE_DISPLAY->geometry().left() + ui->MID->geometry().left() - ui->LEFT->geometry().right() + 10) / 2 + 2, this->geometry().height() / 2 - 10);
@@ -4669,7 +4932,16 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
             AVDictionary *format_opts = nullptr;
             if (is_rtsp_stream) {
                 av_dict_set(&format_opts, "rtsp_transport", "tcp", 0);
-                av_dict_set(&format_opts, "buffer_size", "2097152", 0);
+                // Latency tuning for live RTSP. Defaults are tuned for VOD
+                // (analyzeduration 5 s, probesize 5 MB) and produce ~2 s of
+                // startup lag plus a deep reorder buffer that makes bursty
+                // playback. These shrink the input pipeline so frames hit
+                // the decoder as fast as the network delivers them.
+                av_dict_set(&format_opts, "buffer_size",      "262144",  0);  // 256 KB
+                av_dict_set(&format_opts, "fflags",           "nobuffer", 0);
+                av_dict_set(&format_opts, "max_delay",        "200000",  0);  // 200 ms
+                av_dict_set(&format_opts, "analyzeduration",  "500000",  0);  // 500 ms
+                av_dict_set(&format_opts, "probesize",        "100000",  0);  // 100 KB
             }
             start_time = time(NULL);
             if (avformat_open_input(&format_context, filename.toUtf8().constData(), input_format, &format_opts) != 0) { av_dict_free(&format_opts); return cleanup_and_return(-2); }
@@ -4695,17 +4967,52 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
             codec_param = format_context->streams[video_stream_idx]->codecpar;
 
             if (display) {
-                // avg_frame_rate is the actual playback rate; r_frame_rate can
-                // be a multiple (LCM of all PTS deltas) — using it would double
-                // the reported fps for some files. Fall back to r_frame_rate
-                // only if the container doesn't carry an avg.
+                // avg_frame_rate is the actual playback rate (computed by
+                // FFmpeg from observed packet timing during the probe window);
+                // r_frame_rate is the base/raw rate derived from container
+                // hints. Prefer avg, fall back to r only if avg is empty.
+                //
+                // Failure case this guard exists for: RTSP streams under the
+                // short probe configured above (analyzeduration=500ms,
+                // probesize=100KB). 500 ms isn't long enough for FFmpeg to
+                // populate avg_frame_rate, so avg stays 0/0 → falls back to
+                // r_frame_rate, which for any RTP stream defaults to 90000/1
+                // (the RTP 90 kHz clock per RFC 3551, used as a sentinel when
+                // SDP carries no a=framerate line). Writing 90000 into
+                // frame_rate_edit poisons the next VideoWriter::open() for
+                // this display — H.264 rejects fps=90000 and the recording
+                // produces a 0-byte file. Reject implausibly-high values and
+                // keep the previously-set fps for this display (which on the
+                // main display is driven by CCD_FREQ_EDIT — the user-entered
+                // camera rate, which is the preferred source for real-time
+                // streaming).
+                //
+                // TODO: short probe + late fps refresh. Keep the fast 500ms
+                // probe for low startup lag, then re-read avg_frame_rate from
+                // the stream after ~50 decoded packets — by that point FFmpeg
+                // will have populated it. Would give automatic fps detection
+                // (matching `ffmpeg -i` CLI behavior) without sacrificing the
+                // sub-second connect time. Not implemented; falling back to
+                // the user-entered CCD_FREQ_EDIT value is the deliberate
+                // choice for now.
                 AVRational fr = format_context->streams[video_stream_idx]->avg_frame_rate;
                 if (fr.num == 0 || fr.den == 0)
                     fr = format_context->streams[video_stream_idx]->r_frame_rate;
-                frame_rate_edit[display_idx] = std::round(av_q2d(fr));
-                // Only the main display drives the camera-sync TCU register.
-                if (display_idx == 0)
-                    emit send_double_tcu_msg(TCU::CCD_FREQ, frame_rate_edit[0]);
+                const double fps = av_q2d(fr);
+                if (fps > 0.0 && fps <= 1000.0) {
+                    frame_rate_edit[display_idx] = std::round(fps);
+                    // Only the main display drives the camera-sync TCU register.
+                    if (display_idx == 0)
+                        emit send_double_tcu_msg(TCU::CCD_FREQ, frame_rate_edit[0]);
+                }
+                else {
+                    qDebug() << "[playback] rejecting bogus fps" << fps
+                             << "(avg=" << format_context->streams[video_stream_idx]->avg_frame_rate.num
+                             << "/"     << format_context->streams[video_stream_idx]->avg_frame_rate.den
+                             << "r="    << format_context->streams[video_stream_idx]->r_frame_rate.num
+                             << "/"     << format_context->streams[video_stream_idx]->r_frame_rate.den
+                             << ") — keeping previous fps=" << frame_rate_edit[display_idx];
+                }
             }
 
             codec = avcodec_find_decoder(codec_param->codec_id);
@@ -4713,20 +5020,36 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
 
             if (avcodec_parameters_to_context(codec_context, codec_param) < 0) return cleanup_and_return(-3);
 
-            // try HW-accelerated decoding (D3D11VA), fall back to multi-threaded SW
+            // try HW-accelerated decoding (D3D11VA), fall back to multi-threaded SW.
+            // Streams (RTSP/HTTP) deliberately skip HW: on some machines the
+            // GPU→CPU readback via av_hwframe_transfer_data is slower than SW
+            // decode, causing the HW surface pool to back up and the playback
+            // to burst-then-stall ("PowerPoint" effect). Local files keep HW
+            // because the PTS throttle paces the loop and the pool drains.
             AVBufferRef *hw_device_ctx = nullptr;
             bool hw_decoding = false;
-            if (av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_D3D11VA, nullptr, nullptr, 0) == 0) {
+            if (is_local_file &&
+                av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_D3D11VA, nullptr, nullptr, 0) == 0) {
                 codec_context->hw_device_ctx = av_buffer_ref(hw_device_ctx);
                 hw_decoding = true;
-                qDebug() << "FFmpeg: using D3D11VA hardware decoding";
+                qDebug() << "FFmpeg: using D3D11VA hardware decoding (local file)";
             } else {
-                qDebug() << "FFmpeg: D3D11VA unavailable, using multi-threaded software decoding";
+                qDebug() << "FFmpeg: using SW decoding ("
+                         << (is_local_file ? "HW unavailable" : "stream") << ")";
             }
             if (hw_device_ctx) av_buffer_unref(&hw_device_ctx);
 
             codec_context->thread_count = 0;
             codec_context->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
+            // For network streams, tell the decoder not to wait for B-frame
+            // reorder (output in decode order) and enable fast decode paths.
+            // Without LOW_DELAY the decoder buffers a full reorder window
+            // before emitting the first frame, which compounds the input-side
+            // analyzeduration delay.
+            if (is_rtsp_stream || is_http_stream) {
+                codec_context->flags  |= AV_CODEC_FLAG_LOW_DELAY;
+                codec_context->flags2 |= AV_CODEC_FLAG2_FAST;
+            }
 
             if (avcodec_open2(codec_context, codec, NULL) < 0) {
                 // if HW open failed, retry with SW
@@ -4738,6 +5061,10 @@ int UserPanel::load_video_file(QString filename, bool format_gray, void (*proces
                     if (avcodec_parameters_to_context(codec_context, codec_param) < 0) return cleanup_and_return(-3);
                     codec_context->thread_count = 0;
                     codec_context->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
+                    if (is_rtsp_stream || is_http_stream) {
+                        codec_context->flags  |= AV_CODEC_FLAG_LOW_DELAY;
+                        codec_context->flags2 |= AV_CODEC_FLAG2_FAST;
+                    }
                     if (avcodec_open2(codec_context, codec, NULL) < 0) return cleanup_and_return(-3);
                 } else {
                     return cleanup_and_return(-3);
@@ -4971,7 +5298,19 @@ void UserPanel::on_SAVE_AVI_BUTTON_clicked()
         image_mutex[0].lock();
         raw_avi = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw.mp4");
 //        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w[0], h[0]), is_color[0]);
-        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit[0], cv::Size(w[0], h[0]), is_color[0]);
+        // Real-time fps: use the TimedQueue measured arrival rate over the 5 s
+        // window; fall back to the commanded rate when the window is too
+        // sparse to trust.
+        const double measured_fps_ori = q_fps_calc[0] ? q_fps_calc[0]->count() / 5.0 : 0.0;
+        const double vw_fps_ori = (measured_fps_ori >= 1.0) ? measured_fps_ori : frame_rate_edit[0];
+        qDebug() << "[vid_out ORI] open" << raw_avi
+                 << "size=" << w[0] << "x" << h[0]
+                 << "fps=" << vw_fps_ori
+                 << "(measured=" << measured_fps_ori
+                 << "commanded=" << frame_rate_edit[0] << ")"
+                 << "color=" << is_color[0];
+        vid_out[0].open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), vw_fps_ori, cv::Size(w[0], h[0]), is_color[0]);
+        qDebug() << "[vid_out ORI] isOpened=" << vid_out[0].isOpened();
         image_mutex[0].unlock();
     }
     record_original[0] = !record_original[0];
@@ -5063,6 +5402,11 @@ void UserPanel::set_zoom()
 void UserPanel::set_focus()
 {
     m_lens_ctrl->set_focus_value(ui->FOCUS_EDIT->text().toUInt());
+}
+
+void UserPanel::set_iris()
+{
+    m_lens_ctrl->set_iris_value(ui->IRIS_EDIT->text().toUInt());
 }
 
 void UserPanel::update_current()
@@ -5224,7 +5568,17 @@ void UserPanel::alt_display_control(int cmd)
             image_mutex[display_idx].lock();
             raw_avi[display_idx - 1] = QString(TEMP_SAVE_LOCATION + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_raw_alt" + QString::number(display_idx) + ".mp4");
 //            vid_out[display_idx + 1].open(raw_avi[display_idx - 1].toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(w[display_idx], h[display_idx]), is_color[display_idx]);
-            vid_out[display_idx + 1].open(raw_avi[display_idx - 1].toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), frame_rate_edit[display_idx], cv::Size(w[display_idx], h[display_idx]), is_color[display_idx]);
+            // Real-time fps for this alt display from its own TimedQueue.
+            const double measured_fps_alt = q_fps_calc[display_idx] ? q_fps_calc[display_idx]->count() / 5.0 : 0.0;
+            const double vw_fps_alt = (measured_fps_alt >= 1.0) ? measured_fps_alt : frame_rate_edit[display_idx];
+            qDebug() << "[vid_out ALT" << display_idx << "] open" << raw_avi[display_idx - 1]
+                     << "size=" << w[display_idx] << "x" << h[display_idx]
+                     << "fps=" << vw_fps_alt
+                     << "(measured=" << measured_fps_alt
+                     << "commanded=" << frame_rate_edit[display_idx] << ")"
+                     << "color=" << is_color[display_idx];
+            vid_out[display_idx + 1].open(raw_avi[display_idx - 1].toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), vw_fps_alt, cv::Size(w[display_idx], h[display_idx]), is_color[display_idx]);
+            qDebug() << "[vid_out ALT" << display_idx << "] isOpened=" << vid_out[display_idx + 1].isOpened();
             image_mutex[display_idx].unlock();
         }
         record_modified[display_idx] = !record_modified[display_idx];

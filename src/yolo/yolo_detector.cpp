@@ -2,7 +2,8 @@
 #include "inference.h"
 #include "yolo_app_config.h"
 #include <QDebug>
-#include <fstream>
+#include <QFile>
+#include <sstream>
 
 YoloDetector::YoloDetector()
     : m_core(nullptr)
@@ -24,11 +25,22 @@ bool YoloDetector::initialize(const QString& config_ini_path, const QString& mod
         return true;
     }
 
-    // Load AppConfig from INI file (general parameters only)
+    // Load AppConfig from INI file (general parameters only). Read via QFile
+    // so non-ASCII paths work on Windows (std::ifstream interprets bytes as
+    // the system ACP, which mismatches QString::toStdString()'s UTF-8 output).
     AppConfig app_config;
-    if (!app_config.loadFromFile(config_ini_path.toStdString())) {
-        qWarning() << "YoloDetector: Failed to load config from" << config_ini_path;
-        return false;
+    {
+        QFile cfg_file(config_ini_path);
+        if (!cfg_file.open(QIODevice::ReadOnly)) {
+            qWarning() << "YoloDetector: Failed to open config from" << config_ini_path;
+            return false;
+        }
+        std::istringstream stream(cfg_file.readAll().toStdString());
+        cfg_file.close();
+        if (!app_config.loadFromStream(stream)) {
+            qWarning() << "YoloDetector: Failed to parse config from" << config_ini_path;
+            return false;
+        }
     }
 
     // Check if model file exists
@@ -37,8 +49,8 @@ bool YoloDetector::initialize(const QString& config_ini_path, const QString& mod
         return false;
     }
 
-    // Load class names
-    if (!loadClassNames(classes_file.toStdString())) {
+    // Load class names (QFile path so non-ASCII works on Windows).
+    if (!loadClassNames(classes_file)) {
         qWarning() << "YoloDetector: Failed to load class names from" << classes_file;
         // Continue without class names - not fatal
     }
@@ -117,17 +129,17 @@ bool YoloDetector::run(const cv::Mat& image, std::vector<YoloResult>& results)
     }
 }
 
-bool YoloDetector::loadClassNames(const std::string& filepath)
+bool YoloDetector::loadClassNames(const QString& filepath)
 {
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
+    QFile file(filepath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         return false;
     }
 
     m_class_names.clear();
-    std::string line;
-    while (std::getline(file, line)) {
-        // Trim whitespace
+    while (!file.atEnd()) {
+        const QByteArray raw = file.readLine();
+        const std::string line(raw.constData(), static_cast<size_t>(raw.size()));
         size_t start = line.find_first_not_of(" \t\r\n");
         size_t end = line.find_last_not_of(" \t\r\n");
         if (start != std::string::npos && end != std::string::npos) {

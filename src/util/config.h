@@ -22,6 +22,9 @@ public:
         int udp_target_port = 30000;
         QString udp_listen_ip = "192.168.1.100";
         int udp_listen_port = 30001;
+        // UDPPTZ::Protocol value — 500 (PROTOCOL_500, scan_range in bytes
+        // 8-9) or 530 (PROTOCOL_530, 0x7F7F in bytes 8-9, 10 ms cadence).
+        int udpptz_protocol = 530;
     };
 
     struct UISettings {
@@ -46,9 +49,11 @@ public:
         int base_unit = 0;
         float max_dist = 15000.0f;
         float delay_offset = 0.0f;
-        float max_dov = 15000.0f;
+        // Stored in meters (matches max_dist pattern). UI displays in ns via /m_dist_ns.
+        // 750 m == 5000 ns gate width at dist_ns = c·1e-9/2 = 0.15 m/ns.
+        float max_dov = 750.0f;
         float gate_width_offset = 0.0f;
-        float max_laser_width = 25000.0f;
+        float max_laser_width = 2500.0f;
         float laser_width_offset = 0.0f;
         uint ps_step[4] = {40, 40, 40, 40};
         int laser_on = 0;

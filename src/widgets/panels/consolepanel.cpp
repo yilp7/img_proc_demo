@@ -17,12 +17,6 @@ ConsolePanel::ConsolePanel(QWidget *parent)
 
 void ConsolePanel::setup(QStackedWidget *misc_display)
 {
-    // Map tab labels to source pages by objectName. Index-based extraction
-    // is brittle: MISC_DISPLAY has 8 pages (NULL_PAGE placeholder at [0],
-    // plus PTZ_PAGE at [3] whose PTZ_GRP has been reparented to OpticsPanel),
-    // so the first six by index do NOT line up with the desired tabs.
-    // YOLO_PAGE is skipped — its model lists were relocated to the IMG PROC
-    // right-stack MODELS tab (same way PTZ_PAGE's PTZ_GRP went to OpticsPanel).
     struct TabSpec { const char *label; const char *pageName; };
     static const TabSpec specs[] = {
         { "DATA",  "DATA_PAGE"     },
@@ -32,16 +26,18 @@ void ConsolePanel::setup(QStackedWidget *misc_display)
         { "VID",   "VID_PAGE"      },
     };
 
+    int vid_tab_idx = -1;
     for (const auto &s : specs) {
         QWidget *page = misc_display->findChild<QWidget*>(
             QString::fromLatin1(s.pageName), Qt::FindDirectChildrenOnly);
         if (!page) continue;
         misc_display->removeWidget(page);
-        m_tabs->addTab(page, s.label);
+        page->show();
+        const int idx = m_tabs->addTab(page, s.label);
+        if (QByteArray(s.label) == "VID") vid_tab_idx = idx;
     }
 
-    // 3D placeholder tab — actual point cloud rendering deferred.
     m_tabs->addTab(new QLabel("3D point cloud — placeholder"), "3D");
 
-    adjustSize();
+    if (vid_tab_idx >= 0) m_tabs->setCurrentIndex(vid_tab_idx);
 }

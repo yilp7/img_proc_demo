@@ -74,6 +74,10 @@ public slots:
     void update_ptz_params(qint32 ptz_param, double val);
     void ptz_button_pressed(int id);
     void ptz_button_released(int id);
+    // PTZ direction-pad STOP_BTN. UDPPTZ → STANDBY opcode (0x01), distinct
+    // from joystick-release which keeps MANUAL_SEARCH with zero velocity.
+    // Other PTZ types fall back to active_ptz->ptz_stop().
+    void ptz_stop_btn_clicked();
     void set_ptz_speed(int speed);
     // Joystick path: independent pan/tilt speeds. For Pelco, emits SPEED_H
     // and SPEED_V before the direction so the protocol's two speed bytes

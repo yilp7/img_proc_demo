@@ -152,13 +152,16 @@ int Lens::lens_control(qint32 lens_param, uint val)
         }
         case RELAY1_ON:
         {
-            uchar buf[] = {SYNC_BYTE, address, 0x00, LENS_RELAY_ON, 0x00, 0x00, 0x00};
+            // Pelco-D Aux 1 ON: byte 5 = aux number (1). Was 0x00 (no aux) —
+            // produced FF 01 00 09 00 00 0A which the device ignored.
+            uchar buf[] = {SYNC_BYTE, address, 0x00, LENS_RELAY_ON, 0x00, 0x01, 0x00};
             command = QByteArray((char*)buf, 7);
             goto chksm;
         }
         case RELAY1_OFF:
         {
-            uchar buf[] = {SYNC_BYTE, address, 0x00, LENS_RELAY_OFF, 0x00, 0x00, 0x00};
+            // Pelco-D Aux 1 OFF: byte 5 = aux number (1).
+            uchar buf[] = {SYNC_BYTE, address, 0x00, LENS_RELAY_OFF, 0x00, 0x01, 0x00};
             command = QByteArray((char*)buf, 7);
             goto chksm;
         }

@@ -2189,7 +2189,7 @@
        <x>10</x>
        <y>260</y>
        <width>220</width>
-       <height>95</height>
+       <height>130</height>
       </rect>
      </property>
      <property name="mouseTracking">
@@ -2231,6 +2231,25 @@
       </property>
       <property name="text">
        <string>Focus</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="IRIS_LABEL">
+      <property name="geometry">
+       <rect>
+        <x>130</x>
+        <y>20</y>
+        <width>51</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="text">
+       <string>Iris</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
@@ -2303,9 +2322,9 @@
      <widget class="QSlider" name="FOCUS_SPEED_SLIDER">
       <property name="geometry">
        <rect>
-        <x>128</x>
-        <y>30</y>
-        <width>61</width>
+        <x>10</x>
+        <y>102</y>
+        <width>100</width>
         <height>16</height>
        </rect>
       </property>
@@ -2319,10 +2338,10 @@
      <widget class="QLineEdit" name="FOCUS_SPEED_EDIT">
       <property name="geometry">
        <rect>
-        <x>192</x>
-        <y>27</y>
+        <x>114</x>
+        <y>100</y>
         <width>24</width>
-        <height>24</height>
+        <height>20</height>
        </rect>
       </property>
       <property name="mouseTracking">
@@ -2373,11 +2392,49 @@
        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
       </property>
      </widget>
+     <widget class="QLineEdit" name="IRIS_EDIT">
+      <property name="geometry">
+       <rect>
+        <x>130</x>
+        <y>67</y>
+        <width>51</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::ClickFocus</enum>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="LENS_ON_BTN">
+      <property name="geometry">
+       <rect>
+        <x>187</x>
+        <y>50</y>
+        <width>25</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="toolTip">
+       <string>Lens relay on/off</string>
+      </property>
+      <property name="checkable">
+       <bool>true</bool>
+      </property>
+      <property name="text">
+       <string>o</string>
+      </property>
+     </widget>
      <widget class="QPushButton" name="GET_LENS_PARAM_BTN">
       <property name="geometry">
        <rect>
-        <x>135</x>
-        <y>67</y>
+        <x>142</x>
+        <y>100</y>
         <width>31</width>
         <height>20</height>
        </rect>
@@ -2392,8 +2449,8 @@
      <widget class="QPushButton" name="AUTO_FOCUS_BTN">
       <property name="geometry">
        <rect>
-        <x>175</x>
-        <y>67</y>
+        <x>177</x>
+        <y>100</y>
         <width>31</width>
         <height>20</height>
        </rect>
@@ -2411,10 +2468,10 @@
       </property>
       <property name="geometry">
        <rect>
-        <x>115</x>
-        <y>100</y>
-        <width>24</width>
-        <height>24</height>
+        <x>160</x>
+        <y>37</y>
+        <width>20</width>
+        <height>20</height>
        </rect>
       </property>
       <property name="mouseTracking">
@@ -2430,10 +2487,10 @@
       </property>
       <property name="geometry">
        <rect>
-        <x>20</x>
-        <y>100</y>
-        <width>24</width>
-        <height>24</height>
+        <x>130</x>
+        <y>37</y>
+        <width>20</width>
+        <height>20</height>
        </rect>
       </property>
       <property name="mouseTracking">

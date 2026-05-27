@@ -5,6 +5,7 @@
 
 class Display;
 class QLabel;
+class QPushButton;
 class QVBoxLayout;
 
 // Left-side widget that mirrors the ALT1 / ALT2 displays as live thumbnails.
@@ -22,11 +23,23 @@ public:
     // thumbnails. Either may be null (slot stays blank).
     void setup(Display *alt1, Display *alt2);
 
+    // Re-apply themed icons on the swap buttons. Call from UserPanel::set_theme
+    // alongside the other :/tools/<variant>/switch refreshes.
+    void apply_theme(bool light_theme);
+
+signals:
+    // Emitted when the user clicks the swap-with-main button next to an alt
+    // thumbnail. alt_idx is 1 for ALT 1, 2 for ALT 2 — the receiver should
+    // call swap_grab_thread_display(0, alt_idx).
+    void swap_requested(int alt_idx);
+
 private:
     QVBoxLayout *m_layout;
     QLabel      *m_alt1_label;
+    QPushButton *m_alt1_swap;
     QLabel      *m_alt1_thumb;
     QLabel      *m_alt2_label;
+    QPushButton *m_alt2_swap;
     QLabel      *m_alt2_thumb;
 };
 

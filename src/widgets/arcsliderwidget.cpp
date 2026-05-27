@@ -19,12 +19,23 @@ ArcSliderWidget::ArcSliderWidget(QWidget *parent) :
     m_min(0),
     m_max(100),
     m_value(0),
-    m_pressed(false)
+    m_pressed(false),
+    m_speed_mode(false),
+    m_max_speed(0),
+    m_last_signed_speed(0),
+    m_active_color(0xE0, 0x92, 0x4A) // default: accent
 {
     setObjectName("ArcSliderWidget");
     setAttribute(Qt::WA_StyledBackground, true);
     setMinimumSize(32, 120);
     setCursor(Qt::PointingHandCursor);
+}
+
+void ArcSliderWidget::setActiveColor(const QColor &c)
+{
+    if (m_active_color == c) return;
+    m_active_color = c;
+    update();
 }
 
 void ArcSliderWidget::setRange(int min, int max)
@@ -48,6 +59,50 @@ void ArcSliderWidget::setValue(int value)
     m_value = clamped;
     emit valueChanged(m_value);
     update();
+}
+
+void ArcSliderWidget::setSpeedMode(int maxSpeed)
+{
+    m_speed_mode = true;
+    m_max_speed = qMax(0, maxSpeed);
+    setRange(-m_max_speed, m_max_speed);
+    m_last_signed_speed = 0;
+    setValue(0);
+}
+
+int ArcSliderWidget::pixelToSignedSpeed(int local_y) const
+{
+    const int th = trackHeight();
+    if (th <= 0 || m_max_speed <= 0) return 0;
+
+    const int track_y = local_y - trackTop();
+    const double half = th / 2.0;
+    // delta > 0 when pointer is above midpoint (toward top of track).
+    const double delta = half - double(track_y);
+    if (delta == 0.0) return 0;
+
+    const double frac = qBound(-1.0, delta / half, 1.0);
+    // Quadratic curve — fine control near midpoint, ramps fast near extremes.
+    const double raw = frac * frac * double(m_max_speed);
+    int mag = int(std::round(raw / 4.0)) * 4;
+    if (mag < 4) mag = 4;            // off-midpoint floor; speed 0 only at midpoint
+    if (mag > m_max_speed) mag = m_max_speed;
+    return (frac > 0.0) ? mag : -mag;
+}
+
+void ArcSliderWidget::applySpeedFromPixel(int local_y)
+{
+    const int speed = pixelToSignedSpeed(local_y);
+    if (speed != m_last_signed_speed) {
+        m_last_signed_speed = speed;
+        emit speedChanged(speed);
+    }
+    // Drive m_value too so paintEvent shows the thumb at the dragged position.
+    if (m_value != speed) {
+        m_value = speed;
+        emit valueChanged(m_value);
+        update();
+    }
 }
 
 int ArcSliderWidget::pixelToValue(int y, int trackHeight, int min, int max)
@@ -107,27 +162,24 @@ void ArcSliderWidget::paintEvent(QPaintEvent *)
     const double t = th > 0 ? (thumb_y - top) / double(th) : 0.0;
     const double thumb_x = cx + 3.0 * t * (1.0 - t) * kArcBulge;
 
-    // Theme tokens — match prototype v3. Custom paint, no QSS.
-    static const QColor kInactiveTrack(0x38, 0x2D, 0x25);  // border-default
-    static const QColor kActiveTrack  (0xE0, 0x92, 0x4A);  // accent
-    static const QColor kThumbFill    (0xE0, 0x92, 0x4A);  // accent
-    static const QColor kThumbEdge    (0x26, 0x1B, 0x14);  // bg-header (dark contrast)
+    // Inactive track: visible mid-tone so the arc reads clearly even at v=0.
+    static const QColor kInactiveTrack(0x5C, 0x4A, 0x3D);  // text-dim
+    static const QColor kThumbEdge    (0x12, 0x10, 0x0E);  // bg-raised (dark ring)
 
-    // Inactive (above thumb): dim track.
+    // Inactive (full path): visible neutral.
     p.setPen(QPen(kInactiveTrack, kTrackWidthPx, Qt::SolidLine, Qt::RoundCap));
     p.drawPath(path);
 
-    // Active (from bottom up to thumb): accent color, drawn by re-stroking
-    // the full path under a clip that excludes everything above thumb_y.
+    // Active (from bottom up to thumb): per-slider color.
     p.save();
     p.setClipRect(QRectF(0, thumb_y, double(width()), bottom - thumb_y + kTrackWidthPx));
-    p.setPen(QPen(kActiveTrack, kTrackWidthPx, Qt::SolidLine, Qt::RoundCap));
+    p.setPen(QPen(m_active_color, kTrackWidthPx, Qt::SolidLine, Qt::RoundCap));
     p.drawPath(path);
     p.restore();
 
     // Thumb positioned on the arc.
     p.setPen(QPen(kThumbEdge, 1.5));
-    p.setBrush(kThumbFill);
+    p.setBrush(m_active_color);
     p.drawEllipse(QPointF(thumb_x, thumb_y), kThumbRadius, kThumbRadius);
 }
 
@@ -138,18 +190,36 @@ void ArcSliderWidget::mousePressEvent(QMouseEvent *event)
         return;
     }
     m_pressed = true;
-    setValueFromPixel(event->pos().y());
+    if (m_speed_mode) applySpeedFromPixel(event->pos().y());
+    else              setValueFromPixel(event->pos().y());
     QWidget::mousePressEvent(event);
 }
 
 void ArcSliderWidget::mouseMoveEvent(QMouseEvent *event)
 {
-    if (m_pressed) setValueFromPixel(event->pos().y());
+    if (m_pressed) {
+        if (m_speed_mode) applySpeedFromPixel(event->pos().y());
+        else              setValueFromPixel(event->pos().y());
+    }
     QWidget::mouseMoveEvent(event);
 }
 
 void ArcSliderWidget::mouseReleaseEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton) m_pressed = false;
+    if (event->button() == Qt::LeftButton) {
+        m_pressed = false;
+        if (m_speed_mode) {
+            // Snap to midpoint; emit speedChanged(0) and valueChanged(0).
+            if (m_last_signed_speed != 0) {
+                m_last_signed_speed = 0;
+                emit speedChanged(0);
+            }
+            if (m_value != 0) {
+                m_value = 0;
+                emit valueChanged(0);
+                update();
+            }
+        }
+    }
     QWidget::mouseReleaseEvent(event);
 }

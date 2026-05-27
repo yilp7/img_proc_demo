@@ -1,18 +1,24 @@
 #include "timingbarwidget.h"
 
 #include <QFontMetrics>
+#include <QLinearGradient>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPaintEvent>
 
 namespace {
-const int kRowSpacing   = 6;
+const int kRowSpacing   = 10;  // vertical gap between rows
 const int kHandleHitPx  = 8;   // hit-zone each side of the end edge
-const int kLeftMargin   = 10;
-const int kRightMargin  = 10;
+const int kLeftMargin   = 6;
+const int kRightMargin  = 96;  // generous right pad so the track's max
+                               // position is well inside the panel border
 const int kTopMargin    = 6;
 const int kBottomMargin = 6;
-const int kLabelAreaPx  = 110; // reserved left strip for "Label: value unit"
+const int kLabelAreaPx  = 72;  // reserved left strip — label (line 1) + value (line 2)
+const int kLabelGap     = 8;   // space between label strip and track
+const int kTrackHeight  = 10;  // visual track height (thin, prototype-like)
+const int kEndCapWidth  = 3;   // accent bar drawn at the fill's right edge
 }
 
 TimingBarWidget::TimingBarWidget(QWidget *parent) :
@@ -23,8 +29,7 @@ TimingBarWidget::TimingBarWidget(QWidget *parent) :
 
     setObjectName("TimingBarWidget");
     setAttribute(Qt::WA_StyledBackground, true);
-    setMouseTracking(true);
-    setMinimumSize(360, 140);
+    setMinimumSize(320, 140); // 4 bars × (label + value + thin track) rows
 
     m_bars[LaserWidth] = { 100,    1000,    QStringLiteral("Laser Width"), QStringLiteral("ns"), QColor(0x3d, 0x8b, 0xff) };
     m_bars[Distance]   = { 500,    5000,    QStringLiteral("Distance"),    QStringLiteral("m"),  QColor(0x4c, 0xd9, 0x64) };
@@ -113,7 +118,7 @@ int TimingBarWidget::rowHeight() const
 
 int TimingBarWidget::trackLeft() const
 {
-    return kLeftMargin + kLabelAreaPx;
+    return kLeftMargin + kLabelAreaPx + kLabelGap;
 }
 
 int TimingBarWidget::trackWidth() const
@@ -144,56 +149,102 @@ int TimingBarWidget::endHandleAt(const QPoint &pos) const
 void TimingBarWidget::paintEvent(QPaintEvent *)
 {
     // Theme tokens — match prototype v3 and resources/style_dark.qss.
-    // Custom-painted widget: QSS background-color does not apply, so we
-    // paint with the same hex literals the QSS uses for sibling widgets.
     static const QColor kBg        (0x12, 0x10, 0x0E);  // bg-raised
     static const QColor kTrackBg   (0x04, 0x03, 0x03);  // bg-deepest
-    static const QColor kTrackEdge (0x38, 0x2D, 0x25);  // border-default
-    static const QColor kHandle    (0xE0, 0x92, 0x4A);  // accent
-    static const QColor kText      (0xCD, 0xB2, 0x99);  // text-secondary
+    static const QColor kTrackEdge (0x38, 0x2D, 0x25);  // border-subtle
+    static const QColor kLabel     (0x8F, 0x6B, 0x4D);  // text-dim
+    static const QColor kValue     (0xCD, 0xB2, 0x99);  // readout
 
     QPainter p(this);
-    p.setRenderHint(QPainter::Antialiasing, false);
+    p.setRenderHint(QPainter::Antialiasing, true);
     p.fillRect(rect(), kBg);
 
     const int tw = trackWidth();
     const int rh = rowHeight();
     if (tw <= 0 || rh <= 0) return;
 
-    const QFontMetrics fm = p.fontMetrics();
+    const QFont base_font = p.font();
+    QFont value_font = base_font;
+    if (value_font.pointSize() > 0) {
+        value_font.setPointSizeF(qMax(7.0, value_font.pointSizeF() - 1));
+    }
+    const QFontMetrics fm_label = QFontMetrics(base_font);
+    const QFontMetrics fm_value = QFontMetrics(value_font);
+    const int track_h = qMin(kTrackHeight, rh);
 
     for (int i = 0; i < BarCount; ++i) {
         const int top = rowTop(i);
-        const QRect label_rect(kLeftMargin, top, kLabelAreaPx - 4, rh);
-        const QRect track_rect(trackLeft(), top, tw, rh);
-
-        // Label + value readout on the left.
+        const int track_y = top + (rh - track_h) / 2; // vertically center the thin track
         const Bar &b = m_bars[i];
-        QString label_text = b.unit.isEmpty()
-            ? QStringLiteral("%1: %2").arg(b.label).arg(b.value)
-            : QStringLiteral("%1: %2 %3").arg(b.label).arg(b.value).arg(b.unit);
-        p.setPen(kText);
-        p.drawText(label_rect,
-                   Qt::AlignLeft | Qt::AlignVCenter,
-                   fm.elidedText(label_text, Qt::ElideRight, label_rect.width()));
 
-        // Track background.
-        p.fillRect(track_rect, kTrackBg);
+        // ---- Left text strip: label (line 1) + value+unit (line 2) ----
+        const QString value_text = b.unit.isEmpty()
+            ? QString::number(b.value)
+            : QStringLiteral("%1 %2").arg(b.value).arg(b.unit);
 
-        // Filled bar from track-left to the current value.
-        const int ex = trackLeft() + valueToPixel(b.value, tw, b.scale);
-        const QRect seg_rect(track_rect.left(), top,
-                             qMax(1, ex - track_rect.left()), rh);
-        p.fillRect(seg_rect, b.color);
+        const int line_h_label = fm_label.height();
+        const int line_h_value = fm_value.height();
+        const int stack_h = line_h_label + line_h_value;
+        const int stack_top = top + (rh - stack_h) / 2;
+
+        const QRect label_rect(kLeftMargin, stack_top, kLabelAreaPx, line_h_label);
+        const QRect value_rect(kLeftMargin, stack_top + line_h_label,
+                               kLabelAreaPx, line_h_value);
+
+        p.setFont(base_font);
+        p.setPen(kLabel);
+        p.drawText(label_rect, Qt::AlignLeft | Qt::AlignVCenter,
+                   fm_label.elidedText(b.label, Qt::ElideRight, label_rect.width()));
+
+        p.setFont(value_font);
+        p.setPen(kValue);
+        p.drawText(value_rect, Qt::AlignLeft | Qt::AlignVCenter,
+                   fm_value.elidedText(value_text, Qt::ElideRight, value_rect.width()));
+        p.setFont(base_font);
+
+        // ---- Track + filled segment ----
+        const QRectF track_rect(trackLeft(), track_y, tw, track_h);
+        QPainterPath track_path;
+        track_path.addRoundedRect(track_rect, track_h / 2.0, track_h / 2.0);
+        p.fillPath(track_path, kTrackBg);
+
+        const int seg_w = qMax(0, valueToPixel(b.value, tw, b.scale));
+        if (seg_w > 0) {
+            const QRectF seg_rect(track_rect.left(), track_y, seg_w, track_h);
+            QLinearGradient g(seg_rect.topLeft(), seg_rect.topRight());
+            g.setColorAt(0.0, b.color.darker(220));
+            g.setColorAt(1.0, b.color);
+            QPainterPath seg_path;
+            seg_path.addRoundedRect(seg_rect, track_h / 2.0, track_h / 2.0);
+            p.save();
+            p.setClipPath(track_path);
+            p.fillPath(seg_path, g);
+            p.restore();
+        }
 
         // Track outline.
         p.setPen(kTrackEdge);
         p.setBrush(Qt::NoBrush);
-        p.drawRect(track_rect.adjusted(0, 0, -1, -1));
+        p.drawPath(track_path);
 
-        // End handle marker (small vertical tick) — accent-colored.
-        p.setPen(QPen(kHandle, 2.0));
-        p.drawLine(ex, top + 2, ex, top + rh - 2);
+        // ---- Right-end cap: always visible accent stripe at the fill's
+        //      right edge, including when value == scale. Clipped to the
+        //      track path so the rounded right corner stays clean.
+        if (seg_w > 0) {
+            double cap_left  = track_rect.left() + seg_w - kEndCapWidth;
+            double cap_right = track_rect.left() + seg_w;
+            // Keep the cap inside the track even at max — shift it left when
+            // it would otherwise overflow the rounded right corner.
+            if (cap_right > track_rect.right()) {
+                cap_left  -= (cap_right - track_rect.right());
+                cap_right  = track_rect.right();
+            }
+            const QRectF cap_rect(cap_left, track_y, cap_right - cap_left, track_h);
+            p.save();
+            p.setClipPath(track_path);
+            p.fillRect(cap_rect, b.color.lighter(140));
+            p.restore();
+        }
     }
 }
 
@@ -246,8 +297,6 @@ void TimingBarWidget::mouseMoveEvent(QMouseEvent *event)
             emit barValueChanged(static_cast<BarId>(m_drag_bar), new_value);
             update();
         }
-    } else {
-        setCursor(endHandleAt(event->pos()) >= 0 ? Qt::SizeHorCursor : Qt::ArrowCursor);
     }
     QWidget::mouseMoveEvent(event);
 }

@@ -32,7 +32,10 @@ TopBar::TopBar(QWidget *parent)
     setObjectName("TOP_BAR");
 
     auto *root = new QHBoxLayout(this);
-    root->setContentsMargins(8, 0, 8, 0);
+    // Right margin = 0 so EXIT_BTN touches the window's right edge — Fitts'
+    // law: when the window is maximized, the user can slam the mouse into
+    // the screen corner and click without needing to pixel-aim.
+    root->setContentsMargins(8, 0, 0, 0);
     root->setSpacing(8);
 
     m_left_slot   = new QFrame(this);

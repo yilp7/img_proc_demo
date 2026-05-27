@@ -92,7 +92,7 @@ if(WIN32)
         link_directories(${Hik_SDK_DIR}/lib/x64)
         link_directories(${HQV_DIR}/lib)
         link_directories(${EURESYS_DIR}/lib)
-        link_directories(${FFmpeg_DIR}/lib/x64)
+        link_directories(${FFmpeg_DIR}/lib)
         if(BUILD_STATIC)
             link_directories(${OpenCV_DIR}/lib/x64_static)
         else()
@@ -365,15 +365,18 @@ if(WIN32)
         avutil
         avfilter
         swscale
-        swresample
-        postproc
-        libx264
+#        swresample
+#        postproc
+#        libx264
+        openh264
         # win lib for ffmpeg
         Strmiids
         Mfuuid
         ws2_32
         Secur32
         Bcrypt
+        ncrypt
+        crypt32
         # gcan
         ECanVci64
         # onnx runtime for yolo

@@ -4,7 +4,6 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <QCoreApplication>
-#include <fstream>
 
 Config::Config(QObject *parent)
     : QObject(parent)
@@ -23,20 +22,21 @@ void Config::load_defaults()
 
 bool Config::load_from_file(const QString &filepath)
 {
-    std::ifstream file(filepath.toStdString());
-    if (!file.is_open()) {
+    QFile file(filepath);
+    if (!file.open(QIODevice::ReadOnly)) {
         emit config_error(QString("Cannot open config file: %1").arg(filepath));
         return false;
     }
+    const QByteArray bytes = file.readAll();
+    file.close();
 
     nlohmann::json root;
     try {
-        file >> root;
+        root = nlohmann::json::parse(bytes.constBegin(), bytes.constEnd());
     } catch (const nlohmann::json::parse_error& e) {
         emit config_error(QString("JSON parse error: %1").arg(e.what()));
         return false;
     }
-    file.close();
 
     if (!root.is_object()) {
         emit config_error("Config file root must be a JSON object");
@@ -147,14 +147,17 @@ bool Config::save_to_file(const QString &filepath) const
     // Save YOLO settings
     root["yolo"] = yolo_settings_to_json(m_data.yolo);
 
-    std::ofstream file(filepath.toStdString());
-    if (!file.is_open()) {
+    QFile file(filepath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         return false;
     }
-    
-    file << root.dump(4);
+    const std::string dumped = root.dump(4);
+    if (file.write(dumped.data(), static_cast<qint64>(dumped.size())) != static_cast<qint64>(dumped.size())) {
+        file.close();
+        return false;
+    }
     file.close();
-    
+
     return true;
 }
 
@@ -186,6 +189,7 @@ nlohmann::json Config::network_settings_to_json(const NetworkSettings &settings)
     obj["udp_target_port"] = settings.udp_target_port;
     obj["udp_listen_ip"] = settings.udp_listen_ip.toStdString();
     obj["udp_listen_port"] = settings.udp_listen_port;
+    obj["udpptz_protocol"] = settings.udpptz_protocol;
     return obj;
 }
 
@@ -206,6 +210,14 @@ Config::NetworkSettings Config::network_settings_from_json(const nlohmann::json 
     }
     if (obj.contains("udp_listen_port") && obj["udp_listen_port"].is_number()) {
         settings.udp_listen_port = obj["udp_listen_port"].get<int>();
+    }
+    if (obj.contains("udpptz_protocol") && obj["udpptz_protocol"].is_number()) {
+        int v = obj["udpptz_protocol"].get<int>();
+        // Legacy migration: old default.json used 0/1; new encoding is the
+        // raw model number (500/530). Map old values forward on load.
+        if (v == 0) v = 500;
+        else if (v == 1) v = 530;
+        settings.udpptz_protocol = v;
     }
     return settings;
 }

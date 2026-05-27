@@ -15,6 +15,10 @@ public:
     enum LensButton { BTN_ZOOM_IN, BTN_ZOOM_OUT, BTN_FOCUS_FAR, BTN_FOCUS_NEAR,
                       BTN_RADIUS_INC, BTN_RADIUS_DEC, BTN_IRIS_OPEN, BTN_IRIS_CLOSE };
 
+    // Modern PTZ arc-slider axes — speed/joystick mode where drag distance
+    // from midpoint maps to a signed speed, separated from classic stepping.
+    enum ModernAxis { Zoom, Focus, Iris, ModernAxisCount };
+
     explicit LensController(DeviceManager *device_mgr, QObject *parent = nullptr);
 
     void init(bool *simple_ui, uchar *lang);
@@ -56,6 +60,9 @@ public slots:
     void on_GET_LENS_PARAM_BTN_clicked();
     void on_AUTO_FOCUS_BTN_clicked();
 
+    // Lens relay toggle. Sends Lens::RELAY1_ON / RELAY1_OFF.
+    void on_LENS_ON_BTN_toggled(bool on);
+
     void change_focus_speed(int val);
     void update_lens_params(qint32 lens_param, uint val);
     void lens_stop();
@@ -70,11 +77,21 @@ public slots:
     void focus_far();
     void focus_near();
 
+    // Modern arc-slider drag: signed speed in [-63..63]. 0 sends STOP; nonzero
+    // sends STEPPING(|speed|) + axis-specific direction. Direction flips emit
+    // STOP first so the device sees a clean motion change.
+    void set_modern_speed(ModernAxis axis, int signed_speed);
+
+    // Re-send classic stepping (used when switching modern -> classic so the
+    // device's STEPPING register matches what the classic slider shows).
+    void restore_classic_stepping(int val);
+
 signals:
     void send_lens_msg(qint32 lens_param, uint val = 0);
     void button_text_changed(int button_id, QString text);
     void zoom_text_updated(QString text);
     void focus_text_updated(QString text);
+    void iris_text_updated(QString text);
     void focus_speed_display_changed(int slider_val, QString edit_text);
 
 private:
@@ -87,6 +104,7 @@ private:
     int             focus_direction;
     int             clarity[3];
     uint            lens_adjust_ongoing;
+    int             m_modern_last_speed[ModernAxisCount] = {0, 0, 0};
 };
 
 #endif // LENSCONTROLLER_H

@@ -15,6 +15,11 @@ ControlPort::ControlPort(int index) :
 {
     serial_port = new QSerialPort(this);
     tcp_port = new QTcpSocket(this);
+    // Bypass system-level proxy. On machines where Windows reports an HTTP
+    // proxy (corporate network, stale PAC, "auto-detect settings"), Qt
+    // refuses raw TCP with "The proxy type is invalid for this operation"
+    // and never sends a packet. Skip the system proxy lookup entirely.
+    tcp_port->setProxy(QNetworkProxy::NoProxy);
     timer = new QTimer(this);
     timer->setTimerType(Qt::PreciseTimer);
     timer->setInterval(interval);
@@ -120,8 +125,14 @@ bool ControlPort::connect_to_tcp_port(QString ip, ushort port)
 {
     if (tcp_port->isOpen()) tcp_port->close();
 
+    qDebug() << "[ControlPort" << idx << "] connecting to" << ip << ":" << port;
     tcp_port->connectToHost(ip, port);
     use_tcp = connected_to_tcp = tcp_port->waitForConnected(1000);
+    qDebug() << "[ControlPort" << idx << "] connected=" << connected_to_tcp
+             << "state=" << tcp_port->state()
+             << "local=" << tcp_port->localAddress().toString() << ":" << tcp_port->localPort()
+             << "peer="  << tcp_port->peerAddress().toString()  << ":" << tcp_port->peerPort()
+             << "err="   << tcp_port->errorString();
     if (connected_to_tcp) timer->start();
     else                  timer->stop(), tcp_port->close();
 //    emit tcp_port_status_updated(use_tcp = connected_to_tcp = tcp_port->waitForConnected(1000));

@@ -20,7 +20,8 @@ UDPPTZ::UDPPTZ():
     scan_range_horizontal(0),
     scan_range_vertical(0),
     servo_status(STANDBY),
-    last_received_time(0)
+    last_received_time(0),
+    protocol(PROTOCOL_530)
 {
     connect(this, &UDPPTZ::connect_to, this, &UDPPTZ::connect_to_device, Qt::QueuedConnection);
     connect(this, &UDPPTZ::disconnect_from, this, &UDPPTZ::disconnect_from_device, Qt::QueuedConnection);
@@ -60,6 +61,13 @@ void UDPPTZ::set_target(QHostAddress target, quint16 port)
     target_port = port;
 }
 
+void UDPPTZ::set_protocol(Protocol p)
+{
+    protocol = p;
+    // 530 firmware needs a faster heartbeat (10 ms / 100 Hz); 500 keeps 20 ms.
+    if (timer_tx) timer_tx->setInterval(p == PROTOCOL_530 ? 10 : 20);
+}
+
 void UDPPTZ::set_listen(QHostAddress listen, quint16 port)
 {
     local_ip = listen;
@@ -71,6 +79,9 @@ bool UDPPTZ::connect_to_device()
     if (connected) return false;
 
     udp_socket = new QUdpSocket(this);
+    // Bypass system-level proxy lookup. See controlport.cpp for context;
+    // QUdpSocket inherits from QAbstractSocket and hits the same code path.
+    udp_socket->setProxy(QNetworkProxy::NoProxy);
 
     // Bind to local address for receiving status
     if (!udp_socket->bind(local_ip, local_port)) {
@@ -230,9 +241,11 @@ void UDPPTZ::ptz_move_2d(int direction, int h_speed, int v_speed)
 
 void UDPPTZ::ptz_stop()
 {
+    // Stop semantics are still being characterised per device — currently
+    // zero velocities + MANUAL_SEARCH for all protocols. Will branch on
+    // `protocol` later if a variant requires STANDBY instead.
     set_velocities(0, 0);
-//    emit transmit(MANUAL_SEARCH); // for 500
-    emit transmit(STANDBY); // for 530
+    emit transmit(MANUAL_SEARCH);
 }
 
 void UDPPTZ::ptz_set_angle(float h, float v)
@@ -351,7 +364,6 @@ QByteArray UDPPTZ::create_command_frame(qint32 op, float horizontal, float verti
     // Convert float values to 16-bit integers (big-endian)
     qint16 h_value = float_to_int16(horizontal);
     qint16 v_value = float_to_int16(vertical);
-    qint16 scan_value = float_to_int16(scan_range);
 
     // Horizontal data (bytes 4-5)
     frame[4] = static_cast<uchar>((h_value >> 8) & 0xFF);
@@ -361,9 +373,18 @@ QByteArray UDPPTZ::create_command_frame(qint32 op, float horizontal, float verti
     frame[6] = static_cast<uchar>((v_value >> 8) & 0xFF);
     frame[7] = static_cast<uchar>(v_value & 0xFF);
 
-    // Scan range (bytes 8-9)
-    frame[8] = static_cast<uchar>((scan_value >> 8) & 0xFF);
-    frame[9] = static_cast<uchar>(scan_value & 0xFF);
+    // Bytes 8-9: scan range / per-protocol sentinel.
+    // 530: always 0x7F7F (= 32639, the firmware's "no scan" sentinel)
+    // regardless of op, even for SCAN — scan_range parameter is ignored.
+    // 500: scan_range value as-is (0x00 for non-SCAN ops).
+    if (protocol == PROTOCOL_530) {
+        frame[8] = 0x7F;
+        frame[9] = 0x7F;
+    } else {
+        qint16 scan_value = float_to_int16(scan_range);
+        frame[8] = static_cast<uchar>((scan_value >> 8) & 0xFF);
+        frame[9] = static_cast<uchar>(scan_value & 0xFF);
+    }
 
     // Reserved bytes (10-12) already initialized to 0x00
 
@@ -419,13 +440,15 @@ void UDPPTZ::parse_status_frame(const QByteArray &data)
     if (vertical_angle > 90.0f) vertical_angle = 90.0f;
     if (vertical_angle < -90.0f) vertical_angle = -90.0f;
 
-    // Parse horizontal angular rate (bytes 8-9)
-    qint16 h_vel_raw = (static_cast<uchar>(data[8]) << 8) | static_cast<uchar>(data[9]);
-    horizontal_velocity = int16_to_float(h_vel_raw);
-
-    // Parse vertical angular rate (bytes 10-11)
-    qint16 v_vel_raw = (static_cast<uchar>(data[10]) << 8) | static_cast<uchar>(data[11]);
-    vertical_velocity = int16_to_float(v_vel_raw);
+    // Device reports its current angular rate in bytes 8-9 / 10-11 of the
+    // status frame. Do NOT write into horizontal_velocity / vertical_velocity:
+    // those member fields hold the *commanded* velocity used for outgoing
+    // MANUAL_SEARCH frames (create_command_frame). Writing the device's
+    // reported rate into them corrupts the next outgoing command — e.g. after
+    // joystick release the timer would re-send the device's residual rate
+    // instead of the zeros we set in ptz_stop(). If we ever need device-side
+    // velocity for UI, add separate device_*_velocity fields (mirroring the
+    // target_*_angle vs *_angle split).
 
     // Emit signals
     emit angle_updated(horizontal_angle, vertical_angle);

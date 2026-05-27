@@ -50,7 +50,7 @@ public:
     const std::vector<std::string>& getClassNames() const { return m_class_names; }
 
 private:
-    bool loadClassNames(const std::string& filepath);
+    bool loadClassNames(const QString& filepath);
 
     DCSP_CORE* m_core;
     std::vector<std::string> m_class_names;

@@ -192,6 +192,13 @@ QGroupBox::title {
     bottom: 5px;
 }
 
+/* Setup overlay card titles — small labels above Save/Comm/TCU/Device cards.
+   Color-only; matches the effective render of QGroupBox::title. */
+#SETUP_CARD_TITLE {
+    color: #223C50;
+    padding-left: 4px;
+}
+
 /* tab box */
 .QWidget {
     background-color: #F4F4EA;
@@ -344,42 +351,27 @@ QSlider::handle:horizontal:disabled {
 
 /* tools (on display image) */
 Tools {
-    border-style: none;
-    border-radius: 3px;
+    background-color: #E8DFD6;
+    border: 1px solid #C9C0BB;
+    border-radius: 2px;
 }
 
-#ZOOM_TOOL::indicator {
-    width: 16px;
-    height: 16px;
-    margin-left: 2px;
-    image: url(:/tools/dark/move);
-}
-
-#SELECT_TOOL::indicator {
-    width: 16px;
-    height: 16px;
-    margin-left: 2px;
-    image: url(:/tools/dark/select);
-}
-
+#ZOOM_TOOL::indicator,
+#SELECT_TOOL::indicator,
 #PTZ_TOOL::indicator {
     width: 16px;
     height: 16px;
-    margin-left: 2px;
-    image: url(:/tools/dark/ptz);
+    /* QRadioButton anchors ::indicator left-of-text by default; with no
+       text the indicator still hugs the left edge. Force center. */
+    subcontrol-position: center;
 }
 
-Tools::checked {
-    background-color: #C9C0BB;
-}
+#ZOOM_TOOL::indicator   { image: url(:/tools/dark/move); }
+#SELECT_TOOL::indicator { image: url(:/tools/dark/select); }
+#PTZ_TOOL::indicator    { image: url(:/tools/dark/ptz); }
 
-Tools::unchecked {
-    background-color: transparent;
-}
-
-Tools::hover {
-    background-color: #C9C0BB;
-}
+Tools::checked { background-color: #C9C0BB; border-color: #5E4A36; }
+Tools::hover   { background-color: #D4C9BD; }
 
 /* coordinate info */
 /*#CURR_COORD, #START_COORD, #SHAPE_INFO {*/

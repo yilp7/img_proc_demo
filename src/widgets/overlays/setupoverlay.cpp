@@ -116,21 +116,49 @@ void SetupOverlay::setup_form()
     m_ui = new Ui::Preferences;
     m_ui->setupUi(m_form_root);
 
-    // Move the 5 top-level groups out of m_form_root and into the SetupOverlay rows.
-    auto move_card = [](QHBoxLayout *row, QWidget *card, QWidget *parent_w) {
+    // Move the 4 title-less QFrame cards out of m_form_root into the rows,
+    // each wrapped with a small QLabel title to match the QGroupBox cards
+    // (Presets/Ports/Camera/Image Processing) added by UserPanel.
+    auto move_card = [](QHBoxLayout *row, QWidget *card, QWidget *parent_w, const QString &title) {
         if (!row || !card) return;
         const QSize orig_size = card->size();
-        card->setParent(parent_w);
+
+        auto *wrap = new QWidget(parent_w);
+        wrap->setObjectName(card->objectName() + "_WRAP");
+        auto *vl = new QVBoxLayout(wrap);
+        vl->setContentsMargins(0, 0, 0, 0);
+        vl->setSpacing(2);
+
+        auto *title_lbl = new QLabel(title, wrap);
+        title_lbl->setObjectName("SETUP_CARD_TITLE");
+        // Use plain monaco — matches the effective render of QGroupBox::title
+        // (its QSS font-weight: 700 doesn't actually bold the subcontrol on
+        // this style, so explicit bold here made these labels look heavier).
+        title_lbl->setFont(monaco);
+        vl->addWidget(title_lbl);
+
+        card->setParent(wrap);
         card->move(0, 0);
-        if (!card->layout()) card->setMinimumSize(orig_size);
+        if (!card->layout()) {
+            // Pin to original size — these QFrames have absolutely-positioned
+            // children, so we don't want the layout to stretch them vertically
+            // (would float the content mid-card, away from the title above).
+            card->setFixedSize(orig_size);
+        }
         card->show();
-        row->addWidget(card);
+        vl->addWidget(card);
+        vl->addStretch(1);  // keep title+card glued to the top of the wrap
+
+        wrap->show();
+        // AlignTop so the short Save/Comm wraps don't get vertically centered
+        // inside a row sized by the tallest card (TCU).
+        row->addWidget(wrap, 0, Qt::AlignTop);
     };
 
-    move_card(m_row_layout[0], m_ui->SAVE_LOAD_GRP,    m_row[0]);
-    move_card(m_row_layout[0], m_ui->SERIAL_PORTS_GRP, m_row[0]);
-    move_card(m_row_layout[0], m_ui->TCU_GRP,          m_row[0]);
-    move_card(m_row_layout[1], m_ui->DEVICES_GRP,      m_row[1]);
+    move_card(m_row_layout[0], m_ui->SAVE_LOAD_GRP,    m_row[0], tr("Save Options"));
+    move_card(m_row_layout[0], m_ui->SERIAL_PORTS_GRP, m_row[0], tr("Communication"));
+    move_card(m_row_layout[0], m_ui->TCU_GRP,          m_row[0], tr("TCU"));
+    move_card(m_row_layout[1], m_ui->DEVICES_GRP,      m_row[1], tr("Device"));
 
     // Row 3 — Image Processing as a single full-width card whose body is a
     // FlowLayout. The 6 sub-groups (ACCUMULATIVE / ADAPTIVE / DCP / IMAGE_3D /
@@ -308,15 +336,61 @@ void SetupOverlay::bind()
                 update_distance_display();
             });
 
-    connect(u->MAX_DIST_EDT, &QLineEdit::editingFinished, this, [this](){ if (m_config) emit max_dist_changed(m_config->get_data().tcu.max_dist); });
-    connect(u->DELAY_OFFSET_EDT, &QLineEdit::editingFinished, this,
-            [this](){ if (m_config) emit delay_offset_changed(m_config->get_data().tcu.delay_offset * m_dist_ns); });
-    connect(u->MAX_DOV_EDT, &QLineEdit::editingFinished, this, [this](){ if (m_config) emit max_dov_changed(m_config->get_data().tcu.max_dov); });
-    connect(u->GATE_WIDTH_OFFSET_EDT, &QLineEdit::editingFinished, this,
-            [this](){ if (m_config) emit gate_width_offset_changed(m_config->get_data().tcu.gate_width_offset * m_dist_ns); });
-    connect(u->MAX_LASER_EDT, &QLineEdit::editingFinished, this, [this](){ if (m_config) emit max_laser_changed(m_config->get_data().tcu.max_laser_width); });
-    connect(u->LASER_OFFSET_EDT, &QLineEdit::editingFinished, this,
-            [this](){ if (m_config) emit laser_offset_changed(m_config->get_data().tcu.laser_width_offset); });
+    // editingFinished must write the EDT text into Config *before* emitting,
+    // otherwise downstream slots (e.g. DELAY_SLIDER::setMaximum via
+    // delay_slider_max_changed) read the stale value — data_exchange(true)
+    // doesn't run until the user leaves Setup mode. Mirrors the per-base_unit
+    // conversion in data_exchange(read=true).
+    auto read_unit_field = [this, u](float &dst_meters, QLineEdit *edt) {
+        if (!m_config) return;
+        const float v = edt->text().toFloat();
+        switch (u->UNIT_LIST->currentIndex()) {
+        case 0: dst_meters = v * m_dist_ns;          break; // ns
+        case 1: dst_meters = v * m_dist_ns * 1000;   break; // μs
+        case 2: dst_meters = v;                      break; // m
+        default:                                     break;
+        }
+    };
+    auto read_offset_field = [this, u](float &dst_ns, QLineEdit *edt) {
+        if (!m_config) return;
+        const float v = edt->text().toFloat();
+        switch (u->UNIT_LIST->currentIndex()) {
+        case 0: dst_ns = v;                  break; // ns
+        case 1: dst_ns = v * 1000;           break; // μs
+        case 2: dst_ns = v / m_dist_ns;      break; // m
+        default:                             break;
+        }
+    };
+    connect(u->MAX_DIST_EDT, &QLineEdit::editingFinished, this, [this, u, read_unit_field](){
+        if (!m_config) return;
+        read_unit_field(m_config->get_data().tcu.max_dist, u->MAX_DIST_EDT);
+        emit max_dist_changed(m_config->get_data().tcu.max_dist);
+    });
+    connect(u->DELAY_OFFSET_EDT, &QLineEdit::editingFinished, this, [this, u, read_offset_field](){
+        if (!m_config) return;
+        read_offset_field(m_config->get_data().tcu.delay_offset, u->DELAY_OFFSET_EDT);
+        emit delay_offset_changed(m_config->get_data().tcu.delay_offset * m_dist_ns);
+    });
+    connect(u->MAX_DOV_EDT, &QLineEdit::editingFinished, this, [this, u, read_unit_field](){
+        if (!m_config) return;
+        read_unit_field(m_config->get_data().tcu.max_dov, u->MAX_DOV_EDT);
+        emit max_dov_changed(m_config->get_data().tcu.max_dov);
+    });
+    connect(u->GATE_WIDTH_OFFSET_EDT, &QLineEdit::editingFinished, this, [this, u, read_offset_field](){
+        if (!m_config) return;
+        read_offset_field(m_config->get_data().tcu.gate_width_offset, u->GATE_WIDTH_OFFSET_EDT);
+        emit gate_width_offset_changed(m_config->get_data().tcu.gate_width_offset * m_dist_ns);
+    });
+    connect(u->MAX_LASER_EDT, &QLineEdit::editingFinished, this, [this, u](){
+        if (!m_config) return;
+        m_config->get_data().tcu.max_laser_width = u->MAX_LASER_EDT->text().toFloat();
+        emit max_laser_changed(m_config->get_data().tcu.max_laser_width);
+    });
+    connect(u->LASER_OFFSET_EDT, &QLineEdit::editingFinished, this, [this, u](){
+        if (!m_config) return;
+        m_config->get_data().tcu.laser_width_offset = u->LASER_OFFSET_EDT->text().toFloat();
+        emit laser_offset_changed(m_config->get_data().tcu.laser_width_offset);
+    });
 
     u->PS_CONFIG_GRP->hide();
     u->TCU_PS_CONFIG_LIST->addItem("GW_A");
