@@ -22,7 +22,7 @@ public:
     int start(int idx = 0);
     int shut_down();
 
-    int set_user_pointer(void *user);
+    int set_user_pointer(StreamFrameSink *sink);
 
     int start_grabbing();
     int stop_grabbing();

@@ -458,7 +458,7 @@ nlohmann::json Config::image_proc_settings_to_json(const ImageProcSettings &sett
     obj["custom_3d_delay"] = static_cast<double>(settings.custom_3d_delay);
     obj["custom_3d_gate_width"] = static_cast<double>(settings.custom_3d_gate_width);
     // model/fishnet
-    obj["model_idx"] = settings.model_idx;
+    obj["fishnet_model_idx"] = settings.fishnet_model_idx;
     obj["fishnet_recog"] = settings.fishnet_recog;
     obj["fishnet_thresh"] = static_cast<double>(settings.fishnet_thresh);
     // ECC
@@ -530,9 +530,11 @@ Config::ImageProcSettings Config::image_proc_settings_from_json(const nlohmann::
     if (obj.contains("custom_3d_gate_width") && obj["custom_3d_gate_width"].is_number()) {
         settings.custom_3d_gate_width = static_cast<float>(obj["custom_3d_gate_width"].get<double>());
     }
-    // model/fishnet
-    if (obj.contains("model_idx") && obj["model_idx"].is_number()) {
-        settings.model_idx = obj["model_idx"].get<int>();
+    // model/fishnet — accept legacy "model_idx" key on load for backward compat
+    if (obj.contains("fishnet_model_idx") && obj["fishnet_model_idx"].is_number()) {
+        settings.fishnet_model_idx = obj["fishnet_model_idx"].get<int>();
+    } else if (obj.contains("model_idx") && obj["model_idx"].is_number()) {
+        settings.fishnet_model_idx = obj["model_idx"].get<int>();
     }
     if (obj.contains("fishnet_recog") && obj["fishnet_recog"].is_boolean()) {
         settings.fishnet_recog = obj["fishnet_recog"].get<bool>();

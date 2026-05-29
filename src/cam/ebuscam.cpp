@@ -96,9 +96,9 @@ int EbusCam::shut_down()
     return 0;
 }
 
-int EbusCam::set_user_pointer(void *user)
+int EbusCam::set_user_pointer(StreamFrameSink *sink)
 {
-    ptr_user = user;
+    ptr_user = sink;
     return 0;
 }
 
@@ -140,19 +140,11 @@ int EbusCam::start_grabbing() {
 
                 if (buffer->GetPayloadType() == PvPayloadTypeImage) {
                     PvImage *img = buffer->GetImage();
-                    struct main_ui_info *ptr = (struct main_ui_info*)ptr_user;
-
-                    // Protect both queues with their respective mutexes
-                    if (ptr->frame_info_mutex) {
-                        QMutexLocker frame_locker(ptr->frame_info_mutex);
-                        ptr->frame_info_q->push(0);
+                    StreamFrameSink *sink = ptr_user;
+                    if (sink) {
+                        if (sink->frame_info) sink->frame_info->push(0);
+                        if (sink->frames)     sink->frames->push(cv::Mat(img->GetHeight(), img->GetWidth(), CV_8UC1, buffer->GetDataPointer()).clone());
                     }
-
-                    if (ptr->img_mutex) {
-                        QMutexLocker img_locker(ptr->img_mutex);
-                        ptr->img_q->push(cv::Mat(img->GetHeight(), img->GetWidth(), CV_8UC1, buffer->GetDataPointer()).clone());
-                    }
-//                    cv::imwrite("../a.bmp", cv::Mat(1080, 1920, CV_8UC1, buffer->GetDataPointer()));
                 }
             }
             if (op_result.IsOK()) stream_handle->QueueBuffer(buffer);

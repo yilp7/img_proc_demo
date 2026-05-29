@@ -93,8 +93,9 @@ int EuresysCam::shut_down()
     return ret;
 }
 
-int EuresysCam::set_user_pointer(void *user)
+int EuresysCam::set_user_pointer(StreamFrameSink *sink)
 {
+    void *user = sink;
     // Register the callback function
     return McRegisterCallback(dev_handle, frame_cb, user);
 }
@@ -281,18 +282,11 @@ void EuresysCam::frame_cb(PMCCALLBACKINFO cb_info)
     memcpy(img.data, data, x * y * 3);
     cv::cvtColor(img, img_rb_swapped, cv::COLOR_BGR2RGB);
     // pointer named user passed in here is called by cb_info->Context
-    struct main_ui_info *ptr = (struct main_ui_info*)(cb_info->Context);
+    StreamFrameSink *sink = (StreamFrameSink*)(cb_info->Context);
 
-    // Protect both queues with their respective mutexes
-    if (ptr->frame_info_mutex) {
-        QMutexLocker frame_locker(ptr->frame_info_mutex);
-        ptr->frame_info_q->push(0);
-    }
-
-    if (ptr->img_mutex) {
-        QMutexLocker img_locker(ptr->img_mutex);
-        ptr->img_q->push(img_rb_swapped.clone());
-    }
+    // BoundedQueue is internally thread-safe; no external mutex.
+    if (sink->frame_info) sink->frame_info->push(0);
+    if (sink->frames)     sink->frames->push(img_rb_swapped.clone());
 }
 
 #if CLALLSERIAL

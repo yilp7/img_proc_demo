@@ -55,6 +55,8 @@
 #include "pipeline/processingparams.h"
 #include "pipeline/pipelineconfig.h"
 #include "pipeline/pipelineprocessor.h"
+#include "pipeline/routing.h"
+#include "pipeline/ffmpegsource.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class UserPanel; }
@@ -62,21 +64,25 @@ class QLineEdit;
 QT_END_NAMESPACE
 
 class UserPanel;
+class DisplayRouter;
+struct DisplaySlot;
 
-class GrabThread : public QThread {
+// Consumer-side worker. Reads frames from whatever StreamSlot is currently
+// routed to its DisplaySlot via the DisplayRouter. Was named GrabThread, but
+// it's been the consumer all along — name updated to match.
+class ConsumerThread : public QThread {
     Q_OBJECT
 public:
-    GrabThread(PipelineProcessor *pipeline, int idx);
-    ~GrabThread();
-
-    void display_idx(bool read, int &idx);
+    ConsumerThread(PipelineProcessor *pipeline, DisplayRouter *router, DisplaySlot *display);
+    ~ConsumerThread();
 
 protected:
     void run();
 
 private:
     PipelineProcessor *m_pipeline;
-    int  _display_idx;
+    DisplayRouter     *m_router;
+    DisplaySlot       *m_display;
 
 signals:
     void stop_image_writing();
@@ -436,7 +442,6 @@ public:
 
 private:
     Ui::UserPanel*  ui;
-    QLabel*         m_fps_label[3];   // per-display FPS readout (main + 2 alts)
     QFrame*         m_center_toolbar;  // inline center toolbar: SEL/ZOOM/PTZ + INFO
     QFrame*         m_pbar;           // panel toggle bar: 3 checkable buttons top-right
     OpticsPanel*    m_optics_panel;
@@ -474,69 +479,37 @@ private:
 
     int             calc_avg_option;            // a: 4 frames; b: 8 frames
     bool            trigger_by_software;        // whether the device gets trigger signal from sw
-    QMutex          image_mutex[3];             // img handle lock
     QMutex          port_mutex;                 // port handle lock
-    QMutex          display_mutex[3];           // display handle lock
-    QMutex          frame_info_mutex;           // q_frame_info queue lock (shared across threads)
     Cam*            curr_cam;                   // current camera
     float           time_exposure_edit;
     float           gain_analog_edit;
-    float           frame_rate_edit[3]; // per-display playback / camera rate
     QString         save_location;              // where to save the image
     QString         TEMP_SAVE_LOCATION;         // temp location to save the image
-    cv::VideoWriter vid_out[4];                 // video writer for ORI/RES/alt-display1/2
-    cv::VideoWriter vid_out_proc;               // video writer for export
+    cv::VideoWriter vid_out_proc;               // video writer for export (separate from per-display recorders)
     QString         current_video_filename;     // name of the imported video file (if not a stream)
     QString         output_filename;            // target output name when exporting video
     QString         temp_output_filename;       // temp save location of target output file
-    
-    std::queue<cv::Mat>        q_img[3];                   // image queue in grab_thread
-    std::queue<int>            q_frame_info;
-    TimedQueue*                q_fps_calc[3];
-//    bool                    updated[3];                 // whether the program get a new image from stream
-    // TODO add other scan features
-//    std::vector<TCUDataGroup>  q_scan;                   // targets' tcu param found while scanning
 
-    int  device_type;        // 1: hik gige
+    // Per-stream and per-display state lives in m_router (see pipeline/routing.h).
+    // m_cam_sink is a stable address fed to curr_cam->set_user_pointer so the
+    // cam SDK callbacks push frames through the StreamSlot::frames queue.
+    DisplayRouter    m_router;
+    PipelineGlobals  m_globals;
+    StreamFrameSink  m_cam_sink;
+
+    int  device_type;        // 1/2/3: industrial cam; -1: local file; -2: network stream
     bool device_on;          // whether curr device is on
     bool trigger_mode_on;    // whether img grabbing is on trigger mode
     bool start_grabbing;     // whether the device is rdy to grab imgs
-    std::atomic<bool> record_original[3]; // whether recording original stream
-    std::atomic<bool> record_modified[3]; // whether recording modified stream
-    std::atomic<bool> save_original[3];   // saving original bmp
-    std::atomic<bool> save_modified[3];   // saving modified bmp
-    bool image_3d[3];        // whether to build a 3d image
-    int  image_rotate[3];    // rotate image ccw
     int  trigger_source;     // where the device gets the trigger signal
-    bool is_color[3];        // source in grayscale or color
-    bool pseudocolor[3];     // apply pseudocolor
-    int  w[3];               // image width
-    int  h[3];               // image height
-    int  pixel_format[3];    // for hik cam, use mono 8 for others
-    int  pixel_depth[3];     // pixel depth
 
-    Display*        displays[3];                // 3 set of display widgets
-    int             display_thread_idx[3];      // idx of the thread displaying in display_i
-    bool            grab_image[3];              // whether thread should continue grabbing image
-    GrabThread*     h_grab_thread[3];           // img-grab thread handle
-    std::atomic<bool> grab_thread_state[3];     // whether grabbing thread is on
+    // SETUP-overlay-driven dimensions for the main cam. Per-display dimensions
+    // live on each StreamSlot::meta — these are the cam-control widgets' view.
+    int  main_pixel_format;
+    int  main_pixel_depth;
+
     bool            video_thread_state;         // whether video reading thread is on
     JoystickThread* h_joystick_thread;          // process joystick input
-
-    cv::Mat                 img_mem[3];                 // right-side img display source (stream)
-    cv::Mat                 modified_result[3];         // right-side img display modified (stream)
-//    cv::Mat                 img_display[3];             // right-side img display cropped (stream)
-//    cv::Mat                 prev_img[3];                // previous original image
-//    cv::Mat                 prev_3d[3];                 // previous 3d image
-//    cv::Mat                 seq[3][8];                  // for frame average
-//    cv::Mat                 seq_sum[3];
-//    cv::Mat                 frame_a_sum[3];
-//    cv::Mat                 frame_b_sum[3];
-//    uint                    hist[3][256];               // display histogram
-//    cv::Mat                 hist_mat[3];
-//    int                     seq_idx[3];                 // frame-average current index
-//    cv::Mat                 dist_mat[3];
-    cv::Mat                 user_mask[3];
 
     bool                    hide_left;                  // whether left bar is hidden
     int                     resize_place;               // mouse position when resizing or at border
@@ -566,18 +539,60 @@ private:
     // TODO move to addons
     PluginInterface*        pluginInterface;            // for ir with visible light
 
-    // YOLO Detection
-    YoloDetector*           m_yolo_detector[3] = {nullptr, nullptr, nullptr};
+    // YOLO Detection — detectors live per DisplaySlot now. Init-mutex stays
+    // singleton since it only protects detector construction.
     QMutex                  m_yolo_init_mutex;
-    int                     m_yolo_last_model[3] = {-1, -1, -1};  // Track loaded model for each thread
-    // Thread-safe snapshots of UI widget state and Config for grab_thread_process
+
+    // Thread-safe snapshots of UI widget state and Config for the consumers.
     QMutex                  m_params_mutex;
     ProcessingParams        m_processing_params;
+    // GENERAL-tab display picker selection. The GENERAL controls
+    // (enhance / frame-avg / pseudocolor / 3D / threshold / RESET_3D_BTN
+    // — except RESET_3D_BTN which is global TCU state) read from and
+    // write to m_router.display(m_picked_display).pcfg.
+    DisplayId               m_picked_display = DisplayId::Main;
+    // m_pipeline_config is the "global view" of pipeline settings. On
+    // update_processing_params() it is copied into every DisplaySlot's pcfg
+    // (apply-to-all default). The picker UX in C1b will swap this view to
+    // mirror the currently-selected display.
     PipelineConfig          m_pipeline_config;
     void update_processing_params();
+    // Write the GENERAL-tab widget values into the picked display's pcfg.
+    // Invoked from each GENERAL widget's change-signal lambda.
+    void apply_picked_pcfg_from_widgets();
+    // Read the picked display's pcfg into the GENERAL widgets, with
+    // QSignalBlocker so the writes don't bounce back into the slot we're
+    // switching to. Invoked when m_picked_display changes.
+    void repopulate_general_widgets_from_picked();
 
     // Pipeline processor (owns all pipeline methods, run by GrabThread)
     PipelineProcessor*      m_pipeline;
+
+    // FFmpeg readers — one per stream. Drives the live-network/local-file
+    // playback path; cv:// + industrial cam push directly into StreamFrameSink
+    // instead.
+    FfmpegSource*           m_ffmpeg[kStreamCount] = { nullptr, nullptr, nullptr };
+    // Per-slot cv:// thread lifecycle. Each cv:// dispatch captures the
+    // shared_ptr; setting *m_cv_run[i] = false makes the cv:// loop exit
+    // independently of DisplaySlot::consumer_run (which start_static_display
+    // toggles back to true and would otherwise resurrect a stale cv://).
+    std::shared_ptr<std::atomic<bool>> m_cv_run[kStreamCount];
+    // Per-stream signal handlers (free functions on UserPanel for legibility).
+    // Each slot drops the signal if its `session` doesn't match the source's
+    // current_session() — stale events queued in the GUI loop from a worker
+    // that has been stop()ed must NOT bleed into the newly started worker.
+    void on_ffmpeg_opened(StreamId target, int session, FfmpegSource::VideoInfo info);
+    void on_ffmpeg_frame(StreamId target, int session, cv::Mat frame);
+    void on_ffmpeg_failed(StreamId target, int session, QString reason);
+    void on_ffmpeg_finished(StreamId target, int session);
+
+    // Stop every active producer on the given slot before a new source
+    // takes over. All source types (FFmpeg, cv://, industrial cam, …) push
+    // to the same StreamSlot::frames queue, so any prior producer that's
+    // still alive will interleave with the new one. Call from each
+    // source-load entry point's top so the new source has the queue to
+    // itself.
+    void stop_all_sources_on_slot(int display_idx);
 
 public:
 

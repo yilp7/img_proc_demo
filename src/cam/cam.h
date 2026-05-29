@@ -2,9 +2,10 @@
 #define CAM_H
 
 #include <stddef.h>
-#include <queue>
 #include <opencv2/opencv.hpp>
 #include <QtCore>
+
+#include "pipeline/routing.h"  // StreamFrameSink
 
 class Cam {
 public:
@@ -20,7 +21,10 @@ public:
     virtual int start(int idx = 0) = 0;
     virtual int shut_down() = 0;
 
-    virtual int set_user_pointer(void *user) = 0;
+    // Cam SDK callbacks push frames through this sink. The sink lives on a
+    // StreamSlot owned by UserPanel; cam adapter just stores the pointer and
+    // hands it to its SDK as the user_data parameter.
+    virtual int set_user_pointer(StreamFrameSink *sink) = 0;
 
     virtual int start_grabbing() = 0;
     virtual int stop_grabbing() = 0;
@@ -43,12 +47,4 @@ public:
     virtual int usb3_device_num() = 0;
 
 };
-#if 1
-struct main_ui_info {
-    std::queue<int> *frame_info_q;
-    std::queue<cv::Mat> *img_q;
-    QMutex *frame_info_mutex;  // Mutex to protect frame_info_q
-    QMutex *img_mutex;          // Mutex to protect img_q
-};
-#endif
 #endif // CAM_H

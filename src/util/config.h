@@ -100,7 +100,7 @@ public:
         float custom_3d_delay = 0.0f;
         float custom_3d_gate_width = 0.0f;
         // model/fishnet
-        int model_idx = 0;
+        int fishnet_model_idx = 0;
         bool fishnet_recog = false;
         float fishnet_thresh = 0.99f;
         // ECC temporal denoising
@@ -119,10 +119,8 @@ public:
     struct YoloSettings {
         QString config_path = "yolo_config.ini";  // relative to default.json dir
 
-        // Model selection for each display (0=None, 1=Visible Light, 2=Thermal, 3=Gated)
-        int main_display_model = 0;
-        int alt1_display_model = 0;
-        int alt2_display_model = 0;
+        // Model selection is per-display (lives on each DisplaySlot's PipelineConfig),
+        // not persisted to config file. Defaults to 0 (none) at startup.
 
         // Visible light model
         QString visible_model_path = "models/VL.onnx";

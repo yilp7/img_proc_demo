@@ -252,6 +252,9 @@ set(SOURCE_FILES
     src/pipeline/pipelineconfig.h
     src/pipeline/pipelineprocessor.h
     src/pipeline/pipelineprocessor.cpp
+    src/pipeline/routing.h
+    src/pipeline/ffmpegsource.h
+    src/pipeline/ffmpegsource.cpp
     src/pipeline/scanparams.h
     src/pipeline/scanparams.cpp
     src/controller/devicemanager.h

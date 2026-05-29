@@ -490,7 +490,7 @@ void SetupOverlay::bind()
     u->MODEL_LIST->setCurrentIndex(0);
     connect(u->MODEL_LIST, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this,
             [this, u](int index){
-                if (m_config) m_config->get_data().image_proc.model_idx = index;
+                if (m_config) m_config->get_data().image_proc.fishnet_model_idx = index;
                 u->FISHNET_THRESH_EDIT->setEnabled(!index);
             });
     connect(u->FISHNET_RECOG_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ if (m_config) m_config->get_data().image_proc.fishnet_recog = arg1; });

@@ -56,8 +56,9 @@ int MvCam::shut_down()
     return ret;
 }
 
-int MvCam::set_user_pointer(void *user)
+int MvCam::set_user_pointer(StreamFrameSink *sink)
 {
+    void *user = sink;
     return MV_CC_RegisterImageCallBackEx(dev_handle, frame_cb, user);
 }
 
@@ -308,17 +309,10 @@ void MvCam::frame_cb(unsigned char *data, MV_FRAME_OUT_INFO_EX *frame_info, void
 
 //    ImageIO::save_image_bmp(mv_img, "imgs/" + QDateTime::currentDateTime().toString("hhMMss.zzz") + ".bmp");
 
-    struct main_ui_info *ptr = (struct main_ui_info*)user_data;
+    StreamFrameSink *sink = (StreamFrameSink*)user_data;
 
-    // Protect both queues with their respective mutexes
-    if (ptr->frame_info_mutex) {
-        QMutexLocker frame_locker(ptr->frame_info_mutex);
-        ptr->frame_info_q->push(frame_info->nLostPacket);
-    }
-
-    if (ptr->img_mutex) {
-        QMutexLocker img_locker(ptr->img_mutex);
-        ptr->img_q->push(mv_img.clone());
-    }
+    // BoundedQueue is internally thread-safe; no external mutex.
+    if (sink->frame_info) sink->frame_info->push(frame_info->nLostPacket);
+    if (sink->frames)     sink->frames->push(mv_img.clone());
 //    cv::imwrite("../mv.bmp", mv_img);
 }
