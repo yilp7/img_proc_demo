@@ -166,3 +166,40 @@ User wanted a per-display "model loaded" dot next to each model combobox in the 
 - [x] Walkthrough cadence: per sub-commit, with mid-C1a check-ins as fixes (resize crash, deadlock, HLS burst) surfaced.
 
 **Pre-start state:** working tree stashed (pre-T3 state) to keep C1a's commit focused on the refactor only; T1/T2 work and earlier FFmpeg bug fixes ride with the sprint-end commit. Stash gets popped after C1a lands.
+
+### T4 — SETUP overlay: IP / serial-hex commit regression
+
+Background: in `SETUP` mode, setting a new device IP via `IP_EDIT` did nothing — typing a value and pressing Enter or tabbing away never reached `curr_cam->ip_address(false, ...)`. The serial-comm "send raw hex bytes" field (`COM_DATA_EDT`) was silently broken the same way: `SetupOverlay::send_cmd(QString)` is defined but had zero callers.
+
+**Root cause — common ancestor:** in the legacy `Preferences` dialog ([deleted in 4792c72](src/_deprecated/progsettings.cpp#L307-L313)), every line edit was committed on `Qt::Key_Enter` in the dialog's `keyPressEvent`. Three branches: `IP_EDIT → config_ip(false)`, `COM_DATA_EDT → send_cmd(text)`, and a generic fall-through `data_exchange(true)` that re-read every other field into Config in one sweep. When sprint 22 ported `Preferences` to `SetupOverlay` (a `QFrame` overlay, no longer a `QDialog`), `keyPressEvent` was dropped. The fall-through branch was replaced by per-field `editingFinished` lambdas in `SetupOverlay::bind()` — which is why `MAX_DIST` / `GAMMA` / `FISHNET_THRESH` / etc. still commit. But the two special-case branches had no `connect()` to port from, so both were silently lost.
+
+**Fix:** two `returnPressed` connections in `SetupOverlay::bind()` ([setupoverlay.cpp:211](src/widgets/overlays/setupoverlay.cpp#L211), [setupoverlay.cpp:300](src/widgets/overlays/setupoverlay.cpp#L300)) — `IP_EDIT → config_ip(false)` and `COM_DATA_EDT → send_cmd(text)`. Chose `returnPressed` over `editingFinished` deliberately: both trigger destructive side effects (IP triggers a network reconfigure on the camera; COM_DATA_EDT actually sends bytes over the wire), so a focus-out commit on accidental click-away is wrong. Matches the legacy "Enter only" intent exactly.
+
+Out of scope: re-auditing whether the `editingFinished` choice was correct for the other (benign-write) line edits in `bind()`. Their commits only write to Config — no immediate side effect — so the looser trigger is fine there. Flagged but not changed.
+
+### T5 - RTSP latency in FFmpeg SW decode path
+
+Background: RTSP streams decoded through the extracted `FfmpegSource` path showed much higher latency than other players (roughly 5-10 s) while using software decode. The RTSP input options were already tuned (`rtsp_transport=tcp`, reduced `analyzeduration` / `probesize`, `fflags=nobuffer`, `max_delay=200ms`), so the remaining delay was likely above the demuxer.
+
+**Diagnosis:**
+- `FfmpegSource::frame_decoded` was connected with `Qt::QueuedConnection` ([userpanel.cpp](src/visual/userpanel.cpp)), so every decoded `cv::Mat` became a GUI-thread event before it reached `StreamSlot::frames`.
+- The intended live queue (`BoundedQueue<cv::Mat>` capacity 5) drops oldest frames, but it sat after Qt's unbounded event queue. If decode/conversion outran GUI event dispatch or consumer processing, stale frames accumulated before the bounded queue could drop them.
+- RTSP frames were also going through the PTS throttle in `FfmpegSource` ([ffmpegsource.cpp](src/pipeline/ffmpegsource.cpp)). Live RTSP is already paced by network input; sleeping on PTS preserves any backlog instead of catching up.
+
+**Fix:**
+- Kept lifecycle signals (`opened`, `failed`, `finished`) queued to the GUI thread, but changed `frame_decoded` to `Qt::DirectConnection` so decoded frames are pushed straight into `StreamSlot::frames` / `BoundedQueue` from the FFmpeg worker thread.
+- Added `FfmpegSource::mark_display_ready(session)`: after `on_ffmpeg_opened()` finishes `start_static_display(...)` and reopens the route queue, it acks the worker. The worker waits for that ack before emitting frames, avoiding the first-frame race where direct delivery could push into a closed or not-yet-routed queue.
+- Gated the PTS sleep with `!is_rtsp_stream`, so RTSP stays network-paced. Local files and HTTP/HLS keep the existing PTS pacing behavior.
+- Follow-up: removed `save_info` text overlay from raw recording. Raw recorder now writes the untouched source frame (plus only the required RGB->BGR conversion for color writer input); processed recording keeps the existing info overlay behavior.
+- Follow-up stutter tuning: when RTSP playback showed correct average FPS (~29) but several tiny stalls per second, changed RTSP decoder threading from auto frame+slice threading to single-thread slice mode (`thread_count=1`, `thread_type=FF_THREAD_SLICE`). Rationale: FFmpeg frame threading can batch/reorder software-decoder output, producing burst/gap delivery even when the average pop rate is correct. Local files and HTTP/HLS keep the previous auto-threaded path.
+- Follow-up swap/recording fixes:
+  - Main raw/proc recorder open now reads metadata from `router.snapshot(DisplayId::Main).stream`, not hardcoded `StreamId::S0`. This fixes the swapped Alt1 RTSP -> Main case where Main recorded RTSP frames into a writer opened with industrial-cam metadata, producing a tiny header-only file.
+  - Alt floating-window resize now uses `fw_display[display_idx - 1]`; the previous `fw_display[display_idx]` was off by one for Alt1 and out of bounds for Alt2.
+  - `start_static_display()` only updates legacy global `device_type` / `start_grabbing` for Main display loads. Starting an Alt RTSP stream no longer rewrites Main/camera acquisition state.
+  - `swap_grab_thread_display()` recreates a display consumer if the pointer exists but the thread is no longer running, covering intermittent swap-to-display-with-dead-consumer cases.
+  - Camera stop now targets the display currently routing `StreamId::S0` instead of always stopping Main's consumer. This prevents a swapped camera stop from killing an unrelated Main stream.
+  - Camera restart now force-cleans stale S0 state before `curr_cam->start_grabbing()`: if `start_grabbing`, `StreamSlot::producer_run`, or router state still says S0 is active, START first calls `curr_cam->stop_grabbing()`, closes/clears S0 queues, stops the display currently routing S0, unroutes S0, and resets `start_grabbing=false`. This covers the field case where an industrial cam swapped to Alt stops underneath the app, is swapped back to Main, and then crashes on restart because the SDK is still half-live.
+
+**Verification:**
+- `git diff --check` passed, aside from the repo's existing CRLF normalization warnings.
+- Local compile was attempted with `cmake --build build-Desktop_Qt_5_12_12_MSVC2015_64bit-RelWithDebInfo --config RelWithDebInfo --target GLI_user_panel`, but the configured generator requires `jom`, which was not available in the shell. Runtime RTSP verification still needs to be done in the Qt/MSVC environment.

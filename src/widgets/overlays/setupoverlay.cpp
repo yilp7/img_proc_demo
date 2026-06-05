@@ -208,6 +208,7 @@ void SetupOverlay::bind()
 
 //[1] device config
     u->IP_EDIT->setEnabled(false);
+    connect(u->IP_EDIT, &QLineEdit::returnPressed, this, [this](){ config_ip(false); });
     u->DEVICE_LIST->installEventFilter(this);
     connect(u->DEVICE_LIST, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this,
             [this, u](int index){ if (m_config) m_config->get_data().tcu.type = index; emit query_dev_ip(); });
@@ -297,6 +298,7 @@ void SetupOverlay::bind()
             [this](int arg1){ if (m_config) m_config->get_data().device.share_tcu_port = arg1; emit share_tcu_port(arg1); });
 
     u->COM_DATA_EDT->setFont(consolas);
+    connect(u->COM_DATA_EDT, &QLineEdit::returnPressed, this, [this, u](){ send_cmd(u->COM_DATA_EDT->text()); });
 
 //[3] tcu config
     u->TCU_LIST->addItem("default");

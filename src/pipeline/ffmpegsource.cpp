@@ -6,6 +6,7 @@
 
 #include <QDebug>
 #include <QElapsedTimer>
+#include <QThread>
 
 #include "util/util.h"  // pulls in FFmpeg + opencv via extern "C" block
 
@@ -89,12 +90,17 @@ FfmpegSource::~FfmpegSource() {
 void FfmpegSource::start(StreamId target, QString url, bool format_gray) {
     stop();
     const int session = m_session.fetch_add(1) + 1;
-    m_should_stop = false;
-    m_running     = true;
-    m_target      = target;
+    m_should_stop.store(false);
+    m_ready_session.store(0);
+    m_running.store(true);
+    m_target = target;
     qDebug() << "[FfmpegSource] start: target=" << static_cast<int>(target)
              << "session=" << session << "url=" << url;
     m_thread = std::thread(&FfmpegSource::run_thread, this, target, session, url, format_gray);
+}
+
+void FfmpegSource::mark_display_ready(int session) {
+    m_ready_session.store(session);
 }
 
 void FfmpegSource::stop(int timeout_ms) {
@@ -235,8 +241,13 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
     }
     if (hw_device_ctx) av_buffer_unref(&hw_device_ctx);
 
-    codec_context->thread_count = 0;
-    codec_context->thread_type  = FF_THREAD_FRAME | FF_THREAD_SLICE;
+    if (is_rtsp_stream) {
+        codec_context->thread_count = 1;
+        codec_context->thread_type  = FF_THREAD_SLICE;
+    } else {
+        codec_context->thread_count = 0;
+        codec_context->thread_type  = FF_THREAD_FRAME | FF_THREAD_SLICE;
+    }
     if (is_rtsp_stream || is_http_stream) {
         codec_context->flags  |= AV_CODEC_FLAG_LOW_DELAY;
         codec_context->flags2 |= AV_CODEC_FLAG2_FAST;
@@ -249,8 +260,13 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
             avcodec_free_context(&codec_context);
             codec_context = avcodec_alloc_context3(NULL);
             if (avcodec_parameters_to_context(codec_context, codec_param) < 0) { finish(false, "codec_param_failed"); return; }
-            codec_context->thread_count = 0;
-            codec_context->thread_type  = FF_THREAD_FRAME | FF_THREAD_SLICE;
+            if (is_rtsp_stream) {
+                codec_context->thread_count = 1;
+                codec_context->thread_type  = FF_THREAD_SLICE;
+            } else {
+                codec_context->thread_count = 0;
+                codec_context->thread_type  = FF_THREAD_FRAME | FF_THREAD_SLICE;
+            }
             if (is_rtsp_stream || is_http_stream) {
                 codec_context->flags  |= AV_CODEC_FLAG_LOW_DELAY;
                 codec_context->flags2 |= AV_CODEC_FLAG2_FAST;
@@ -279,6 +295,14 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
     info.fps      = fps;
     info.is_color = !format_gray;
     emit opened(target, session, info);
+
+    // frame_decoded uses a direct connection to avoid queueing cv::Mat events
+    // on the GUI thread. Wait until UserPanel has opened/reopened the route's
+    // BoundedQueue so the first frames are not dropped into a closed queue.
+    while (!m_should_stop.load() && m_ready_session.load() != session) {
+        QThread::msleep(1);
+    }
+    if (m_should_stop.load()) { finish(true, ""); return; }
 
     AVPacket packet;
     if (format_gray) init_filter_graph(format_context, video_stream_idx, filter_graph,
@@ -328,7 +352,9 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
                     // av_hwframe_transfer_data does not copy metadata, so
                     // sw_frame->pts is unset (0) under HW decoding, making
                     // the throttle a no-op.
-                    if (frame->pts != AV_NOPTS_VALUE) {
+                    // RTSP is already network-paced; sleeping on PTS keeps
+                    // any demuxer/camera backlog alive instead of catching up.
+                    if (!is_rtsp_stream && frame->pts != AV_NOPTS_VALUE) {
                         if (last_pts != AV_NOPTS_VALUE) {
                             delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1000;
                             if (delay > 0 && delay < 1000000) av_usleep(delay);

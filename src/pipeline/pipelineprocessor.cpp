@@ -768,6 +768,7 @@ void PipelineProcessor::record_frame(StreamSlot& stream, DisplaySlot& display, b
     const QString& info_tcu, const QString& info_time,
     int ww, int hh, float weight)
 {
+    (void)info_tcu;
     bool is_color = false;
     { QMutexLocker mlk(&stream.meta_mutex); is_color = stream.meta.is_color; }
 
@@ -781,10 +782,6 @@ void PipelineProcessor::record_frame(StreamSlot& stream, DisplaySlot& display, b
     }
     if (updated && display.record_raw) {
         cv::Mat temp = stream.latest_raw.clone();
-        if (pcfg.save_info) {
-            cv::putText(temp, info_tcu.toLatin1().data(), cv::Point(10, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-            cv::putText(temp, info_time.toLatin1().data(), cv::Point(ww - 240 * weight, 50 * weight), cv::FONT_HERSHEY_SIMPLEX, weight, cv::Scalar(255), weight * 2);
-        }
         if (is_color) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
         if (display.raw_writer.isOpened()) display.raw_writer.write(temp);
     }

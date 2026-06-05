@@ -84,15 +84,15 @@ inline double diff_timespec(struct timespec &t1, struct timespec &t2) {
 
 void TimedQueue::run()
 {
+    QElapsedTimer et;
     while (!_quit) {
 #if 1
         QThread::msleep(5);
-        static struct timespec t;
+        struct timespec t;
         timespec_get(&t, TIME_UTC);
         if (q.empty()) { continue; }
         mtx.lock();
         if (diff_timespec(q.front(), t) > expiration_time * 1e3) q.pop();
-        static QElapsedTimer et;
         if (et.isValid() && et.elapsed() < 200) { mtx.unlock(); continue; }
         QMetaObject::invokeMethod(fps_status, "setText", Qt::QueuedConnection,
                                   Q_ARG(QString, QString::number(q.size() ? ((q.size() - 1) / diff_timespec(q.front(), q.back())) * 1000 : 0.f, 'f', 2) + " fps"));
@@ -100,6 +100,53 @@ void TimedQueue::run()
         et.restart();
 #endif
     }
+}
+
+void UserPanel::position_display_overlays(DisplayId did)
+{
+    DisplaySlot& d = m_router.display(did);
+    Display* w = d.widget;
+    if (!w) return;
+
+    auto map_pos = [this, did, w](const QPoint& p) {
+        return did == DisplayId::Main ? w->mapTo(ui->CENTRAL, p) : p;
+    };
+
+    if (QLabel* fps = d.fps_label) {
+        fps->adjustSize();
+        const QPoint p(6, qMax(0, w->height() - fps->height() - 6));
+        fps->move(map_pos(p));
+        fps->raise();
+    }
+
+    if (QLabel* sd = d.source_dead_label) {
+        sd->adjustSize();
+        const QPoint p(qMax(6, w->width() - sd->width() - 6),
+                       qMax(0, w->height() - sd->height() - 6));
+        sd->move(map_pos(p));
+        sd->raise();
+    }
+}
+
+void UserPanel::set_source_dead_overlay(DisplayId did, bool dead)
+{
+    if (did == DisplayId::_Count) return;
+
+    DisplaySlot& d = m_router.display(did);
+    d.source_dead = dead;
+    QLabel* sd = d.source_dead_label;
+    if (!sd) return;
+
+    position_display_overlays(did);
+    if (!dead) {
+        sd->hide();
+        return;
+    }
+
+    const bool any_overlay = (m_setup_overlay && m_setup_overlay->isVisible())
+                          || (m_scan_overlay  && m_scan_overlay ->isVisible());
+    sd->setVisible(did != DisplayId::Main || !any_overlay);
+    sd->raise();
 }
 
 UserPanel::UserPanel(QWidget *parent) :
@@ -209,6 +256,7 @@ UserPanel::UserPanel(QWidget *parent) :
         QLabel* fps_main = new QLabel("0.00 fps", ui->CENTRAL);
         fps_main->setObjectName("FPS_LABEL");
         fps_main->setAttribute(Qt::WA_TranslucentBackground);
+        fps_main->setStyleSheet("color: #F5E1CE; background-color: rgba(0, 0, 0, 130); padding: 1px 4px; border-radius: 2px;");
         fps_main->hide(); // shown once resizeEvent places it
         m_router.display(DisplayId::Main).fps_label = fps_main;
     }
@@ -218,7 +266,10 @@ UserPanel::UserPanel(QWidget *parent) :
         QLabel* lbl = new QLabel("0.00 fps", w);
         lbl->setObjectName("FPS_LABEL");
         lbl->setAttribute(Qt::WA_TranslucentBackground);
+        lbl->setStyleSheet("color: #F5E1CE; background-color: rgba(0, 0, 0, 130); padding: 1px 4px; border-radius: 2px;");
         lbl->move(6, w->height() - 20);
+        lbl->show();
+        lbl->raise();
         m_router.display(did).fps_label = lbl;
         w->installEventFilter(this); // reposition on Display resize
     }
@@ -231,6 +282,7 @@ UserPanel::UserPanel(QWidget *parent) :
         QLabel* lbl = new QLabel(tr("STREAM ENDED"), ui->CENTRAL);
         lbl->setObjectName("SOURCE_DEAD_LABEL");
         lbl->setAttribute(Qt::WA_TranslucentBackground);
+        lbl->setStyleSheet("color: #F08080; background-color: rgba(0, 0, 0, 150); padding: 1px 4px; border-radius: 2px;");
         lbl->hide();
         m_router.display(DisplayId::Main).source_dead_label = lbl;
     }
@@ -240,6 +292,7 @@ UserPanel::UserPanel(QWidget *parent) :
         QLabel* lbl = new QLabel(tr("STREAM ENDED"), w);
         lbl->setObjectName("SOURCE_DEAD_LABEL");
         lbl->setAttribute(Qt::WA_TranslucentBackground);
+        lbl->setStyleSheet("color: #F08080; background-color: rgba(0, 0, 0, 150); padding: 1px 4px; border-radius: 2px;");
         lbl->adjustSize();
         lbl->move(w->width() - lbl->width() - 6, w->height() - 20);
         lbl->hide();
@@ -1253,11 +1306,13 @@ UserPanel::UserPanel(QWidget *parent) :
         if (m_scan_overlay)  m_scan_overlay ->setVisible(scan_mode);
         if (m_right_stack)   m_right_stack  ->setVisible(!overlay_mode);
         if (m_pbar)          m_pbar         ->setVisible(!overlay_mode);
+        position_display_overlays(DisplayId::Main);
         if (m_router.display(DisplayId::Main).fps_label) m_router.display(DisplayId::Main).fps_label->setVisible(!overlay_mode);
         // Source-death label tracks the actual queue state (DisplaySlot::source_dead),
         // but stays hidden whenever an overlay is up.
         if (QLabel* sd = m_router.display(DisplayId::Main).source_dead_label) {
             sd->setVisible(!overlay_mode && m_router.display(DisplayId::Main).source_dead);
+            if (sd->isVisible()) sd->raise();
         }
         // Alt FPS labels (1/2) live inside FloatingWindows — visibility tracks parent.
         // Floating panels follow their pbar toggle state when not in an overlay mode.
@@ -1996,13 +2051,13 @@ UserPanel::UserPanel(QWidget *parent) :
         m_pipeline = new PipelineProcessor(m_globals, this);
     }
 
-    // One FfmpegSource per stream slot. Each emits signals back on the GUI
-    // thread; UserPanel routes opened()/frame_decoded()/failed()/finished()
-    // to the corresponding StreamSlot.
+    // One FfmpegSource per stream slot. Lifecycle signals run on the GUI
+    // thread; frame_decoded runs direct so frames hit BoundedQueue without an
+    // unbounded GUI-event backlog.
     for (std::size_t i = 0; i < kStreamCount; ++i) {
         m_ffmpeg[i] = new FfmpegSource(this);
         connect(m_ffmpeg[i], &FfmpegSource::opened,        this, &UserPanel::on_ffmpeg_opened,   Qt::QueuedConnection);
-        connect(m_ffmpeg[i], &FfmpegSource::frame_decoded, this, &UserPanel::on_ffmpeg_frame,    Qt::QueuedConnection);
+        connect(m_ffmpeg[i], &FfmpegSource::frame_decoded, this, &UserPanel::on_ffmpeg_frame,    Qt::DirectConnection);
         connect(m_ffmpeg[i], &FfmpegSource::failed,        this, &UserPanel::on_ffmpeg_failed,   Qt::QueuedConnection);
         connect(m_ffmpeg[i], &FfmpegSource::finished,      this, &UserPanel::on_ffmpeg_finished, Qt::QueuedConnection);
     }
@@ -2053,16 +2108,7 @@ UserPanel::UserPanel(QWidget *parent) :
     }, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::source_state_changed, this, [this](int display_idx, bool dead) {
         if (display_idx < 0 || display_idx >= 3) return;
-        QLabel* sd = m_router.display(static_cast<DisplayId>(display_idx)).source_dead_label;
-        if (!sd) return;
-        if (dead) {
-            const bool any_overlay = (m_setup_overlay && m_setup_overlay->isVisible())
-                                  || (m_scan_overlay  && m_scan_overlay ->isVisible());
-            sd->setVisible(display_idx != 0 || !any_overlay);
-            sd->raise();
-        } else {
-            sd->hide();
-        }
+        set_source_dead_overlay(static_cast<DisplayId>(display_idx), dead);
     }, Qt::QueuedConnection);
 #ifdef LVTONG
     connect(m_pipeline, &PipelineProcessor::set_model_list_enabled, this, [this](bool enabled) {
@@ -2457,7 +2503,14 @@ void UserPanel::swap_grab_thread_display(int display_idx1, int display_idx2)
     // up before the swap so frames flow as soon as the route flips.
     auto ensure_consumer = [this](DisplayId did) {
         DisplaySlot& d = m_router.display(did);
-        if (d.consumer) return;
+        if (d.consumer && d.consumer->isRunning()) return;
+        if (d.consumer) {
+            d.consumer_run = false;
+            d.consumer->quit();
+            d.consumer->wait();
+            delete d.consumer;
+            d.consumer = NULL;
+        }
         d.consumer_run = true;
         d.consumer = new ConsumerThread(m_pipeline, &m_router, &d);
         if (d.consumer) d.consumer->start();
@@ -2820,6 +2873,32 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
 //    if (!device_on || start_grabbing || curr_cam == NULL) return;
     if (!device_on || curr_cam == NULL) return;
 
+    // If the camera/SDK stopped underneath us, the UI/router can still think
+    // S0 is active. Force the old acquisition path to quiesce before calling
+    // start_grabbing() again; camera SDKs often crash on start-while-half-live.
+    const DisplayId old_cam_display = m_router.display_for(StreamId::S0);
+    if (start_grabbing || m_router.stream(StreamId::S0).producer_run.load() || old_cam_display != DisplayId::_Count) {
+        curr_cam->stop_grabbing();
+        m_router.stream(StreamId::S0).frames.close();
+        m_router.stream(StreamId::S0).frames.clear();
+        m_router.stream(StreamId::S0).frame_info.close();
+        m_router.stream(StreamId::S0).frame_info.clear();
+        m_router.stream(StreamId::S0).producer_run = false;
+        if (old_cam_display != DisplayId::_Count) {
+            DisplaySlot& d = m_router.display(old_cam_display);
+            d.consumer_run = false;
+            if (d.consumer) {
+                d.consumer->quit();
+                d.consumer->wait();
+                delete d.consumer;
+                d.consumer = NULL;
+            }
+            if (d.widget) d.widget->is_grabbing = false;
+        }
+        m_router.unroute(StreamId::S0);
+        start_grabbing = false;
+    }
+
     // Cam binds to StreamId::S0. Stop any other source already producing
     // there so the cam SDK doesn't push into a queue another producer is
     // also feeding.
@@ -2885,6 +2964,7 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
         return;
     }
     m_router.route(DisplayId::Main, StreamId::S0);
+    set_source_dead_overlay(DisplayId::Main, false);
     m_router.stream(StreamId::S0).producer_run = true;
     m_router.display(DisplayId::Main).consumer->start();
 
@@ -2912,8 +2992,11 @@ void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
 {
 //    if (!device_on || !start_grabbing || curr_cam == NULL) return;
 
-    if (m_router.display(DisplayId::Main).record_raw) on_SAVE_AVI_BUTTON_clicked();
-    if (m_router.display(DisplayId::Main).record_proc) on_SAVE_FINAL_BUTTON_clicked();
+    const DisplayId cam_display = m_router.display_for(StreamId::S0);
+    if (cam_display == DisplayId::Main) {
+        if (m_router.display(DisplayId::Main).record_raw) on_SAVE_AVI_BUTTON_clicked();
+        if (m_router.display(DisplayId::Main).record_proc) on_SAVE_FINAL_BUTTON_clicked();
+    }
 
     // Stop the cam SDK first so callbacks deregister before we close the
     // queue. This is the cam stop+restart crash fix path: previously the SDK
@@ -2928,12 +3011,16 @@ void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
     m_router.stream(StreamId::S0).frame_info.clear();
     m_router.stream(StreamId::S0).producer_run = false;
 
-    m_router.display(DisplayId::Main).consumer_run = false;
-    if (m_router.display(DisplayId::Main).consumer) {
-        m_router.display(DisplayId::Main).consumer->quit();
-        m_router.display(DisplayId::Main).consumer->wait();
-        delete m_router.display(DisplayId::Main).consumer;
-        m_router.display(DisplayId::Main).consumer = NULL;
+    if (cam_display != DisplayId::_Count) {
+        set_source_dead_overlay(cam_display, true);
+        DisplaySlot& d = m_router.display(cam_display);
+        d.consumer_run = false;
+        if (d.consumer) {
+            d.consumer->quit();
+            d.consumer->wait();
+            delete d.consumer;
+            d.consumer = NULL;
+        }
     }
     m_router.unroute(StreamId::S0);
 
@@ -2959,6 +3046,8 @@ void UserPanel::on_SAVE_BMP_BUTTON_clicked()
 void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
 {
     DisplaySlot& d = m_router.display(DisplayId::Main);
+    const StreamId sid = m_router.snapshot(DisplayId::Main).stream;
+    const StreamMeta meta = (sid == StreamId::None) ? StreamMeta{} : m_router.stream(sid).meta;
 //    cv::imwrite(QString(save_location + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".jpg").toLatin1().data(), modified_result);
     if (d.record_proc) {
 //        curr_cam->stop_recording(0);
@@ -2987,20 +3076,20 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
                 // SAVE_FINAL records Main display; size/color from Main's pcfg.
                 const bool main_3d = m_router.display(DisplayId::Main).pcfg.image_3d;
                 const bool main_pc = m_router.display(DisplayId::Main).pcfg.pseudocolor;
-                const int vw_w = main_3d ? m_router.stream(StreamId::S0).meta.width + 104 : m_router.stream(StreamId::S0).meta.width;
-                const int vw_h = m_router.stream(StreamId::S0).meta.height;
-                const bool vw_color = m_router.stream(StreamId::S0).meta.is_color || main_pc;
+                const int vw_w = main_3d ? meta.width + 104 : meta.width;
+                const int vw_h = meta.height;
+                const bool vw_color = meta.is_color || main_pc || main_3d;
                 // Real-time fps: prefer the TimedQueue measured arrival rate
                 // (count over the 5 s window). Fall back to frame_rate_edit
                 // only if the window is too sparse to be meaningful (e.g.
                 // record was triggered immediately after stream connect).
                 const double measured_fps = m_router.display(DisplayId::Main).fps_calc ? m_router.display(DisplayId::Main).fps_calc->count() / 5.0 : 0.0;
-                const double vw_fps = (measured_fps >= 1.0) ? measured_fps : m_router.stream(StreamId::S0).meta.fps;
+                const double vw_fps = (measured_fps >= 1.0) ? measured_fps : meta.fps;
                 qDebug() << "[vid_out RES] open" << res_avi
                          << "size=" << vw_w << "x" << vw_h
                          << "fps=" << vw_fps
                          << "(measured=" << measured_fps
-                         << "commanded=" << m_router.stream(StreamId::S0).meta.fps << ")"
+                         << "commanded=" << meta.fps << ")"
                          << "color=" << vw_color;
                 m_router.display(DisplayId::Main).proc_writer.open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), vw_fps, cv::Size(vw_w, vw_h), vw_color);
                 qDebug() << "[vid_out RES] isOpened=" << m_router.display(DisplayId::Main).proc_writer.isOpened();
@@ -4695,19 +4784,8 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     }
 
     // FPS overlay (main): bottom-left of display, in CENTRAL coords — hidden in overlay modes
-    const QPoint fps_pos = ui->SOURCE_DISPLAY->mapTo(ui->CENTRAL, QPoint(6, region.height() - 20));
-    m_router.display(DisplayId::Main).fps_label->move(fps_pos);
     const bool any_overlay = (m_setup_overlay && m_setup_overlay->isVisible())
                           || (m_scan_overlay  && m_scan_overlay ->isVisible());
-    m_router.display(DisplayId::Main).fps_label->setVisible(!any_overlay);
-    // Source-death overlay (main): bottom-right, also in CENTRAL coords.
-    if (QLabel* sd = m_router.display(DisplayId::Main).source_dead_label) {
-        sd->adjustSize();
-        const QPoint sd_pos = ui->SOURCE_DISPLAY->mapTo(ui->CENTRAL,
-            QPoint(region.width() - sd->width() - 6, region.height() - 20));
-        sd->move(sd_pos);
-        if (any_overlay) sd->hide();
-    }
     // Alt FPS labels are children of displays[1/2]; their visibility follows
     // the parent FloatingWindow visibility automatically.
     // Floating panels live in CENTRAL; raise above the fps label to keep
@@ -4751,6 +4829,10 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     m_router.display(DisplayId::Main).paint_mutex.lock();
     ui->SOURCE_DISPLAY->setGeometry(region);
     ui->SOURCE_DISPLAY->update_roi(center);
+    position_display_overlays(DisplayId::Main);
+    if (QLabel* fps = m_router.display(DisplayId::Main).fps_label) fps->setVisible(!any_overlay);
+    if (QLabel* sd = m_router.display(DisplayId::Main).source_dead_label)
+        sd->setVisible(!any_overlay && m_router.display(DisplayId::Main).source_dead);
     qInfo("display region x: %d, y: %d, w: %d, h: %d", region.x(), region.y(), region.width(), region.height());
     m_router.display(DisplayId::Main).paint_mutex.unlock();
 
@@ -5474,6 +5556,7 @@ void UserPanel::on_ffmpeg_opened(StreamId target, int session, FfmpegSource::Vid
         if (display_idx == 0)
             emit send_double_tcu_msg(TCU::CCD_FREQ, m_router.stream(StreamId::S0).meta.fps);
     }
+    m_ffmpeg[display_idx]->mark_display_ready(session);
 }
 
 void UserPanel::on_ffmpeg_frame(StreamId target, int session, cv::Mat frame)
@@ -5490,6 +5573,7 @@ void UserPanel::on_ffmpeg_failed(StreamId target, int session, QString reason)
     if (target == StreamId::None) return;
     const int display_idx = static_cast<int>(target);
     if (ffmpeg_session_stale(m_ffmpeg[display_idx], session)) return;
+    set_source_dead_overlay(m_router.display_for(target), true);
     m_router.stream(target).frames.close();
     m_router.stream(target).frame_info.close();
 }
@@ -5500,6 +5584,7 @@ void UserPanel::on_ffmpeg_finished(StreamId target, int session)
     if (target == StreamId::None) return;
     const int display_idx = static_cast<int>(target);
     if (ffmpeg_session_stale(m_ffmpeg[display_idx], session)) return;
+    set_source_dead_overlay(m_router.display_for(target), true);
     m_router.stream(target).frames.close();
     m_router.stream(target).frame_info.close();
 }
@@ -5509,6 +5594,13 @@ void UserPanel::stop_all_sources_on_slot(int display_idx)
     if (display_idx < 0 || display_idx >= kStreamCount) return;
     if (m_ffmpeg[display_idx]) m_ffmpeg[display_idx]->stop();
     if (m_cv_run[display_idx]) m_cv_run[display_idx]->store(false);
+    StreamId sid = static_cast<StreamId>(display_idx);
+    if (m_router.stream(sid).meta.source_type != SourceType::IndustrialCam) {
+        DisplayId did = m_router.display_for(sid);
+        if (did != DisplayId::_Count) set_source_dead_overlay(did, true);
+        m_router.stream(sid).frames.close();
+        m_router.stream(sid).frame_info.close();
+    }
     // Industrial cam is intentionally NOT auto-stopped from this helper.
     // Cam is the primary source on Main with its own UI surface and
     // recording state; silently tearing it down on a video load would be
@@ -5574,7 +5666,7 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
         if (display_idx == 0) ui->TITLE->set_resolution(width, height);
         this->m_router.stream(static_cast<StreamId>(display_idx)).meta.is_color = is_color;
         update_pixel_depth(pixel_depth, display_idx);
-        this->device_type = device_type;
+        if (display_idx == 0) this->device_type = device_type;
         // Map legacy device_type to per-stream SourceType.
         m_router.stream(sid).meta.source_type =
             device_type == 1  ? SourceType::IndustrialCam :
@@ -5583,11 +5675,13 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
                                 SourceType::None;
     }
 
-    if (display_idx) fw_display[display_idx]->resize_display(width, height);
+    if (display_idx) fw_display[display_idx - 1]->resize_display(width, height);
     else {
         QResizeEvent e(this->size(), this->size());
         resizeEvent(&e);
     }
+    set_source_dead_overlay(did, false);
+    position_display_overlays(did);
 
     m_router.display(static_cast<DisplayId>(display_idx)).consumer_run = true;
     m_router.display(static_cast<DisplayId>(display_idx)).consumer = new ConsumerThread(m_pipeline, &m_router, &m_router.display(did));
@@ -5599,9 +5693,9 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
     m_router.route(did, sid);
     m_router.stream(sid).producer_run = true;
     m_router.display(static_cast<DisplayId>(display_idx)).consumer->start();
-    start_grabbing = true;
     m_router.display(static_cast<DisplayId>(display_idx)).widget->is_grabbing = true;
     if (display_idx == 0) {
+        start_grabbing = true;
         enable_controls(true);
         ui->ENUM_BUTTON->setEnabled(false);
         ui->START_BUTTON->setEnabled(false);
@@ -5621,6 +5715,8 @@ void UserPanel::showEvent(QShowEvent *event)
 void UserPanel::on_SAVE_AVI_BUTTON_clicked()
 {
     DisplaySlot& d = m_router.display(DisplayId::Main);
+    const StreamId sid = m_router.snapshot(DisplayId::Main).stream;
+    const StreamMeta meta = (sid == StreamId::None) ? StreamMeta{} : m_router.stream(sid).meta;
     if (d.record_raw) {
 //        curr_cam->stop_recording(0);
         QString raw_avi;
@@ -5646,14 +5742,14 @@ void UserPanel::on_SAVE_AVI_BUTTON_clicked()
         // window; fall back to the commanded rate when the window is too
         // sparse to trust.
         const double measured_fps_ori = m_router.display(DisplayId::Main).fps_calc ? m_router.display(DisplayId::Main).fps_calc->count() / 5.0 : 0.0;
-        const double vw_fps_ori = (measured_fps_ori >= 1.0) ? measured_fps_ori : m_router.stream(StreamId::S0).meta.fps;
+        const double vw_fps_ori = (measured_fps_ori >= 1.0) ? measured_fps_ori : meta.fps;
         qDebug() << "[vid_out ORI] open" << raw_avi
-                 << "size=" << m_router.stream(StreamId::S0).meta.width << "x" << m_router.stream(StreamId::S0).meta.height
+                 << "size=" << meta.width << "x" << meta.height
                  << "fps=" << vw_fps_ori
                  << "(measured=" << measured_fps_ori
-                 << "commanded=" << m_router.stream(StreamId::S0).meta.fps << ")"
-                 << "color=" << m_router.stream(StreamId::S0).meta.is_color;
-        m_router.display(DisplayId::Main).raw_writer.open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), vw_fps_ori, cv::Size(m_router.stream(StreamId::S0).meta.width, m_router.stream(StreamId::S0).meta.height), m_router.stream(StreamId::S0).meta.is_color);
+                 << "commanded=" << meta.fps << ")"
+                 << "color=" << meta.is_color;
+        m_router.display(DisplayId::Main).raw_writer.open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), vw_fps_ori, cv::Size(meta.width, meta.height), meta.is_color);
         qDebug() << "[vid_out ORI] isOpened=" << m_router.display(DisplayId::Main).raw_writer.isOpened();
         m_router.display(DisplayId::Main).paint_mutex.unlock();
     }
@@ -5894,6 +5990,7 @@ void UserPanel::alt_display_control(int cmd)
             m_router.display(static_cast<DisplayId>(display_idx)).consumer = NULL;
         }
         QTimer::singleShot(100, m_router.display(static_cast<DisplayId>(display_idx)).widget, SLOT(clear()));
+        set_source_dead_overlay(static_cast<DisplayId>(display_idx), true);
 
         break;
     }
@@ -6130,14 +6227,11 @@ bool UserPanel::eventFilter(QObject *obj, QEvent *event)
 {
     if (event->type() == QEvent::Resize) {
         for (int i = 1; i < 3; i++) {
-            if (obj == m_router.display(static_cast<DisplayId>(i)).widget && m_router.display(static_cast<DisplayId>(i)).fps_label)
-                m_router.display(static_cast<DisplayId>(i)).fps_label->move(6, m_router.display(static_cast<DisplayId>(i)).widget->height() - 20);
             if (obj == m_router.display(static_cast<DisplayId>(i)).widget) {
-                QLabel* sd = m_router.display(static_cast<DisplayId>(i)).source_dead_label;
-                if (sd) {
-                    sd->adjustSize();
-                    sd->move(m_router.display(static_cast<DisplayId>(i)).widget->width() - sd->width() - 6, m_router.display(static_cast<DisplayId>(i)).widget->height() - 20);
-                }
+                position_display_overlays(static_cast<DisplayId>(i));
+                if (QLabel* fps = m_router.display(static_cast<DisplayId>(i)).fps_label) fps->show();
+                if (QLabel* sd = m_router.display(static_cast<DisplayId>(i)).source_dead_label)
+                    sd->setVisible(m_router.display(static_cast<DisplayId>(i)).source_dead);
             }
         }
     }

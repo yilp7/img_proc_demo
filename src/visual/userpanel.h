@@ -383,6 +383,9 @@ private:
 
     // Port init/setup delegated to DeviceManager
 
+    void position_display_overlays(DisplayId did);
+    void set_source_dead_overlay(DisplayId did, bool dead);
+
     // Lens operations delegated to LensController
     void lens_stop() { m_lens_ctrl->lens_stop(); }
     void set_zoom();
