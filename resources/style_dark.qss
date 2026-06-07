@@ -673,7 +673,7 @@ TopButton:pressed {
     padding-left: 2px;
 }
 
-#FloatingPanelPin, #FloatingPanelHide {
+#FloatingPanelPin, #FloatingPanelHide, #FloatingPanelReset {
     background-color: transparent;
     color: #8A7461;
     border: none;
@@ -681,7 +681,7 @@ TopButton:pressed {
     font-size: 9px;
 }
 
-#FloatingPanelPin:hover, #FloatingPanelHide:hover {
+#FloatingPanelPin:hover, #FloatingPanelHide:hover, #FloatingPanelReset:hover {
     background-color: #2E221A;
     color: #F5E1CE;
 }
@@ -694,6 +694,26 @@ TopButton:pressed {
 #FloatingPanelHide:hover {
     background-color: #4D161E;
     color: #E6455D;
+}
+
+#PANORAMA_RESIZE_HANDLE {
+    background-color: transparent;
+    border-right: 2px solid #8A7461;
+    border-bottom: 2px solid #8A7461;
+}
+
+#PANORAMA_RESIZE_HANDLE:hover {
+    background-color: #2E221A;
+    border-right: 2px solid #E0924A;
+    border-bottom: 2px solid #E0924A;
+}
+
+#PANORAMA_STATUS {
+    color: #8A7461;
+    font-size: 9px;
+    font-weight: 700;
+    background: transparent;
+    padding-right: 2px;
 }
 
 /* OpticsPanel / TCUPanel mode toggles — Classic/Modern, Normal/Guru */
@@ -766,7 +786,7 @@ TopButton:pressed {
     border-radius: 3px;
 }
 
-#IMG_PROC_WIDGET, #SAVE_OPTIONS_WIDGET, #VISION_WIDGET {
+#IMG_PROC_WIDGET, #PTZ_RADAR_WIDGET, #SAVE_OPTIONS_WIDGET, #VISION_WIDGET {
     background-color: transparent;
     border: none;
     border-bottom: 1px solid #241E1A;

@@ -1,5 +1,7 @@
 #include "imageio.h"
 
+#include <QFile>
+
 ImageIO::ImageIO()
 {
 
@@ -436,5 +438,14 @@ void ImageIO::save_image_jpg(cv::Mat img, QString filename)
 {
     cv::Mat img_to_save;
     if (img.channels() == 3) cv::cvtColor(img, img_to_save, cv::COLOR_RGB2BGR);
-    cv::imwrite(filename.toLatin1().constData(), img.channels() == 3 ? img_to_save: img);
+    else img_to_save = img;
+
+    std::vector<uchar> encoded;
+    if (!cv::imencode(".jpg", img_to_save, encoded) || encoded.empty()) return;
+
+    QFile file(filename);
+    if (!file.open(QIODevice::WriteOnly)) return;
+    file.write(reinterpret_cast<const char*>(encoded.data()),
+               static_cast<qint64>(encoded.size()));
+    file.close();
 }

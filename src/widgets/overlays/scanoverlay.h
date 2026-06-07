@@ -9,6 +9,7 @@ class QVBoxLayout;
 class QWidget;
 class QLineEdit;
 class QCheckBox;
+class QComboBox;
 class QRadioButton;
 class QLabel;
 class ScanController;
@@ -76,6 +77,24 @@ public:
         QCheckBox  *record_res      = nullptr;
         QRadioButton *dir_n         = nullptr;
         QRadioButton *dir_z         = nullptr;
+        QRadioButton *mode_grid     = nullptr;
+        QRadioButton *mode_panorama = nullptr;
+        QWidget    *grid_delay_card = nullptr;
+        QWidget    *grid_gate_card  = nullptr;
+        QWidget    *grid_ptz_card   = nullptr;
+        QWidget    *grid_capture_card = nullptr;
+        QWidget    *panorama_card   = nullptr;
+        QLineEdit  *panorama_start_h = nullptr;
+        QCheckBox  *panorama_use_end_h = nullptr;
+        QLineEdit  *panorama_end_h   = nullptr;
+        QLineEdit  *panorama_fixed_v = nullptr;
+        QLineEdit  *panorama_step_h  = nullptr;
+        QLineEdit  *panorama_count   = nullptr;
+        QLineEdit  *panorama_wait    = nullptr;
+        QLineEdit  *panorama_zoom    = nullptr;
+        QComboBox  *panorama_fusion  = nullptr;
+        QRadioButton *panorama_cw   = nullptr;
+        QRadioButton *panorama_ccw  = nullptr;
         QLabel     *unit_1          = nullptr;   // step-delay unit label (ns or m)
         QLabel     *unit_2          = nullptr;   // step-gw unit label
         QLabel     *freq_unit       = nullptr;   // kHz / Hz
@@ -124,8 +143,15 @@ private slots:
     void on_dir_z();
     void on_ptz_wait_edit();
     void on_num_single_pos_edit();
+    void on_mode_grid();
+    void on_mode_panorama();
+    void on_panorama_edit();
+    void on_panorama_cw();
+    void on_panorama_ccw();
 
 private:
+    void update_mode_enabled();
+
     QScrollArea *m_scroll;
     QWidget     *m_cards_container;
     QHBoxLayout *m_cards_layout;

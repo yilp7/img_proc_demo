@@ -174,10 +174,14 @@ set(SOURCE_FILES
     src/widgets/panels/tcupanel.cpp
     src/widgets/panels/consolepanel.h
     src/widgets/panels/consolepanel.cpp
+    src/widgets/panels/panoramapanel.h
+    src/widgets/panels/panoramapanel.cpp
     src/widgets/sidebar/rightstackcontainer.h
     src/widgets/sidebar/rightstackcontainer.cpp
     src/widgets/sidebar/imgprocwidget.h
     src/widgets/sidebar/imgprocwidget.cpp
+    src/widgets/sidebar/ptzradarwidget.h
+    src/widgets/sidebar/ptzradarwidget.cpp
     src/widgets/sidebar/saveoptionswidget.h
     src/widgets/sidebar/saveoptionswidget.cpp
     src/widgets/sidebar/visionwidget.h

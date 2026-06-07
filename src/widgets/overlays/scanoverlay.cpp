@@ -3,15 +3,30 @@
 #include "controller/scancontroller.h"
 
 #include <QCheckBox>
+#include <QComboBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QRadioButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QVBoxLayout>
 #include <QWidget>
 
 #include <cmath>
+
+namespace {
+
+const int kMaxPanoramaStops = 2000;
+
+int clamp_int(int value, int lo, int hi)
+{
+    if (value < lo) return lo;
+    if (value > hi) return hi;
+    return value;
+}
+
+} // namespace
 
 ScanOverlay::ScanOverlay(QWidget *parent)
     : QFrame(parent),
@@ -100,6 +115,28 @@ void ScanOverlay::bind(ScanController *ctrl, const Widgets &w)
     if (m_w.ptz_wait)       connect(m_w.ptz_wait,       &QLineEdit::editingFinished, this, &ScanOverlay::on_ptz_wait_edit);
     if (m_w.num_single_pos) connect(m_w.num_single_pos, &QLineEdit::editingFinished, this, &ScanOverlay::on_num_single_pos_edit);
 
+    if (m_w.mode_grid)     connect(m_w.mode_grid,     &QRadioButton::clicked, this, &ScanOverlay::on_mode_grid);
+    if (m_w.mode_panorama) connect(m_w.mode_panorama, &QRadioButton::clicked, this, &ScanOverlay::on_mode_panorama);
+
+    auto panorama_edits = {
+        m_w.panorama_start_h, m_w.panorama_end_h, m_w.panorama_fixed_v,
+        m_w.panorama_step_h,  m_w.panorama_count,
+        m_w.panorama_wait,    m_w.panorama_zoom
+    };
+    for (auto *e : panorama_edits)
+        if (e) connect(e, &QLineEdit::editingFinished, this, &ScanOverlay::on_panorama_edit);
+    if (m_w.panorama_use_end_h) {
+        connect(m_w.panorama_use_end_h, &QCheckBox::stateChanged,
+                this, [this](int) { on_panorama_edit(); });
+    }
+
+    if (m_w.panorama_cw)  connect(m_w.panorama_cw,  &QRadioButton::clicked, this, &ScanOverlay::on_panorama_cw);
+    if (m_w.panorama_ccw) connect(m_w.panorama_ccw, &QRadioButton::clicked, this, &ScanOverlay::on_panorama_ccw);
+    if (m_w.panorama_fusion) {
+        connect(m_w.panorama_fusion, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, [this](int) { on_panorama_edit(); });
+    }
+
     loadFromParams();
     setup_hz(0);
     setup_unit(0);
@@ -108,7 +145,8 @@ void ScanOverlay::bind(ScanController *ctrl, const Widgets &w)
 void ScanOverlay::loadFromParams()
 {
     if (!m_ctrl) return;
-    const ScanParams &p = m_ctrl->params();
+    ScanParams &p = m_ctrl->params();
+    update_panorama_fov_from_zoom(p);
 
     auto setT = [](QLineEdit *e, const QString &s) { if (e) e->setText(s); };
     auto setI = [&setT](QLineEdit *e, int v)       { setT(e, QString::number(v)); };
@@ -153,6 +191,25 @@ void ScanOverlay::loadFromParams()
     setI(m_w.frame_v, p.count_v);
     setI(m_w.ptz_wait,       p.ptz_wait_time);
     setI(m_w.num_single_pos, p.num_single_pos);
+
+    if (m_w.mode_grid)     m_w.mode_grid->setChecked(p.ptz_scan_mode == ScanParams::PTZ_SCAN_GRID);
+    if (m_w.mode_panorama) m_w.mode_panorama->setChecked(p.ptz_scan_mode == ScanParams::PTZ_SCAN_PANORAMA);
+    setF(m_w.panorama_start_h, p.panorama_start_h);
+    if (m_w.panorama_use_end_h) m_w.panorama_use_end_h->setChecked(p.panorama_use_end_h);
+    setF(m_w.panorama_end_h,   p.panorama_end_h);
+    setF(m_w.panorama_fixed_v, p.panorama_fixed_v);
+    setF(m_w.panorama_step_h,  p.panorama_step_h);
+    setI(m_w.panorama_count,   p.panorama_count);
+    setI(m_w.panorama_wait,    p.panorama_wait_time);
+    setF(m_w.panorama_zoom,    p.panorama_zoom_level, 2);
+    if (m_w.panorama_fusion) {
+        QSignalBlocker block(m_w.panorama_fusion);
+        m_w.panorama_fusion->setCurrentIndex(clamp_int(p.panorama_fusion_mode, 0, 2));
+    }
+    if (m_w.panorama_end_h) m_w.panorama_end_h->setEnabled(p.panorama_use_end_h);
+    if (m_w.panorama_cw)  m_w.panorama_cw->setChecked(p.panorama_direction == 0);
+    if (m_w.panorama_ccw) m_w.panorama_ccw->setChecked(p.panorama_direction != 0);
+    update_mode_enabled();
 }
 
 void ScanOverlay::setup_hz(int idx)
@@ -357,4 +414,120 @@ void ScanOverlay::on_num_single_pos_edit()
     if (v > 20) v = 20;
     m_ctrl->params().num_single_pos = v;
     m_w.num_single_pos->setText(QString::number(v));
+}
+
+void ScanOverlay::on_mode_grid()
+{
+    if (m_w.mode_panorama) m_w.mode_panorama->setChecked(false);
+    if (m_ctrl) m_ctrl->params().ptz_scan_mode = ScanParams::PTZ_SCAN_GRID;
+    update_mode_enabled();
+}
+
+void ScanOverlay::on_mode_panorama()
+{
+    if (m_w.mode_grid) m_w.mode_grid->setChecked(false);
+    if (m_ctrl) m_ctrl->params().ptz_scan_mode = ScanParams::PTZ_SCAN_PANORAMA;
+    update_mode_enabled();
+}
+
+void ScanOverlay::on_panorama_edit()
+{
+    if (!m_ctrl) return;
+
+    ScanParams &p = m_ctrl->params();
+    auto txtf = [](QLineEdit *e) { return e ? e->text().toFloat() : 0.f; };
+    auto txti = [](QLineEdit *e) { return e ? e->text().toInt()   : 0; };
+    auto setF = [](QLineEdit *e, float v, int prec = 2) {
+        if (e) e->setText(QString::number(v, 'f', prec));
+    };
+
+    p.panorama_start_h = txtf(m_w.panorama_start_h);
+    p.panorama_use_end_h = m_w.panorama_use_end_h ? m_w.panorama_use_end_h->isChecked() : false;
+    p.panorama_end_h = txtf(m_w.panorama_end_h);
+    p.panorama_fixed_v = txtf(m_w.panorama_fixed_v);
+    p.panorama_wait_time = clamp_int(txti(m_w.panorama_wait), 0, 20);
+    p.panorama_zoom_level = txtf(m_w.panorama_zoom);
+    if (p.panorama_zoom_level <= 0.0f) p.panorama_zoom_level = 1.0f;
+    update_panorama_fov_from_zoom(p);
+    p.panorama_fusion_mode = m_w.panorama_fusion
+        ? clamp_int(m_w.panorama_fusion->currentIndex(), 0, 2)
+        : ScanParams::PANORAMA_FUSION_GAIN;
+
+    QLineEdit *src = qobject_cast<QLineEdit*>(sender());
+    int count = txti(m_w.panorama_count);
+    float step = txtf(m_w.panorama_step_h);
+
+    if (src == m_w.panorama_step_h) {
+        step = std::fabs(step);
+        if (step < 1e-4f) step = p.panorama_fov_h > 0.0f ? p.panorama_fov_h : 360.0f;
+        p.panorama_step_h = step;
+        count = get_panorama_stop_count(p);
+    } else if (src == m_w.panorama_count) {
+        count = clamp_int(count, 1, kMaxPanoramaStops);
+        const float sweep = get_panorama_sweep_degrees(p);
+        const int segments = p.panorama_use_end_h ? qMax(1, count - 1) : count;
+        p.panorama_step_h = sweep / static_cast<float>(segments);
+    } else {
+        if (src == m_w.panorama_zoom) {
+            p.panorama_step_h = p.panorama_fov_h > 0.0f ? p.panorama_fov_h : p.panorama_step_h;
+        } else {
+            p.panorama_step_h = std::fabs(step);
+            if (p.panorama_step_h < 1e-4f) {
+                p.panorama_step_h = p.panorama_fov_h > 0.0f ? p.panorama_fov_h : 360.0f;
+            }
+        }
+        count = get_panorama_stop_count(p);
+    }
+
+    p.panorama_count = count;
+
+    setF(m_w.panorama_start_h, p.panorama_start_h);
+    if (m_w.panorama_use_end_h) m_w.panorama_use_end_h->setChecked(p.panorama_use_end_h);
+    setF(m_w.panorama_end_h, p.panorama_end_h);
+    setF(m_w.panorama_fixed_v, p.panorama_fixed_v);
+    setF(m_w.panorama_step_h, p.panorama_step_h);
+    if (m_w.panorama_count) m_w.panorama_count->setText(QString::number(p.panorama_count));
+    if (m_w.panorama_wait) m_w.panorama_wait->setText(QString::number(p.panorama_wait_time));
+    setF(m_w.panorama_zoom, p.panorama_zoom_level, 2);
+    if (m_w.panorama_fusion && m_w.panorama_fusion->currentIndex() != p.panorama_fusion_mode) {
+        QSignalBlocker block(m_w.panorama_fusion);
+        m_w.panorama_fusion->setCurrentIndex(p.panorama_fusion_mode);
+    }
+    if (m_w.panorama_end_h) m_w.panorama_end_h->setEnabled(p.panorama_use_end_h);
+}
+
+void ScanOverlay::on_panorama_cw()
+{
+    if (m_w.panorama_ccw) m_w.panorama_ccw->setChecked(false);
+    if (m_ctrl) m_ctrl->params().panorama_direction = 0;
+    on_panorama_edit();
+}
+
+void ScanOverlay::on_panorama_ccw()
+{
+    if (m_w.panorama_cw) m_w.panorama_cw->setChecked(false);
+    if (m_ctrl) m_ctrl->params().panorama_direction = 1;
+    on_panorama_edit();
+}
+
+void ScanOverlay::update_mode_enabled()
+{
+    if (!m_ctrl) return;
+
+    const bool grid_mode = (m_ctrl->params().ptz_scan_mode == ScanParams::PTZ_SCAN_GRID);
+    const bool panorama_mode = !grid_mode;
+
+    auto set_enabled = [](QWidget *w, bool enabled) {
+        if (w) w->setEnabled(enabled);
+    };
+
+    set_enabled(m_w.grid_delay_card, grid_mode);
+    set_enabled(m_w.grid_gate_card, grid_mode);
+    set_enabled(m_w.grid_ptz_card, grid_mode);
+    set_enabled(m_w.grid_capture_card, grid_mode);
+    set_enabled(m_w.panorama_card, panorama_mode);
+
+    if (m_w.mode_grid) m_w.mode_grid->setEnabled(true);
+    if (m_w.mode_panorama) m_w.mode_panorama->setEnabled(true);
+    if (m_w.panorama_end_h) m_w.panorama_end_h->setEnabled(panorama_mode && m_ctrl->params().panorama_use_end_h);
 }

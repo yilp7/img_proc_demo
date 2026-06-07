@@ -132,10 +132,6 @@ void Display::mouseReleaseEvent(QMouseEvent *event)
         emit updated_pos(2, event->pos() - QPoint(selection_v1.x, selection_v1.y));
         emit updated_pos(4, (event->pos() + QPoint(selection_v1.x, selection_v1.y) - QPoint(this->width(), this->height())) / 2);
     }
-    else if (mode == 2) {
-//        emit ptz_target(event->pos());
-        emit updated_pos(3, event->pos());
-    }
 }
 
 void Display::wheelEvent(QWheelEvent *event)
@@ -180,7 +176,11 @@ void Display::mouseDoubleClickEvent(QMouseEvent *event)
 {
     QLabel::mouseDoubleClickEvent(event);
 
-    if (mode == 2) return; // PTZ tool: no fullscreen on double-click
+    if (mode == 2) {
+        pressed = false;
+        if (event->button() == Qt::LeftButton && is_grabbing) emit ptz_target(event->pos());
+        return; // PTZ tool: follow target instead of fullscreen on double-click
+    }
 
     if (!is_fullscreen) {
         reserved_geometry = geometry();

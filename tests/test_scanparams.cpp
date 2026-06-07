@@ -40,6 +40,23 @@ private slots:
         QCOMPARE(p.ptz_direction, (unsigned int)0);
         QCOMPARE(p.ptz_wait_time, 4);
         QCOMPARE(p.num_single_pos, 8);
+
+        QCOMPARE(p.ptz_scan_mode, static_cast<int>(ScanParams::PTZ_SCAN_PANORAMA));
+        QCOMPARE(p.panorama_start_h, 0.0f);
+        QCOMPARE(p.panorama_fixed_v, 0.0f);
+        QCOMPARE(p.panorama_step_h, 30.0f);
+        QCOMPARE(p.panorama_count, 12);
+        QCOMPARE(p.panorama_direction, (unsigned int)0);
+        QCOMPARE(p.panorama_wait_time, 2);
+        QCOMPARE(p.panorama_use_end_h, false);
+        QCOMPARE(p.panorama_end_h, 0.0f);
+        QCOMPARE(p.panorama_zoom_level, 1.0f);
+        QCOMPARE(p.panorama_fov_h, 38.4f);
+        QCOMPARE(p.panorama_fov_v, 22.5f);
+        QCOMPARE(p.panorama_fusion_mode, static_cast<int>(ScanParams::PANORAMA_FUSION_GAIN));
+        QCOMPARE(static_cast<int>(p.panorama_zoom_fov.size()), 2);
+        QCOMPARE(p.panorama_zoom_fov[0].focal_length_mm, 10.0f);
+        QCOMPARE(p.panorama_zoom_fov[1].focal_length_mm, 860.0f);
     }
 
     // TC-SP-010: get_tcu_route produces frame_count delay values starting
@@ -197,6 +214,92 @@ private slots:
         QCOMPARE(r1[0], std::make_pair( 0.0f, 5.0f));
         QCOMPARE(r1[1], std::make_pair(10.0f, 5.0f));
         QCOMPARE(r1[2], std::make_pair(20.0f, 5.0f));
+    }
+
+    void panoramaRouteDefault()
+    {
+        ScanParams p;
+
+        auto route = get_panorama_route(p);
+        QCOMPARE(route.size(), (size_t)12);
+        QCOMPARE(route[0], std::make_pair(0.0f, 0.0f));
+        QCOMPARE(route[1], std::make_pair(30.0f, 0.0f));
+        QCOMPARE(route[11], std::make_pair(330.0f, 0.0f));
+    }
+
+    void panoramaRouteNoDuplicateEndpoint()
+    {
+        ScanParams p;
+        p.panorama_start_h = 15.0f;
+        p.panorama_fixed_v = -5.0f;
+        p.panorama_count = 4;
+
+        auto route = get_panorama_route(p);
+        QCOMPARE(route.size(), (size_t)4);
+        QCOMPARE(route[0], std::make_pair(15.0f, -5.0f));
+        QCOMPARE(route[1], std::make_pair(105.0f, -5.0f));
+        QCOMPARE(route[2], std::make_pair(195.0f, -5.0f));
+        QCOMPARE(route[3], std::make_pair(285.0f, -5.0f));
+    }
+
+    void panoramaRouteCounterClockwiseWrap()
+    {
+        ScanParams p;
+        p.panorama_start_h = 10.0f;
+        p.panorama_count = 4;
+        p.panorama_direction = 1;
+
+        auto route = get_panorama_route(p);
+        QCOMPARE(route.size(), (size_t)4);
+        QCOMPARE(route[0], std::make_pair(10.0f, 0.0f));
+        QCOMPARE(route[1], std::make_pair(280.0f, 0.0f));
+        QCOMPARE(route[2], std::make_pair(190.0f, 0.0f));
+        QCOMPARE(route[3], std::make_pair(100.0f, 0.0f));
+    }
+
+    void panoramaRouteStepFallback()
+    {
+        ScanParams p;
+        p.panorama_count = 0;
+        p.panorama_step_h = 45.0f;
+
+        auto route = get_panorama_route(p);
+        QCOMPARE(route.size(), (size_t)8);
+        QCOMPARE(route[0], std::make_pair(0.0f, 0.0f));
+        QCOMPARE(route[7], std::make_pair(315.0f, 0.0f));
+    }
+
+    void panoramaRouteEndingHorizontal()
+    {
+        ScanParams p;
+        p.panorama_start_h = 350.0f;
+        p.panorama_end_h = 20.0f;
+        p.panorama_use_end_h = true;
+        p.panorama_count = 4;
+
+        auto route = get_panorama_route(p);
+        QCOMPARE(route.size(), (size_t)4);
+        QCOMPARE(route[0], std::make_pair(350.0f, 0.0f));
+        QCOMPARE(route[1], std::make_pair(0.0f, 0.0f));
+        QCOMPARE(route[2], std::make_pair(10.0f, 0.0f));
+        QCOMPARE(route[3], std::make_pair(20.0f, 0.0f));
+    }
+
+    void panoramaZoomFovInterpolation()
+    {
+        ScanParams p;
+        p.panorama_zoom_level = 86.0f;
+        update_panorama_fov_from_zoom(p);
+
+        QVERIFY(qAbs(p.panorama_fov_h - 0.49f) < 0.0001f);
+        QVERIFY(qAbs(p.panorama_fov_v - 0.28f) < 0.0001f);
+
+        p.panorama_zoom_level = 20.0f;
+        update_panorama_fov_from_zoom(p);
+        QVERIFY(p.panorama_fov_h < 38.4f);
+        QVERIFY(p.panorama_fov_h > 0.49f);
+        QVERIFY(p.panorama_fov_v < 22.5f);
+        QVERIFY(p.panorama_fov_v > 0.28f);
     }
 };
 

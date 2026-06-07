@@ -18,11 +18,66 @@
 #include <QFile>
 #include <QDateTime>
 #include <QCoreApplication>
+#include <algorithm>
 #include <cmath>
+#include <limits>
+#include <opencv2/imgproc.hpp>
 
 PipelineProcessor::PipelineProcessor(PipelineGlobals globals, QObject* parent)
     : QObject(parent), m_g(globals)
 {
+}
+
+static QVector<QRect> map_yolo_boxes_to_display(const std::vector<YoloResult>& results,
+    const ProcessingParams& params,
+    const cv::Size& result_size,
+    const cv::Size& render_size,
+    const cv::Rect& region)
+{
+    QVector<QRect> boxes;
+    if (results.empty()
+            || result_size.width <= 0 || result_size.height <= 0
+            || render_size.width <= 0 || render_size.height <= 0
+            || params.display_width <= 0 || params.display_height <= 0
+            || region.width <= 0 || region.height <= 0) {
+        return boxes;
+    }
+
+    const cv::Rect image_rect(0, 0, result_size.width, result_size.height);
+    const cv::Rect visible_region = region & image_rect;
+    if (visible_region.width <= 0 || visible_region.height <= 0) return boxes;
+
+    const double crop_scale_x = static_cast<double>(render_size.width) / visible_region.width;
+    const double crop_scale_y = static_cast<double>(render_size.height) / visible_region.height;
+
+    const double fit_scale = std::min(static_cast<double>(params.display_width) / render_size.width,
+                                      static_cast<double>(params.display_height) / render_size.height);
+    const int fit_w = static_cast<int>(std::round(render_size.width * fit_scale));
+    const int fit_h = static_cast<int>(std::round(render_size.height * fit_scale));
+    const int offset_x = (params.display_width - fit_w) / 2;
+    const int offset_y = (params.display_height - fit_h) / 2;
+    const double display_scale_x = static_cast<double>(fit_w) / render_size.width;
+    const double display_scale_y = static_cast<double>(fit_h) / render_size.height;
+    const QRect display_rect(0, 0, params.display_width, params.display_height);
+
+    boxes.reserve(static_cast<int>(results.size()));
+    for (const auto& det : results) {
+        const cv::Rect box = det.box & visible_region;
+        if (box.width <= 0 || box.height <= 0) continue;
+
+        const double crop_x1 = (box.x - visible_region.x) * crop_scale_x;
+        const double crop_y1 = (box.y - visible_region.y) * crop_scale_y;
+        const double crop_x2 = (box.x + box.width - visible_region.x) * crop_scale_x;
+        const double crop_y2 = (box.y + box.height - visible_region.y) * crop_scale_y;
+
+        const int x1 = offset_x + static_cast<int>(std::floor(crop_x1 * display_scale_x));
+        const int y1 = offset_y + static_cast<int>(std::floor(crop_y1 * display_scale_y));
+        const int x2 = offset_x + static_cast<int>(std::ceil(crop_x2 * display_scale_x));
+        const int y2 = offset_y + static_cast<int>(std::ceil(crop_y2 * display_scale_y));
+        const QRect rect(x1, y1, x2 - x1, y2 - y1);
+        if (!rect.isEmpty() && rect.intersects(display_rect)) boxes.push_back(rect);
+    }
+    return boxes;
 }
 
 int PipelineProcessor::run(DisplayRouter& router, DisplaySlot& display) {
@@ -33,6 +88,8 @@ int PipelineProcessor::run(DisplayRouter& router, DisplaySlot& display) {
     float weight = 0.0f;
     int scan_img_count = -1;
     QString scan_save_path_a, scan_save_path;
+    PanoramaCanvas panorama_canvas;
+    qint64 panorama_position_started_ms = -1;
 
 #ifdef LVTONG
     emit set_model_list_enabled(false);
@@ -65,6 +122,7 @@ int PipelineProcessor::run(DisplayRouter& router, DisplaySlot& display) {
                 emit recorder_finalized(static_cast<int>(display.id), 1, display.proc_path);
             }
             display.modified_result.release();
+            if (display.id == DisplayId::Main) emit main_detection_boxes_updated(QVector<QRect>());
             display.last_route_gen = snap.gen;
             // Route change clears the dead-source observation. Subsequent
             // iterations re-set it from the new stream's queue state.
@@ -151,10 +209,11 @@ int PipelineProcessor::run(DisplayRouter& router, DisplaySlot& display) {
                                      QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(m_g.tcu_ctrl->get_delay_dist() / m_g.tcu_ctrl->get_dist_ns()), (int)std::round(m_g.tcu_ctrl->get_depth_of_view() / m_g.tcu_ctrl->get_dist_ns()));
         QString info_time = QDateTime::currentDateTime().toString("hh:mm:ss:zzz");
 
-        render_and_display(stream, display, params, pcfg, yolo_results, is_net, ww, hh, _w, _h, weight, info_tcu, info_time);
+        render_and_display(stream, display, params, pcfg, yolo_results, updated, is_net, ww, hh, _w, _h, weight, info_tcu, info_time);
 
         if (display.id == DisplayId::Main) {
-            advance_scan_main(router, stream, display, updated, pcfg, scan_img_count, scan_save_path_a, scan_save_path);
+            advance_scan_main(router, stream, display, updated, pcfg, scan_img_count, scan_save_path_a, scan_save_path,
+                              panorama_canvas, panorama_position_started_ms);
         }
 
         record_frame(stream, display, updated, params, pcfg, is_net, info_tcu, info_time, ww, hh, weight);
@@ -599,7 +658,7 @@ void PipelineProcessor::enhance_frame(StreamSlot& stream, DisplaySlot& display,
 void PipelineProcessor::render_and_display(StreamSlot& stream, DisplaySlot& display,
     const ProcessingParams& params, const PipelineConfig& pcfg,
     const std::vector<YoloResult>& yolo_results,
-    double is_net, int ww, int hh, int _w, int _h, float weight,
+    bool updated, double is_net, int ww, int hh, int _w, int _h, float weight,
     const QString& info_tcu, const QString& info_time)
 {
     (void)info_tcu;
@@ -619,7 +678,7 @@ void PipelineProcessor::render_and_display(StreamSlot& stream, DisplaySlot& disp
         for (int i = 0; i < _h; i++) for (int j = 0; j < _w; j++) display.hist[(mat_for_hist.data + i * mat_for_hist.cols)[j]]++;
 
         uchar* img = mat_for_hist.data;
-        int step = mat_for_hist.step;
+        const std::size_t step = mat_for_hist.step;
         memset(display.hist, 0, 256 * sizeof(uint));
         for (int i = 0; i < hh; i++) for (int j = 0; j < ww; j++) display.hist[(img + i * step)[j]]++;
         uint max = 0;
@@ -628,7 +687,7 @@ void PipelineProcessor::render_and_display(StreamSlot& stream, DisplaySlot& disp
         for (int i = 1; i < 256; i++) {
             cv::rectangle(hist_mat, cv::Point(i, 225), cv::Point(i + 1, 225 - display.hist[i] * 225.0 / max), cv::Scalar(202, 225, 255));
         }
-        emit set_hist_pixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, hist_mat.step, QImage::Format_RGB888).scaled(params.hist_display_size, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+        emit set_hist_pixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, static_cast<int>(hist_mat.step), QImage::Format_RGB888).scaled(params.hist_display_size, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     }
 
     cv::Rect region(cv::Point(params.display_region.tl().x * ww / params.display_width,
@@ -637,6 +696,12 @@ void PipelineProcessor::render_and_display(StreamSlot& stream, DisplaySlot& disp
                               params.display_region.br().y * hh / params.display_height));
     if (region.height + region.y > result.rows) region.height = result.rows - region.y;
     if (region.width + region.x > result.cols) region.width = result.cols - region.x;
+    QVector<QRect> main_detection_boxes;
+    if (display.id == DisplayId::Main && updated) {
+        main_detection_boxes = map_yolo_boxes_to_display(
+            yolo_results, params, cv::Size(result.cols, result.rows),
+            cv::Size(ww, hh), region);
+    }
     result = result(region);
     cv::resize(result, result, cv::Size(ww, hh));
 
@@ -677,15 +742,404 @@ void PipelineProcessor::render_and_display(StreamSlot& stream, DisplaySlot& disp
     }
     if (use_mask) img_display = (img_display & (~info_mask)) + ((~thresh_result) & info_mask);
 
-    QImage stream_img = QImage(img_display.data, img_display.cols, img_display.rows, img_display.step, is_color || pcfg.pseudocolor ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+    QImage stream_img = QImage(img_display.data, img_display.cols, img_display.rows, static_cast<int>(img_display.step), is_color || pcfg.pseudocolor ? QImage::Format_RGB888 : QImage::Format_Indexed8);
     if (disp) disp->emit set_pixmap(QPixmap::fromImage(stream_img.scaled(disp->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+    if (display.id == DisplayId::Main && updated) emit main_detection_boxes_updated(main_detection_boxes);
 
     if (display.id == DisplayId::Main && params.dual_display && m_g.secondary_display) {
         cv::Mat ori_img_display;
         Display* ori_display = m_g.secondary_display->get_display_widget();
         cv::resize(stream.latest_raw, ori_img_display, cv::Size(ori_display->width(), ori_display->height()), 0, 0, cv::INTER_AREA);
-        QImage ori_img = QImage(ori_img_display.data, ori_img_display.cols, ori_img_display.rows, ori_img_display.step, is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
+        QImage ori_img = QImage(ori_img_display.data, ori_img_display.cols, ori_img_display.rows, static_cast<int>(ori_img_display.step), is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
         ori_display->emit set_pixmap(QPixmap::fromImage(ori_img).scaled(ori_display->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+}
+
+namespace {
+
+const int kPanoramaMaxOutputWidth = 24000;
+const int kPanoramaFeatherPx = 48;
+const int kPanoramaGainMinOverlap = 64;
+const double kPanoramaWeightEps = 1e-6;
+const double kPanoramaGainMin = 0.7;
+const double kPanoramaGainMax = 1.3;
+
+double normalize_angle_mod(double value)
+{
+    double result = std::fmod(value, 360.0);
+    if (result < 0.0) result += 360.0;
+    return result;
+}
+
+double normalize_angle_delta(double delta)
+{
+    while (delta > 180.0) delta -= 360.0;
+    while (delta <= -180.0) delta += 360.0;
+    return delta;
+}
+
+std::vector<double> unwrap_panorama_angles(const std::vector<std::pair<float, float>>& route,
+                                           unsigned int direction)
+{
+    std::vector<double> angles;
+    if (route.empty()) return angles;
+
+    angles.reserve(route.size());
+    angles.push_back(static_cast<double>(route.front().first));
+    for (size_t i = 1; i < route.size(); ++i) {
+        double delta = normalize_angle_delta(static_cast<double>(route[i].first)
+                                             - normalize_angle_mod(angles.back()));
+        if (direction == 0 && delta < 0.0) delta += 360.0;
+        if (direction != 0 && delta > 0.0) delta -= 360.0;
+        angles.push_back(angles.back() + delta);
+    }
+    return angles;
+}
+
+cv::Mat panorama_source_rgb8(const cv::Mat& input)
+{
+    if (input.empty()) return cv::Mat();
+
+    cv::Mat src = input.clone();
+    if (src.depth() != CV_8U) {
+        double min_val = 0.0;
+        double max_val = 0.0;
+        cv::Mat flat = src.reshape(1);
+        cv::minMaxLoc(flat, &min_val, &max_val);
+        const double scale = (max_val > min_val) ? (255.0 / (max_val - min_val)) : 1.0;
+        src.convertTo(src, CV_MAKETYPE(CV_8U, src.channels()), scale, -min_val * scale);
+    }
+
+    cv::Mat rgb;
+    if (src.channels() == 1) {
+        cv::cvtColor(src, rgb, cv::COLOR_GRAY2RGB);
+    } else if (src.channels() == 3) {
+        rgb = src;
+    } else if (src.channels() == 4) {
+        cv::cvtColor(src, rgb, cv::COLOR_RGBA2RGB);
+    }
+    return rgb;
+}
+
+cv::Mat make_panorama_feather_mask(int width, int height)
+{
+    cv::Mat mask(height, width, CV_32FC1, cv::Scalar(1.0f));
+    const int feather = std::max(0, std::min(kPanoramaFeatherPx, width / 2));
+    if (feather <= 0) return mask;
+
+    for (int y = 0; y < height; ++y) {
+        float *row = mask.ptr<float>(y);
+        for (int x = 0; x < feather; ++x) {
+            const float value = feather > 1
+                ? static_cast<float>(x) / static_cast<float>(feather - 1)
+                : 0.0f;
+            row[x] *= value;
+            row[width - 1 - x] *= value;
+        }
+    }
+    return mask;
+}
+
+bool clipped_panorama_rect(const PanoramaCanvas& canvas, const cv::Mat& src,
+                           int x, int y, cv::Rect& dst_rect, cv::Rect& src_rect)
+{
+    const int x0 = std::max(0, x);
+    const int y0 = std::max(0, y);
+    const int x1 = std::min(canvas.canvas_width, x + src.cols);
+    const int y1 = std::min(canvas.canvas_height, y + src.rows);
+    if (x1 <= x0 || y1 <= y0) return false;
+
+    dst_rect = cv::Rect(x0, y0, x1 - x0, y1 - y0);
+    src_rect = cv::Rect(x0 - x, y0 - y, x1 - x0, y1 - y0);
+    return true;
+}
+
+cv::Mat overlap_mask_from_weights(const cv::Mat& mask_roi, const cv::Mat& weights_roi)
+{
+    cv::Mat incoming_mask;
+    cv::Mat existing_mask;
+    cv::Mat overlap;
+    cv::compare(mask_roi, kPanoramaWeightEps, incoming_mask, cv::CMP_GT);
+    cv::compare(weights_roi, kPanoramaWeightEps, existing_mask, cv::CMP_GT);
+    cv::bitwise_and(incoming_mask, existing_mask, overlap);
+    return overlap;
+}
+
+cv::Mat existing_panorama_roi(const cv::Mat& accum_roi, const cv::Mat& weights_roi)
+{
+    cv::Mat denom;
+    cv::max(weights_roi, kPanoramaWeightEps, denom);
+
+    std::vector<cv::Mat> denom_channels;
+    denom_channels.push_back(denom);
+    denom_channels.push_back(denom);
+    denom_channels.push_back(denom);
+
+    cv::Mat denom3;
+    cv::Mat existing;
+    cv::merge(denom_channels, denom3);
+    cv::divide(accum_roi, denom3, existing);
+    return existing;
+}
+
+void apply_panorama_gain(cv::Mat& src, const cv::Mat& mask_roi,
+                         const cv::Mat& accum_roi, const cv::Mat& weights_roi)
+{
+    const cv::Mat overlap = overlap_mask_from_weights(mask_roi, weights_roi);
+    if (cv::countNonZero(overlap) < kPanoramaGainMinOverlap) return;
+
+    const cv::Mat existing = existing_panorama_roi(accum_roi, weights_roi);
+    const cv::Scalar incoming_mean = cv::mean(src, overlap);
+    const cv::Scalar existing_mean = cv::mean(existing, overlap);
+
+    std::vector<cv::Mat> channels;
+    cv::split(src, channels);
+    for (int c = 0; c < 3; ++c) {
+        const double gain = std::max(kPanoramaGainMin, std::min(kPanoramaGainMax,
+            existing_mean[c] / std::max(incoming_mean[c], 1.0)));
+        channels[c] *= gain;
+    }
+    cv::merge(channels, src);
+    cv::min(src, 255.0, src);
+    cv::max(src, 0.0, src);
+}
+
+bool score_panorama_match(const PanoramaCanvas& canvas, const cv::Mat& src_float,
+                          const cv::Mat& mask, int x, int y,
+                          double& score, int& count)
+{
+    cv::Rect dst_rect;
+    cv::Rect src_rect;
+    if (!clipped_panorama_rect(canvas, src_float, x, y, dst_rect, src_rect)) return false;
+
+    const cv::Mat mask_roi = mask(src_rect);
+    const cv::Mat weights_roi = canvas.weights(dst_rect);
+    const cv::Mat overlap = overlap_mask_from_weights(mask_roi, weights_roi);
+    count = cv::countNonZero(overlap);
+    if (count < kPanoramaGainMinOverlap) return false;
+
+    const cv::Mat src_roi = src_float(src_rect);
+    const cv::Mat existing = existing_panorama_roi(canvas.accum(dst_rect), weights_roi);
+    cv::Mat diff;
+    cv::absdiff(src_roi, existing, diff);
+    const cv::Scalar mean_diff = cv::mean(diff, overlap);
+    score = (mean_diff[0] + mean_diff[1] + mean_diff[2]) / 3.0;
+    return true;
+}
+
+int refine_panorama_x_by_matching(const PanoramaCanvas& canvas, const cv::Mat& src_float,
+                                  const cv::Mat& mask, int nominal_x, int y)
+{
+    if (canvas.accum.empty() || canvas.weights.empty()) return nominal_x;
+
+    double nominal_score = 0.0;
+    int nominal_count = 0;
+    const bool nominal_ok = score_panorama_match(canvas, src_float, mask, nominal_x, y,
+                                                 nominal_score, nominal_count);
+
+    const int radius = std::min(160, std::max(12, src_float.cols / 5));
+    int best_x = nominal_x;
+    int best_count = 0;
+    double best_score = std::numeric_limits<double>::max();
+
+    for (int dx = -radius; dx <= radius; dx += 2) {
+        double score = 0.0;
+        int count = 0;
+        if (!score_panorama_match(canvas, src_float, mask, nominal_x + dx, y, score, count)) continue;
+        if (score < best_score) {
+            best_score = score;
+            best_count = count;
+            best_x = nominal_x + dx;
+        }
+    }
+
+    for (int x = best_x - 2; x <= best_x + 2; ++x) {
+        double score = 0.0;
+        int count = 0;
+        if (!score_panorama_match(canvas, src_float, mask, x, y, score, count)) continue;
+        if (score < best_score) {
+            best_score = score;
+            best_count = count;
+            best_x = x;
+        }
+    }
+
+    if (best_count < kPanoramaGainMinOverlap || best_x == nominal_x) return nominal_x;
+    if (!nominal_ok) return best_score <= 45.0 ? best_x : nominal_x;
+    if (best_score + 1.0 < nominal_score * 0.98) return best_x;
+    return nominal_x;
+}
+
+bool initialize_panorama_canvas(PanoramaCanvas& canvas, const cv::Mat& rgb,
+                                const std::vector<std::pair<float, float>>& route,
+                                const ScanParams& params)
+{
+    if (route.empty() || rgb.empty() || rgb.cols <= 0 || rgb.rows <= 0) return false;
+
+    float fov_h = params.panorama_fov_h;
+    if (fov_h <= 1e-4f) fov_h = std::fabs(params.panorama_step_h);
+    if (fov_h <= 1e-4f) fov_h = 1.0f;
+
+    std::vector<double> angles = unwrap_panorama_angles(route, params.panorama_direction);
+    if (angles.empty()) return false;
+
+    double left_deg = angles.front() - static_cast<double>(fov_h) * 0.5;
+    double right_deg = angles.front() + static_cast<double>(fov_h) * 0.5;
+    for (double angle : angles) {
+        left_deg = std::min(left_deg, angle - static_cast<double>(fov_h) * 0.5);
+        right_deg = std::max(right_deg, angle + static_cast<double>(fov_h) * 0.5);
+    }
+
+    const double extent_deg = std::max(static_cast<double>(fov_h), right_deg - left_deg);
+    double px_per_deg = static_cast<double>(rgb.cols) / static_cast<double>(fov_h);
+    if (kPanoramaMaxOutputWidth > 0 && extent_deg * px_per_deg > kPanoramaMaxOutputWidth) {
+        px_per_deg = static_cast<double>(kPanoramaMaxOutputWidth) / extent_deg;
+    }
+
+    const int target_width = std::max(1, static_cast<int>(std::round(fov_h * px_per_deg)));
+    const double scale = static_cast<double>(target_width) / static_cast<double>(rgb.cols);
+    const int target_height = std::max(1, static_cast<int>(std::round(rgb.rows * scale)));
+    const int canvas_width = std::max(1, static_cast<int>(std::ceil(extent_deg * px_per_deg)));
+
+    canvas.reset();
+    canvas.angles = angles;
+    canvas.left_deg = left_deg;
+    canvas.extent_deg = extent_deg;
+    canvas.px_per_deg = px_per_deg;
+    canvas.fov_h = fov_h;
+    canvas.target_width = target_width;
+    canvas.canvas_width = canvas_width;
+    canvas.canvas_height = target_height;
+    canvas.route_size = static_cast<int>(route.size());
+    canvas.accum = cv::Mat::zeros(canvas.canvas_height, canvas.canvas_width, CV_32FC3);
+    canvas.weights = cv::Mat::zeros(canvas.canvas_height, canvas.canvas_width, CV_32FC1);
+    return true;
+}
+
+cv::Mat render_panorama_canvas(const PanoramaCanvas& canvas, bool crop_to_content)
+{
+    if (canvas.accum.empty() || canvas.weights.empty()) return cv::Mat();
+
+    cv::Mat denom;
+    cv::max(canvas.weights, kPanoramaWeightEps, denom);
+    std::vector<cv::Mat> denom_channels;
+    denom_channels.push_back(denom);
+    denom_channels.push_back(denom);
+    denom_channels.push_back(denom);
+
+    cv::Mat denom3;
+    cv::Mat output32;
+    cv::merge(denom_channels, denom3);
+    cv::divide(canvas.accum, denom3, output32);
+
+    cv::Mat content_mask;
+    cv::compare(canvas.weights, kPanoramaWeightEps, content_mask, cv::CMP_GT);
+    cv::Mat empty_mask;
+    cv::bitwise_not(content_mask, empty_mask);
+    output32.setTo(cv::Scalar(0, 0, 0), empty_mask);
+
+    cv::Mat output8;
+    output32.convertTo(output8, CV_8UC3);
+
+    if (!crop_to_content) return output8;
+
+    std::vector<cv::Point> content_points;
+    cv::findNonZero(content_mask, content_points);
+    if (content_points.empty()) return output8;
+
+    const cv::Rect crop = cv::boundingRect(content_points) & cv::Rect(0, 0, output8.cols, output8.rows);
+    return crop.width > 0 && crop.height > 0 ? output8(crop).clone() : output8;
+}
+
+} // namespace
+
+void PipelineProcessor::append_panorama_preview(DisplaySlot& main_display,
+    int ptz_idx, const std::vector<std::pair<float, float>>& route,
+    PanoramaCanvas& panorama_canvas)
+{
+    if (ptz_idx < 0 || ptz_idx >= static_cast<int>(route.size()) || main_display.modified_result.empty()) return;
+
+    const cv::Mat rgb = panorama_source_rgb8(main_display.modified_result);
+    if (rgb.empty() || rgb.rows <= 0 || rgb.cols <= 0) return;
+
+    if (ptz_idx == 0) panorama_canvas.reset();
+    if (panorama_canvas.accum.empty()
+            || panorama_canvas.route_size != static_cast<int>(route.size())
+            || std::fabs(panorama_canvas.fov_h - m_g.scan_params->panorama_fov_h) > 1e-4f) {
+        if (!initialize_panorama_canvas(panorama_canvas, rgb, route, *m_g.scan_params)) return;
+    }
+
+    cv::Mat resized;
+    cv::resize(rgb, resized, cv::Size(panorama_canvas.target_width, panorama_canvas.canvas_height),
+               0, 0, cv::INTER_AREA);
+
+    cv::Mat src_float;
+    resized.convertTo(src_float, CV_32FC3);
+    cv::Mat mask = make_panorama_feather_mask(src_float.cols, src_float.rows);
+
+    int x = static_cast<int>(std::round(
+        (panorama_canvas.angles[static_cast<size_t>(ptz_idx)]
+         - static_cast<double>(panorama_canvas.fov_h) * 0.5
+         - panorama_canvas.left_deg) * panorama_canvas.px_per_deg));
+    const int y = (panorama_canvas.canvas_height - src_float.rows) / 2;
+
+    if (m_g.scan_params->panorama_fusion_mode == ScanParams::PANORAMA_FUSION_MATCHING) {
+        x = refine_panorama_x_by_matching(panorama_canvas, src_float, mask, x, y);
+    }
+
+    cv::Rect dst_rect;
+    cv::Rect src_rect;
+    if (!clipped_panorama_rect(panorama_canvas, src_float, x, y, dst_rect, src_rect)) return;
+
+    cv::Mat src_roi = src_float(src_rect).clone();
+    const cv::Mat mask_roi = mask(src_rect);
+    cv::Mat accum_roi = panorama_canvas.accum(dst_rect);
+    cv::Mat weights_roi = panorama_canvas.weights(dst_rect);
+
+    if (m_g.scan_params->panorama_fusion_mode == ScanParams::PANORAMA_FUSION_GAIN
+            || m_g.scan_params->panorama_fusion_mode == ScanParams::PANORAMA_FUSION_MATCHING) {
+        apply_panorama_gain(src_roi, mask_roi, accum_roi, weights_roi);
+    }
+
+    std::vector<cv::Mat> mask_channels;
+    mask_channels.push_back(mask_roi);
+    mask_channels.push_back(mask_roi);
+    mask_channels.push_back(mask_roi);
+    cv::Mat mask3;
+    cv::merge(mask_channels, mask3);
+
+    cv::Mat weighted_src;
+    cv::multiply(src_roi, mask3, weighted_src);
+    accum_roi += weighted_src;
+    weights_roi += mask_roi;
+
+    const cv::Mat preview = render_panorama_canvas(panorama_canvas, true);
+    if (preview.empty()) return;
+
+    QImage preview_img(preview.data, preview.cols, preview.rows,
+                       static_cast<int>(preview.step), QImage::Format_RGB888);
+    emit panorama_preview_updated(QPixmap::fromImage(preview_img.copy()));
+}
+
+void PipelineProcessor::save_panorama_preview(const PanoramaCanvas& panorama_canvas,
+    const PipelineConfig& pcfg)
+{
+    if (panorama_canvas.accum.empty() || !m_g.save_location || !m_g.tp || !m_g.scan_ctrl) return;
+
+    const cv::Mat panorama = render_panorama_canvas(panorama_canvas, false);
+    if (panorama.empty()) return;
+
+    QImage preview_img(panorama.data, panorama.cols, panorama.rows,
+                       static_cast<int>(panorama.step), QImage::Format_RGB888);
+    emit panorama_preview_updated(QPixmap::fromImage(preview_img.copy()));
+
+    const QString scan_root = *m_g.save_location + "/" + m_g.scan_ctrl->get_scan_name();
+    QDir().mkpath(scan_root);
+
+    (void)pcfg;
+    if (!m_g.tp->append_task(std::bind(ImageIO::save_image_jpg, panorama,
+                                       scan_root + "/panorama.jpg"))) {
+        emit task_queue_full();
     }
 }
 
@@ -694,19 +1148,29 @@ void PipelineProcessor::render_and_display(StreamSlot& stream, DisplaySlot& disp
 void PipelineProcessor::advance_scan_main(DisplayRouter& router, StreamSlot& main_stream, DisplaySlot& main_display,
     bool updated, const PipelineConfig& pcfg,
     int& scan_img_count,
-    QString& scan_save_path_a, QString& scan_save_path)
+    QString& scan_save_path_a, QString& scan_save_path,
+    PanoramaCanvas& panorama_canvas,
+    qint64& panorama_position_started_ms)
 {
     (void)main_display;
     if (!m_g.scan_ctrl->is_scanning() || !updated) return;
+
+    if (m_g.scan_params->ptz_scan_mode == ScanParams::PTZ_SCAN_PANORAMA) {
+        advance_panorama_scan_main(router, main_stream, main_display, pcfg, scan_img_count, scan_save_path,
+                                   panorama_canvas,
+                                   panorama_position_started_ms);
+        return;
+    }
 
     scan_img_count -= 1;
     if (scan_img_count < 0) scan_img_count = 0;
 
     int save_img_num = m_g.scan_params->num_single_pos;
-    if (scan_img_count > 0 && scan_img_count <= save_img_num) {
+    if (save_img_num < 1) save_img_num = 1;
+    if (scan_img_count > 0 && scan_img_count <= save_img_num && !scan_save_path.isEmpty()) {
         save_scan_img(router, main_stream, scan_save_path, QString::number(save_img_num - scan_img_count + 1) + ".bmp", pcfg);
     }
-    if (scan_img_count == save_img_num) {
+    if (scan_img_count == save_img_num && !scan_save_path.isEmpty()) {
         emit save_screenshot_signal(scan_save_path + "/screenshot_" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".png");
     }
 
@@ -720,6 +1184,11 @@ void PipelineProcessor::advance_scan_main(DisplayRouter& router, StreamSlot& mai
         int ptz_idx = m_g.scan_ctrl->get_scan_ptz_idx();
         const auto tcu_route = m_g.scan_ctrl->get_scan_tcu_route();
         const auto ptz_route = m_g.scan_ctrl->get_scan_ptz_route();
+        if (tcu_route.empty() || ptz_route.empty()) {
+            scan_img_count = -1;
+            emit finish_scan_signal();
+            return;
+        }
 
         if (tcu_idx == (int)tcu_route.size() - 1 || tcu_idx == -1) {
             m_g.scan_ctrl->set_scan_tcu_idx(-1);
@@ -743,6 +1212,7 @@ void PipelineProcessor::advance_scan_main(DisplayRouter& router, StreamSlot& mai
             else {
                 scan_img_count = -1;
                 emit finish_scan_signal();
+                return;
             }
         }
 
@@ -760,6 +1230,111 @@ void PipelineProcessor::advance_scan_main(DisplayRouter& router, StreamSlot& mai
 
         emit update_delay_in_thread();
     }
+}
+
+void PipelineProcessor::advance_panorama_scan_main(DisplayRouter& router, StreamSlot& main_stream, DisplaySlot& main_display,
+    const PipelineConfig& pcfg,
+    int& scan_img_count,
+    QString& scan_save_path,
+    PanoramaCanvas& panorama_canvas,
+    qint64& panorama_position_started_ms)
+{
+    int save_img_num = m_g.scan_params->num_single_pos;
+    if (save_img_num < 1) save_img_num = 1;
+
+    if (m_g.scan_ctrl->get_scan_ptz_idx() < 0 && scan_img_count >= 0) {
+        scan_img_count = -1;
+        scan_save_path.clear();
+        panorama_canvas.reset();
+        panorama_position_started_ms = -1;
+    }
+
+    if (scan_img_count > 0) {
+        const int image_number = save_img_num - scan_img_count + 1;
+        if (scan_img_count == save_img_num && !scan_save_path.isEmpty()) {
+            const auto ptz_route = m_g.scan_ctrl->get_scan_ptz_route();
+            append_panorama_preview(main_display, m_g.scan_ctrl->get_scan_ptz_idx(),
+                                    ptz_route, panorama_canvas);
+        }
+        if (!scan_save_path.isEmpty()) {
+            save_scan_img(router, main_stream, scan_save_path, QString::number(image_number) + ".bmp", pcfg);
+        }
+
+        scan_img_count -= 1;
+        if (scan_img_count <= 0) {
+            scan_img_count = -1;
+            panorama_position_started_ms = -1;
+        }
+        return;
+    }
+
+    if (scan_img_count == 0) {
+        const int wait_time = m_g.scan_params->panorama_wait_time < 0 ? 0 : m_g.scan_params->panorama_wait_time;
+        const qint64 now_ms = QDateTime::currentMSecsSinceEpoch();
+        if (panorama_position_started_ms < 0) panorama_position_started_ms = now_ms;
+        if (now_ms - panorama_position_started_ms < static_cast<qint64>(wait_time) * 1000) return;
+
+        scan_img_count = save_img_num;
+        return;
+    }
+
+    const auto ptz_route = m_g.scan_ctrl->get_scan_ptz_route();
+    int ptz_idx = m_g.scan_ctrl->get_scan_ptz_idx() + 1;
+    m_g.scan_ctrl->set_scan_ptz_idx(ptz_idx);
+
+    if (ptz_route.empty() || ptz_idx >= (int)ptz_route.size()) {
+        save_panorama_preview(panorama_canvas, pcfg);
+        panorama_canvas.reset();
+        scan_img_count = -1;
+        scan_save_path.clear();
+        panorama_position_started_ms = -1;
+        emit finish_scan_signal();
+        return;
+    }
+
+    const float angle_h = ptz_route[ptz_idx].first;
+    const float angle_v = ptz_route[ptz_idx].second;
+    m_g.device_mgr->send_ptz_angle(angle_h, angle_v);
+
+    const QString pos_name = QString("%1_h%2_v%3")
+        .arg(ptz_idx, 3, 10, QChar('0'))
+        .arg(angle_h, 0, 'f', 2)
+        .arg(angle_v, 0, 'f', 2);
+    scan_save_path = *m_g.save_location + "/" + m_g.scan_ctrl->get_scan_name() + "/" + pos_name;
+    QDir().mkdir(scan_save_path);
+
+    QFile params_file(scan_save_path + "/params");
+    params_file.open(QIODevice::WriteOnly);
+    const QString ending = m_g.scan_params->panorama_use_end_h
+        ? QString::number(m_g.scan_params->panorama_end_h, 'f', 2) + " deg"
+        : QString("disabled");
+    params_file.write(QString("mode: panorama\n"
+                              "angle:\n"
+                              "    H: %1\n"
+                              "    V: %2\n"
+                              "ending H: %3\n"
+                              "zoom: %4 x\n"
+                              "FOV H: %5 deg\n"
+                              "FOV V: %6 deg\n"
+                              "fusion: %7\n")
+                          .arg(angle_h, 0, 'f', 2)
+                          .arg(angle_v, 0, 'f', 2)
+                          .arg(ending)
+                          .arg(m_g.scan_params->panorama_zoom_level, 0, 'f', 2)
+                          .arg(m_g.scan_params->panorama_fov_h, 0, 'f', 2)
+                          .arg(m_g.scan_params->panorama_fov_v, 0, 'f', 2)
+                          .arg(get_panorama_fusion_name(m_g.scan_params->panorama_fusion_mode))
+                          .toUtf8());
+    params_file.close();
+
+    QDir().mkdir(scan_save_path + "/ori_bmp");
+    QDir().mkdir(scan_save_path + "/res_bmp");
+
+    StreamId alt1_stream = router.stream_routed_to(DisplayId::Alt1);
+    if (alt1_stream != StreamId::None) QDir().mkdir(scan_save_path + "/alt_bmp");
+
+    panorama_position_started_ms = QDateTime::currentMSecsSinceEpoch();
+    scan_img_count = 0;
 }
 
 void PipelineProcessor::record_frame(StreamSlot& stream, DisplaySlot& display, bool updated,

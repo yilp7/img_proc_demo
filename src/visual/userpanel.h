@@ -1,6 +1,9 @@
 #ifndef USERPANEL_H
 #define USERPANEL_H
 
+#include <QRect>
+#include <QVector>
+
 //#include "cam.h"
 #include "cam/mvcam.h"
 #ifdef WIN32
@@ -36,8 +39,10 @@
 #include "widgets/panels/opticspanel.h"
 #include "widgets/panels/tcupanel.h"
 #include "widgets/panels/consolepanel.h"
+#include "widgets/panels/panoramapanel.h"
 #include "widgets/sidebar/rightstackcontainer.h"
 #include "widgets/sidebar/imgprocwidget.h"
+#include "widgets/sidebar/ptzradarwidget.h"
 #include "widgets/sidebar/saveoptionswidget.h"
 #include "widgets/sidebar/visionwidget.h"
 #include "widgets/sidebar/sidedisplaywidget.h"
@@ -61,6 +66,7 @@
 QT_BEGIN_NAMESPACE
 namespace Ui { class UserPanel; }
 class QLineEdit;
+class QPushButton;
 QT_END_NAMESPACE
 
 class UserPanel;
@@ -385,6 +391,9 @@ private:
 
     void position_display_overlays(DisplayId did);
     void set_source_dead_overlay(DisplayId did, bool dead);
+    void position_panorama_panel();
+    void raise_floating_panels();
+    void set_panorama_panel_visible(bool visible);
 
     // Lens operations delegated to LensController
     void lens_stop() { m_lens_ctrl->lens_stop(); }
@@ -450,8 +459,13 @@ private:
     OpticsPanel*    m_optics_panel;
     TCUPanel*       m_tcu_panel;
     ConsolePanel*   m_console_panel;
+    PanoramaPanel*  m_panorama_panel;
+    QPushButton*    m_scan_panorama_toggle;
+    bool            m_panorama_panel_user_placed;
+    bool            m_panorama_scan_active;
     RightStackContainer* m_right_stack;
     ImgProcWidget*       m_img_proc;
+    PtzRadarWidget*      m_ptz_radar;
     SaveOptionsWidget*   m_save_options;
     VisionWidget*        m_vision;
     SideDisplayWidget*   m_side_display;
@@ -545,6 +559,7 @@ private:
     // YOLO Detection — detectors live per DisplaySlot now. Init-mutex stays
     // singleton since it only protects detector construction.
     QMutex                  m_yolo_init_mutex;
+    QVector<QRect>          m_main_detection_boxes;
 
     // Thread-safe snapshots of UI widget state and Config for the consumers.
     QMutex                  m_params_mutex;

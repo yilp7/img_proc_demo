@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QString>
+#include <vector>
 #include "util/version.h"
 #include "nlohmann/json.hpp"
 
@@ -65,6 +66,7 @@ public:
         bool ebus = false;
         bool share_tcu_port = false;
         int ptz_type = 0;
+        float ptz_zero_angle_h = 0.0f;
         int rotation = 0;
         int pixel_type = 0;
     };
@@ -76,6 +78,23 @@ public:
         bool consecutive_capture = true;
         bool integrate_info = true;
         int img_format = 0;
+    };
+
+    struct ZoomFovPoint {
+        float zoom = 1.0f;
+        float focal_length_mm = 10.0f;
+        float fov_h = 38.4f;
+        float fov_v = 22.5f;
+
+        ZoomFovPoint(float z = 1.0f, float focal = 10.0f, float h = 38.4f, float v = 22.5f)
+            : zoom(z), focal_length_mm(focal), fov_h(h), fov_v(v) {}
+    };
+
+    struct PanoramaOpticsSettings {
+        std::vector<ZoomFovPoint> zoom_fov = {
+            ZoomFovPoint(1.0f, 10.0f, 38.4f, 22.5f),
+            ZoomFovPoint(86.0f, 860.0f, 0.49f, 0.28f)
+        };
     };
 
     struct ImageProcSettings {
@@ -148,6 +167,7 @@ public:
         TCUSettings tcu;
         DeviceSettings device;
         SaveSettings save;
+        PanoramaOpticsSettings panorama_optics;
         ImageProcSettings image_proc;
         YoloSettings yolo;
 
@@ -200,6 +220,9 @@ private:
 
     nlohmann::json save_settings_to_json(const SaveSettings &settings) const;
     SaveSettings save_settings_from_json(const nlohmann::json &obj) const;
+
+    nlohmann::json panorama_optics_settings_to_json(const PanoramaOpticsSettings &settings) const;
+    PanoramaOpticsSettings panorama_optics_settings_from_json(const nlohmann::json &obj) const;
 
     nlohmann::json image_proc_settings_to_json(const ImageProcSettings &settings) const;
     ImageProcSettings image_proc_settings_from_json(const nlohmann::json &obj) const;

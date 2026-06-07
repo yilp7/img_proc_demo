@@ -80,7 +80,6 @@ public:
         // qint64 current_time = QDateTime::currentMSecsSinceEpoch();
         // return connected && (current_time - last_received_time) < CONNECTION_TIMEOUT_MS;
     }
-    void set_velocities(float h_vel, float v_vel) { horizontal_velocity = h_vel; vertical_velocity = v_vel; }
     void update_timer_interval(uint interval = 0);
 
     // IPTZController interface
@@ -102,6 +101,9 @@ public slots:
     void disconnect_from_device();
     void transmit_data(qint32 op);
     void device_control(qint32 op, float val);
+    void apply_manual_velocity(float h_vel, float v_vel);
+    void apply_follow_target(float h, float v);
+    void apply_angle_target(float h, float v);
     void handle_received();
     void transmit_status();
 
@@ -121,6 +123,10 @@ private:
     void parse_status_frame(const QByteArray &data);
     qint16 float_to_int16(float value);
     float int16_to_float(qint16 value);
+    void dispatch_manual_velocity(float h_vel, float v_vel, Qt::ConnectionType connection);
+    void dispatch_follow_target(float h, float v, Qt::ConnectionType connection);
+    void dispatch_angle_target(float h, float v, Qt::ConnectionType connection);
+    void set_velocities(float h_vel, float v_vel) { horizontal_velocity = h_vel; vertical_velocity = v_vel; }
 
 private:
     QUdpSocket *udp_socket;

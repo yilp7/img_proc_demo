@@ -1,5 +1,8 @@
 #include "udpptz.h"
 
+#include <QMetaObject>
+#include <QThread>
+
 UDPPTZ::UDPPTZ():
     QObject{nullptr},
     udp_socket(nullptr),
@@ -63,6 +66,7 @@ void UDPPTZ::set_target(QHostAddress target, quint16 port)
 
 void UDPPTZ::set_protocol(Protocol p)
 {
+    if (p != PROTOCOL_500 && p != PROTOCOL_530) p = PROTOCOL_530;
     protocol = p;
     // 530 firmware needs a faster heartbeat (10 ms / 100 Hz); 500 keeps 20 ms.
     if (timer_tx) timer_tx->setInterval(p == PROTOCOL_530 ? 10 : 20);
@@ -211,8 +215,7 @@ void UDPPTZ::ptz_move(int direction, int speed)
     case DIR_DOWN_RIGHT: h_vel =  velocity; v_vel = -velocity; break;
     default: return;
     }
-    set_velocities(h_vel, v_vel);
-    emit transmit(MANUAL_SEARCH);
+    dispatch_manual_velocity(h_vel, v_vel, Qt::QueuedConnection);
 }
 
 void UDPPTZ::ptz_move_2d(int direction, int h_speed, int v_speed)
@@ -235,8 +238,7 @@ void UDPPTZ::ptz_move_2d(int direction, int h_speed, int v_speed)
     case DIR_DOWN_RIGHT: h_vel =  h_mag; v_vel = -v_mag; break;
     default: return;
     }
-    set_velocities(h_vel, v_vel);
-    emit transmit(MANUAL_SEARCH);
+    dispatch_manual_velocity(h_vel, v_vel, Qt::QueuedConnection);
 }
 
 void UDPPTZ::ptz_stop()
@@ -244,14 +246,12 @@ void UDPPTZ::ptz_stop()
     // Stop semantics are still being characterised per device — currently
     // zero velocities + MANUAL_SEARCH for all protocols. Will branch on
     // `protocol` later if a variant requires STANDBY instead.
-    set_velocities(0, 0);
-    emit transmit(MANUAL_SEARCH);
+    dispatch_manual_velocity(0, 0, Qt::BlockingQueuedConnection);
 }
 
 void UDPPTZ::ptz_set_angle(float h, float v)
 {
-    emit control(ANGLE_H, h);
-    emit control(ANGLE_V, v);
+    dispatch_angle_target(h, v, Qt::QueuedConnection);
 }
 
 void UDPPTZ::ptz_set_angle_h(float h) { emit control(ANGLE_H, h); }
@@ -259,9 +259,57 @@ void UDPPTZ::ptz_set_angle_v(float v) { emit control(ANGLE_V, v); }
 
 void UDPPTZ::ptz_follow(float h, float v)
 {
+    dispatch_follow_target(h, v, Qt::QueuedConnection);
+}
+
+void UDPPTZ::apply_manual_velocity(float h_vel, float v_vel)
+{
+    set_velocities(h_vel, v_vel);
+    transmit_data(MANUAL_SEARCH);
+}
+
+void UDPPTZ::apply_follow_target(float h, float v)
+{
     target_horizontal_angle = h;
     target_vertical_angle = v;
     transmit_data(FOLLOW);
+}
+
+void UDPPTZ::apply_angle_target(float h, float v)
+{
+    target_horizontal_angle = h > 180.0f ? h - 360.0f : h;
+    target_vertical_angle = std::max(-90.0f, std::min(90.0f, v));
+    transmit_data(ANGLE_POSITION);
+}
+
+void UDPPTZ::dispatch_manual_velocity(float h_vel, float v_vel, Qt::ConnectionType connection)
+{
+    if (QThread::currentThread() == thread()) {
+        apply_manual_velocity(h_vel, v_vel);
+        return;
+    }
+    QMetaObject::invokeMethod(this, "apply_manual_velocity", connection,
+                              Q_ARG(float, h_vel), Q_ARG(float, v_vel));
+}
+
+void UDPPTZ::dispatch_follow_target(float h, float v, Qt::ConnectionType connection)
+{
+    if (QThread::currentThread() == thread()) {
+        apply_follow_target(h, v);
+        return;
+    }
+    QMetaObject::invokeMethod(this, "apply_follow_target", connection,
+                              Q_ARG(float, h), Q_ARG(float, v));
+}
+
+void UDPPTZ::dispatch_angle_target(float h, float v, Qt::ConnectionType connection)
+{
+    if (QThread::currentThread() == thread()) {
+        apply_angle_target(h, v);
+        return;
+    }
+    QMetaObject::invokeMethod(this, "apply_angle_target", connection,
+                              Q_ARG(float, h), Q_ARG(float, v));
 }
 
 void UDPPTZ::device_control(qint32 op, float val)

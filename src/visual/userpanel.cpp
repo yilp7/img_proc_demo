@@ -3,13 +3,16 @@
 #include "ui_preferences.h"
 #include "util/constants.h"
 #include <QCheckBox>
+#include <QComboBox>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMetaType>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QSignalBlocker>
 #include <QStyle>
 #include <QVBoxLayout>
 
@@ -149,6 +152,64 @@ void UserPanel::set_source_dead_overlay(DisplayId did, bool dead)
     sd->raise();
 }
 
+void UserPanel::position_panorama_panel()
+{
+    if (!m_panorama_panel || !ui || !ui->CENTRAL || !ui->SOURCE_DISPLAY) return;
+
+    const int central_w = ui->CENTRAL->width();
+    const int central_h = ui->CENTRAL->height();
+    if (central_w <= 0 || central_h <= 0) return;
+
+    const QRect display = ui->SOURCE_DISPLAY->geometry();
+    const int margin = 10;
+    const int right_pad = 10;
+    const int left_pad = 10;
+    const int panel_gap = 12;
+    const int bottom_margin = 60;
+    const int height = qMin(180, qMax(130, central_h / 5));
+    int x = left_pad + (m_optics_panel ? m_optics_panel->width() : 240) + panel_gap;
+
+    const int min_width = qMin(360, qMax(1, central_w - margin - right_pad));
+    const int max_x = qMax(margin, central_w - min_width - right_pad);
+    x = qBound(margin, x, max_x);
+    const int available_width = qMax(min_width, central_w - x - right_pad);
+    const int desired_width = qMax(min_width, display.width());
+    const int width = qMin(available_width, desired_width);
+    const int y = qBound(margin, central_h - height - bottom_margin,
+                         qMax(margin, central_h - height - margin));
+
+    if (m_panorama_panel_user_placed) {
+        const QPoint clamped = FloatingPanel::clampToParent(
+            m_panorama_panel->pos(), m_panorama_panel->size(), ui->CENTRAL->size());
+        if (m_panorama_panel->pos() != clamped) m_panorama_panel->move(clamped);
+        return;
+    }
+
+    m_panorama_panel->setGeometry(x, y, width, height);
+}
+
+void UserPanel::raise_floating_panels()
+{
+    if (m_optics_panel)  m_optics_panel ->raise();
+    if (m_tcu_panel)     m_tcu_panel    ->raise();
+    if (m_console_panel) m_console_panel->raise();
+    if (m_panorama_panel && m_panorama_panel->isVisible()) m_panorama_panel->raise();
+}
+
+void UserPanel::set_panorama_panel_visible(bool visible)
+{
+    if (!m_panorama_panel) return;
+
+    if (visible) position_panorama_panel();
+    m_panorama_panel->setVisible(visible);
+    if (visible) m_panorama_panel->raise();
+
+    if (m_scan_panorama_toggle && m_scan_panorama_toggle->isChecked() != visible) {
+        QSignalBlocker block(m_scan_panorama_toggle);
+        m_scan_panorama_toggle->setChecked(visible);
+    }
+}
+
 UserPanel::UserPanel(QWidget *parent) :
     QMainWindow(parent),
     mouse_pressed(false),
@@ -158,8 +219,13 @@ UserPanel::UserPanel(QWidget *parent) :
     m_optics_panel(nullptr),
     m_tcu_panel(nullptr),
     m_console_panel(nullptr),
+    m_panorama_panel(nullptr),
+    m_scan_panorama_toggle(nullptr),
+    m_panorama_panel_user_placed(false),
+    m_panorama_scan_active(false),
     m_right_stack(nullptr),
     m_img_proc(nullptr),
+    m_ptz_radar(nullptr),
     m_save_options(nullptr),
     m_vision(nullptr),
     m_side_display(nullptr),
@@ -579,6 +645,23 @@ UserPanel::UserPanel(QWidget *parent) :
             default: break;
             }
         });
+    connect(ui->SOURCE_DISPLAY, &Display::ptz_target, this,
+        [this](QPoint pos) {
+            Display *disp = ui->SOURCE_DISPLAY;
+            if (!disp || !m_device_mgr) return;
+
+            QPoint target = pos;
+            int best_area = 0;
+            for (const QRect& box : m_main_detection_boxes) {
+                if (!box.contains(pos)) continue;
+                const int area = box.width() * box.height();
+                if (best_area == 0 || area < best_area) {
+                    best_area = area;
+                    target = box.center();
+                }
+            }
+            m_device_mgr->point_ptz_to_target(target, disp->width(), disp->height());
+        });
 //    ui->SOFTWARE_CHECK->hide();
 //    ui->SOFTWARE_TRIGGER_BUTTON->hide();
 
@@ -638,6 +721,7 @@ UserPanel::UserPanel(QWidget *parent) :
     m_optics_panel  = new OpticsPanel(ui->CENTRAL);
     m_tcu_panel     = new TCUPanel(ui->CENTRAL);
     m_console_panel = new ConsolePanel(ui->CENTRAL);
+    m_panorama_panel = new PanoramaPanel(ui->CENTRAL);
 
     // OpticsPanel: LENS_STATIC + PTZ_GRP (from LEFT/PARAMS_STATIC/PTZ_PAGE)
     m_optics_panel->setup(ui->LENS_STATIC, ui->PTZ_GRP,
@@ -677,9 +761,11 @@ UserPanel::UserPanel(QWidget *parent) :
     m_optics_panel ->resize(240, 390); m_optics_panel ->move(0, 0);
     m_tcu_panel    ->resize(250, 360); m_tcu_panel    ->move(0, 0);
     m_console_panel->resize(208, 220); m_console_panel->move(0, 0);
+    m_panorama_panel->resize(960, 150); m_panorama_panel->move(0, 0);
     m_optics_panel ->show();
     m_tcu_panel    ->show();
     m_console_panel->show();
+    m_panorama_panel->hide();
 
     // Wire panel close-button → uncheck corresponding pbar toggle
     {
@@ -689,13 +775,29 @@ UserPanel::UserPanel(QWidget *parent) :
         if (ob) connect(m_optics_panel,  &FloatingPanel::hideRequested, ob, [ob]() { ob->setChecked(false); });
         if (tb) connect(m_tcu_panel,     &FloatingPanel::hideRequested, tb, [tb]() { tb->setChecked(false); });
         if (cb) connect(m_console_panel, &FloatingPanel::hideRequested, cb, [cb]() { cb->setChecked(false); });
+        connect(m_panorama_panel, &FloatingPanel::dragged, this, [this](QPoint) {
+            m_panorama_panel_user_placed = true;
+        });
+        connect(m_panorama_panel, &PanoramaPanel::resizedByUser, this, [this]() {
+            m_panorama_panel_user_placed = true;
+        });
+        connect(m_panorama_panel, &PanoramaPanel::resetRequested, this, [this]() {
+            m_panorama_panel_user_placed = false;
+            position_panorama_panel();
+            if (m_panorama_panel && m_panorama_panel->isVisible()) m_panorama_panel->raise();
+        });
+        connect(m_panorama_panel, &FloatingPanel::hideRequested, this, [this]() {
+            set_panorama_panel_visible(false);
+        });
     }
 
     // ----- Right-side widget stack (Sprint 17.5 cutover) -----
     m_right_stack  = new RightStackContainer(ui->CENTRAL);
     m_img_proc     = new ImgProcWidget(m_right_stack);
+    m_ptz_radar    = new PtzRadarWidget(m_right_stack);
     m_save_options = new SaveOptionsWidget(m_right_stack);
     m_vision       = new VisionWidget(m_right_stack);
+    m_ptz_radar->setZeroAngle(config->get_data().device.ptz_zero_angle_h);
 
     // Display picker for the GENERAL tab. Items match DisplayId ordering so
     // currentIndex maps 1:1 to the enum value (Main=0, Alt1=1, Alt2=2).
@@ -734,6 +836,7 @@ UserPanel::UserPanel(QWidget *parent) :
 
     m_right_stack->addSection(m_img_proc);
     m_right_stack->addSection(m_save_options);
+    m_right_stack->addSection(m_ptz_radar);
     // Vision widget dropped from the right stack — detection results are
     // already drawn as overlays on the displays themselves (draw_yolo_boxes
     // at pipelineprocessor.cpp:606), and the Side Display already mirrors
@@ -938,8 +1041,8 @@ UserPanel::UserPanel(QWidget *parent) :
     m_setup_overlay->hide();  // shown only in SETUP mode
 
     // ----- SCAN overlay (Sprint 19, rewritten S22) -----
-    // Builds 4 titled group cards (Delay / Gate Width / PTZ / Capture+Record)
-    // plus a vertical action column. Widgets are hand-created (was previously
+    // Builds titled group cards (Delay / Gate Width / PTZ / Capture+Record /
+    // Panorama) plus a vertical action column. Widgets are hand-created (was previously
     // re-parented from the legacy ScanConfig dialog; that class is gone in S22)
     // and bound to ScanOverlay, which owns the widget→ScanController::params()
     // sync. Matches the prototype.html v3 layout.
@@ -947,6 +1050,27 @@ UserPanel::UserPanel(QWidget *parent) :
     {
         auto *cards  = m_scan_overlay->cardsLayout();
         auto *cw     = m_scan_overlay->contentWidget();
+
+        auto *rows_w = new QWidget(cw);
+        rows_w->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+        auto *rows_l = new QVBoxLayout(rows_w);
+        rows_l->setContentsMargins(0, 0, 0, 0);
+        rows_l->setSpacing(8);
+
+        auto *grid_row_w = new QWidget(rows_w);
+        auto *grid_row = new QHBoxLayout(grid_row_w);
+        grid_row->setContentsMargins(0, 0, 0, 0);
+        grid_row->setSpacing(8);
+
+        auto *panorama_row_w = new QWidget(rows_w);
+        auto *panorama_row = new QHBoxLayout(panorama_row_w);
+        panorama_row->setContentsMargins(0, 0, 0, 0);
+        panorama_row->setSpacing(8);
+
+        rows_l->addWidget(grid_row_w, 0, Qt::AlignTop);
+        rows_l->addWidget(panorama_row_w, 0, Qt::AlignTop);
+        rows_l->addStretch(1);
+        cards->addWidget(rows_w);
 
         // Helpers — small widget factories with the alignment/style the
         // legacy ScanConfig .ui used to set.
@@ -961,10 +1085,10 @@ UserPanel::UserPanel(QWidget *parent) :
             return new QLabel(text, parent);
         };
 
-        // Creates a titled group card, registers it with cardsLayout(), and
+        // Creates a titled group card, registers it with the requested row, and
         // returns the body QWidget ready to receive a layout.
-        auto make_card = [&](const char *title) -> QWidget* {
-            auto *card = new QFrame(cw);
+        auto make_card = [&](const char *title, QWidget *row_parent, QHBoxLayout *row) -> QWidget* {
+            auto *card = new QFrame(row_parent);
             card->setObjectName("SCAN_CARD");
             card->setProperty("scan_card_title", title);  // for diagnostics
             card->setFrameShape(QFrame::StyledPanel);
@@ -987,15 +1111,33 @@ UserPanel::UserPanel(QWidget *parent) :
             vl->addWidget(body, 1);
             // Top-align so cards size to their content height instead of
             // stretching to fill the overlay's vertical viewport.
-            cards->addWidget(card, 0, Qt::AlignTop);
+            row->addWidget(card, 0, Qt::AlignTop);
             return body;
+        };
+
+        auto make_mode_cell = [&](QWidget *parent, QRadioButton *button) -> QWidget* {
+            auto *cell = new QWidget(parent);
+            cell->setFixedWidth(58);
+            auto *vl = new QVBoxLayout(cell);
+            vl->setContentsMargins(0, 8, 0, 0);
+            vl->setSpacing(0);
+            vl->addWidget(button, 0, Qt::AlignLeft | Qt::AlignTop);
+            vl->addStretch(1);
+            return cell;
         };
 
         ScanOverlay::Widgets sw;
 
+        sw.mode_grid = new QRadioButton("Grid", grid_row_w);
+        grid_row->addWidget(make_mode_cell(grid_row_w, sw.mode_grid), 0, Qt::AlignTop);
+
+        sw.mode_panorama = new QRadioButton("360", panorama_row_w);
+        panorama_row->addWidget(make_mode_cell(panorama_row_w, sw.mode_panorama), 0, Qt::AlignTop);
+
         // ── Delay ──────────────────────────────────────────────────────────
         {
-            auto *body = make_card("DELAY");
+            auto *body = make_card("DELAY", grid_row_w, grid_row);
+            sw.grid_delay_card = body->parentWidget();
             auto *bl   = static_cast<QVBoxLayout*>(body->layout());
 
             sw.start_delay_u = le(body); sw.start_delay_n = le(body); sw.start_delay_m = le(body);
@@ -1039,7 +1181,8 @@ UserPanel::UserPanel(QWidget *parent) :
 
         // ── Gate Width ─────────────────────────────────────────────────────
         {
-            auto *body = make_card("GATE WIDTH");
+            auto *body = make_card("GATE WIDTH", grid_row_w, grid_row);
+            sw.grid_gate_card = body->parentWidget();
             auto *bl   = static_cast<QVBoxLayout*>(body->layout());
 
             sw.start_gw_u = le(body); sw.start_gw_n = le(body); sw.start_gw_m = le(body);
@@ -1079,7 +1222,8 @@ UserPanel::UserPanel(QWidget *parent) :
 
         // ── PTZ ────────────────────────────────────────────────────────────
         {
-            auto *body = make_card("PTZ");
+            auto *body = make_card("PTZ", grid_row_w, grid_row);
+            sw.grid_ptz_card = body->parentWidget();
             auto *bl   = static_cast<QVBoxLayout*>(body->layout());
 
             auto *row_w = new QWidget(body);
@@ -1141,7 +1285,8 @@ UserPanel::UserPanel(QWidget *parent) :
 
         // ── Capture / Record ───────────────────────────────────────────────
         {
-            auto *body = make_card("CAPTURE / RECORD");
+            auto *body = make_card("CAPTURE / RECORD", grid_row_w, grid_row);
+            sw.grid_capture_card = body->parentWidget();
             auto *bl   = static_cast<QVBoxLayout*>(body->layout());
 
             auto *row_w = new QWidget(body);
@@ -1211,9 +1356,85 @@ UserPanel::UserPanel(QWidget *parent) :
             bl->addStretch(1);
         }
 
+        // ── Panorama ───────────────────────────────────────────────────────
+        {
+            auto *body = make_card("PANORAMA", panorama_row_w, panorama_row);
+            sw.panorama_card = body->parentWidget();
+            auto *bl   = static_cast<QVBoxLayout*>(body->layout());
+
+            auto *grid = new QGridLayout;
+            grid->setHorizontalSpacing(4);
+            grid->setVerticalSpacing(4);
+            grid->setContentsMargins(0, 0, 0, 0);
+            const int value_w = 55;
+            grid->setColumnMinimumWidth(1, value_w);
+
+            sw.panorama_start_h = le(body);
+            sw.panorama_use_end_h = new QCheckBox("End H", body);
+            sw.panorama_end_h = le(body);
+            sw.panorama_fixed_v = le(body);
+            sw.panorama_step_h  = le(body);
+            sw.panorama_count   = le(body);
+            sw.panorama_wait    = le(body);
+            sw.panorama_zoom    = le(body);
+            sw.panorama_fusion  = new QComboBox(body);
+            sw.panorama_fusion->addItem("none");
+            sw.panorama_fusion->addItem("gain");
+            sw.panorama_fusion->addItem("matching");
+            for (QLineEdit *edit : {sw.panorama_start_h, sw.panorama_end_h,
+                                    sw.panorama_fixed_v, sw.panorama_step_h,
+                                    sw.panorama_count, sw.panorama_wait,
+                                    sw.panorama_zoom}) {
+                edit->setFixedWidth(value_w);
+            }
+            sw.panorama_fusion->setFixedWidth(value_w);
+
+            grid->addWidget(lbl(body, "Start H"), 0, 0);
+            grid->addWidget(sw.panorama_start_h, 0, 1, Qt::AlignRight);
+            grid->addWidget(sw.panorama_use_end_h, 1, 0);
+            grid->addWidget(sw.panorama_end_h, 1, 1, Qt::AlignRight);
+            grid->addWidget(lbl(body, "Fixed V"), 2, 0);
+            grid->addWidget(sw.panorama_fixed_v, 2, 1, Qt::AlignRight);
+            grid->addWidget(lbl(body, "Zoom"), 3, 0);
+            grid->addWidget(sw.panorama_zoom, 3, 1, Qt::AlignRight);
+            grid->addWidget(lbl(body, "x"), 3, 2);
+            grid->addWidget(lbl(body, "Step"), 4, 0);
+            grid->addWidget(sw.panorama_step_h, 4, 1, Qt::AlignRight);
+            grid->addWidget(lbl(body, "Stops"), 5, 0);
+            grid->addWidget(sw.panorama_count, 5, 1, Qt::AlignRight);
+            grid->addWidget(lbl(body, "Wait"), 6, 0);
+            grid->addWidget(sw.panorama_wait, 6, 1, Qt::AlignRight);
+            grid->addWidget(lbl(body, "s"), 6, 2);
+            grid->addWidget(lbl(body, "Fusion"), 7, 0);
+            grid->addWidget(sw.panorama_fusion, 7, 1, Qt::AlignRight);
+            grid->addWidget(lbl(body, "Dir"), 8, 0);
+
+            auto *dir_row = new QWidget(body);
+            auto *drl = new QHBoxLayout(dir_row);
+            drl->setContentsMargins(0, 0, 0, 0);
+            drl->setSpacing(6);
+            sw.panorama_cw = new QRadioButton("CW", dir_row);
+            sw.panorama_ccw = new QRadioButton("CCW", dir_row);
+            drl->addWidget(sw.panorama_cw);
+            drl->addWidget(sw.panorama_ccw);
+            drl->addStretch(1);
+            grid->addWidget(dir_row, 8, 1, 1, 2, Qt::AlignLeft);
+
+            bl->addLayout(grid);
+            bl->addStretch(1);
+        }
+
+        grid_row->addStretch(1);
+        panorama_row->addStretch(1);
+
         // ── Action column (90 px) ──────────────────────────────────────────
         {
-            auto *ac  = new QWidget(cw);
+            auto *actions = new QWidget(rows_w);
+            auto *actions_l = new QHBoxLayout(actions);
+            actions_l->setContentsMargins(0, 0, 0, 0);
+            actions_l->setSpacing(6);
+
+            auto *ac  = new QWidget(actions);
             ac->setObjectName("SCAN_ACTION_COL");
             ac->setFixedWidth(90);
             auto *vl  = new QVBoxLayout(ac);
@@ -1225,8 +1446,19 @@ UserPanel::UserPanel(QWidget *parent) :
             vl->addWidget(ui->CONTINUE_SCAN_BUTTON);
             ui->RESTART_SCAN_BUTTON->setParent(ac);
             vl->addWidget(ui->RESTART_SCAN_BUTTON);
-            vl->addStretch(1);
-            cards->addWidget(ac);
+            actions_l->addWidget(ac, 0, Qt::AlignBottom);
+
+            m_scan_panorama_toggle = new QPushButton("Panorama", actions);
+            m_scan_panorama_toggle->setObjectName("SCAN_PANORAMA_PANEL_TOGGLE");
+            m_scan_panorama_toggle->setCheckable(true);
+            m_scan_panorama_toggle->setChecked(false);
+            m_scan_panorama_toggle->setFixedWidth(92);
+            actions_l->addWidget(m_scan_panorama_toggle, 0, Qt::AlignBottom);
+            actions_l->addStretch(1);
+            connect(m_scan_panorama_toggle, &QPushButton::toggled,
+                    this, &UserPanel::set_panorama_panel_visible);
+
+            rows_l->addWidget(actions, 0, Qt::AlignLeft | Qt::AlignBottom);
         }
 
         cards->addStretch(1);
@@ -1326,9 +1558,7 @@ UserPanel::UserPanel(QWidget *parent) :
         if (m_console_panel) m_console_panel->setVisible(!overlay_mode && pbar_checked("PBAR_CONSOLE_BTN"));
         // Panels must sit above side-zone widgets (siblings in CENTRAL's z-order).
         if (!overlay_mode) {
-            if (m_optics_panel)  m_optics_panel ->raise();
-            if (m_tcu_panel)     m_tcu_panel    ->raise();
-            if (m_console_panel) m_console_panel->raise();
+            raise_floating_panels();
         }
         if (setup_mode && m_setup_overlay) {
             m_setup_overlay->raise();
@@ -1340,6 +1570,7 @@ UserPanel::UserPanel(QWidget *parent) :
             const QRect c = ui->CENTRAL->rect();
             m_scan_overlay->setGeometry(c.x(), 40, c.width(), c.height() - 40);
         }
+        if (m_panorama_panel && m_panorama_panel->isVisible()) m_panorama_panel->raise();
     });
 
     // ui->LEFT permanent hide: PARAMS_STATIC + IMG_GRAB_STATIC migrated above;
@@ -1357,9 +1588,7 @@ UserPanel::UserPanel(QWidget *parent) :
     if (m_mapbox)       m_mapbox      ->show();
     // All four side widgets are now CENTRAL children; raise floating panels so
     // they remain above the side-zone widgets in CENTRAL's z-order.
-    if (m_optics_panel)  m_optics_panel ->raise();
-    if (m_tcu_panel)     m_tcu_panel    ->raise();
-    if (m_console_panel) m_console_panel->raise();
+    raise_floating_panels();
 
     ui->DATA_EXCHANGE->document()->setMaximumBlockCount(200);
     ui->DATA_EXCHANGE->setFont(temp_f);
@@ -1419,6 +1648,12 @@ UserPanel::UserPanel(QWidget *parent) :
         if (!ui->ANGLE_H_EDIT->hasFocus()) ui->ANGLE_H_EDIT->setText(h);
         if (!ui->ANGLE_V_EDIT->hasFocus()) ui->ANGLE_V_EDIT->setText(v);
     });
+    connect(m_device_mgr, &DeviceManager::ptz_angle_changed,
+            m_ptz_radar, &PtzRadarWidget::setAngle);
+    if (m_ptz_radar) {
+        m_ptz_radar->setAngle(m_device_mgr->ptz()->get(PTZ::ANGLE_H),
+                              m_device_mgr->ptz()->get(PTZ::ANGLE_V));
+    }
     connect(m_device_mgr, &DeviceManager::ptz_speed_display_changed, this, [this](int val, QString text) {
         ui->PTZ_SPEED_SLIDER->setValue(val);
         if (!text.isEmpty()) ui->PTZ_SPEED_EDIT->setText(text);
@@ -1688,6 +1923,25 @@ UserPanel::UserPanel(QWidget *parent) :
             ui->SCAN_BUTTON->setProperty("scanning", scanning);
             ui->SCAN_BUTTON->style()->unpolish(ui->SCAN_BUTTON);
             ui->SCAN_BUTTON->style()->polish(ui->SCAN_BUTTON);
+        }
+        if (scanning && m_scan_ctrl) {
+            const bool panorama_scan = (m_scan_ctrl->params().ptz_scan_mode == ScanParams::PTZ_SCAN_PANORAMA);
+            if (panorama_scan) {
+                m_panorama_scan_active = true;
+                if (m_panorama_panel) {
+                    m_panorama_panel->setGenerating();
+                    if (m_scan_ctrl->get_scan_ptz_idx() < 0) m_panorama_panel->clearPreview();
+                }
+                set_panorama_panel_visible(true);
+            } else {
+                m_panorama_scan_active = false;
+                if (m_panorama_panel && m_panorama_panel->isVisible()) {
+                    set_panorama_panel_visible(false);
+                }
+            }
+        } else if (m_panorama_scan_active) {
+            m_panorama_scan_active = false;
+            if (m_panorama_panel) m_panorama_panel->setGenerated();
         }
     });
     connect(m_scan_ctrl, &ScanController::scan_options_changed, this, [this](bool cont, bool restart) {
@@ -2064,8 +2318,13 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // Connect PipelineProcessor signals
     // packet_lost_updated: discarded in UI redesign (Sprint 16)
+    qRegisterMetaType<QVector<QRect>>("QVector<QRect>");
     connect(m_pipeline, &PipelineProcessor::update_mcp_in_thread, this, &UserPanel::change_mcp, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::set_hist_pixmap, ui->HIST_DISPLAY, &Display::setPixmap, Qt::QueuedConnection);
+    connect(m_pipeline, &PipelineProcessor::panorama_preview_updated, m_panorama_panel, &PanoramaPanel::setPreviewPixmap, Qt::QueuedConnection);
+    connect(m_pipeline, &PipelineProcessor::main_detection_boxes_updated, this, [this](QVector<QRect> boxes) {
+        m_main_detection_boxes = boxes;
+    }, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::finish_scan_signal, m_scan_ctrl, &ScanController::on_SCAN_BUTTON_clicked, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::save_screenshot_signal, this, [this](QString path) {
         window()->grab().save(path);
@@ -2081,6 +2340,7 @@ UserPanel::UserPanel(QWidget *parent) :
     connect(m_pipeline, &PipelineProcessor::task_queue_full, this, &UserPanel::stop_image_writing, Qt::UniqueConnection);
     connect(m_pipeline, &PipelineProcessor::yolo_status_changed, this, [this](int display_idx, int state) {
         if (m_img_proc) m_img_proc->set_model_status(display_idx, state);
+        if (display_idx == 0 && state != 1) m_main_detection_boxes.clear();
     }, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::recorder_finalized, this,
             [this](int display_idx, int kind, QString temp_path) {
@@ -2193,7 +2453,7 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // serial_port/tcp_port creation → DeviceManager
 
-    // connect ptz targeting slots (moved to signal updated_pos)
+    // PTZ targeting is handled by SOURCE_DISPLAY::ptz_target double-click wiring above.
 //    connect(ui->SOURCE_DISPLAY, SIGNAL(ptz_target(QPoint)), this, SLOT(point_ptz_to_target(QPoint)));
 
     // init ui
@@ -3832,6 +4092,16 @@ void UserPanel::syncPreferencesToConfig()
 void UserPanel::syncConfigToPreferences()
 {
     const Config::ConfigData& data = config->get_data();
+    if (m_ptz_radar) m_ptz_radar->setZeroAngle(data.device.ptz_zero_angle_h);
+    if (m_scan_ctrl) {
+        ScanParams &sp = m_scan_ctrl->params();
+        sp.panorama_zoom_fov.clear();
+        for (const Config::ZoomFovPoint &pt : data.panorama_optics.zoom_fov) {
+            sp.panorama_zoom_fov.push_back(PanoramaZoomFovPoint(pt.zoom, pt.focal_length_mm, pt.fov_h, pt.fov_v));
+        }
+        update_panorama_fov_from_zoom(sp);
+        if (m_scan_overlay) m_scan_overlay->loadFromParams();
+    }
 
     // Sync COM settings to UI
 #ifdef WIN32
@@ -4836,6 +5106,13 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     qInfo("display region x: %d, y: %d, w: %d, h: %d", region.x(), region.y(), region.width(), region.height());
     m_router.display(DisplayId::Main).paint_mutex.unlock();
 
+    position_panorama_panel();
+    if (!any_overlay) {
+        raise_floating_panels();
+    } else if (m_panorama_panel && m_panorama_panel->isVisible()) {
+        m_panorama_panel->raise();
+    }
+
     update_processing_params();
     event->accept();
 }
@@ -5538,6 +5815,12 @@ static inline bool ffmpeg_session_stale(FfmpegSource* src, int session) {
     return !src || src->current_session() != session;
 }
 
+static inline bool is_network_video_url(const QString& url) {
+    return url.startsWith("rtsp://", Qt::CaseInsensitive) ||
+           url.startsWith("http://", Qt::CaseInsensitive) ||
+           url.startsWith("https://", Qt::CaseInsensitive);
+}
+
 void UserPanel::on_ffmpeg_opened(StreamId target, int session, FfmpegSource::VideoInfo info)
 {
     if (target == StreamId::None) return;
@@ -5573,9 +5856,23 @@ void UserPanel::on_ffmpeg_failed(StreamId target, int session, QString reason)
     if (target == StreamId::None) return;
     const int display_idx = static_cast<int>(target);
     if (ffmpeg_session_stale(m_ffmpeg[display_idx], session)) return;
+    const QString url = m_ffmpeg[display_idx]->current_url();
+    const bool format_gray = m_ffmpeg[display_idx]->current_format_gray();
+    const bool restart_network_stream = reason == "read_failed" && is_network_video_url(url);
     set_source_dead_overlay(m_router.display_for(target), true);
     m_router.stream(target).frames.close();
     m_router.stream(target).frame_info.close();
+    if (restart_network_stream) {
+        QTimer::singleShot(800, this, [this, target, session, display_idx, url, format_gray]() {
+            if (display_idx < 0 || display_idx >= kStreamCount || !m_ffmpeg[display_idx]) return;
+            if (ffmpeg_session_stale(m_ffmpeg[display_idx], session)) return;
+            if (m_ffmpeg[display_idx]->is_stopped()) return;
+            if (m_ffmpeg[display_idx]->current_url() != url) return;
+            qDebug() << "[FfmpegSource] reconnecting network stream:"
+                     << static_cast<int>(target) << "session=" << session << url;
+            m_ffmpeg[display_idx]->start(target, url, format_gray);
+        });
+    }
 }
 
 void UserPanel::on_ffmpeg_finished(StreamId target, int session)

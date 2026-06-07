@@ -6,6 +6,8 @@
 #include <QMutexLocker>
 #include <QString>
 #include <QPixmap>
+#include <QRect>
+#include <QVector>
 #include <vector>
 #include <opencv2/core.hpp>
 #ifdef LVTONG
@@ -47,6 +49,35 @@ struct PipelineGlobals {
     ThreadPool*     tp                = nullptr;
 };
 
+struct PanoramaCanvas {
+    cv::Mat accum;
+    cv::Mat weights;
+    std::vector<double> angles;
+    double left_deg = 0.0;
+    double extent_deg = 0.0;
+    double px_per_deg = 0.0;
+    float fov_h = 0.0f;
+    int target_width = 0;
+    int canvas_width = 0;
+    int canvas_height = 0;
+    int route_size = 0;
+
+    void reset()
+    {
+        accum.release();
+        weights.release();
+        angles.clear();
+        left_deg = 0.0;
+        extent_deg = 0.0;
+        px_per_deg = 0.0;
+        fov_h = 0.0f;
+        target_width = 0;
+        canvas_width = 0;
+        canvas_height = 0;
+        route_size = 0;
+    }
+};
+
 class PipelineProcessor : public QObject
 {
     Q_OBJECT
@@ -63,6 +94,8 @@ signals:
     void packet_lost_updated(int packets_lost);
     void update_mcp_in_thread(int new_mcp);
     void set_hist_pixmap(QPixmap pm);
+    void panorama_preview_updated(QPixmap pm);
+    void main_detection_boxes_updated(QVector<QRect> boxes);
     void finish_scan_signal();
     void save_screenshot_signal(QString path);
     void update_delay_in_thread();
@@ -110,14 +143,28 @@ private:
     void render_and_display(StreamSlot& stream, DisplaySlot& display,
         const ProcessingParams& params, const PipelineConfig& pcfg,
         const std::vector<YoloResult>& yolo_results,
-        double is_net, int ww, int hh, int _w, int _h, float weight,
+        bool updated, double is_net, int ww, int hh, int _w, int _h, float weight,
         const QString& info_tcu, const QString& info_time);
     // Main-display-only. Walks main + alt1 in lockstep; needs router for alt1.
     void advance_scan_main(DisplayRouter& router,
         StreamSlot& main_stream, DisplaySlot& main_display,
         bool updated, const PipelineConfig& pcfg,
         int& scan_img_count,
-        QString& scan_save_path_a, QString& scan_save_path);
+        QString& scan_save_path_a, QString& scan_save_path,
+        PanoramaCanvas& panorama_canvas,
+        qint64& panorama_position_started_ms);
+    void advance_panorama_scan_main(DisplayRouter& router,
+        StreamSlot& main_stream, DisplaySlot& main_display,
+        const PipelineConfig& pcfg,
+        int& scan_img_count,
+        QString& scan_save_path,
+        PanoramaCanvas& panorama_canvas,
+        qint64& panorama_position_started_ms);
+    void append_panorama_preview(DisplaySlot& main_display,
+        int ptz_idx, const std::vector<std::pair<float, float>>& route,
+        PanoramaCanvas& panorama_canvas);
+    void save_panorama_preview(const PanoramaCanvas& panorama_canvas,
+        const PipelineConfig& pcfg);
     void record_frame(StreamSlot& stream, DisplaySlot& display,
         bool updated, const ProcessingParams& params, const PipelineConfig& pcfg,
         double is_net,

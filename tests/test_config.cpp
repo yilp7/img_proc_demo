@@ -36,6 +36,18 @@ private slots:
 
         // Device defaults
         QCOMPARE(d.device.ptz_type, 0);
+        QCOMPARE(d.device.ptz_zero_angle_h, 0.0f);
+
+        // Panorama optics defaults
+        QCOMPARE(static_cast<int>(d.panorama_optics.zoom_fov.size()), 2);
+        QCOMPARE(d.panorama_optics.zoom_fov[0].zoom, 1.0f);
+        QCOMPARE(d.panorama_optics.zoom_fov[0].focal_length_mm, 10.0f);
+        QCOMPARE(d.panorama_optics.zoom_fov[0].fov_h, 38.4f);
+        QCOMPARE(d.panorama_optics.zoom_fov[0].fov_v, 22.5f);
+        QCOMPARE(d.panorama_optics.zoom_fov[1].zoom, 86.0f);
+        QCOMPARE(d.panorama_optics.zoom_fov[1].focal_length_mm, 860.0f);
+        QCOMPARE(d.panorama_optics.zoom_fov[1].fov_h, 0.49f);
+        QCOMPARE(d.panorama_optics.zoom_fov[1].fov_v, 0.28f);
 
         // YOLO defaults
         QCOMPARE(d.yolo.config_path, QString("yolo_config.ini"));
@@ -56,6 +68,10 @@ private slots:
         config1.get_data().ui.dark_theme = false;
         config1.get_data().camera.frequency = 30;
         config1.get_data().tcu.type = 2;
+        config1.get_data().device.ptz_zero_angle_h = 123.5f;
+        config1.get_data().panorama_optics.zoom_fov.clear();
+        config1.get_data().panorama_optics.zoom_fov.push_back(Config::ZoomFovPoint(1.0f, 12.0f, 40.0f, 24.0f));
+        config1.get_data().panorama_optics.zoom_fov.push_back(Config::ZoomFovPoint(50.0f, 600.0f, 0.8f, 0.45f));
         QVERIFY(config1.save_to_file(tmpFile));
 
         // Load into a fresh config
@@ -69,6 +85,14 @@ private slots:
         QCOMPARE(d.ui.dark_theme, false);
         QCOMPARE(d.camera.frequency, 30);
         QCOMPARE(d.tcu.type, 2);
+        QCOMPARE(d.device.ptz_zero_angle_h, 123.5f);
+        QCOMPARE(static_cast<int>(d.panorama_optics.zoom_fov.size()), 2);
+        QCOMPARE(d.panorama_optics.zoom_fov[0].zoom, 1.0f);
+        QCOMPARE(d.panorama_optics.zoom_fov[0].focal_length_mm, 12.0f);
+        QCOMPARE(d.panorama_optics.zoom_fov[0].fov_h, 40.0f);
+        QCOMPARE(d.panorama_optics.zoom_fov[1].zoom, 50.0f);
+        QCOMPARE(d.panorama_optics.zoom_fov[1].focal_length_mm, 600.0f);
+        QCOMPARE(d.panorama_optics.zoom_fov[1].fov_v, 0.45f);
     }
 
     // TC-CF-003: Partial JSON - missing fields preserve defaults
@@ -106,6 +130,9 @@ private slots:
         QCOMPARE(d.tcu.ab_lock, true);
         QCOMPARE(d.tcu.max_dist, 15000.0f);
         QCOMPARE(d.device.ptz_type, 0);
+        QCOMPARE(d.device.ptz_zero_angle_h, 0.0f);
+        QCOMPARE(static_cast<int>(d.panorama_optics.zoom_fov.size()), 2);
+        QCOMPARE(d.panorama_optics.zoom_fov[0].fov_h, 38.4f);
         QCOMPARE(d.yolo.config_path, QString("yolo_config.ini"));
     }
 
@@ -203,6 +230,7 @@ private slots:
         config.get_data().tcu.ab_lock = false;
         config.get_data().tcu.max_dist = 9999.0f;
         config.get_data().device.ptz_type = 2;
+        config.get_data().device.ptz_zero_angle_h = 210.0f;
         config.get_data().yolo.config_path = "other.ini";
 
         // Reset to defaults
@@ -220,6 +248,7 @@ private slots:
         QCOMPARE(d.tcu.ab_lock, true);
         QCOMPARE(d.tcu.max_dist, 15000.0f);
         QCOMPARE(d.device.ptz_type, 0);
+        QCOMPARE(d.device.ptz_zero_angle_h, 0.0f);
         QCOMPARE(d.yolo.config_path, QString("yolo_config.ini"));
     }
 
@@ -329,6 +358,7 @@ private slots:
         config1.get_data().device.flip = 2;
         config1.get_data().device.rotation = 90;
         config1.get_data().device.pixel_type = 1;
+        config1.get_data().device.ptz_zero_angle_h = 315.25f;
         QVERIFY(config1.save_to_file(tmpFile));
 
         Config config2;
@@ -336,6 +366,7 @@ private slots:
         QCOMPARE(config2.get_data().device.flip, 2);
         QCOMPARE(config2.get_data().device.rotation, 90);
         QCOMPARE(config2.get_data().device.pixel_type, 1);
+        QCOMPARE(config2.get_data().device.ptz_zero_angle_h, 315.25f);
     }
 
     // TC-CF-013: ImageProcSettings defaults preserved on partial JSON

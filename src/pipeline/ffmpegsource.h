@@ -50,7 +50,10 @@ public:
     void mark_display_ready(int session);
 
     bool is_running() const { return m_running.load(); }
+    bool is_stopped() const { return m_stopped.load(); }
     StreamId target() const { return m_target; }
+    QString current_url() const { return m_url; }
+    bool current_format_gray() const { return m_format_gray; }
     // Monotonic session counter. Bumped on every start(); worker captures the
     // value at thread launch and tags every emit. Receivers drop signals
     // whose session != current_session(), so events from a stop()ped worker
@@ -71,10 +74,13 @@ private:
 
     std::atomic<bool> m_should_stop {false};
     std::atomic<bool> m_running     {false};
+    std::atomic<bool> m_stopped     {true};
     std::atomic<int>  m_session     {0};
     std::atomic<int>  m_ready_session {0};
     std::thread       m_thread;
     StreamId          m_target = StreamId::None;
+    QString           m_url;
+    bool              m_format_gray = false;
 };
 
 Q_DECLARE_METATYPE(FfmpegSource::VideoInfo)

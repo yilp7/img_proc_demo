@@ -461,20 +461,20 @@ void DeviceManager::vid_camera_pressed(int operation)
 {
     if (!p_udpptz || !p_udpptz->is_connected()) return;
     emit vid_camera_btn_text(operation, "x");
-    p_udpptz->emit transmit_data(operation);
+    p_udpptz->emit transmit(operation);
 }
 
 void DeviceManager::vid_camera_released()
 {
     if (!p_udpptz || !p_udpptz->is_connected()) return;
     emit vid_camera_buttons_reset();
-    p_udpptz->emit transmit_data(UDPPTZ::STOP);
+    p_udpptz->emit transmit(UDPPTZ::STOP);
 }
 
 void DeviceManager::vid_defog_toggled(bool checked)
 {
     if (!p_udpptz || !p_udpptz->is_connected()) return;
-    p_udpptz->emit transmit_data(checked ? UDPPTZ::VL_DEFOG_ON : UDPPTZ::VL_DEFOG_OFF);
+    p_udpptz->emit transmit(checked ? UDPPTZ::VL_DEFOG_ON : UDPPTZ::VL_DEFOG_OFF);
     emit vid_btn_style_changed("VL_DEFOG_BTN", checked ? "background-color: #5B8C5B;" : "");
 }
 
@@ -493,34 +493,34 @@ void DeviceManager::vid_ir_power_toggled(bool checked)
         }
     }
 
-    p_udpptz->emit transmit_data(checked ? UDPPTZ::IR_POWER_ON : UDPPTZ::IR_POWER_OFF);
+    p_udpptz->emit transmit(checked ? UDPPTZ::IR_POWER_ON : UDPPTZ::IR_POWER_OFF);
     emit vid_btn_style_changed("IR_POWER_BTN", checked ? "background-color: #5B8C5B;" : "");
 }
 
 void DeviceManager::vid_ir_auto_focus_clicked()
 {
     if (!p_udpptz || !p_udpptz->is_connected()) return;
-    p_udpptz->emit transmit_data(UDPPTZ::IR_AUTO_FOCUS);
+    p_udpptz->emit transmit(UDPPTZ::IR_AUTO_FOCUS);
 }
 
 void DeviceManager::vid_ldm_toggled(bool checked)
 {
     if (!p_udpptz || !p_udpptz->is_connected()) return;
-    p_udpptz->emit transmit_data(checked ? UDPPTZ::LASER_ON : UDPPTZ::LASER_OFF);
+    p_udpptz->emit transmit(checked ? UDPPTZ::LASER_ON : UDPPTZ::LASER_OFF);
     emit vid_btn_style_changed("LDM_BTN", checked ? "background-color: #5B8C5B;" : "");
 }
 
 void DeviceManager::vid_video_source_toggled(bool checked)
 {
     if (!p_udpptz || !p_udpptz->is_connected()) return;
-    p_udpptz->emit transmit_data(checked ? UDPPTZ::SWITCH_IR : UDPPTZ::SWITCH_VL);
+    p_udpptz->emit transmit(checked ? UDPPTZ::SWITCH_IR : UDPPTZ::SWITCH_VL);
     emit vid_btn_text_changed("VIDEO_SOURCE_BTN", checked ? "Switch to VL" : "Switch to IR");
 }
 
 void DeviceManager::vid_osd_toggled(bool checked)
 {
     if (!p_udpptz || !p_udpptz->is_connected()) return;
-    p_udpptz->emit transmit_data(checked ? UDPPTZ::OSD_FULL : UDPPTZ::OSD_HIDE);
+    p_udpptz->emit transmit(checked ? UDPPTZ::OSD_FULL : UDPPTZ::OSD_HIDE);
     emit vid_btn_style_changed("OSD_BTN", checked ? "background-color: #5B8C5B;" : "");
 }
 

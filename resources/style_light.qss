@@ -261,6 +261,31 @@ QPushButton::menu-indicator {
     image: none;
 }
 
+#FloatingPanelReset {
+    background-color: transparent;
+    color: #4D463E;
+    border: none;
+    border-radius: 2px;
+    font-size: 9px;
+}
+
+#FloatingPanelReset:hover {
+    background-color: #E5D1B2;
+    color: #180D1C;
+}
+
+#PANORAMA_RESIZE_HANDLE {
+    background-color: transparent;
+    border-right: 2px solid #877B6E;
+    border-bottom: 2px solid #877B6E;
+}
+
+#PANORAMA_RESIZE_HANDLE:hover {
+    background-color: #E5D1B2;
+    border-right: 2px solid #223C50;
+    border-bottom: 2px solid #223C50;
+}
+
 /* checkbox */
 .QCheckBox, .QRadioButton {
     color: #180D1C;

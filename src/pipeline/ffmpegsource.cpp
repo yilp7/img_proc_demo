@@ -1,5 +1,6 @@
 #include "ffmpegsource.h"
 
+#include <cerrno>
 #include <cmath>
 #include <ctime>
 #include <memory>
@@ -29,6 +30,14 @@ int ffmpeg_interrupt(void* opaque) {
     // stop.
     if (ctx->last_activity > 0 && time(NULL) - ctx->last_activity > 30) return 1;
     return 0;
+}
+
+bool is_transient_read_error(int err) {
+    return err == AVERROR(EAGAIN);
+}
+
+bool is_connection_reset_error(int err) {
+    return err == -10054 || err == AVERROR(ECONNRESET);
 }
 
 void init_filter_graph(AVFormatContext* format_context, int video_stream_idx,
@@ -93,7 +102,10 @@ void FfmpegSource::start(StreamId target, QString url, bool format_gray) {
     m_should_stop.store(false);
     m_ready_session.store(0);
     m_running.store(true);
+    m_stopped.store(false);
     m_target = target;
+    m_url = url;
+    m_format_gray = format_gray;
     qDebug() << "[FfmpegSource] start: target=" << static_cast<int>(target)
              << "session=" << session << "url=" << url;
     m_thread = std::thread(&FfmpegSource::run_thread, this, target, session, url, format_gray);
@@ -107,6 +119,7 @@ void FfmpegSource::stop(int timeout_ms) {
     const bool was_joinable = m_thread.joinable();
     if (was_joinable) qDebug() << "[FfmpegSource] stop: joining previous worker";
     m_should_stop = true;
+    m_stopped = true;
     if (m_thread.joinable()) {
         // The worker checks m_should_stop after each av_read_frame and at
         // every decoded frame, and the interrupt callback aborts blocking
@@ -314,13 +327,37 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
     long long  delay;
     QElapsedTimer elapsed_timer;
     int result;
+    int read_error_count = 0;
+    const bool is_network_stream = is_rtsp_stream || is_http_stream;
 
     while (!m_should_stop.load()) {
         interrupt_ctx.last_activity = time(NULL);
         if ((result = av_read_frame(format_context, &packet)) < 0) {
             if (result == AVERROR_EOF) break;
+            if (is_transient_read_error(result)) {
+                QThread::msleep(2);
+                continue;
+            }
+            if (is_network_stream) {
+                ++read_error_count;
+                if (is_connection_reset_error(result) || read_error_count >= 20) {
+                    char errbuf[AV_ERROR_MAX_STRING_SIZE] = {0};
+                    av_strerror(result, errbuf, sizeof(errbuf));
+                    qDebug() << "[FfmpegSource] network read failed: target="
+                             << static_cast<int>(target)
+                             << "session=" << session
+                             << "err=" << result
+                             << errbuf
+                             << "count=" << read_error_count;
+                    finish(false, "read_failed");
+                    return;
+                }
+                QThread::msleep(10);
+                continue;
+            }
             continue;
         }
+        read_error_count = 0;
 
         std::shared_ptr<AVPacket> deleter_packet(&packet, av_packet_unref);
 

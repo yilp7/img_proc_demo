@@ -95,6 +95,11 @@ bool Config::load_from_file(const QString &filepath)
         m_data.save = save_settings_from_json(root["save"]);
     }
 
+    // Load panorama optics calibration
+    if (root.contains("panorama_optics") && root["panorama_optics"].is_object()) {
+        m_data.panorama_optics = panorama_optics_settings_from_json(root["panorama_optics"]);
+    }
+
     // Load image processing settings
     if (root.contains("image_proc") && root["image_proc"].is_object()) {
         m_data.image_proc = image_proc_settings_from_json(root["image_proc"]);
@@ -140,6 +145,9 @@ bool Config::save_to_file(const QString &filepath) const
 
     // Save save settings
     root["save"] = save_settings_to_json(m_data.save);
+
+    // Save panorama optics calibration
+    root["panorama_optics"] = panorama_optics_settings_to_json(m_data.panorama_optics);
 
     // Save image processing settings
     root["image_proc"] = image_proc_settings_to_json(m_data.image_proc);
@@ -362,6 +370,7 @@ nlohmann::json Config::device_settings_to_json(const DeviceSettings &settings) c
     obj["ebus"] = settings.ebus;
     obj["share_tcu_port"] = settings.share_tcu_port;
     obj["ptz_type"] = settings.ptz_type;
+    obj["ptz_zero_angle_h"] = static_cast<double>(settings.ptz_zero_angle_h);
     obj["rotation"] = settings.rotation;
     obj["pixel_type"] = settings.pixel_type;
     return obj;
@@ -388,6 +397,9 @@ Config::DeviceSettings Config::device_settings_from_json(const nlohmann::json &o
     }
     if (obj.contains("ptz_type") && obj["ptz_type"].is_number()) {
         settings.ptz_type = obj["ptz_type"].get<int>();
+    }
+    if (obj.contains("ptz_zero_angle_h") && obj["ptz_zero_angle_h"].is_number()) {
+        settings.ptz_zero_angle_h = static_cast<float>(obj["ptz_zero_angle_h"].get<double>());
     }
     if (obj.contains("rotation") && obj["rotation"].is_number()) {
         settings.rotation = obj["rotation"].get<int>();
@@ -431,6 +443,48 @@ Config::SaveSettings Config::save_settings_from_json(const nlohmann::json &obj) 
     if (obj.contains("img_format") && obj["img_format"].is_number()) {
         settings.img_format = obj["img_format"].get<int>();
     }
+    return settings;
+}
+
+nlohmann::json Config::panorama_optics_settings_to_json(const PanoramaOpticsSettings &settings) const
+{
+    nlohmann::json obj;
+    nlohmann::json zoomFovArray = nlohmann::json::array();
+    for (const ZoomFovPoint &pt : settings.zoom_fov) {
+        nlohmann::json item;
+        item["zoom"] = static_cast<double>(pt.zoom);
+        item["focal_length_mm"] = static_cast<double>(pt.focal_length_mm);
+        item["fov_h"] = static_cast<double>(pt.fov_h);
+        item["fov_v"] = static_cast<double>(pt.fov_v);
+        zoomFovArray.push_back(item);
+    }
+    obj["zoom_fov"] = zoomFovArray;
+    return obj;
+}
+
+Config::PanoramaOpticsSettings Config::panorama_optics_settings_from_json(const nlohmann::json &obj) const
+{
+    PanoramaOpticsSettings settings;
+    if (!obj.contains("zoom_fov") || !obj["zoom_fov"].is_array()) return settings;
+
+    std::vector<ZoomFovPoint> points;
+    for (const auto &item : obj["zoom_fov"]) {
+        if (!item.is_object()) continue;
+        if (!item.contains("zoom") || !item.contains("fov_h") || !item.contains("fov_v")) continue;
+        if (!item["zoom"].is_number() || !item["fov_h"].is_number() || !item["fov_v"].is_number()) continue;
+
+        const float zoom = static_cast<float>(item["zoom"].get<double>());
+        float focal_length_mm = zoom * 10.0f;
+        if (item.contains("focal_length_mm") && item["focal_length_mm"].is_number()) {
+            focal_length_mm = static_cast<float>(item["focal_length_mm"].get<double>());
+        }
+        const float fov_h = static_cast<float>(item["fov_h"].get<double>());
+        const float fov_v = static_cast<float>(item["fov_v"].get<double>());
+        if (zoom <= 0.0f || focal_length_mm <= 0.0f || fov_h <= 0.0f || fov_v <= 0.0f) continue;
+        points.push_back(ZoomFovPoint(zoom, focal_length_mm, fov_h, fov_v));
+    }
+
+    if (!points.empty()) settings.zoom_fov = points;
     return settings;
 }
 
