@@ -117,6 +117,9 @@ void ScanOverlay::bind(ScanController *ctrl, const Widgets &w)
 
     if (m_w.mode_grid)     connect(m_w.mode_grid,     &QRadioButton::clicked, this, &ScanOverlay::on_mode_grid);
     if (m_w.mode_panorama) connect(m_w.mode_panorama, &QRadioButton::clicked, this, &ScanOverlay::on_mode_panorama);
+    if (m_w.enable_delay) connect(m_w.enable_delay, &QCheckBox::toggled, this, &ScanOverlay::on_grid_section_toggled);
+    if (m_w.enable_gate)  connect(m_w.enable_gate,  &QCheckBox::toggled, this, &ScanOverlay::on_grid_section_toggled);
+    if (m_w.enable_ptz)   connect(m_w.enable_ptz,   &QCheckBox::toggled, this, &ScanOverlay::on_grid_section_toggled);
 
     auto panorama_edits = {
         m_w.panorama_start_h, m_w.panorama_end_h, m_w.panorama_fixed_v,
@@ -147,6 +150,9 @@ void ScanOverlay::loadFromParams()
     if (!m_ctrl) return;
     ScanParams &p = m_ctrl->params();
     update_panorama_fov_from_zoom(p);
+
+    if (!p.scan_delay_enabled && !p.scan_gate_width_enabled && !p.scan_ptz_enabled)
+        p.scan_ptz_enabled = true;
 
     auto setT = [](QLineEdit *e, const QString &s) { if (e) e->setText(s); };
     auto setI = [&setT](QLineEdit *e, int v)       { setT(e, QString::number(v)); };
@@ -180,6 +186,15 @@ void ScanOverlay::loadFromParams()
     if (m_w.capture_res) m_w.capture_res->setChecked(p.capture_scan_res);
     if (m_w.record_ori)  m_w.record_ori ->setChecked(p.record_scan_ori);
     if (m_w.record_res)  m_w.record_res ->setChecked(p.record_scan_res);
+
+    auto setCheckedBlocked = [](QCheckBox *box, bool checked) {
+        if (!box) return;
+        QSignalBlocker blocker(box);
+        box->setChecked(checked);
+    };
+    setCheckedBlocked(m_w.enable_delay, p.scan_delay_enabled);
+    setCheckedBlocked(m_w.enable_gate,  p.scan_gate_width_enabled);
+    setCheckedBlocked(m_w.enable_ptz,   p.scan_ptz_enabled);
 
     setF(m_w.start_h, p.starting_h);
     setF(m_w.start_v, p.starting_v);
@@ -430,6 +445,31 @@ void ScanOverlay::on_mode_panorama()
     update_mode_enabled();
 }
 
+void ScanOverlay::on_grid_section_toggled()
+{
+    if (!m_ctrl) return;
+
+    bool delay_enabled = m_w.enable_delay && m_w.enable_delay->isChecked();
+    bool gate_enabled = m_w.enable_gate && m_w.enable_gate->isChecked();
+    bool ptz_enabled = m_w.enable_ptz && m_w.enable_ptz->isChecked();
+    if (!delay_enabled && !gate_enabled && !ptz_enabled) {
+        QCheckBox *changed = qobject_cast<QCheckBox*>(sender());
+        if (changed) {
+            QSignalBlocker blocker(changed);
+            changed->setChecked(true);
+        }
+        delay_enabled = m_w.enable_delay && m_w.enable_delay->isChecked();
+        gate_enabled = m_w.enable_gate && m_w.enable_gate->isChecked();
+        ptz_enabled = m_w.enable_ptz && m_w.enable_ptz->isChecked();
+    }
+
+    ScanParams &p = m_ctrl->params();
+    p.scan_delay_enabled = delay_enabled;
+    p.scan_gate_width_enabled = gate_enabled;
+    p.scan_ptz_enabled = ptz_enabled;
+    update_mode_enabled();
+}
+
 void ScanOverlay::on_panorama_edit()
 {
     if (!m_ctrl) return;
@@ -514,7 +554,8 @@ void ScanOverlay::update_mode_enabled()
 {
     if (!m_ctrl) return;
 
-    const bool grid_mode = (m_ctrl->params().ptz_scan_mode == ScanParams::PTZ_SCAN_GRID);
+    const ScanParams &p = m_ctrl->params();
+    const bool grid_mode = (p.ptz_scan_mode == ScanParams::PTZ_SCAN_GRID);
     const bool panorama_mode = !grid_mode;
 
     auto set_enabled = [](QWidget *w, bool enabled) {
@@ -526,6 +567,9 @@ void ScanOverlay::update_mode_enabled()
     set_enabled(m_w.grid_ptz_card, grid_mode);
     set_enabled(m_w.grid_capture_card, grid_mode);
     set_enabled(m_w.panorama_card, panorama_mode);
+    set_enabled(m_w.grid_delay_body, grid_mode && p.scan_delay_enabled);
+    set_enabled(m_w.grid_gate_body, grid_mode && p.scan_gate_width_enabled);
+    set_enabled(m_w.grid_ptz_body, grid_mode && p.scan_ptz_enabled);
 
     if (m_w.mode_grid) m_w.mode_grid->setEnabled(true);
     if (m_w.mode_panorama) m_w.mode_panorama->setEnabled(true);

@@ -79,9 +79,15 @@ public:
         QRadioButton *dir_z         = nullptr;
         QRadioButton *mode_grid     = nullptr;
         QRadioButton *mode_panorama = nullptr;
+        QCheckBox  *enable_delay    = nullptr;
+        QCheckBox  *enable_gate     = nullptr;
+        QCheckBox  *enable_ptz      = nullptr;
         QWidget    *grid_delay_card = nullptr;
         QWidget    *grid_gate_card  = nullptr;
         QWidget    *grid_ptz_card   = nullptr;
+        QWidget    *grid_delay_body = nullptr;
+        QWidget    *grid_gate_body  = nullptr;
+        QWidget    *grid_ptz_body   = nullptr;
         QWidget    *grid_capture_card = nullptr;
         QWidget    *panorama_card   = nullptr;
         QLineEdit  *panorama_start_h = nullptr;
@@ -145,6 +151,7 @@ private slots:
     void on_num_single_pos_edit();
     void on_mode_grid();
     void on_mode_panorama();
+    void on_grid_section_toggled();
     void on_panorama_edit();
     void on_panorama_cw();
     void on_panorama_ccw();

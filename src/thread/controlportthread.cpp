@@ -1,6 +1,23 @@
 #include "controlportthread.h"
 // #include "userpanel.h"
 
+#include <QLabel>
+#include <QStyle>
+
+namespace {
+void setPortLabelState(QLabel *label, bool connected)
+{
+    if (!label) return;
+    label->setProperty("portState", connected ? "connected" : "error");
+    label->setProperty("portNetwork", "false");
+    if (label->style()) {
+        label->style()->unpolish(label);
+        label->style()->polish(label);
+    }
+    label->update();
+}
+}
+
 ControlPortThread::ControlPortThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon, QObject *parent) :
     QThread{parent},
     thread_interrupt(false),
@@ -71,7 +88,7 @@ void ControlPortThread::setup_serial_port()
         serial_port->clear();
         qDebug("%s connected", qPrintable(port_name));
 //        connected_to_serial = true;
-        lbl->setStyleSheet(app_theme ? "color: #180D1C;" : "color: #B0C4DE;");
+        setPortLabelState(lbl, true);
 
         serial_port->setBaudRate(baudrate);
         serial_port->setDataBits(QSerialPort::Data8);
@@ -96,7 +113,7 @@ void ControlPortThread::setup_serial_port()
     }
     else {
         connected_to_serial = false;
-        lbl->setStyleSheet("color: #CD5C5C;");
+        setPortLabelState(lbl, false);
     }
     // COM port changes will be saved to JSON config when user saves configuration
 }
@@ -256,9 +273,9 @@ int ControlPortThread::get_port_status()
            (connected_to_serial ? PortStatus::SERIAL_CONNECTED : PortStatus::NOT_CONNECTED);
 }
 
-void ControlPortThread::set_theme()
+void ControlPortThread::apply_color_mode()
 {
-    lbl->setStyleSheet(connected_to_serial ? (app_theme ? "color: #180D1C;" : "color: #B0C4DE;") : "color: #CD5C5C;");
+    setPortLabelState(lbl, connected_to_serial);
 }
 
 void ControlPortThread::quit_thread()

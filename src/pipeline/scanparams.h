@@ -43,6 +43,12 @@ struct ScanParams {
     int   frame_count      = 1;
     float rep_freq         = 10;
 
+    // Grid scan dimensions. Disabled dimensions retain the device value that
+    // is active when the scan starts.
+    bool  scan_delay_enabled = true;
+    bool  scan_gate_width_enabled = true;
+    bool  scan_ptz_enabled = true;
+
     // Capture / record
     bool  capture_scan_ori = true;
     bool  capture_scan_res = false;
@@ -89,6 +95,7 @@ struct ScanParams {
 std::vector<std::pair<float, float>> get_ptz_route(const ScanParams &p);
 std::vector<std::pair<float, float>> get_panorama_route(const ScanParams &p);
 std::vector<float>                   get_tcu_route(const ScanParams &p);
+std::vector<float>                   get_gate_width_route(const ScanParams &p);
 std::pair<float, float>              get_panorama_fov(float zoom, const std::vector<PanoramaZoomFovPoint> &points);
 void                                 update_panorama_fov_from_zoom(ScanParams &p);
 float                                get_panorama_sweep_degrees(const ScanParams &p);

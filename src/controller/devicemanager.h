@@ -60,7 +60,10 @@ public:
     void send_ptz_angle(float h, float v);
     void send_ptz_angle_h(float h);
     void send_ptz_angle_v(float v);
+    void ptz_move_velocity(float h_velocity, float v_velocity);
     void point_ptz_to_target(QPoint target, int display_width, int display_height);
+    float to_display_ptz_angle_h(float device_angle) const;
+    float to_device_ptz_angle_h(float display_angle) const;
     float get_angle_h() const { return angle_h.load(); }
     float get_angle_v() const { return angle_v.load(); }
     void set_angle_h(float h) { angle_h.store(h); }
@@ -90,6 +93,7 @@ public slots:
     void vid_camera_released();
     void vid_defog_toggled(bool checked);
     void vid_ir_power_toggled(bool checked);
+    void apply_vid_ir_power_state(bool checked);
     void vid_ir_auto_focus_clicked();
     void vid_ldm_toggled(bool checked);
     void vid_video_source_toggled(bool checked);

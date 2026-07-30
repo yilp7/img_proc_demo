@@ -1,48 +1,48 @@
 /* ============================================================
- * GLI User Panel — Dark Theme (prototype v3)
- * Sprint 20: ports prototype.html :root tokens to QSS literals.
+ * GLI User Panel - Dark Theme (prototype v3)
+ * Theme template: token placeholders are resolved at runtime.
  * ============================================================
  *
  * Color tokens (prototype.html v3 :root)
  *
  * Surfaces
- *   bg-deepest    #040303    bg-base       #080707
- *   bg-raised     #12100E    bg-elevated   #1C1815
- *   bg-header     #261B14    bg-header-end #12100E
- *   bg-active     #2E221A
+ *   bg-deepest    ${bg-deepest}    bg-base       ${bg-base}
+ *   bg-raised     ${bg-raised}    bg-elevated   ${bg-elevated}
+ *   bg-header     ${bg-header}    bg-header-end ${bg-raised}
+ *   bg-active     ${bg-active}
  *
  * Borders
- *   border-subtle #241E1A    border-default #382D25
- *   border-strong #8F6B4D
+ *   border-subtle ${border-subtle}    border-default ${border-default}
+ *   border-strong ${border-strong}
  *
  * Text
- *   text-primary   #F5E1CE   text-secondary #CDB299
- *   text-muted     #8A7461   text-dim       #5C4A3D
- *   text-ghost     #3D2E24
+ *   text-primary   ${text-primary}   text-secondary ${text-secondary}
+ *   text-muted     ${text-muted}   text-dim       ${text-dim}
+ *   text-ghost     ${text-ghost}
  *
  * Accent
- *   accent #E0924A   accent-muted #9E612B
- *   accent-glow-33 #E0924A55
+ *   accent ${accent}   accent-muted ${accent-muted}
+ *   accent-glow-33 ${accent-glow-33}
  *
  * Semantic
- *   positive #00ff7f   negative #E6455D
- *   info     #4DA6E6   warning  #E6B345
- *   readout  #579972
+ *   positive ${positive}   negative ${negative}
+ *   info     ${info}   warning  ${warning}
+ *   readout  ${readout}
  *
  * Misc
- *   slider-thumb #E0924A   slider-track #040303
- *   crosshair    #3cb371   shadow       #00000088
+ *   slider-thumb ${accent}   slider-track ${slider-track}
+ *   crosshair    ${crosshair}   shadow       ${shadow}
  * ============================================================ */
 
 /* === Base ============================================== */
 QMainWindow {
-    background-color: #080707;
-    color: #CDB299;
+    background-color: ${bg-base};
+    color: ${text-secondary};
 }
 
 #Distance3DView {
-    background-color: #080707;
-    color: #CDB299;
+    background-color: ${bg-base};
+    color: ${text-secondary};
 }
 
 /* Baseline rule for plain QWidget / QFrame instances (matches only
@@ -50,13 +50,13 @@ QMainWindow {
    QFrames (e.g. Preferences sub-groups) from showing the system
    palette through. Subclass-specific rules below override per id. */
 .QWidget {
-    background-color: #12100E;
-    color: #CDB299;
+    background-color: ${bg-raised};
+    color: ${text-secondary};
 }
 
 .QFrame {
-    background-color: #12100E;
-    color: #CDB299;
+    background-color: ${bg-raised};
+    color: ${text-secondary};
 }
 
 /* === TopBar action cluster (preserved icon assets) ====== */
@@ -64,22 +64,9 @@ QMainWindow {
     image: url(:/title/GLI_dark);
 }
 
-#MIN_BTN::hover, #MAX_BTN::hover {
-    background-color: #2E221A;
-}
-
-#MIN_BTN::pressed, #MAX_BTN::pressed {
-    background-color: #382D25;
-    border-style: none;
-}
-
-#EXIT_BTN::hover {
-    background-color: #E6455D;
-}
-
-#EXIT_BTN::pressed {
-    background-color: #992D3E;
-}
+#ADDON_BTN            { image: url(:/tools/dark/addon); }
+#ADDON_BTN::hover,
+#ADDON_BTN::pressed   { image: url(:/tools/dark/addon_hover); }
 
 #URL_BTN              { image: url(:/tools/dark/url); }
 #URL_BTN::hover,
@@ -99,41 +86,55 @@ QMainWindow {
 #CLS_BTN::hover,
 #CLS_BTN::pressed     { image: url(:/tools/dark/brush_hover); }
 
-#THEME_BTN            { image: url(:/tools/toggle_dark); }
-#THEME_BTN::hover,
-#THEME_BTN::pressed   { image: url(:/tools/toggle_light); }
+#COLOR_MODE_BTN            { image: url(:/tools/toggle_dark); }
+#COLOR_MODE_BTN::hover,
+#COLOR_MODE_BTN::pressed   { image: url(:/tools/toggle_light); }
+
+#HIDE_BTN {
+    padding: 2px;
+    border: none;
+    background-color: transparent;
+}
+
+#HIDE_BTN[hideDirection="left"] {
+    image: url(:/tools/dark/left);
+}
+
+#HIDE_BTN[hideDirection="right"] {
+    image: url(:/tools/dark/right);
+}
 
 /* === Menus ============================================= */
 QMenuBar, QMenu {
-    background-color: #1C1815;
-    color: #CDB299;
-    border: 1px solid #382D25;
+    background-color: ${bg-elevated};
+    color: ${text-secondary};
+    border: 1px solid ${border-default};
 }
 
 QMenuBar::item:selected, QMenu::selected {
-    background-color: #2E221A;
-    color: #F5E1CE;
+    background-color: ${bg-active};
+    color: ${text-primary};
 }
 
 /* === Inputs ============================================ */
 QLineEdit, QTextEdit, QPlainTextEdit, .QComboBox, QDialog {
-    border: 1px solid #241E1A;
-    background-color: #080707;
-    color: #579972;
-    selection-background-color: #E0924A55;
-    selection-color: #F5E1CE;
+    border: 1px solid ${border-subtle};
+    background-color: ${bg-base};
+    color: ${readout};
+    selection-background-color: ${accent-glow-33};
+    selection-color: ${text-primary};
     border-radius: 2px;
 }
 
 QLineEdit::disabled, QTextEdit::disabled,
 QPlainTextEdit::disabled, .QComboBox::disabled {
-    background-color: #12100E;
-    color: #5C4A3D;
+    background-color: ${bg-raised};
+    color: ${text-dim};
 }
 
 QLineEdit::focus, QTextEdit::focus,
 QPlainTextEdit::focus, .QComboBox::focus {
-    border: 1px solid #E0924A55;
+    border: 1px solid ${accent-glow-33};
 }
 
 /* === ComboBox ========================================== */
@@ -143,69 +144,110 @@ QPlainTextEdit::focus, .QComboBox::focus {
     height: 12px;
     margin-top: 2px;
     margin-left: 2px;
-    background-color: #1C1815;
+    background-color: ${bg-elevated};
     border-radius: 2px;
 }
 
 .QComboBox::on {
-    border: 1px solid #E0924A55;
+    border: 1px solid ${accent-glow-33};
 }
 
 .QComboBox::drop-down:disabled,
 .QComboBox::drop-down:hover {
-    background-color: #2E221A;
+    background-color: ${bg-active};
 }
 
 .QComboBox::drop-down:on {
-    background-color: #382D25;
+    background-color: ${border-default};
 }
 
 .QComboBox QAbstractItemView {
-    background-color: #1C1815;
-    selection-background-color: #2E221A;
-    color: #CDB299;
-    selection-color: #F5E1CE;
-    border: 1px solid #382D25;
+    background-color: ${bg-elevated};
+    selection-background-color: ${bg-active};
+    color: ${text-secondary};
+    selection-color: ${text-primary};
+    border: 1px solid ${border-default};
     border-radius: 2px;
     outline: 0px;
 }
 
 MiscSelection {
     border: none;
-    background-color: #080707;
-    color: #CDB299;
+    background-color: ${bg-raised};
+    color: ${text-secondary};
     width: 60px;
 }
 
 MiscSelection QAbstractItemView {
-    background-color: #1C1815;
-    selection-background-color: #2E221A;
-    color: #CDB299;
-    selection-color: #F5E1CE;
+    background-color: ${bg-elevated};
+    selection-background-color: ${bg-active};
+    color: ${text-secondary};
+    selection-color: ${text-primary};
     border-radius: 2px;
     outline: 0px;
 }
 
 /* === Labels and frames ================================= */
 .QLabel {
-    color: #CDB299;
+    color: ${text-secondary};
     background: transparent;
 }
 
 Display {
-    border: 1px solid #382D25;
-    background-color: #040303;
+    border: 1px solid ${border-default};
+    background-color: ${bg-deepest};
+}
+
+#FPS_LABEL {
+    color: ${text-primary};
+    background-color: ${shadow};
+    padding: 1px 4px;
+    border-radius: 2px;
+}
+
+#SOURCE_DEAD_LABEL {
+    color: ${negative};
+    background-color: ${shadow};
+    padding: 1px 4px;
+    border-radius: 2px;
+}
+
+#MONITOR_CUSTOM_TITLE {
+    color: ${text-primary};
+    background-color: ${shadow};
+    padding: 8px 40px;
+    border-radius: 2px;
+}
+
+QLabel[portState="connected"] {
+    color: ${text-primary};
+}
+
+QLabel[portState="error"] {
+    color: ${negative};
+}
+
+QLabel[portNetwork="true"] {
+    text-decoration: underline;
+}
+
+#FISHNET_RESULT[fishnetState="neutral"] {
+    color: ${text-secondary};
+}
+
+#FISHNET_RESULT[fishnetState="alert"] {
+    color: ${negative};
 }
 
 Ruler {
-    color: #5C4A3D;
+    color: ${text-dim};
 }
 
 /* === Group box ========================================= */
-/* Flat — matches plain-QFrame look used by the re-parented Preferences
+/* Flat - matches plain-QFrame look used by the re-parented Preferences
    groups in SETUP overlay. Title remains as accent-colored label. */
 QGroupBox {
-    color: #F5E1CE;
+    color: ${text-primary};
     border: none;
     margin-top: 14px;
     padding-top: 0;
@@ -216,81 +258,81 @@ QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
     left: 4px;
-    color: #E0924A;
+    color: ${accent};
     background: transparent;
     padding: 0 4px;
     font-weight: 700;
 }
 
-/* Setup overlay card titles — small labels above Save/Comm/TCU/Device cards.
+/* Setup overlay card titles - small labels above Save/Comm/TCU/Device cards.
    Color-only; weight intentionally normal to match how QGroupBox::title
    actually renders (its font-weight: 700 doesn't bold the subcontrol). */
 #SETUP_CARD_TITLE {
-    color: #E0924A;
+    color: ${accent};
     padding-left: 4px;
 }
 
 /* === Tabs ============================================== */
 QTabWidget::pane {
-    border: 1px solid #382D25;
+    border: 1px solid ${border-default};
     border-top-right-radius: 3px;
     border-bottom-left-radius: 3px;
     border-bottom-right-radius: 3px;
-    background-color: #12100E;
+    background-color: ${bg-raised};
 }
 
 QTabBar::tab {
-    background-color: #12100E;
-    color: #8A7461;
-    width: 64px;
+    background-color: ${bg-raised};
+    color: ${text-muted};
+    min-width: 64px;
     height: 20px;
     border-top-left-radius: 3px;
     border-top-right-radius: 3px;
-    border: 1px solid #241E1A;
+    border: 1px solid ${border-subtle};
     border-bottom: none;
 }
 
 QTabBar::tab:selected {
-    background-color: #1C1815;
-    color: #E0924A;
-    border-color: #382D25;
+    background-color: ${bg-elevated};
+    color: ${accent};
+    border-color: ${border-default};
 }
 
 QTabBar::tab:hover {
-    background-color: #2E221A;
-    color: #CDB299;
+    background-color: ${bg-active};
+    color: ${text-secondary};
 }
 
 /* === Buttons =========================================== */
 .QPushButton, .QToolButton {
-    background-color: #12100E;
-    color: #CDB299;
-    border: 1px solid #382D25;
+    background-color: ${bg-raised};
+    color: ${text-secondary};
+    border: 1px solid ${border-default};
     border-radius: 2px;
     padding: 2px 6px;
 }
 
 .QPushButton::disabled, .QToolButton::disabled {
-    background-color: #080707;
-    border: 1px solid #241E1A;
-    color: #5C4A3D;
+    background-color: ${bg-base};
+    border: 1px solid ${border-subtle};
+    color: ${text-dim};
 }
 
 .QPushButton::hover, .QToolButton::hover {
-    background-color: #261B14;
-    border: 1px solid #8F6B4D;
-    color: #F5E1CE;
+    background-color: ${bg-header};
+    border: 1px solid ${border-strong};
+    color: ${text-primary};
 }
 
 .QPushButton::pressed, .QToolButton::pressed {
-    background-color: #2E221A;
-    color: #E0924A;
+    background-color: ${bg-active};
+    color: ${accent};
 }
 
 .QPushButton:checked, .QToolButton:checked {
-    background-color: #2E221A;
-    border: 1px solid #E0924A;
-    color: #E0924A;
+    background-color: ${bg-active};
+    border: 1px solid ${accent};
+    color: ${accent};
 }
 
 QPushButton::menu-indicator {
@@ -299,27 +341,27 @@ QPushButton::menu-indicator {
 
 /* === Checkbox / Radio (icon assets preserved) ========== */
 .QCheckBox, .QRadioButton {
-    color: #CDB299;
+    color: ${text-secondary};
     background: transparent;
 }
 
 .QCheckBox::disabled, .QRadioButton::disabled {
-    color: #5C4A3D;
+    color: ${text-dim};
 }
 
 .QCheckBox::indicator {
     width: 10px;
     height: 10px;
-    border: 1px solid #382D25;
-    background-color: #080707;
+    border: 1px solid ${border-default};
+    background-color: ${bg-base};
     border-radius: 2px;
 }
 
 .QRadioButton::indicator {
     width: 10px;
     height: 10px;
-    border: 1px solid #382D25;
-    background-color: #080707;
+    border: 1px solid ${border-default};
+    background-color: ${bg-base};
     border-radius: 7px;
 }
 
@@ -328,64 +370,64 @@ QPushButton::menu-indicator {
 
 .QCheckBox::indicator:disabled,
 .QRadioButton::indicator:disabled {
-    background-color: #12100E;
-    border-color: #241E1A;
+    background-color: ${bg-raised};
+    border-color: ${border-subtle};
 }
 
 .QCheckBox::indicator:hover,
 .QRadioButton::indicator:hover {
-    background-color: #1C1815;
-    border-color: #8F6B4D;
+    background-color: ${bg-elevated};
+    border-color: ${border-strong};
 }
 
 .QCheckBox::indicator:pressed,
 .QRadioButton::indicator:pressed {
-    background-color: #040303;
+    background-color: ${bg-deepest};
 }
 
 /* === Slider ============================================ */
 QSlider::groove:horizontal {
     height: 4px;
-    background-color: #040303;
-    border: 1px solid #241E1A;
+    background-color: ${slider-track};
+    border: 1px solid ${border-subtle};
     border-radius: 2px;
 }
 
 QSlider::handle:horizontal {
-    background-color: #E0924A;
-    border: 1px solid #8F6B4D;
+    background-color: ${accent};
+    border: 1px solid ${border-strong};
     border-radius: 2px;
 }
 
 QSlider::handle:horizontal:hover {
-    background-color: #F5A75D;
-    border: 1px solid #E0924A;
+    background-color: ${accent-hover};
+    border: 1px solid ${accent};
 }
 
 QSlider::handle:horizontal:pressed {
-    background-color: #9E612B;
+    background-color: ${accent-muted};
 }
 
 QSlider::handle:horizontal:disabled {
-    background-color: #5C4A3D;
-    border: 1px solid #382D25;
+    background-color: ${text-dim};
+    border: 1px solid ${border-default};
 }
 
 QSlider::groove:vertical {
     width: 4px;
-    background-color: #040303;
-    border: 1px solid #241E1A;
+    background-color: ${slider-track};
+    border: 1px solid ${border-subtle};
     border-radius: 2px;
 }
 
 QSlider::handle:vertical {
-    background-color: #E0924A;
-    border: 1px solid #8F6B4D;
+    background-color: ${accent};
+    border: 1px solid ${border-strong};
     border-radius: 2px;
 }
 
 QSlider::handle:vertical:hover {
-    background-color: #F5A75D;
+    background-color: ${accent-hover};
 }
 
 #MCP_SLIDER::handle:horizontal,
@@ -411,8 +453,8 @@ QSlider::handle:vertical:hover {
 
 /* === Tools (display image overlay) ===================== */
 Tools {
-    background-color: #12100E;
-    border: 1px solid #241E1A;
+    background-color: ${bg-raised};
+    border: 1px solid ${border-subtle};
     border-radius: 2px;
 }
 
@@ -430,27 +472,27 @@ Tools {
 #SELECT_TOOL::indicator { image: url(:/tools/dark/select); }
 #PTZ_TOOL::indicator    { image: url(:/tools/dark/ptz); }
 
-Tools::checked { background-color: #2E221A; border-color: #E0924A55; }
-Tools::hover   { background-color: #261B14; }
+Tools::checked { background-color: ${bg-active}; border-color: ${accent-glow-33}; }
+Tools::hover   { background-color: ${bg-header}; }
 
 /* === Coordinate / info labels ========================== */
 Coordinate InfoLabel {
-    color: #F5E1CE;
+    color: ${text-primary};
 }
 
 /* === Spin box ========================================== */
 QSpinBox {
     padding-right: 12px;
-    border: 1px solid #241E1A;
-    background-color: #080707;
-    color: #579972;
-    selection-background-color: #E0924A55;
-    selection-color: #F5E1CE;
+    border: 1px solid ${border-subtle};
+    background-color: ${bg-base};
+    color: ${readout};
+    selection-background-color: ${accent-glow-33};
+    selection-color: ${text-primary};
     border-radius: 2px;
 }
 
 QSpinBox::focus {
-    border: 1px solid #E0924A55;
+    border: 1px solid ${accent-glow-33};
 }
 
 QSpinBox::up-button {
@@ -472,16 +514,16 @@ QSpinBox::down-button {
 /* === Scroll area ======================================= */
 QScrollArea, #CONTENT {
     border: none;
-    background-color: #080707;
-    color: #CDB299;
+    background-color: ${bg-base};
+    color: ${text-secondary};
 }
 
 IndexLabel {
-    color: #CDB299;
+    color: ${text-secondary};
 }
 
 IndexLabel::hover {
-    color: #F5E1CE;
+    color: ${text-primary};
     text-decoration: line-through;
 }
 
@@ -520,7 +562,7 @@ QScrollBar::sub-page {
 
 QScrollBar::handle:vertical,
 QScrollBar::handle:horizontal {
-    background: #382D25;
+    background: ${border-default};
     border: none;
     border-radius: 4px;
     min-height: 16px;
@@ -531,7 +573,7 @@ QScrollBar::handle:vertical:hover,
 QScrollBar::handle:vertical:pressed,
 QScrollBar::handle:horizontal:hover,
 QScrollBar::handle:horizontal:pressed {
-    background: #8F6B4D;
+    background: ${border-strong};
 }
 
 QScrollBar::sub-line, QScrollBar::add-line {
@@ -542,47 +584,47 @@ QScrollBar::sub-line, QScrollBar::add-line {
 
 /* === Aliasing / table view ============================= */
 QTableView {
-    background-color: #080707;
-    color: #F5E1CE;
-    border: 1px solid #382D25;
-    gridline-color: #382D25;
-    alternate-background-color: #12100E;
-    selection-color: #F5E1CE;
-    selection-background-color: #2E221A;
+    background-color: ${bg-base};
+    color: ${text-primary};
+    border: 1px solid ${border-default};
+    gridline-color: ${border-default};
+    alternate-background-color: ${bg-raised};
+    selection-color: ${text-primary};
+    selection-background-color: ${bg-active};
 }
 
 QTableView::item:!alternate:!selected {
-    background-color: #080707;
+    background-color: ${bg-base};
 }
 
 QHeaderView::section {
-    background-color: #1C1815;
-    color: #E0924A;
+    background-color: ${bg-elevated};
+    color: ${accent};
     padding-left: 4px;
-    border: 1px solid #382D25;
+    border: 1px solid ${border-default};
     min-height: 24px;
 }
 
 /* === Tooltip =========================================== */
 QToolTip {
-    background-color: #261B14;
-    color: #F5E1CE;
-    border: 1px solid #8F6B4D;
+    background-color: ${bg-header};
+    color: ${text-primary};
+    border: 1px solid ${border-strong};
     padding: 2px 4px;
 }
 
 /* ============================================================
- * Sprint 20.2 — custom widgets
+ * Sprint 20.2 - custom widgets
  * ============================================================ */
 
 /* === TopBar shell ====================================== */
 #TOP_BAR {
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #261B14, stop:1 #1C1815);
-    border-bottom: 1px solid #382D25;
+        stop:0 ${bg-header}, stop:1 ${bg-elevated});
+    border-bottom: 1px solid ${border-default};
 }
 
-/* TopButton — QPushButton subclass for the action cluster + window
+/* TopButton - QPushButton subclass for the action cluster + window
    controls. The `image: url(...)` rules above place the icon; here we
    keep the button itself transparent + borderless so the icon shows
    on the TopBar gradient. (The legacy QSS had the equivalent rule
@@ -594,79 +636,121 @@ TopButton {
 }
 
 TopButton:hover {
-    background-color: #2E221A;
+    background-color: transparent;
 }
 
 TopButton:pressed {
-    background-color: #382D25;
+    background-color: transparent;
 }
 
-#TOP_BAR_LEFT, #TOP_BAR_CENTER, #TOP_BAR_RIGHT {
+#ADDON_BTN, #URL_BTN, #SETTINGS_BTN, #CAPTURE_BTN,
+#CLS_BTN, #LANGUAGE_BTN, #COLOR_MODE_BTN,
+#ADDON_BTN::hover, #URL_BTN::hover, #SETTINGS_BTN::hover, #CAPTURE_BTN::hover,
+#CLS_BTN::hover, #LANGUAGE_BTN::hover, #COLOR_MODE_BTN::hover,
+#ADDON_BTN::pressed, #URL_BTN::pressed, #SETTINGS_BTN::pressed, #CAPTURE_BTN::pressed,
+#CLS_BTN::pressed, #LANGUAGE_BTN::pressed, #COLOR_MODE_BTN::pressed {
+    background-color: transparent;
+    border: none;
+}
+
+#MIN_BTN, #MAX_BTN, #EXIT_BTN {
+    background-color: transparent;
+    border: none;
+    padding: 7px 12px;
+}
+
+#MIN_BTN::hover, #MAX_BTN::hover {
+    background-color: ${bg-active};
+    border: none;
+}
+
+#MIN_BTN::pressed, #MAX_BTN::pressed {
+    background-color: ${border-default};
+    border: none;
+}
+
+#EXIT_BTN::hover {
+    background-color: #CD5C5C;
+    border: none;
+}
+
+#EXIT_BTN::pressed {
+    background-color: #BD4C4C;
+    border: none;
+}
+
+#TOP_BAR_LEFT, #TOP_BAR_CENTER, #TOP_BAR_RIGHT, #TOP_WINDOW_CONTROLS {
     background: transparent;
 }
 
 #TOP_BAR_CLOCK {
-    color: #579972;
+    color: ${readout};
     font-family: Consolas;
     font-size: 11px;
     background: transparent;
 }
 
 #PIXEL_DEPTH_LABEL, #RESOLUTION_LABEL {
-    color: #8A7461;
+    color: ${text-muted};
     background: transparent;
     font-size: 10px;
 }
 
+DotIndicator {
+    qproperty-offColor: ${border-subtle};
+    qproperty-okColor: ${positive};
+    qproperty-warnColor: ${accent};
+    qproperty-errColor: ${negative};
+}
+
 #SYSTEM_SELECTOR {
-    background-color: #1C1815;
-    color: #CDB299;
-    border: 1px solid #382D25;
+    background-color: ${bg-elevated};
+    color: ${text-secondary};
+    border: 1px solid ${border-default};
     border-radius: 2px;
     padding: 0 6px;
     min-height: 20px;
     max-height: 22px;
 }
 
-/* mode tabs (SETUP / MONITOR / SCAN) — checked state shows accent gradient */
+/* mode tabs (SETUP / MONITOR / SCAN) */
 #MODE_SETUP, #MODE_MONITOR, #MODE_SCAN {
-    background-color: #1C1815;
-    color: #5C4A3D;
-    border: 1px solid #241E1A;
+    background-color: ${bg-elevated};
+    color: ${text-dim};
+    border: 1px solid ${border-subtle};
     padding: 3px 12px;
     font-weight: 700;
     font-size: 10px;
 }
 
 #MODE_SETUP:hover, #MODE_MONITOR:hover, #MODE_SCAN:hover {
-    background-color: #2E221A;
-    color: #CDB299;
+    background-color: ${bg-active};
+    color: ${text-secondary};
 }
 
 #MODE_SETUP:checked, #MODE_MONITOR:checked, #MODE_SCAN:checked {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #2E221A, stop:1 #1C1815);
-    color: #E0924A;
-    border: 1px solid #E0924A;
+    background-color: ${bg-active};
+    color: ${accent};
+    border: 1px solid ${accent};
 }
 
 /* === FloatingPanel base ================================ */
 #FloatingPanel {
-    background-color: #12100E;
-    border: 1px solid #382D25;
+    background-color: ${bg-raised};
+    border: 1px solid ${border-default};
     border-radius: 3px;
 }
 
 #FloatingPanelHeader {
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #261B14, stop:1 #12100E);
-    border-bottom: 1px solid #382D25;
+        stop:0 ${bg-header}, stop:1 ${bg-raised});
+    border-bottom: 1px solid ${border-default};
     border-top-left-radius: 3px;
     border-top-right-radius: 3px;
 }
 
 #FloatingPanelTitle {
-    color: #E0924A;
+    color: ${accent};
     font-weight: 700;
     font-size: 10px;
     background: transparent;
@@ -675,53 +759,83 @@ TopButton:pressed {
 
 #FloatingPanelPin, #FloatingPanelHide, #FloatingPanelReset {
     background-color: transparent;
-    color: #8A7461;
+    color: ${text-muted};
     border: none;
     border-radius: 2px;
     font-size: 9px;
 }
 
 #FloatingPanelPin:hover, #FloatingPanelHide:hover, #FloatingPanelReset:hover {
-    background-color: #2E221A;
-    color: #F5E1CE;
+    background-color: ${bg-active};
+    color: ${text-primary};
 }
 
 #FloatingPanelPin:checked {
-    background-color: #2E221A;
-    color: #E0924A;
+    background-color: ${bg-active};
+    color: ${accent};
 }
 
 #FloatingPanelHide:hover {
-    background-color: #4D161E;
-    color: #E6455D;
+    background-color: ${negative-hover-bg};
+    color: ${negative};
 }
 
-#PANORAMA_RESIZE_HANDLE {
+#FLOATING_WINDOW_CHROME {
     background-color: transparent;
-    border-right: 2px solid #8A7461;
-    border-bottom: 2px solid #8A7461;
+    border: none;
 }
 
-#PANORAMA_RESIZE_HANDLE:hover {
-    background-color: #2E221A;
-    border-right: 2px solid #E0924A;
-    border-bottom: 2px solid #E0924A;
+#FLOATING_WINDOW_EXIT {
+    background-color: transparent;
+    border: none;
+    padding: 0px;
+}
+
+#FLOATING_WINDOW_EXIT:hover {
+    background-color: ${negative-hover-bg};
+}
+
+#PANORAMA_RESIZE_HANDLE, #ADDON_RESIZE_HANDLE {
+    background-color: transparent;
+    border-right: 2px solid ${text-muted};
+    border-bottom: 2px solid ${text-muted};
+}
+
+#PANORAMA_RESIZE_HANDLE:hover, #ADDON_RESIZE_HANDLE:hover {
+    background-color: ${bg-active};
+    border-right: 2px solid ${accent};
+    border-bottom: 2px solid ${accent};
 }
 
 #PANORAMA_STATUS {
-    color: #8A7461;
+    color: ${text-muted};
     font-size: 9px;
     font-weight: 700;
     background: transparent;
     padding-right: 2px;
 }
 
-/* OpticsPanel / TCUPanel mode toggles — Classic/Modern, Normal/Guru */
+#PANORAMA_SCROLL {
+    background-color: ${bg-deepest};
+    border: none;
+}
+
+#PANORAMA_PREVIEW {
+    background-color: ${bg-deepest};
+    border: none;
+}
+
+#ADDON_PLUGIN_HOST {
+    background-color: ${bg-deepest};
+    border: none;
+}
+
+/* OpticsPanel / TCUPanel mode toggles - Classic/Modern, Normal/Guru */
 #OPTICS_CLASSIC_BTN, #OPTICS_MODERN_BTN,
 #TCU_NORMAL_BTN, #TCU_GURU_BTN {
-    background-color: #12100E;
-    color: #5C4A3D;
-    border: 1px solid #241E1A;
+    background-color: ${bg-raised};
+    color: ${text-dim};
+    border: 1px solid ${border-subtle};
     border-radius: 2px;
     padding: 2px 8px;
     font-size: 9px;
@@ -730,15 +844,15 @@ TopButton:pressed {
 
 #OPTICS_CLASSIC_BTN:hover, #OPTICS_MODERN_BTN:hover,
 #TCU_NORMAL_BTN:hover, #TCU_GURU_BTN:hover {
-    background-color: #2E221A;
-    color: #CDB299;
+    background-color: ${bg-active};
+    color: ${text-secondary};
 }
 
 #OPTICS_CLASSIC_BTN:checked, #OPTICS_MODERN_BTN:checked,
 #TCU_NORMAL_BTN:checked, #TCU_GURU_BTN:checked {
-    background-color: #2E221A;
-    color: #E0924A;
-    border: 1px solid #E0924A;
+    background-color: ${bg-active};
+    color: ${accent};
+    border: 1px solid ${accent};
 }
 
 /* === Center display toolbar (SEL / ZOOM / PTZ + INFO) === */
@@ -759,9 +873,9 @@ TopButton:pressed {
 }
 
 #PBAR_OPTICS_BTN, #PBAR_TCU_BTN, #PBAR_CONSOLE_BTN {
-    background-color: #12100E;
-    color: #8A7461;
-    border: 1px solid #241E1A;
+    background-color: ${bg-raised};
+    color: ${text-muted};
+    border: 1px solid ${border-subtle};
     border-radius: 2px;
     padding: 2px 6px;
     font-size: 10px;
@@ -769,27 +883,27 @@ TopButton:pressed {
 }
 
 #PBAR_OPTICS_BTN:hover, #PBAR_TCU_BTN:hover, #PBAR_CONSOLE_BTN:hover {
-    background-color: #2E221A;
-    color: #CDB299;
+    background-color: ${bg-active};
+    color: ${text-secondary};
 }
 
 #PBAR_OPTICS_BTN:checked, #PBAR_TCU_BTN:checked, #PBAR_CONSOLE_BTN:checked {
-    background-color: #2E221A;
-    color: #E0924A;
-    border: 1px solid #E0924A;
+    background-color: ${bg-active};
+    color: ${accent};
+    border: 1px solid ${accent};
 }
 
 /* === Right-side widget stack =========================== */
 #RIGHT_STACK {
-    background-color: #12100E;
-    border: 1px solid #241E1A;
+    background-color: ${bg-raised};
+    border: 1px solid ${border-subtle};
     border-radius: 3px;
 }
 
 #IMG_PROC_WIDGET, #PTZ_RADAR_WIDGET, #SAVE_OPTIONS_WIDGET, #VISION_WIDGET {
     background-color: transparent;
     border: none;
-    border-bottom: 1px solid #241E1A;
+    border-bottom: 1px solid ${border-subtle};
 }
 
 #VISION_WIDGET { border-bottom: none; }
@@ -799,38 +913,59 @@ TopButton:pressed {
     border: none;
 }
 
+#PTZ_RADAR_WIDGET {
+    qproperty-radarBackgroundColor: ${bg-deepest};
+    qproperty-radarBorderColor: ${border-subtle};
+    qproperty-radarGridColor: ${border-default};
+    qproperty-radarGridSoftColor: ${border-subtle};
+    qproperty-radarTextColor: ${text-secondary};
+    qproperty-radarMutedColor: ${text-muted};
+    qproperty-radarAccentColor: ${accent};
+}
+
 /* === Side zone (SideDisplay + Mapbox) ================== */
 #SIDE_DISPLAY_WIDGET, #MAPBOX_WIDGET {
-    background-color: #040303;
-    border: 1px solid #241E1A;
+    background-color: ${bg-deepest};
+    border: 1px solid ${border-subtle};
     border-radius: 3px;
 }
 
 #SIDE_DISPLAY_PLACEHOLDER, #MAPBOX_PLACEHOLDER {
-    color: #5C4A3D;
+    color: ${text-dim};
     background: transparent;
     font-size: 10px;
 }
 
+#SIDE_DISPLAY_SECTION_LBL, #PREVIEW_THUMB_LBL {
+    color: ${accent};
+    background: transparent;
+    font-weight: 700;
+}
+
+#SIDE_DISPLAY_THUMB, #PREVIEW_THUMB {
+    background-color: ${bg-deepest};
+    border: 1px solid ${border-subtle};
+}
+
 #SIDE_DISPLAY_SWAP_BTN {
-    background-color: #1A1612;
-    border: 1px solid #382D25;
+    background-color: ${side-action-bg};
+    border: 1px solid ${border-default};
     border-radius: 3px;
     padding: 0px;
 }
 
 #SIDE_DISPLAY_SWAP_BTN:hover {
-    background-color: #2A2018;
-    border-color: #5C4A3D;
+    background-color: ${side-action-hover-bg};
+    border-color: ${text-dim};
 }
 
 #SIDE_DISPLAY_SWAP_BTN:pressed {
-    background-color: #3A2C20;
+    background-color: ${side-action-pressed-bg};
 }
 
 /* === SETUP overlay ===================================== */
 #SETUP_OVERLAY {
-    background-color: #080707;
+    background-color: ${bg-base};
     border: none;
 }
 
@@ -844,19 +979,19 @@ TopButton:pressed {
 }
 
 #SETUP_PREVIEW_SIDEBAR {
-    background-color: #12100E;
-    border: 1px solid #241E1A;
+    background-color: ${bg-raised};
+    border: 1px solid ${border-subtle};
     border-radius: 3px;
 }
 
 #SETUP_PREVIEW_PLACEHOLDER {
-    color: #5C4A3D;
+    color: ${text-dim};
     background: transparent;
 }
 
 /* === SCAN overlay ====================================== */
 #SCAN_OVERLAY {
-    background-color: #080707;
+    background-color: ${bg-base};
     border: none;
 }
 
@@ -867,15 +1002,15 @@ TopButton:pressed {
 
 /* group cards */
 #SCAN_CARD {
-    background-color: #12100E;
-    border: 1px solid #382D25;
+    background-color: ${bg-raised};
+    border: 1px solid ${border-default};
     border-radius: 3px;
 }
 
 #SCAN_CARD_TTL {
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #261B14, stop:1 #12100E);
-    border-bottom: 1px solid #382D25;
+        stop:0 ${bg-header}, stop:1 ${bg-raised});
+    border-bottom: 1px solid ${border-default};
     border-top-left-radius: 3px;
     border-top-right-radius: 3px;
     min-height: 22px;
@@ -883,35 +1018,35 @@ TopButton:pressed {
 }
 
 #SCAN_CARD_TTL > QLabel {
-    color: #E0924A;
+    color: ${accent};
     font-weight: 700;
     font-size: 10px;
     background: transparent;
 }
 
 #SCAN_CARD_BODY {
-    background-color: #12100E;
+    background-color: ${bg-raised};
     border: none;
 }
 
-/* Separator line inside scan card bodies — prototype `.guru-sep`.
+/* Separator line inside scan card bodies - prototype `.guru-sep`.
    Replaces QFrame::HLine palette rendering with token-driven color. */
 #SCAN_CARD_SEP {
-    background-color: #261B14;
+    background-color: ${bg-header};
     border: none;
     max-height: 1px;
     min-height: 1px;
 }
 
-/* action column — Start (positive) / Continue / Restart / Stop (negative) */
+/* action column - Start (positive) / Continue / Restart / Stop (negative) */
 #SCAN_ACTION_COL {
     background-color: transparent;
 }
 
 #SCAN_ACTION_COL > QPushButton {
-    background-color: #12100E;
-    color: #8A7461;
-    border: 1px solid #382D25;
+    background-color: ${bg-raised};
+    color: ${text-muted};
+    border: 1px solid ${border-default};
     border-radius: 3px;
     padding: 6px 0;
     font-size: 10px;
@@ -920,84 +1055,137 @@ TopButton:pressed {
 }
 
 #SCAN_ACTION_COL > QPushButton:hover {
-    background-color: #261B14;
-    color: #CDB299;
-    border-color: #8F6B4D;
+    background-color: ${bg-header};
+    color: ${text-secondary};
+    border-color: ${border-strong};
 }
 
-/* SCAN_BUTTON dual state — start (positive-green) vs running (warning-amber).
+/* SCAN_BUTTON dual state - start (positive-green) vs running (warning-amber).
    The `scanning` dynamic property is set in userpanel.cpp's lambda hooked to
    ScanController::scan_button_text_changed. QSS attribute selectors pick up
    the value after unpolish + polish. */
 #SCAN_ACTION_COL > #SCAN_BUTTON {
-    background-color: #0b1b19;        /* positive-bg */
-    color: #579972;                   /* readout */
-    border: 1px solid #113c29;        /* positive-border */
+    background-color: ${positive-bg};        /* positive-bg */
+    color: ${readout};                   /* readout */
+    border: 1px solid ${positive-border};        /* positive-border */
 }
 
 #SCAN_ACTION_COL > #SCAN_BUTTON:hover {
-    background-color: #10251e;        /* positive-hover-bg */
-    color: #81e0a9;                   /* positive-hover-text */
-    border: 1px solid #215c39;        /* positive-hover-border */
+    background-color: ${positive-hover-bg};        /* positive-hover-bg */
+    color: ${positive-hover-text};                   /* positive-hover-text */
+    border: 1px solid ${positive-hover-border};        /* positive-hover-border */
 }
 
 #SCAN_ACTION_COL > #SCAN_BUTTON[scanning="true"] {
-    background-color: #33270F;        /* warning-bg */
-    color: #EFC670;                   /* warning-hover-text */
-    border: 1px solid #664E1E;        /* warning-border */
+    background-color: ${warning-bg};        /* warning-bg */
+    color: ${warning-hover-text};                   /* warning-hover-text */
+    border: 1px solid ${warning-border};        /* warning-border */
 }
 
 #SCAN_ACTION_COL > #SCAN_BUTTON[scanning="true"]:hover {
-    background-color: #4D3B16;        /* warning-hover-bg */
-    color: #E6B345;                   /* warning */
-    border: 1px solid #806226;        /* warning-hover-border */
+    background-color: ${warning-hover-bg};        /* warning-hover-bg */
+    color: ${warning};                   /* warning */
+    border: 1px solid ${warning-hover-border};        /* warning-hover-border */
 }
 
 /* === SCAN preview sidebar ============================== */
 #SCAN_PREVIEW_SIDEBAR {
-    background-color: #12100E;
-    border: 1px solid #241E1A;
+    background-color: ${bg-raised};
+    border: 1px solid ${border-subtle};
     border-radius: 3px;
 }
 
 #SCAN_PREVIEW_PH {
-    color: #5C4A3D;
+    color: ${text-dim};
     background: transparent;
 }
 
 /* === Modern PTZ labels (joystick + arc sliders) ======== */
 #JoyLabel {
     font-size: 9px;
-    color: #5C4A3D;             /* text-dim */
+    color: ${text-dim};             /* text-dim */
     background: transparent;
 }
 
 #ArcLabel {
     font-size: 8px;
-    color: #5C4A3D;             /* text-dim */
+    color: ${text-dim};             /* text-dim */
     background: transparent;
 }
 
 #ArcValue {
     font-family: "Consolas";
     font-size: 9px;
-    color: #CDB299;             /* readout */
+    color: ${text-secondary};             /* readout */
     background: transparent;
+}
+
+JoystickWidget {
+    qproperty-baseEdgeColor: ${border-default};
+    qproperty-baseDarkColor: ${bg-deepest};
+    qproperty-baseLightColor: ${bg-elevated};
+    qproperty-baseGrooveColor: ${border-subtle};
+    qproperty-glyphColor: ${text-dim};
+    qproperty-handleEdgeColor: ${accent};
+    qproperty-domeDarkColor: ${bg-deepest};
+    qproperty-domeLightColor: ${bg-elevated};
+}
+
+ArcSliderWidget {
+    qproperty-activeColor: ${accent};
+    qproperty-inactiveTrackColor: ${text-dim};
+    qproperty-thumbEdgeColor: ${bg-raised};
+}
+
+ArcSliderWidget[lensRole="zoom"] {
+    qproperty-activeColor: ${negative};
+}
+
+ArcSliderWidget[lensRole="focus"] {
+    qproperty-activeColor: ${accent};
+}
+
+ArcSliderWidget[lensRole="iris"] {
+    qproperty-activeColor: ${info};
 }
 
 /* === TCU Normal-mode DIST readout ======================= */
 #TcuDistLabel {
     font-family: "Consolas";
     font-size: 10px;
-    color: #8F6B4D;             /* readout-dim */
+    color: ${border-strong};             /* readout-dim */
     background: transparent;
+}
+
+UnlockBar {
+    qproperty-trackBackgroundColor: ${bg-raised};
+    qproperty-stripeColor: ${warning};
+    qproperty-trackEdgeColor: ${border-default};
+    qproperty-thumbLockedColor: ${bg-elevated};
+    qproperty-thumbUnlockedColor: ${bg-elevated};
+    qproperty-thumbEdgeArmedColor: ${border-strong};
+    qproperty-thumbEdgePassColor: ${border-strong};
+}
+
+TimingBarWidget {
+    qproperty-barBackgroundColor: ${bg-raised};
+    qproperty-barTrackBackgroundColor: ${slider-track};
+    qproperty-barTrackBorderColor: ${border-subtle};
+    qproperty-barLabelColor: ${readout-dim};
+    qproperty-barValueColor: ${text-secondary};
+    qproperty-laserColor: ${info};
+    qproperty-distanceColor: ${positive};
+    qproperty-dovColor: ${warning};
+    qproperty-mcpColor: ${negative};
+    qproperty-barGradientStartFactor: 220;
+    qproperty-barGradientEndFactor: 100;
 }
 
 /* === TCU Normal-mode FIRE LASER button =================== */
 #FireLaserBtn {
-    background-color: #2A1217;  /* negative-bg */
-    color: #E6455D;             /* negative */
-    border: 1px solid #4D161E;  /* negative-dim */
+    background-color: ${negative-bg};  /* negative-bg */
+    color: ${negative};             /* negative */
+    border: 1px solid ${negative-hover-bg};  /* negative-dim */
     border-radius: 3px;
     padding: 6px 12px;
     font-size: 11px;
@@ -1005,19 +1193,31 @@ TopButton:pressed {
 }
 
 #FireLaserBtn:hover {
-    background-color: #4D161E;
-    color: #FF7589;
+    background-color: ${negative-hover-bg};
+    color: ${negative-hover-text};
 }
 
 #FireLaserBtn:pressed,
 #FireLaserBtn:checked {
-    background-color: #6A1A23;
-    color: #FFFFFF;
-    border-color: #E6455D;
+    background-color: ${negative-active-bg};
+    color: ${negative-active-text};
+    border-color: ${negative};
 }
 
 #FireLaserBtn:disabled {
-    background-color: #1C0E10;
-    color: #5C2A30;
-    border-color: #2E1418;
+    background-color: ${negative-disabled-bg};
+    color: ${negative-disabled-text};
+    border-color: ${negative-disabled-border};
+}
+
+QPushButton[vidActive="true"] {
+    background-color: ${positive-bg};
+    color: ${positive};
+    border-color: ${positive-border};
+}
+
+QPushButton[vidActive="true"]:hover {
+    background-color: ${positive-hover-bg};
+    color: ${positive-hover-text};
+    border-color: ${positive-hover-border};
 }

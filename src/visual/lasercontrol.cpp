@@ -13,7 +13,7 @@ LaserControl::LaserControl(QWidget *parent, Lens *p_lens) :
 
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
 
-    set_theme();
+    apply_color_mode();
 
     laser_control = new QButtonGroup(this);
     laser_control->addButton(ui->BTN_CONTROL_A_1, 0);
@@ -80,16 +80,17 @@ LaserControl::~LaserControl()
     delete ui;
 }
 
-void LaserControl::set_theme()
+void LaserControl::apply_color_mode()
 {
-    ui->BTN_CONTROL_A_1->setIcon(QIcon(":/lens/" + QString(app_theme ? "light" : "dark") + "/iris_1"));
-    ui->BTN_CONTROL_A_2->setIcon(QIcon(":/lens/" + QString(app_theme ? "light" : "dark") + "/iris_2"));
-    ui->BTN_CONTROL_B_1->setIcon(QIcon(":/lens/" + QString(app_theme ? "light" : "dark") + "/iris_1"));
-    ui->BTN_CONTROL_B_2->setIcon(QIcon(":/lens/" + QString(app_theme ? "light" : "dark") + "/iris_2"));
-    ui->BTN_CONTROL_C_1->setIcon(QIcon(":/lens/" + QString(app_theme ? "light" : "dark") + "/iris_1"));
-    ui->BTN_CONTROL_C_2->setIcon(QIcon(":/lens/" + QString(app_theme ? "light" : "dark") + "/iris_2"));
-    ui->BTN_CONTROL_D_1->setIcon(QIcon(":/lens/" + QString(app_theme ? "light" : "dark") + "/iris_1"));
-    ui->BTN_CONTROL_D_2->setIcon(QIcon(":/lens/" + QString(app_theme ? "light" : "dark") + "/iris_2"));
+    const QString mode_dir = app_color_mode ? "light" : "dark";
+    ui->BTN_CONTROL_A_1->setIcon(QIcon(":/lens/" + mode_dir + "/iris_1"));
+    ui->BTN_CONTROL_A_2->setIcon(QIcon(":/lens/" + mode_dir + "/iris_2"));
+    ui->BTN_CONTROL_B_1->setIcon(QIcon(":/lens/" + mode_dir + "/iris_1"));
+    ui->BTN_CONTROL_B_2->setIcon(QIcon(":/lens/" + mode_dir + "/iris_2"));
+    ui->BTN_CONTROL_C_1->setIcon(QIcon(":/lens/" + mode_dir + "/iris_1"));
+    ui->BTN_CONTROL_C_2->setIcon(QIcon(":/lens/" + mode_dir + "/iris_2"));
+    ui->BTN_CONTROL_D_1->setIcon(QIcon(":/lens/" + mode_dir + "/iris_1"));
+    ui->BTN_CONTROL_D_2->setIcon(QIcon(":/lens/" + mode_dir + "/iris_2"));
 }
 
 void LaserControl::mousePressEvent(QMouseEvent *event)

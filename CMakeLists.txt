@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(GLI_user_panel LANGUAGES CXX VERSION 0.11.0.0)
+project(GLI_user_panel LANGUAGES CXX VERSION 0.12.0.0)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -8,7 +8,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(BUILD_STATIC 0)
@@ -35,7 +35,7 @@ if(WIN32)
     set(FFmpeg_DIR "${SDK_DIR}/ffmpeg")
     set(GCAN_DIR "${SDK_DIR}/GCAN")
     # YOLO/ONNX Runtime configuration (using SDK)
-    set(ONNXRUNTIME_DIR "${SDK_DIR}/onnxruntime")
+    set(ONNXRUNTIME_DIR "${SDK_DIR}/onnxruntime-gpu")
 else()
     set(OpenCV_DIR "/opt/OpenCV4.8.0")
     set(FFmpeg_DIR "/opt/FFmpeg5.1.3")
@@ -148,6 +148,8 @@ set(SOURCE_FILES
     src/util/timedqueue.h
     src/util/config.h
     src/util/config.cpp
+    src/util/thememanager.h
+    src/util/thememanager.cpp
     src/widgets/display.h
     src/widgets/display.cpp
     src/widgets/floatingwindow.h
@@ -174,8 +176,12 @@ set(SOURCE_FILES
     src/widgets/panels/tcupanel.cpp
     src/widgets/panels/consolepanel.h
     src/widgets/panels/consolepanel.cpp
+    src/widgets/panels/addonpanel.h
+    src/widgets/panels/addonpanel.cpp
     src/widgets/panels/panoramapanel.h
     src/widgets/panels/panoramapanel.cpp
+    src/widgets/udp709window.h
+    src/widgets/udp709window.cpp
     src/widgets/sidebar/rightstackcontainer.h
     src/widgets/sidebar/rightstackcontainer.cpp
     src/widgets/sidebar/imgprocwidget.h
@@ -261,6 +267,10 @@ set(SOURCE_FILES
     src/pipeline/ffmpegsource.cpp
     src/pipeline/scanparams.h
     src/pipeline/scanparams.cpp
+    src/protocol709/packetcodec.h
+    src/protocol709/packetcodec.cpp
+    src/protocol709/udp709service.h
+    src/protocol709/udp709service.cpp
     src/controller/devicemanager.h
     src/controller/devicemanager.cpp
     src/controller/tcucontroller.h
@@ -278,6 +288,8 @@ set(SOURCE_FILES
     resources/resources.qrc
     resources/style_dark.qss
     resources/style_light.qss
+    resources/themes/gruvbox/dark.json
+    resources/themes/gruvbox/light.json
 #    src/progsettings.h
 #    src/progsettings.cpp
 #    src/settings.ui
@@ -526,6 +538,27 @@ if(BUILD_TESTS)
     target_include_directories(test_scanparams PRIVATE src)
     target_link_libraries(test_scanparams Qt${QT_VERSION_MAJOR}::Test)
     add_test(NAME scanparams COMMAND test_scanparams)
+
+    add_executable(test_udp709_packetcodec
+        tests/test_udp709_packetcodec.cpp
+        src/protocol709/packetcodec.h
+        src/protocol709/packetcodec.cpp)
+    target_include_directories(test_udp709_packetcodec PRIVATE src)
+    target_link_libraries(test_udp709_packetcodec Qt${QT_VERSION_MAJOR}::Core)
+    add_test(NAME udp709_packetcodec COMMAND test_udp709_packetcodec)
+
+    add_executable(test_udp709_service
+        tests/test_udp709_service.cpp
+        src/protocol709/packetcodec.h
+        src/protocol709/packetcodec.cpp
+        src/protocol709/udp709service.h
+        src/protocol709/udp709service.cpp)
+    target_include_directories(test_udp709_service PRIVATE src)
+    target_link_libraries(test_udp709_service
+        Qt${QT_VERSION_MAJOR}::Test
+        Qt${QT_VERSION_MAJOR}::Core
+        Qt${QT_VERSION_MAJOR}::Network)
+    add_test(NAME udp709_service COMMAND test_udp709_service)
 
     add_executable(test_imageio tests/test_imageio.cpp src/image/imageio.h src/image/imageio.cpp)
     target_include_directories(test_imageio PRIVATE src)

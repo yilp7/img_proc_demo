@@ -33,13 +33,13 @@ extern "C" {
 
 #include <PixelType.h>
 
-extern QFont monaco, consolas, yozai;
+extern QFont monaco, consolas, sans_heiti;
 
 extern QTextCodec *locale_codec;
 
-extern uchar app_theme;
+extern uchar app_color_mode;
 
-extern QByteArray theme_dark, theme_light;
+extern QByteArray stylesheet_dark, stylesheet_light;
 
 extern QCursor cursor_dark_pointer, cursor_dark_resize_h, cursor_dark_resize_v, cursor_dark_resize_md, cursor_dark_resize_sd;
 extern QCursor cursor_light_pointer, cursor_light_resize_h, cursor_light_resize_v, cursor_light_resize_md, cursor_light_resize_sd;

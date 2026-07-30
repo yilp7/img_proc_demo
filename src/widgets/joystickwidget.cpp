@@ -10,6 +10,13 @@
 namespace {
 const double kStickRadiusFrac = 0.25; // stick cap radius as fraction of base radius
 const double kDefaultDeadzone = 0.1;
+
+bool updateColor(QColor &slot, const QColor &color)
+{
+    if (slot == color) return false;
+    slot = color;
+    return true;
+}
 }
 
 JoystickWidget::JoystickWidget(QWidget *parent) :
@@ -17,13 +24,61 @@ JoystickWidget::JoystickWidget(QWidget *parent) :
     m_stick_local(),
     m_direction(0.0, 0.0),
     m_deadzone_frac(kDefaultDeadzone),
-    m_pressed(false)
+    m_pressed(false),
+    m_base_edge_color(0x22, 0x22, 0x22),
+    m_base_dark_color(0x08, 0x08, 0x08),
+    m_base_light_color(0x1E, 0x1E, 0x1E),
+    m_base_groove_color(0x25, 0x25, 0x25),
+    m_glyph_color(0x5C, 0x4A, 0x3D),
+    m_handle_edge_color(0xE0, 0x92, 0x4A),
+    m_dome_dark_color(0x08, 0x08, 0x08),
+    m_dome_light_color(0x2A, 0x2A, 0x2A)
 {
     setObjectName("JoystickWidget");
     setAttribute(Qt::WA_StyledBackground, true);
     setMinimumSize(80, 80);
     setCursor(Qt::OpenHandCursor);
     m_stick_local = baseCenter();
+}
+
+void JoystickWidget::setBaseEdgeColor(const QColor &color)
+{
+    if (updateColor(m_base_edge_color, color)) update();
+}
+
+void JoystickWidget::setBaseDarkColor(const QColor &color)
+{
+    if (updateColor(m_base_dark_color, color)) update();
+}
+
+void JoystickWidget::setBaseLightColor(const QColor &color)
+{
+    if (updateColor(m_base_light_color, color)) update();
+}
+
+void JoystickWidget::setBaseGrooveColor(const QColor &color)
+{
+    if (updateColor(m_base_groove_color, color)) update();
+}
+
+void JoystickWidget::setGlyphColor(const QColor &color)
+{
+    if (updateColor(m_glyph_color, color)) update();
+}
+
+void JoystickWidget::setHandleEdgeColor(const QColor &color)
+{
+    if (updateColor(m_handle_edge_color, color)) update();
+}
+
+void JoystickWidget::setDomeDarkColor(const QColor &color)
+{
+    if (updateColor(m_dome_dark_color, color)) update();
+}
+
+void JoystickWidget::setDomeLightColor(const QColor &color)
+{
+    if (updateColor(m_dome_light_color, color)) update();
 }
 
 void JoystickWidget::setDeadzone(double fraction)
@@ -77,16 +132,6 @@ double JoystickWidget::baseRadius() const
 
 void JoystickWidget::paintEvent(QPaintEvent *)
 {
-    // Theme tokens — match prototype v3 / style_dark.qss.
-    static const QColor kBaseEdge   (0x22, 0x22, 0x22);  // hw / dark ring edge
-    static const QColor kBaseDark   (0x08, 0x08, 0x08);  // inner gradient end
-    static const QColor kBaseLight  (0x1E, 0x1E, 0x1E);  // inner gradient start
-    static const QColor kBaseGroove (0x25, 0x25, 0x25);  // concentric ring stroke
-    static const QColor kGlyph      (0x5C, 0x4A, 0x3D);  // joy-dir (text-dim)
-    static const QColor kHandleEdge (0xE0, 0x92, 0x4A);  // accent (joy-handle)
-    static const QColor kDomeDark   (0x08, 0x08, 0x08);  // dome gradient end
-    static const QColor kDomeLight  (0x2A, 0x2A, 0x2A);  // dome gradient start
-
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
 
@@ -96,15 +141,15 @@ void JoystickWidget::paintEvent(QPaintEvent *)
 
     // Base fill: radial gradient (highlight at upper-left, dark at lower-right).
     QRadialGradient base_g(c.x() - r * 0.16, c.y() - r * 0.24, r * 1.4);
-    base_g.setColorAt(0.0, kBaseLight);
-    base_g.setColorAt(1.0, kBaseDark);
-    p.setPen(QPen(kBaseEdge, 2.0));
+    base_g.setColorAt(0.0, m_base_light_color);
+    base_g.setColorAt(1.0, m_base_dark_color);
+    p.setPen(QPen(m_base_edge_color, 2.0));
     p.setBrush(base_g);
     p.drawEllipse(c, r, r);
 
     // Concentric inset grooves (3) — match prototype radial-gradient rings.
     p.setBrush(Qt::NoBrush);
-    p.setPen(QPen(kBaseGroove, 1.0));
+    p.setPen(QPen(m_base_groove_color, 1.0));
     for (double frac : {0.22, 0.42, 0.62}) {
         p.drawEllipse(c, r * frac, r * frac);
     }
@@ -113,7 +158,7 @@ void JoystickWidget::paintEvent(QPaintEvent *)
     QFont gf = p.font();
     gf.setPointSizeF(qMax(6.0, r * 0.10));
     p.setFont(gf);
-    p.setPen(kGlyph);
+    p.setPen(m_glyph_color);
     const double gpad = qMax(7.0, r * 0.10);
     auto drawGlyph = [&](const QString &g, QPointF at) {
         const QRectF box(at.x() - 8, at.y() - 8, 16, 16);
@@ -128,14 +173,14 @@ void JoystickWidget::paintEvent(QPaintEvent *)
     const double stick_r = r * (kStickRadiusFrac + 0.21); // ~46% — matches 56/120 in proto
     const double dome_r  = stick_r * (40.0 / 56.0);
 
-    p.setPen(QPen(kHandleEdge, 2.0));
+    p.setPen(QPen(m_handle_edge_color, 2.0));
     p.setBrush(Qt::NoBrush);
     p.drawEllipse(m_stick_local, stick_r, stick_r);
 
     QRadialGradient dome_g(m_stick_local.x() - dome_r * 0.24,
                            m_stick_local.y() - dome_r * 0.32, dome_r * 1.4);
-    dome_g.setColorAt(0.0, kDomeLight);
-    dome_g.setColorAt(1.0, kDomeDark);
+    dome_g.setColorAt(0.0, m_dome_light_color);
+    dome_g.setColorAt(1.0, m_dome_dark_color);
     p.setPen(Qt::NoPen);
     p.setBrush(dome_g);
     p.drawEllipse(m_stick_local, dome_r, dome_r);

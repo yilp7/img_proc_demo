@@ -101,17 +101,14 @@ void Coordinate::setup(QString name)
     set_name = new InfoLabel(this);
     set_name->setText(name);
     set_name->setFont(monaco);
-//    set_name->setStyleSheet("color: #DEC4B0;");
     set_name->setGeometry(0, 0, this->fontMetrics().width(name) + 10, 13);
     coord_x = new InfoLabel(this);
     coord_x->setText("X: xxxx");
     coord_x->setFont(monaco);
-//    coord_x->setStyleSheet("color: #DEC4B0;");
     coord_x->setGeometry(set_name->geometry().right() + 10, 0, this->fontMetrics().width("X: xxxx") + 10, 13);
     coord_y = new InfoLabel(this);
     coord_y->setText("Y: yyyy");
     coord_y->setFont(monaco);
-//    coord_y->setStyleSheet("color: #DEC4B0;");
     coord_y->setGeometry(set_name->geometry().right() + 10, 17, this->fontMetrics().width("Y: yyyy") + 10, 13);
 
     this->resize(set_name->width() + 10 + coord_x->width(), 30);

@@ -16,6 +16,9 @@ class QPaintEvent;
 class ArcSliderWidget : public QWidget
 {
     Q_OBJECT
+    Q_PROPERTY(QColor activeColor READ activeColor WRITE setActiveColor)
+    Q_PROPERTY(QColor inactiveTrackColor READ inactiveTrackColor WRITE setInactiveTrackColor)
+    Q_PROPERTY(QColor thumbEdgeColor READ thumbEdgeColor WRITE setThumbEdgeColor)
 public:
     explicit ArcSliderWidget(QWidget *parent = nullptr);
 
@@ -37,6 +40,10 @@ public:
     // Does not affect value mapping or signals.
     void   setActiveColor(const QColor &c);
     QColor activeColor() const { return m_active_color; }
+    void   setInactiveTrackColor(const QColor &c);
+    QColor inactiveTrackColor() const { return m_inactive_track_color; }
+    void   setThumbEdgeColor(const QColor &c);
+    QColor thumbEdgeColor() const { return m_thumb_edge_color; }
 
     // Pure math helpers — testable without constructing a widget.
     // y=0 is top (=max); y=trackHeight is bottom (=min).
@@ -70,6 +77,8 @@ private:
     int    m_max_speed;
     int    m_last_signed_speed;
     QColor m_active_color;
+    QColor m_inactive_track_color;
+    QColor m_thumb_edge_color;
 };
 
 #endif // ARCSLIDERWIDGET_H

@@ -2,19 +2,150 @@
 #include "ui_user_panel.h"
 #include "ui_preferences.h"
 #include "util/constants.h"
+#include "util/thememanager.h"
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDebug>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMetaType>
+#include <QPluginLoader>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QSignalBlocker>
+#include <QShortcut>
 #include <QStyle>
+#include <QStyleOptionComboBox>
+#include <QStylePainter>
 #include <QVBoxLayout>
+
+#include <cmath>
+
+namespace {
+class RightAlignedComboBox : public QComboBox
+{
+public:
+    explicit RightAlignedComboBox(QWidget *parent = nullptr) : QComboBox(parent) {}
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        Q_UNUSED(event)
+        QStylePainter painter(this);
+        QStyleOptionComboBox opt;
+        initStyleOption(&opt);
+        opt.currentText.clear();
+        painter.drawComplexControl(QStyle::CC_ComboBox, opt);
+        painter.drawControl(QStyle::CE_ComboBoxLabel, opt);
+
+        QRect text_rect = style()->subControlRect(QStyle::CC_ComboBox, &opt,
+                                                  QStyle::SC_ComboBoxEditField, this);
+        painter.drawText(text_rect.adjusted(0, 0, -2, 0),
+                         Qt::AlignRight | Qt::AlignVCenter,
+                         currentText());
+    }
+};
+
+void repolish(QWidget *w)
+{
+    if (!w || !w->style()) return;
+    w->style()->unpolish(w);
+    w->style()->polish(w);
+    w->update();
+}
+
+void setPortLabelState(QLabel *label, const QString &state_token)
+{
+    if (!label) return;
+    const QString state = state_token.toLower();
+    const bool network = state.contains("network");
+    const bool connected = state.contains("connected");
+    label->setProperty("portState", connected ? "connected" : "error");
+    label->setProperty("portNetwork", network ? "true" : "false");
+    repolish(label);
+}
+
+void setPortLabelStatus(QLabel *label, qint32 status)
+{
+    if (!label) return;
+    label->setProperty("portState", (status & ControlPort::SERIAL_CONNECTED) ? "connected" : "error");
+    label->setProperty("portNetwork", (status & ControlPort::TCP_CONNECTED) ? "true" : "false");
+    repolish(label);
+}
+
+void setActiveButtonState(QWidget *button, const QString &state_token)
+{
+    if (!button) return;
+    const QString state = state_token.toLower();
+    const bool active = state == "true" || state == "active";
+    button->setProperty("vidActive", active ? "true" : "false");
+    repolish(button);
+}
+
+void setHideButtonDirection(QWidget *button, bool hide_left)
+{
+    if (!button) return;
+    button->setProperty("hideDirection", hide_left ? "right" : "left");
+    repolish(button);
+}
+
+QPoint detectionFollowPoint(const QRect &box)
+{
+    return QPoint(box.x() + box.width() / 2,
+                  box.y() + box.height() * 2 / 3);
+}
+
+constexpr quint8 Udp709LensZoomIn = 0x80;
+constexpr quint8 Udp709LensZoomOut = 0x40;
+constexpr quint8 Udp709LensFocusNear = 0x20;
+constexpr quint8 Udp709LensFocusFar = 0x10;
+constexpr quint8 Udp709LensVisibleLight = 0x08;
+constexpr quint8 Udp709LensInfrared = 0x04;
+constexpr quint8 Udp709LensLaserNir = 0x02;
+constexpr quint8 Udp709ImageEnhance = 0x80;
+constexpr quint8 Udp709DenoiseFrameAverage = 0x40;
+constexpr quint8 Udp709DenoiseEcc = 0x20;
+
+int udp709LensOperation(quint8 control, bool *valid)
+{
+    const bool zoom_in = control & Udp709LensZoomIn;
+    const bool zoom_out = control & Udp709LensZoomOut;
+    const bool focus_near = control & Udp709LensFocusNear;
+    const bool focus_far = control & Udp709LensFocusFar;
+    const int action_count = static_cast<int>(zoom_in) + static_cast<int>(zoom_out)
+            + static_cast<int>(focus_near) + static_cast<int>(focus_far);
+
+    if (action_count == 0) {
+        *valid = true;
+        return -1;
+    }
+
+    const bool visible_light = control & Udp709LensVisibleLight;
+    const bool infrared = control & Udp709LensInfrared;
+    const bool laser_nir = control & Udp709LensLaserNir;
+    const int channel_count = static_cast<int>(visible_light) + static_cast<int>(infrared)
+            + static_cast<int>(laser_nir);
+    if (action_count != 1 || channel_count != 1 || laser_nir) {
+        *valid = false;
+        return -1;
+    }
+
+    *valid = true;
+    if (visible_light) {
+        if (zoom_in) return UDPPTZ::VL_ZOOM_IN;
+        if (zoom_out) return UDPPTZ::VL_ZOOM_OUT;
+        if (focus_near) return UDPPTZ::VL_FOCUS_NEAR;
+        return UDPPTZ::VL_FOCUS_FAR;
+    }
+    if (zoom_in) return UDPPTZ::IR_ZOOM_IN;
+    if (zoom_out) return UDPPTZ::IR_ZOOM_OUT;
+    if (focus_near) return UDPPTZ::IR_FOCUS_NEAR;
+    return UDPPTZ::IR_FOCUS_FAR;
+}
+}
 
 static bool throttle_check(QElapsedTimer &t)
 {
@@ -160,18 +291,16 @@ void UserPanel::position_panorama_panel()
     const int central_h = ui->CENTRAL->height();
     if (central_w <= 0 || central_h <= 0) return;
 
-    const QRect display = ui->SOURCE_DISPLAY->geometry();
+    const QPoint display_top_left = ui->SOURCE_DISPLAY->mapTo(ui->CENTRAL, QPoint(0, 0));
+    const QRect display(display_top_left, ui->SOURCE_DISPLAY->size());
     const int margin = 10;
     const int right_pad = 10;
-    const int left_pad = 10;
-    const int panel_gap = 12;
-    const int bottom_margin = 60;
+    const int bottom_margin = 100;
     const int height = qMin(180, qMax(130, central_h / 5));
-    int x = left_pad + (m_optics_panel ? m_optics_panel->width() : 240) + panel_gap;
 
     const int min_width = qMin(360, qMax(1, central_w - margin - right_pad));
-    const int max_x = qMax(margin, central_w - min_width - right_pad);
-    x = qBound(margin, x, max_x);
+    const int max_x = qMax(0, central_w - min_width - right_pad);
+    const int x = qBound(0, display.left(), max_x);
     const int available_width = qMax(min_width, central_w - x - right_pad);
     const int desired_width = qMax(min_width, display.width());
     const int width = qMin(available_width, desired_width);
@@ -188,10 +317,58 @@ void UserPanel::position_panorama_panel()
     m_panorama_panel->setGeometry(x, y, width, height);
 }
 
+void UserPanel::position_addon_panel()
+{
+    if (!m_addon_panel || !ui || !ui->CENTRAL || !ui->SOURCE_DISPLAY) return;
+    if (ui->SOURCE_DISPLAY->width() <= 0 || ui->SOURCE_DISPLAY->height() <= 0) return;
+
+    const QPoint top_left = ui->SOURCE_DISPLAY->mapTo(ui->CENTRAL, QPoint(0, 0));
+    m_addon_panel->setGeometry(QRect(top_left, ui->SOURCE_DISPLAY->size()));
+    m_addon_panel->fitPluginChildren();
+    if (m_addon_panel->isVisible()) m_addon_panel->raise();
+}
+
+void UserPanel::position_custom_title_label()
+{
+    if (!m_custom_title_label || !ui || !ui->CENTRAL || !ui->SOURCE_DISPLAY || !ui->TITLE) return;
+
+    const bool overlay_mode = (m_setup_overlay && m_setup_overlay->isVisible())
+                           || (m_scan_overlay && m_scan_overlay->isVisible());
+    const bool monitor_mode = (ui->TITLE->current_mode() == TopBar::Mode::Monitor);
+    const QString text = m_custom_title_label->text();
+    if (!monitor_mode || overlay_mode || text.isEmpty()) {
+        m_custom_title_label->hide();
+        return;
+    }
+
+    const QPoint display_top_left = ui->SOURCE_DISPLAY->mapTo(ui->CENTRAL, QPoint(0, 0));
+    const QRect display(display_top_left, ui->SOURCE_DISPLAY->size());
+    const int max_width = qMax(80, display.width() - 40);
+
+    m_custom_title_label->setMaximumWidth(max_width);
+    m_custom_title_label->ensurePolished();
+    m_custom_title_label->adjustSize();
+
+    const QSize hint = m_custom_title_label->size().isValid()
+                     ? m_custom_title_label->size()
+                     : m_custom_title_label->sizeHint();
+    const int w = qMin(max_width, hint.width());
+    const int h = hint.height();
+    const int max_x = qMax(display.left(), display.right() - w + 1);
+    const int x = qBound(display.left(), display.center().x() - w / 2, max_x);
+    const int title_center_y = ui->CENTRAL->height() - 40;
+    const int y = qBound(0, title_center_y - h / 2, qMax(0, ui->CENTRAL->height() - h));
+
+    m_custom_title_label->setGeometry(x, y, w, h);
+    m_custom_title_label->show();
+    m_custom_title_label->raise();
+}
+
 void UserPanel::raise_floating_panels()
 {
     if (m_optics_panel)  m_optics_panel ->raise();
     if (m_tcu_panel)     m_tcu_panel    ->raise();
+    if (m_addon_panel && m_addon_panel->isVisible()) m_addon_panel->raise();
     if (m_console_panel) m_console_panel->raise();
     if (m_panorama_panel && m_panorama_panel->isVisible()) m_panorama_panel->raise();
 }
@@ -210,6 +387,44 @@ void UserPanel::set_panorama_panel_visible(bool visible)
     }
 }
 
+void UserPanel::apply_theme_selection(const QString &theme_name, const QString &color_mode)
+{
+    if (!config) return;
+
+    QString theme = theme_name.trimmed();
+    if (theme.isEmpty() || theme == "default") theme = "gruvbox";
+    const QString mode = color_mode.compare("light", Qt::CaseInsensitive) == 0 ? QString("light") : QString("dark");
+
+    if (m_theme_combo) {
+        int idx = m_theme_combo->findData(theme);
+        if (idx < 0) idx = m_theme_combo->findText(theme);
+        if (idx < 0 && m_theme_combo->count() > 0) {
+            theme = m_theme_combo->itemData(0).toString();
+            if (theme.isEmpty()) theme = m_theme_combo->itemText(0);
+        }
+    }
+
+    Config::UISettings &ui_settings = config->get_data().ui;
+    ui_settings.theme = theme;
+    ui_settings.color_mode = mode;
+    ui_settings.dark_mode = (mode == "dark");
+
+    QByteArray style = ThemeManager::instance().buildStyleSheet(theme, mode);
+    if (!style.isEmpty()) {
+        if (mode == "light") stylesheet_light = style;
+        else stylesheet_dark = style;
+        ThemeManager::instance().setCurrentTheme(theme, mode);
+        qApp->setStyleSheet(mode == "light" ? stylesheet_light : stylesheet_dark);
+    }
+
+    if (m_theme_combo) {
+        QSignalBlocker block(m_theme_combo);
+        int idx = m_theme_combo->findData(theme);
+        if (idx < 0) idx = m_theme_combo->findText(theme);
+        if (idx >= 0) m_theme_combo->setCurrentIndex(idx);
+    }
+}
+
 UserPanel::UserPanel(QWidget *parent) :
     QMainWindow(parent),
     mouse_pressed(false),
@@ -219,8 +434,14 @@ UserPanel::UserPanel(QWidget *parent) :
     m_optics_panel(nullptr),
     m_tcu_panel(nullptr),
     m_console_panel(nullptr),
+    m_addon_panel(nullptr),
+    m_addon_panel_requested(false),
     m_panorama_panel(nullptr),
+    m_udp709_window(nullptr),
     m_scan_panorama_toggle(nullptr),
+    m_theme_label(nullptr),
+    m_theme_combo(nullptr),
+    m_custom_title_label(nullptr),
     m_panorama_panel_user_placed(false),
     m_panorama_scan_active(false),
     m_right_stack(nullptr),
@@ -245,6 +466,8 @@ UserPanel::UserPanel(QWidget *parent) :
     laser_settings(NULL),
     config(NULL),
     aliasing(NULL),
+    pluginInterface(nullptr),
+    m_addon_plugin_loader(nullptr),
 #if SIMPLE_UI
     gain_analog_edit(23),
 #else //SIMPLE_UI
@@ -322,7 +545,7 @@ UserPanel::UserPanel(QWidget *parent) :
         QLabel* fps_main = new QLabel("0.00 fps", ui->CENTRAL);
         fps_main->setObjectName("FPS_LABEL");
         fps_main->setAttribute(Qt::WA_TranslucentBackground);
-        fps_main->setStyleSheet("color: #F5E1CE; background-color: rgba(0, 0, 0, 130); padding: 1px 4px; border-radius: 2px;");
+        fps_main->setAttribute(Qt::WA_StyledBackground, true);
         fps_main->hide(); // shown once resizeEvent places it
         m_router.display(DisplayId::Main).fps_label = fps_main;
     }
@@ -332,7 +555,7 @@ UserPanel::UserPanel(QWidget *parent) :
         QLabel* lbl = new QLabel("0.00 fps", w);
         lbl->setObjectName("FPS_LABEL");
         lbl->setAttribute(Qt::WA_TranslucentBackground);
-        lbl->setStyleSheet("color: #F5E1CE; background-color: rgba(0, 0, 0, 130); padding: 1px 4px; border-radius: 2px;");
+        lbl->setAttribute(Qt::WA_StyledBackground, true);
         lbl->move(6, w->height() - 20);
         lbl->show();
         lbl->raise();
@@ -348,7 +571,7 @@ UserPanel::UserPanel(QWidget *parent) :
         QLabel* lbl = new QLabel(tr("STREAM ENDED"), ui->CENTRAL);
         lbl->setObjectName("SOURCE_DEAD_LABEL");
         lbl->setAttribute(Qt::WA_TranslucentBackground);
-        lbl->setStyleSheet("color: #F08080; background-color: rgba(0, 0, 0, 150); padding: 1px 4px; border-radius: 2px;");
+        lbl->setAttribute(Qt::WA_StyledBackground, true);
         lbl->hide();
         m_router.display(DisplayId::Main).source_dead_label = lbl;
     }
@@ -358,12 +581,27 @@ UserPanel::UserPanel(QWidget *parent) :
         QLabel* lbl = new QLabel(tr("STREAM ENDED"), w);
         lbl->setObjectName("SOURCE_DEAD_LABEL");
         lbl->setAttribute(Qt::WA_TranslucentBackground);
-        lbl->setStyleSheet("color: #F08080; background-color: rgba(0, 0, 0, 150); padding: 1px 4px; border-radius: 2px;");
+        lbl->setAttribute(Qt::WA_StyledBackground, true);
         lbl->adjustSize();
         lbl->move(w->width() - lbl->width() - 6, w->height() - 20);
         lbl->hide();
         m_router.display(did).source_dead_label = lbl;
     }
+
+    m_custom_title_label = new QLabel(QString(), ui->CENTRAL);
+    m_custom_title_label->setObjectName("MONITOR_CUSTOM_TITLE");
+    {
+        QFont title_font(monaco);
+        title_font.setPixelSize(52);
+        title_font.setBold(true);
+        m_custom_title_label->setFont(title_font);
+    }
+    m_custom_title_label->setAttribute(Qt::WA_TranslucentBackground);
+    m_custom_title_label->setAttribute(Qt::WA_StyledBackground, true);
+    m_custom_title_label->setAlignment(Qt::AlignCenter);
+    m_custom_title_label->setWordWrap(false);
+    m_custom_title_label->hide();
+
     // Resnapshot ProcessingParams whenever any Display widget resizes — keeps
     // display_region / display_width / display_height in sync with the widget,
     // so the pipeline's crop+scale (pipelineprocessor.cpp:632/652) targets the
@@ -371,6 +609,7 @@ UserPanel::UserPanel(QWidget *parent) :
     // stale pre-resize crop to fill the new widget.
     for (int i = 0; i < 3; i++)
         connect(m_router.display(static_cast<DisplayId>(i)).widget, &Display::widget_resized, this, [this]() { update_processing_params(); });
+    connect(ui->SOURCE_DISPLAY, &Display::view_changed, this, [this]() { update_processing_params(); });
 
     // center toolbar: reparent existing Tools + INFO_CHECK into a framed row
     m_center_toolbar = new QFrame(ui->MID);
@@ -391,26 +630,26 @@ UserPanel::UserPanel(QWidget *parent) :
         m_center_toolbar->adjustSize();
     }
 
-    // panel toggle bar: 3 checkable buttons, positioned top-right in resizeEvent
+    // panel toggle bar: checkable buttons, positioned top-right in resizeEvent
     m_pbar = new QFrame(ui->CENTRAL);
     m_pbar->setObjectName("PANEL_TOGGLE_BAR");
     {
         auto *pl = new QHBoxLayout(m_pbar);
         pl->setContentsMargins(3, 2, 3, 2);
         pl->setSpacing(3);
-        auto makeToggle = [&](const char *text, const char *name) -> QPushButton * {
+        auto makeToggle = [&](const QString &text, const char *name, bool checked = true) -> QPushButton * {
             auto *btn = new QPushButton(text, m_pbar);
             btn->setObjectName(name);
             btn->setCheckable(true);
-            btn->setChecked(true);
+            btn->setChecked(checked);
             btn->setFixedHeight(20);
-            // stretch=1 so the 3 buttons spread evenly across the pbar row.
+            // stretch=1 so the buttons spread evenly across the pbar row.
             pl->addWidget(btn, 1);
             return btn;
         };
-        auto *optics_btn  = makeToggle("Optics",  "PBAR_OPTICS_BTN");
-        auto *tcu_btn     = makeToggle("TCU",     "PBAR_TCU_BTN");
-        auto *console_btn = makeToggle("Console", "PBAR_CONSOLE_BTN");
+        auto *optics_btn  = makeToggle(tr("Optics"),  "PBAR_OPTICS_BTN");
+        auto *tcu_btn     = makeToggle(tr("TCU"),     "PBAR_TCU_BTN");
+        auto *console_btn = makeToggle(tr("Console"), "PBAR_CONSOLE_BTN");
         m_pbar->adjustSize();
         m_pbar->raise();
 
@@ -438,6 +677,12 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // initialize config system
     config = new Config(this);
+
+    m_udp709_window = new Udp709Window(config, this);
+    auto *udp709Shortcut = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_9), this);
+    udp709Shortcut->setContext(Qt::ApplicationShortcut);
+    connect(udp709Shortcut, &QShortcut::activated,
+            m_udp709_window, &Udp709Window::toggleVisible);
 
     // SETUP overlay -- owns the legacy Preferences widgets (built via
     // Ui::Preferences::setupUi on a hidden form root, then re-parented into
@@ -482,7 +727,7 @@ UserPanel::UserPanel(QWidget *parent) :
 //    qDebug() << QStandardPaths::writableLocation(QStandardPaths::HomeLocation).section('/', 0, -1);
     TEMP_SAVE_LOCATION = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
 
-    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s/%s);", app_theme ? "light" : "dark", hide_left ? "right" : "left"));
+    setHideButtonDirection(ui->HIDE_BTN, hide_left);
 
     connect(this, SIGNAL(set_src_pixmap(QPixmap)), ui->SOURCE_DISPLAY, SLOT(setPixmap(QPixmap)), Qt::QueuedConnection);
     connect(ui->SOURCE_DISPLAY, &Display::add_roi, this,
@@ -657,7 +902,7 @@ UserPanel::UserPanel(QWidget *parent) :
                 const int area = box.width() * box.height();
                 if (best_area == 0 || area < best_area) {
                     best_area = area;
-                    target = box.center();
+                    target = detectionFollowPoint(box);
                 }
             }
             m_device_mgr->point_ptz_to_target(target, disp->width(), disp->height());
@@ -667,9 +912,9 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // PTZ button group, VID camera buttons, VID toggle buttons → DeviceManager
 
-    ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
-    m_setup_overlay->w()->REFRESH_AVAILABLE_PORTS_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
-    ui->SWITCH_TCU_UI_BTN->setIcon(QIcon(":/tools/" + QString(app_theme ? "light" : "dark") + "/switch"));
+    ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/self_test"));
+    m_setup_overlay->w()->REFRESH_AVAILABLE_PORTS_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/self_test"));
+    ui->SWITCH_TCU_UI_BTN->setIcon(QIcon(":/tools/" + QString(app_color_mode ? "light" : "dark") + "/switch"));
 
     // PTZ speed slider → DeviceManager
 
@@ -690,12 +935,13 @@ UserPanel::UserPanel(QWidget *parent) :
     m_aux_panel = new AuxPanelManager(this);
     {
         QStringList alt_options_str;
-        alt_options_str << "DATA" << "HIST" << "PTZ" << "ALT" << "ADDON" << "VID" << "YOLO";
+        alt_options_str << tr("DATA") << tr("HIST") << tr("PTZ") << tr("ALT")
+                        << tr("ADDON") << tr("VID") << tr("YOLO");
         ui->MISC_OPTION_1->addItems(alt_options_str);
         ui->MISC_OPTION_2->addItems(alt_options_str);
         ui->MISC_OPTION_3->addItems(alt_options_str);
-        ui->MISC_OPTION_1->setCurrentIndex(0);
-        ui->MISC_OPTION_2->setCurrentIndex(2);
+        ui->MISC_OPTION_1->setCurrentIndex(1);
+        ui->MISC_OPTION_2->setCurrentIndex(3);
         ui->MISC_OPTION_3->setCurrentIndex(5);
 
         QFont misc_f("consolas", 8);
@@ -711,8 +957,8 @@ UserPanel::UserPanel(QWidget *parent) :
         display_grp->addButton(ui->MISC_RADIO_2);
         display_grp->addButton(ui->MISC_RADIO_3);
         display_grp->setExclusive(true);
-        ui->MISC_RADIO_1->setChecked(true);
-        ui->MISC_DISPLAY->setCurrentIndex(1);
+        ui->MISC_RADIO_3->setChecked(true);
+        ui->MISC_DISPLAY->setCurrentIndex(6);
 
         // display_page_changed re-routed to ConsolePanel tab in setup_panels() below
     }
@@ -721,6 +967,7 @@ UserPanel::UserPanel(QWidget *parent) :
     m_optics_panel  = new OpticsPanel(ui->CENTRAL);
     m_tcu_panel     = new TCUPanel(ui->CENTRAL);
     m_console_panel = new ConsolePanel(ui->CENTRAL);
+    m_addon_panel   = new AddonPanel(ui->CENTRAL);
     m_panorama_panel = new PanoramaPanel(ui->CENTRAL);
 
     // OpticsPanel: LENS_STATIC + PTZ_GRP (from LEFT/PARAMS_STATIC/PTZ_PAGE)
@@ -732,39 +979,30 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // ConsolePanel: pull pages from MISC_DISPLAY stacked widget
     m_console_panel->setup(ui->MISC_DISPLAY);
-    // Replace old MISC_OPTION/MISC_RADIO wiring with tab-widget routing.
-    // MISC_DISPLAY_GRP and its combos/radios are no longer the driver — tab
-    // clicks set alt_display_option directly. Master used combo_index → option
-    // 1..7 over [DATA, HIST, PTZ, ALT, ADDON, VID, YOLO]; with PTZ now in the
-    // OpticsPanel that index is dropped, giving the map below.
+    // Replace old MISC_OPTION/MISC_RADIO wiring with ConsolePanel's local
+    // three-selector switcher. Master used combo_index -> option 1..7 over
+    // [DATA, HIST, PTZ, ALT, ADDON, VID, YOLO]; ConsolePanel emits the same
+    // old option ids for the pages still hosted here.
     ui->MISC_DISPLAY_GRP->hide();
     disconnect(m_aux_panel, &AuxPanelManager::display_page_changed, nullptr, nullptr);
-    // tab index → master alt_display_option value (preserving HIST==2 so the
-    // pipeline histogram check at pipelineprocessor.cpp:610 still fires).
-    // YOLO tab dropped — its content moved to IMG PROC MODELS tab.
-    static const int tab_to_alt_opt[] = {
-        1,  // DATA
-        2,  // HIST
-        4,  // ALT  (master combo_index 3 → option 4)
-        5,  // ADDON
-        6,  // VID
-        0,  // 3D placeholder — no aux-panel option
+    auto sync_console_option = [this](int optionId) {
+        // select_display takes combo_index and stores combo_index + 1. The 3D
+        // placeholder has no master option id, so pass -1 to clear side output.
+        m_aux_panel->select_display(optionId > 0 ? optionId - 1 : -1);
     };
-    connect(m_console_panel->tab_widget(), &QTabWidget::currentChanged,
-            this, [this](int idx) {
-        if (idx < 0 || idx >= (int)(sizeof(tab_to_alt_opt) / sizeof(tab_to_alt_opt[0]))) return;
-        // select_display takes combo_index and stores combo_index + 1, so pass
-        // (option - 1) here to land at the desired alt_display_option value.
-        m_aux_panel->select_display(tab_to_alt_opt[idx] - 1);
-    });
+    connect(m_console_panel, &ConsolePanel::optionSelected,
+            this, sync_console_option);
+    sync_console_option(m_console_panel->currentOption());
 
     m_optics_panel ->resize(240, 390); m_optics_panel ->move(0, 0);
     m_tcu_panel    ->resize(250, 360); m_tcu_panel    ->move(0, 0);
     m_console_panel->resize(208, 220); m_console_panel->move(0, 0);
+    m_addon_panel  ->resize(260, 220); m_addon_panel  ->move(0, 0);
     m_panorama_panel->resize(960, 150); m_panorama_panel->move(0, 0);
     m_optics_panel ->show();
     m_tcu_panel    ->show();
     m_console_panel->show();
+    m_addon_panel  ->hide();
     m_panorama_panel->hide();
 
     // Wire panel close-button → uncheck corresponding pbar toggle
@@ -775,6 +1013,9 @@ UserPanel::UserPanel(QWidget *parent) :
         if (ob) connect(m_optics_panel,  &FloatingPanel::hideRequested, ob, [ob]() { ob->setChecked(false); });
         if (tb) connect(m_tcu_panel,     &FloatingPanel::hideRequested, tb, [tb]() { tb->setChecked(false); });
         if (cb) connect(m_console_panel, &FloatingPanel::hideRequested, cb, [cb]() { cb->setChecked(false); });
+        connect(m_addon_panel, &FloatingPanel::hideRequested, this, [this]() {
+            m_addon_panel_requested = false;
+        });
         connect(m_panorama_panel, &FloatingPanel::dragged, this, [this](QPoint) {
             m_panorama_panel_user_placed = true;
         });
@@ -803,7 +1044,7 @@ UserPanel::UserPanel(QWidget *parent) :
     // currentIndex maps 1:1 to the enum value (Main=0, Alt1=1, Alt2=2).
     QComboBox *display_picker = new QComboBox(m_img_proc);
     display_picker->setObjectName("DISPLAY_PICKER");
-    display_picker->addItems({"MAIN", "ALT1", "ALT2"});
+    display_picker->addItems(QStringList() << tr("MAIN") << tr("ALT1") << tr("ALT2"));
     display_picker->setCurrentIndex(static_cast<int>(m_picked_display));
     connect(display_picker, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [this](int idx) {
@@ -822,6 +1063,12 @@ UserPanel::UserPanel(QWidget *parent) :
                       ui->IMG_3D_CHECK,        ui->RANGE_THRESH_EDIT,
                       ui->RESET_3D_BTN,
                       ui->PSEUDOCOLOR_CHK);
+    connect(m_img_proc, &ImgProcWidget::auto_follow_changed, this, [this](bool enabled) {
+        if (!enabled && m_detection_auto_follow_active && m_device_mgr) {
+            m_device_mgr->ptz_stop_btn_clicked();
+        }
+        if (!enabled) m_detection_auto_follow_active = false;
+    });
 
     // SaveOptionsWidget slots are (capture ORI, capture RES, record ORI, record RES).
     // The action handlers (on_SAVE_*_clicked) define the real semantic:
@@ -907,12 +1154,51 @@ UserPanel::UserPanel(QWidget *parent) :
         pg->setSpacing(4);
         auto *export_btn = new QPushButton(tr("Export"), presets);
         auto *import_btn = new QPushButton(tr("Import"), presets);
+        auto *reload_btn = new QPushButton(tr("Reload"), presets);
         export_btn->setObjectName("EXPORT_PREF_BTN");
         import_btn->setObjectName("IMPORT_PREF_BTN");
-        pg->addWidget(export_btn, 0, 0);
-        pg->addWidget(import_btn, 0, 1);
+        reload_btn->setObjectName("RELOAD_PREF_BTN");
+        export_btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        import_btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        reload_btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        auto *preset_btn_row = new QWidget(presets);
+        preset_btn_row->setObjectName("PRESET_BUTTON_ROW");
+        preset_btn_row->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        auto *preset_btn_l = new QHBoxLayout(preset_btn_row);
+        preset_btn_l->setContentsMargins(0, 0, 0, 0);
+        preset_btn_l->setSpacing(4);
+        preset_btn_l->addWidget(export_btn, 1);
+        preset_btn_l->addWidget(import_btn, 1);
+        pg->addWidget(preset_btn_row, 0, 0, 1, 2);
+        pg->addWidget(reload_btn, 1, 0, 1, 2);
+
+        m_theme_label = new QLabel(tr("THEME"), presets);
+        m_theme_label->setObjectName("THEME_LABEL");
+        m_theme_combo = new RightAlignedComboBox(presets);
+        m_theme_combo->setObjectName("THEME_LIST");
+        m_theme_combo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        for (const QString &theme : ThemeManager::instance().availableThemes()) {
+            m_theme_combo->addItem(theme, theme);
+        }
+        if (m_theme_combo->count() == 0) {
+            m_theme_combo->addItem("gruvbox", "gruvbox");
+        }
+        pg->addWidget(m_theme_label, 2, 0);
+        pg->addWidget(m_theme_combo, 2, 1);
+        pg->setColumnStretch(1, 1);
+
         connect(export_btn, &QPushButton::clicked, this, &UserPanel::save_config_to_file);
         connect(import_btn, &QPushButton::clicked, this, &UserPanel::prompt_for_config_file);
+        connect(reload_btn, &QPushButton::clicked, this, &UserPanel::reload_default_config);
+        connect(m_theme_combo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+                [this](int idx) {
+            if (!config || !m_theme_combo || idx < 0) return;
+            const QString theme = m_theme_combo->itemData(idx).toString();
+            if (theme.isEmpty()) return;
+            const QString color_mode = app_color_mode ? "light" : "dark";
+            apply_theme_selection(theme, color_mode);
+            config->auto_save();
+        });
         sv->addWidget(presets);
 
         auto *ports = new QGroupBox(tr("Ports"), stack);
@@ -1087,7 +1373,8 @@ UserPanel::UserPanel(QWidget *parent) :
 
         // Creates a titled group card, registers it with the requested row, and
         // returns the body QWidget ready to receive a layout.
-        auto make_card = [&](const char *title, QWidget *row_parent, QHBoxLayout *row) -> QWidget* {
+        auto make_card = [&](const char *title, QWidget *row_parent, QHBoxLayout *row,
+                             QCheckBox **enable_toggle) -> QWidget* {
             auto *card = new QFrame(row_parent);
             card->setObjectName("SCAN_CARD");
             card->setProperty("scan_card_title", title);  // for diagnostics
@@ -1100,6 +1387,11 @@ UserPanel::UserPanel(QWidget *parent) :
             ttl->setAttribute(Qt::WA_StyledBackground, true);
             auto *tl = new QHBoxLayout(ttl);
             tl->setContentsMargins(8, 3, 8, 3);
+            if (enable_toggle) {
+                *enable_toggle = new QCheckBox(ttl);
+                (*enable_toggle)->setChecked(true);
+                tl->addWidget(*enable_toggle);
+            }
             tl->addWidget(new QLabel(title, ttl));
             vl->addWidget(ttl);
             auto *body = new QWidget(card);
@@ -1136,8 +1428,9 @@ UserPanel::UserPanel(QWidget *parent) :
 
         // ── Delay ──────────────────────────────────────────────────────────
         {
-            auto *body = make_card("DELAY", grid_row_w, grid_row);
+            auto *body = make_card("DELAY", grid_row_w, grid_row, &sw.enable_delay);
             sw.grid_delay_card = body->parentWidget();
+            sw.grid_delay_body = body;
             auto *bl   = static_cast<QVBoxLayout*>(body->layout());
 
             sw.start_delay_u = le(body); sw.start_delay_n = le(body); sw.start_delay_m = le(body);
@@ -1181,8 +1474,9 @@ UserPanel::UserPanel(QWidget *parent) :
 
         // ── Gate Width ─────────────────────────────────────────────────────
         {
-            auto *body = make_card("GATE WIDTH", grid_row_w, grid_row);
+            auto *body = make_card("GATE WIDTH", grid_row_w, grid_row, &sw.enable_gate);
             sw.grid_gate_card = body->parentWidget();
+            sw.grid_gate_body = body;
             auto *bl   = static_cast<QVBoxLayout*>(body->layout());
 
             sw.start_gw_u = le(body); sw.start_gw_n = le(body); sw.start_gw_m = le(body);
@@ -1222,8 +1516,9 @@ UserPanel::UserPanel(QWidget *parent) :
 
         // ── PTZ ────────────────────────────────────────────────────────────
         {
-            auto *body = make_card("PTZ", grid_row_w, grid_row);
+            auto *body = make_card("PTZ", grid_row_w, grid_row, &sw.enable_ptz);
             sw.grid_ptz_card = body->parentWidget();
+            sw.grid_ptz_body = body;
             auto *bl   = static_cast<QVBoxLayout*>(body->layout());
 
             auto *row_w = new QWidget(body);
@@ -1285,7 +1580,7 @@ UserPanel::UserPanel(QWidget *parent) :
 
         // ── Capture / Record ───────────────────────────────────────────────
         {
-            auto *body = make_card("CAPTURE / RECORD", grid_row_w, grid_row);
+            auto *body = make_card("CAPTURE / RECORD", grid_row_w, grid_row, nullptr);
             sw.grid_capture_card = body->parentWidget();
             auto *bl   = static_cast<QVBoxLayout*>(body->layout());
 
@@ -1358,7 +1653,7 @@ UserPanel::UserPanel(QWidget *parent) :
 
         // ── Panorama ───────────────────────────────────────────────────────
         {
-            auto *body = make_card("PANORAMA", panorama_row_w, panorama_row);
+            auto *body = make_card("PANORAMA", panorama_row_w, panorama_row, nullptr);
             sw.panorama_card = body->parentWidget();
             auto *bl   = static_cast<QVBoxLayout*>(body->layout());
 
@@ -1433,6 +1728,13 @@ UserPanel::UserPanel(QWidget *parent) :
             auto *actions_l = new QHBoxLayout(actions);
             actions_l->setContentsMargins(0, 0, 0, 0);
             actions_l->setSpacing(6);
+            constexpr int scan_action_btn_h = 28;
+            auto prep_scan_action_button = [scan_action_btn_h](QPushButton *btn) {
+                if (!btn) return;
+                btn->setFixedHeight(scan_action_btn_h);
+                btn->setMinimumWidth(0);
+                btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+            };
 
             auto *ac  = new QWidget(actions);
             ac->setObjectName("SCAN_ACTION_COL");
@@ -1440,19 +1742,23 @@ UserPanel::UserPanel(QWidget *parent) :
             auto *vl  = new QVBoxLayout(ac);
             vl->setContentsMargins(4, 4, 4, 4); vl->setSpacing(6);
             ui->SCAN_BUTTON->setParent(ac); ui->SCAN_BUTTON->show();
+            prep_scan_action_button(ui->SCAN_BUTTON);
             vl->addWidget(ui->SCAN_BUTTON);
             // Re-parent but don't force visible — ScanController owns visibility.
             ui->CONTINUE_SCAN_BUTTON->setParent(ac);
+            prep_scan_action_button(ui->CONTINUE_SCAN_BUTTON);
             vl->addWidget(ui->CONTINUE_SCAN_BUTTON);
             ui->RESTART_SCAN_BUTTON->setParent(ac);
+            prep_scan_action_button(ui->RESTART_SCAN_BUTTON);
             vl->addWidget(ui->RESTART_SCAN_BUTTON);
             actions_l->addWidget(ac, 0, Qt::AlignBottom);
 
-            m_scan_panorama_toggle = new QPushButton("Panorama", actions);
+            m_scan_panorama_toggle = new QPushButton(tr("Panorama"), actions);
             m_scan_panorama_toggle->setObjectName("SCAN_PANORAMA_PANEL_TOGGLE");
             m_scan_panorama_toggle->setCheckable(true);
             m_scan_panorama_toggle->setChecked(false);
             m_scan_panorama_toggle->setFixedWidth(92);
+            prep_scan_action_button(m_scan_panorama_toggle);
             actions_l->addWidget(m_scan_panorama_toggle, 0, Qt::AlignBottom);
             actions_l->addStretch(1);
             connect(m_scan_panorama_toggle, &QPushButton::toggled,
@@ -1483,18 +1789,17 @@ UserPanel::UserPanel(QWidget *parent) :
             delete item;
         }
         QWidget *parent_w = layout->parentWidget();
-        static const char *names[3] = { "MAIN", "ALT 1", "ALT 2" };
+        const QString names[3] = { tr("MAIN"), tr("ALT 1"), tr("ALT 2") };
         for (int i = 0; i < 3; ++i) {
             auto *lbl = new QLabel(names[i], parent_w);
             lbl->setObjectName("PREVIEW_THUMB_LBL");
-            lbl->setStyleSheet("font-weight: 700; color: #E0924A; background: transparent;");
             layout->addWidget(lbl);
             thumbs[i] = new QLabel(parent_w);
             thumbs[i]->setObjectName("PREVIEW_THUMB");
+            thumbs[i]->setAttribute(Qt::WA_StyledBackground, true);
             thumbs[i]->setFixedHeight(150);
             thumbs[i]->setMinimumWidth(180);
             thumbs[i]->setAlignment(Qt::AlignCenter);
-            thumbs[i]->setStyleSheet("background-color: #040303; border: 1px solid #382D25;");
             layout->addWidget(thumbs[i]);
         }
         layout->addStretch(1);
@@ -1534,12 +1839,18 @@ UserPanel::UserPanel(QWidget *parent) :
             if (config) config->auto_save();
         }
 
+        if (scan_mode && m_scan_ctrl && m_scan_overlay && !m_scan_ctrl->is_scanning()) {
+            m_scan_ctrl->refresh_current_values();
+            m_scan_overlay->loadFromParams();
+        }
+
         if (m_setup_overlay) m_setup_overlay->setVisible(setup_mode);
         if (m_scan_overlay)  m_scan_overlay ->setVisible(scan_mode);
         if (m_right_stack)   m_right_stack  ->setVisible(!overlay_mode);
         if (m_pbar)          m_pbar         ->setVisible(!overlay_mode);
         position_display_overlays(DisplayId::Main);
         if (m_router.display(DisplayId::Main).fps_label) m_router.display(DisplayId::Main).fps_label->setVisible(!overlay_mode);
+        position_custom_title_label();
         // Source-death label tracks the actual queue state (DisplaySlot::source_dead),
         // but stays hidden whenever an overlay is up.
         if (QLabel* sd = m_router.display(DisplayId::Main).source_dead_label) {
@@ -1556,6 +1867,10 @@ UserPanel::UserPanel(QWidget *parent) :
         if (m_optics_panel)  m_optics_panel ->setVisible(!overlay_mode && pbar_checked("PBAR_OPTICS_BTN"));
         if (m_tcu_panel)     m_tcu_panel    ->setVisible(!overlay_mode && pbar_checked("PBAR_TCU_BTN"));
         if (m_console_panel) m_console_panel->setVisible(!overlay_mode && pbar_checked("PBAR_CONSOLE_BTN"));
+        if (m_addon_panel) {
+            m_addon_panel->setVisible(!overlay_mode && m_addon_panel_requested);
+            if (m_addon_panel->isVisible()) position_addon_panel();
+        }
         // Panels must sit above side-zone widgets (siblings in CENTRAL's z-order).
         if (!overlay_mode) {
             raise_floating_panels();
@@ -1636,11 +1951,25 @@ UserPanel::UserPanel(QWidget *parent) :
     // earlier in init() and cached on m_scan_overlay_widgets.
     if (m_scan_overlay) m_scan_overlay->bind(m_scan_ctrl, m_scan_overlay_widgets);
 
+    // The scan action buttons are re-parented from the legacy .ui group into
+    // ScanOverlay. Wire them explicitly so the overlay does not depend on
+    // connectSlotsByName() from the old layout, and disconnect the legacy
+    // auto-slots first to avoid double toggling.
+    disconnect(ui->SCAN_BUTTON, nullptr, this, SLOT(on_SCAN_BUTTON_clicked()));
+    disconnect(ui->CONTINUE_SCAN_BUTTON, nullptr, this, SLOT(on_CONTINUE_SCAN_BUTTON_clicked()));
+    disconnect(ui->RESTART_SCAN_BUTTON, nullptr, this, SLOT(on_RESTART_SCAN_BUTTON_clicked()));
+    connect(ui->SCAN_BUTTON, &QPushButton::clicked,
+            m_scan_ctrl, &ScanController::on_SCAN_BUTTON_clicked);
+    connect(ui->CONTINUE_SCAN_BUTTON, &QPushButton::clicked,
+            m_scan_ctrl, &ScanController::on_CONTINUE_SCAN_BUTTON_clicked);
+    connect(ui->RESTART_SCAN_BUTTON, &QPushButton::clicked,
+            m_scan_ctrl, &ScanController::on_RESTART_SCAN_BUTTON_clicked);
+
     // --- Wire controller UI signals ---
     // DeviceManager → UI
     connect(m_device_mgr, &DeviceManager::port_label_style_changed, this, [this](int idx, QString style) {
         QLabel *labels[] = { ui->TCU_COM, ui->LENS_COM, ui->LASER_COM, ui->PTZ_COM, ui->RANGE_COM };
-        if (idx >= 0 && idx < 5) labels[idx]->setStyleSheet(style);
+        if (idx >= 0 && idx < 5) setPortLabelState(labels[idx], style);
     });
     connect(m_device_mgr, &DeviceManager::angle_display_updated, this, [this](QString h, QString v) {
         // Skip when the field has focus — device status frames arrive every
@@ -1649,7 +1978,13 @@ UserPanel::UserPanel(QWidget *parent) :
         if (!ui->ANGLE_V_EDIT->hasFocus()) ui->ANGLE_V_EDIT->setText(v);
     });
     connect(m_device_mgr, &DeviceManager::ptz_angle_changed,
+            this, [this](float, float) { update_udp709_device_status(); });
+    update_udp709_device_status();
+    connect(m_device_mgr, &DeviceManager::ptz_angle_changed,
             m_ptz_radar, &PtzRadarWidget::setAngle);
+    connect(m_udp709_window, &Udp709Window::turretControlReceived, this, &UserPanel::update_udp709_device_control);
+    connect(m_udp709_window, &Udp709Window::laserNirControlReceived,
+            this, &UserPanel::update_udp709_laser_nir_control);
     if (m_ptz_radar) {
         m_ptz_radar->setAngle(m_device_mgr->ptz()->get(PTZ::ANGLE_H),
                               m_device_mgr->ptz()->get(PTZ::ANGLE_V));
@@ -1683,14 +2018,16 @@ UserPanel::UserPanel(QWidget *parent) :
     });
     connect(m_device_mgr, &DeviceManager::vid_btn_style_changed, this, [this](QString name, QString style) {
         QWidget *w = findChild<QWidget*>(name);
-        if (w) w->setStyleSheet(style);
+        setActiveButtonState(w, style);
     });
     connect(m_device_mgr, &DeviceManager::vid_btn_text_changed, this, [this](QString name, QString text) {
         QAbstractButton *b = findChild<QAbstractButton*>(name);
-        if (b) b->setText(text);
-    });
-    connect(m_device_mgr, &DeviceManager::ir_power_btn_revert, this, [this]() {
-        ui->IR_POWER_BTN->setChecked(!ui->IR_POWER_BTN->isChecked());
+        if (b) {
+            b->setText(text);
+            if (name == QStringLiteral("VIDEO_SOURCE_BTN")) {
+                b->setChecked(false);
+            }
+        }
     });
     connect(m_device_mgr, &DeviceManager::ptz_type_enable_changed, this, [this](bool enabled) {
         m_setup_overlay->set_ptz_type_enabled(enabled);
@@ -1717,25 +2054,25 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // DeviceManager UI setup (PTZ button group, VID buttons, PTZ speed slider)
     {
-        QString theme_dir = app_theme ? "light" : "dark";
+        QString mode_dir = app_color_mode ? "light" : "dark";
         QButtonGroup *ptz_grp = new QButtonGroup(this);
-        ui->UP_LEFT_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/up_left"));
+        ui->UP_LEFT_BTN->setIcon(QIcon(":/directions/" + mode_dir + "/up_left"));
         ptz_grp->addButton(ui->UP_LEFT_BTN, 0);
-        ui->UP_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/up"));
+        ui->UP_BTN->setIcon(QIcon(":/directions/" + mode_dir + "/up"));
         ptz_grp->addButton(ui->UP_BTN, 1);
-        ui->UP_RIGHT_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/up_right"));
+        ui->UP_RIGHT_BTN->setIcon(QIcon(":/directions/" + mode_dir + "/up_right"));
         ptz_grp->addButton(ui->UP_RIGHT_BTN, 2);
-        ui->LEFT_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/left"));
+        ui->LEFT_BTN->setIcon(QIcon(":/directions/" + mode_dir + "/left"));
         ptz_grp->addButton(ui->LEFT_BTN, 3);
-        ui->SELF_TEST_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/self_test"));
+        ui->SELF_TEST_BTN->setIcon(QIcon(":/directions/" + mode_dir + "/self_test"));
         ptz_grp->addButton(ui->SELF_TEST_BTN, 4);
-        ui->RIGHT_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/right"));
+        ui->RIGHT_BTN->setIcon(QIcon(":/directions/" + mode_dir + "/right"));
         ptz_grp->addButton(ui->RIGHT_BTN, 5);
-        ui->DOWN_LEFT_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/down_left"));
+        ui->DOWN_LEFT_BTN->setIcon(QIcon(":/directions/" + mode_dir + "/down_left"));
         ptz_grp->addButton(ui->DOWN_LEFT_BTN, 6);
-        ui->DOWN_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/down"));
+        ui->DOWN_BTN->setIcon(QIcon(":/directions/" + mode_dir + "/down"));
         ptz_grp->addButton(ui->DOWN_BTN, 7);
-        ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/" + theme_dir + "/down_right"));
+        ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/" + mode_dir + "/down_right"));
         ptz_grp->addButton(ui->DOWN_RIGHT_BTN, 8);
         connect(ptz_grp, QOverload<int>::of(&QButtonGroup::buttonPressed), m_device_mgr, &DeviceManager::ptz_button_pressed);
         connect(ptz_grp, QOverload<int>::of(&QButtonGroup::buttonReleased), m_device_mgr, &DeviceManager::ptz_button_released);
@@ -1760,12 +2097,24 @@ UserPanel::UserPanel(QWidget *parent) :
             m_device_mgr->set_ptz_speed(ui->PTZ_SPEED_EDIT->text().toInt());
         });
 
-        // VID toggle button connections
+        // VID button connections
         connect(ui->VL_DEFOG_BTN, &QAbstractButton::toggled, m_device_mgr, &DeviceManager::vid_defog_toggled);
         connect(ui->IR_POWER_BTN, &QAbstractButton::toggled, m_device_mgr, &DeviceManager::vid_ir_power_toggled);
+        connect(m_device_mgr, &DeviceManager::ir_power_btn_revert, this, [this]() {
+            const QSignalBlocker blocker(ui->IR_POWER_BTN);
+            ui->IR_POWER_BTN->setChecked(true);
+        });
         connect(ui->IR_AUTO_FOCUS_BTN, &QAbstractButton::clicked, m_device_mgr, &DeviceManager::vid_ir_auto_focus_clicked);
         connect(ui->LDM_BTN, &QAbstractButton::toggled, m_device_mgr, &DeviceManager::vid_ldm_toggled);
-        connect(ui->VIDEO_SOURCE_BTN, &QAbstractButton::toggled, m_device_mgr, &DeviceManager::vid_video_source_toggled);
+        ui->VIDEO_SOURCE_BTN->setChecked(false);
+        ui->VIDEO_SOURCE_BTN->setCheckable(false);
+        ui->VIDEO_SOURCE_BTN->setProperty("videoSourceIr", false);
+        connect(ui->VIDEO_SOURCE_BTN, &QAbstractButton::clicked, this, [this]() {
+            const bool switch_to_ir = !ui->VIDEO_SOURCE_BTN->property("videoSourceIr").toBool();
+            ui->VIDEO_SOURCE_BTN->setProperty("videoSourceIr", switch_to_ir);
+            ui->VIDEO_SOURCE_BTN->setText(switch_to_ir ? tr("Switch to VL") : tr("Switch to IR"));
+            m_device_mgr->vid_video_source_toggled(switch_to_ir);
+        });
         connect(ui->OSD_BTN, &QAbstractButton::toggled, m_device_mgr, &DeviceManager::vid_osd_toggled);
 
         // COM port edit connections
@@ -1975,6 +2324,9 @@ UserPanel::UserPanel(QWidget *parent) :
         auto *zoom_slider  = new ArcSliderWidget(modern_w);
         auto *focus_slider = new ArcSliderWidget(modern_w);
         auto *iris_slider  = new ArcSliderWidget(modern_w);
+        zoom_slider ->setProperty("lensRole", "zoom");
+        focus_slider->setProperty("lensRole", "focus");
+        iris_slider ->setProperty("lensRole", "iris");
         zoom_slider ->setFixedSize(54, 120);
         focus_slider->setFixedSize(54, 120);
         iris_slider ->setFixedSize(54, 120);
@@ -1983,10 +2335,6 @@ UserPanel::UserPanel(QWidget *parent) :
         zoom_slider ->setSpeedMode(63);
         focus_slider->setSpeedMode(63);
         iris_slider ->setSpeedMode(63);
-        // Per-slider colours match prototype v3 lens tokens.
-        zoom_slider ->setActiveColor(QColor(0xE6, 0x45, 0x5D)); // lens-zoom  (pink)
-        focus_slider->setActiveColor(QColor(0xE0, 0x92, 0x4A)); // lens-focus (orange)
-        iris_slider ->setActiveColor(QColor(0x4D, 0xA6, 0xE6)); // lens-iris  (blue)
 
         // Helper: wrap an ArcSliderWidget in a vertical sub-column
         // [slider][label][value]. Each sub-column sits side-by-side in slider_row.
@@ -2157,13 +2505,15 @@ UserPanel::UserPanel(QWidget *parent) :
         ui->FIRE_LASER_BTN->setVisible(true);
         ui->FIRE_LASER_BTN->setEnabled(false);
         ui->FIRE_LASER_BTN->setObjectName("FireLaserBtn"); // QSS hook
+        ui->FIRE_LASER_BTN->setFixedHeight(32);
+        ui->FIRE_LASER_BTN->setMinimumWidth(0);
+        ui->FIRE_LASER_BTN->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
         auto *timing = new TimingBarWidget(normal_w);
         timing->setBarLabel(TimingBarWidget::LaserWidth, "LASER");
         timing->setBarUnit (TimingBarWidget::LaserWidth, "ns");
         timing->setBarScale(TimingBarWidget::LaserWidth,
                             (quint64)qMax(1, (int)config->get_data().tcu.max_laser_width));
-        timing->setBarColor(TimingBarWidget::LaserWidth, QColor(0x3d, 0x8b, 0xff));
 
         // Distance and Dov bars use the same units as DELAY_SLIDER /
         // GW_SLIDER — meters, with the scale (slider max) driven by
@@ -2174,19 +2524,16 @@ UserPanel::UserPanel(QWidget *parent) :
         timing->setBarUnit (TimingBarWidget::Distance, "m");
         timing->setBarScale(TimingBarWidget::Distance,
                             (quint64)qMax(1, (int)config->get_data().tcu.max_dist));
-        timing->setBarColor(TimingBarWidget::Distance, QColor(0x4c, 0xc4, 0x77));
 
         timing->setBarLabel(TimingBarWidget::Dov, "DEPTH");
         timing->setBarUnit (TimingBarWidget::Dov, "m");
         timing->setBarScale(TimingBarWidget::Dov,
                             (quint64)qMax(1, (int)config->get_data().tcu.max_dov));
-        timing->setBarColor(TimingBarWidget::Dov, QColor(0xff, 0xb0, 0x3a));
 
         timing->setBarLabel(TimingBarWidget::Mcp, "MCP");
         timing->setBarUnit (TimingBarWidget::Mcp, "");
         timing->setBarScale(TimingBarWidget::Mcp,
                             (quint64)qMax(1, m_tcu_ctrl->get_mcp_max()));
-        timing->setBarColor(TimingBarWidget::Mcp, QColor(0xee, 0x44, 0x44));
 
         nl->addWidget(top_row);
         nl->addWidget(ui->FIRE_LASER_BTN);
@@ -2324,6 +2671,26 @@ UserPanel::UserPanel(QWidget *parent) :
     connect(m_pipeline, &PipelineProcessor::panorama_preview_updated, m_panorama_panel, &PanoramaPanel::setPreviewPixmap, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::main_detection_boxes_updated, this, [this](QVector<QRect> boxes) {
         m_main_detection_boxes = boxes;
+        Display *disp = ui->SOURCE_DISPLAY;
+        const bool should_follow = boxes.size() == 1
+                && m_img_proc && m_img_proc->auto_follow_enabled()
+                && disp && disp->is_grabbing && m_device_mgr
+                && config && config->get_data().device.ptz_type == 2
+                && m_device_mgr->udpptz() && m_device_mgr->udpptz()->is_connected()
+                && ui->TITLE->current_mode() == TopBar::Mode::Monitor;
+        if (!should_follow) {
+            if (m_detection_auto_follow_active && m_device_mgr) {
+                m_device_mgr->ptz_stop_btn_clicked();
+            }
+            m_detection_auto_follow_active = false;
+            update_udp709_device_status();
+            return;
+        }
+
+        m_device_mgr->point_ptz_to_target(detectionFollowPoint(boxes.first()),
+                                          disp->width(), disp->height());
+        m_detection_auto_follow_active = true;
+        update_udp709_device_status();
     }, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::finish_scan_signal, m_scan_ctrl, &ScanController::on_SCAN_BUTTON_clicked, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::save_screenshot_signal, this, [this](QString path) {
@@ -2331,6 +2698,9 @@ UserPanel::UserPanel(QWidget *parent) :
     }, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::update_delay_in_thread, this, [this](){
         m_tcu_ctrl->update_delay();
+    }, Qt::QueuedConnection);
+    connect(m_pipeline, &PipelineProcessor::update_gate_width_in_thread, this, [this](){
+        m_tcu_ctrl->update_gate_width();
     }, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::update_dist_mat, this, [this](cv::Mat mat, double min, double max){
 #ifdef DISTANCE_3D_VIEW
@@ -2567,8 +2937,6 @@ void UserPanel::init()
     ui->HIDE_BTN->click();
     ui->START_GRABBING_BUTTON->click();
     switch_ui();
-    QKeyEvent connect_to_TCP(QKeyEvent::KeyPress, Qt::Key_Q, Qt::AltModifier);
-    QApplication::sendEvent(this, &connect_to_TCP);
     m_tcu_ctrl->set_delay_dist(1000);
     m_tcu_ctrl->set_depth_of_view(75);
     m_tcu_ctrl->set_laser_width(500);
@@ -2665,6 +3033,12 @@ void UserPanel::init()
     // Start maximized so the SETUP overlay shows full content (the FlowLayout
     // in IMG_PROC wraps narrowly without enough viewport width).
     ui->TITLE->process_maximize();
+
+    // Automatic mode is evaluated once per process launch. Config reloads may
+    // update its stored value for the next launch, but never run these actions.
+    if (config->get_data().automatic.enabled) {
+        QTimer::singleShot(0, this, &UserPanel::run_automatic_actions);
+    }
 }
 
 void UserPanel::data_exchange(bool read){
@@ -2721,6 +3095,10 @@ void UserPanel::data_exchange(bool read){
         ui->FRAME_AVG_OPTIONS->setCurrentIndex(calc_avg_option / 4 - 1);
 
         ui->SOFTWARE_CHECK->setChecked(trigger_by_software);
+        ui->CONTINUOUS_RADIO->setChecked(!trigger_mode_on);
+        ui->TRIGGER_RADIO->setChecked(trigger_mode_on);
+        ui->SOFTWARE_CHECK->setEnabled(device_on && !start_grabbing && trigger_mode_on);
+        ui->SOFTWARE_TRIGGER_BUTTON->setEnabled(start_grabbing && trigger_mode_on && trigger_by_software);
         ui->IMG_3D_CHECK->setChecked(m_router.display(m_picked_display).pcfg.image_3d);
 
         ui->GAIN_EDIT->setText(QString::asprintf("%d", (int)std::round(gain_analog_edit)));
@@ -2746,7 +3124,8 @@ void UserPanel::data_exchange(bool read){
         ui->FOCUS_EDIT->setText(QString::asprintf("%d", m_device_mgr->lens()->get(Lens::FOCUS_POS)));
         ui->IRIS_EDIT->setText(QString::asprintf("%d", m_device_mgr->lens()->get(Lens::LASER_RADIUS)));
 
-        ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", m_device_mgr->ptz()->get(PTZ::ANGLE_H)));
+        ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f",
+                m_device_mgr->to_display_ptz_angle_h(m_device_mgr->ptz()->get(PTZ::ANGLE_H))));
         ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", m_device_mgr->ptz()->get(PTZ::ANGLE_V)));
     }
 }
@@ -2806,42 +3185,43 @@ void UserPanel::move_to_dest(QString src, QString dst)
     QFile::rename(src, dst);
 }
 
-void UserPanel::set_theme()
+void UserPanel::toggle_color_mode()
 {
-    app_theme ^= 1;
+    app_color_mode ^= 1;
 
-    if (app_theme) qApp->setStyleSheet(theme_light);
-    else qApp->setStyleSheet(theme_dark);
+    Config::UISettings &ui_settings = config->get_data().ui;
+    if (ui_settings.theme.trimmed().isEmpty() || ui_settings.theme == "default") ui_settings.theme = "gruvbox";
+    ui_settings.color_mode = app_color_mode ? "light" : "dark";
+    ui_settings.dark_mode = (app_color_mode == 0);
+    apply_theme_selection(ui_settings.theme, ui_settings.color_mode);
 
-    cursor_curr_pointer   = app_theme ? cursor_light_pointer   : cursor_dark_pointer;
-    cursor_curr_resize_h  = app_theme ? cursor_light_resize_h  : cursor_dark_resize_h;
-    cursor_curr_resize_v  = app_theme ? cursor_light_resize_v  : cursor_dark_resize_v;
-    cursor_curr_resize_md = app_theme ? cursor_light_resize_md : cursor_dark_resize_md;
-    cursor_curr_resize_sd = app_theme ? cursor_light_resize_sd : cursor_dark_resize_sd;
+    ui->TITLE->apply_color_mode(app_color_mode);
 
-    ui->UP_LEFT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/up_left"));
-    ui->UP_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/up"));
-    ui->UP_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/up_right"));
-    ui->LEFT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/left"));
-    ui->SELF_TEST_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
-    ui->RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/right"));
-    ui->DOWN_LEFT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down_left"));
-    ui->DOWN_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down"));
-    ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/down_right"));
-    ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
-    m_setup_overlay->w()->REFRESH_AVAILABLE_PORTS_BTN->setIcon(QIcon(":/directions/" + QString(app_theme ? "light" : "dark") + "/self_test"));
-    ui->SWITCH_TCU_UI_BTN->setIcon(QIcon(":/tools/" + QString(app_theme ? "light" : "dark") + "/switch"));
-    if (m_side_display) m_side_display->apply_theme(app_theme);
+    cursor_curr_pointer   = app_color_mode ? cursor_light_pointer   : cursor_dark_pointer;
+    cursor_curr_resize_h  = app_color_mode ? cursor_light_resize_h  : cursor_dark_resize_h;
+    cursor_curr_resize_v  = app_color_mode ? cursor_light_resize_v  : cursor_dark_resize_v;
+    cursor_curr_resize_md = app_color_mode ? cursor_light_resize_md : cursor_dark_resize_md;
+    cursor_curr_resize_sd = app_color_mode ? cursor_light_resize_sd : cursor_dark_resize_sd;
 
-//    for (int i = 0 ; i < 5; i++) if (serial_port_connected[i]) com_label[i]->setStyleSheet(app_theme ? "color: #180D1C;" : "color: #B0C4DE;");
-//    ptr_tcu->set_theme();
-//    ptr_lens->set_theme();
-//    ptr_laser->set_theme();
-//    ptr_ptz->set_theme();
-    ui->TCU_COM->setStyleSheet(m_device_mgr->tcu()->get_port_status() & ControlPort::SERIAL_CONNECTED ? (app_theme ? "color: #180D1C;" : "color: #B0C4DE;") : "color: #CD5C5C;");
-    ui->LENS_COM->setStyleSheet(m_device_mgr->lens()->get_port_status() & ControlPort::SERIAL_CONNECTED ? (app_theme ? "color: #180D1C;" : "color: #B0C4DE;") : "color: #CD5C5C;");
-    ui->LASER_COM->setStyleSheet(m_device_mgr->laser()->get_port_status() & ControlPort::SERIAL_CONNECTED ? (app_theme ? "color: #180D1C;" : "color: #B0C4DE;") : "color: #CD5C5C;");
-    ui->PTZ_COM->setStyleSheet(m_device_mgr->ptz()->get_port_status() & ControlPort::SERIAL_CONNECTED ? (app_theme ? "color: #180D1C;" : "color: #B0C4DE;") : "color: #CD5C5C;");
+    ui->UP_LEFT_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/up_left"));
+    ui->UP_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/up"));
+    ui->UP_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/up_right"));
+    ui->LEFT_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/left"));
+    ui->SELF_TEST_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/self_test"));
+    ui->RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/right"));
+    ui->DOWN_LEFT_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/down_left"));
+    ui->DOWN_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/down"));
+    ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/down_right"));
+    ui->RESET_3D_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/self_test"));
+    m_setup_overlay->w()->REFRESH_AVAILABLE_PORTS_BTN->setIcon(QIcon(":/directions/" + QString(app_color_mode ? "light" : "dark") + "/self_test"));
+    ui->SWITCH_TCU_UI_BTN->setIcon(QIcon(":/tools/" + QString(app_color_mode ? "light" : "dark") + "/switch"));
+    if (m_side_display) m_side_display->apply_color_mode(app_color_mode);
+
+    setPortLabelStatus(ui->TCU_COM,   m_device_mgr->tcu()->get_port_status());
+    setPortLabelStatus(ui->LENS_COM,  m_device_mgr->lens()->get_port_status());
+    setPortLabelStatus(ui->LASER_COM, m_device_mgr->laser()->get_port_status());
+    setPortLabelStatus(ui->PTZ_COM,   m_device_mgr->ptz()->get_port_status());
+    setPortLabelStatus(ui->RANGE_COM, m_device_mgr->rf()->get_port_status());
 
     QFont temp_f(consolas);
     temp_f.setPixelSize(11);
@@ -2849,11 +3229,10 @@ void UserPanel::set_theme()
 
     setCursor(cursor_curr_pointer);
 
-    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s/%s);", app_theme ? "light" : "dark", hide_left ? "right" : "left"));
+    setHideButtonDirection(ui->HIDE_BTN, hide_left);
 
-    laser_settings->set_theme();
+    laser_settings->apply_color_mode();
 
-    config->get_data().ui.dark_theme = (app_theme == 0);
     config->auto_save();
 }
 
@@ -2868,12 +3247,11 @@ void UserPanel::stop_image_writing()
 //    QThread::msleep(1000);
 }
 
-// FIXME font change when switching language
 void UserPanel::switch_language()
 {
     lang ^= 1;
     lang ? QApplication::installTranslator(&trans) : QApplication::removeTranslator(&trans);
-//    lang ? QApplication::setFont(consolas) : QApplication::setFont(monaco);
+    QApplication::setFont(monaco);
     ui->retranslateUi(this);
     m_setup_overlay->switch_language(lang == 0, &trans);
 //    int idx = ui->ENHANCE_OPTIONS->currentIndex();
@@ -3032,12 +3410,12 @@ void UserPanel::on_START_BUTTON_clicked()
     if (device_on) return;
 
     if (!curr_cam) {
-        QMessageBox::warning(this, "PROMPT", tr("No camera available"));
+        QMessageBox::warning(this, tr("PROMPT"), tr("No camera available"));
         return;
     }
 
     if (curr_cam->start(config->get_data().tcu.type)) {
-        QMessageBox::warning(this, "PROMPT", tr("start failed"));
+        QMessageBox::warning(this, tr("PROMPT"), tr("start failed"));
         return;
     }
     device_on = true;
@@ -3051,8 +3429,7 @@ void UserPanel::on_START_BUTTON_clicked()
     ui->GAIN_SLIDER->setValue(gain_analog_edit);
     connect(ui->GAIN_SLIDER, SIGNAL(valueChanged(int)), SLOT(change_gain(int)));
 
-//    on_CONTINUOUS_RADIO_clicked();
-    on_TRIGGER_RADIO_clicked();
+    trigger_mode_on ? on_TRIGGER_RADIO_clicked() : on_CONTINUOUS_RADIO_clicked();
 
     curr_cam->time_exposure(true, &time_exposure_edit);
     curr_cam->gain_analog(true, &gain_analog_edit);
@@ -3094,7 +3471,7 @@ void UserPanel::on_CONTINUOUS_RADIO_clicked()
     ui->TRIGGER_RADIO->setChecked(false);
     ui->SOFTWARE_CHECK->setEnabled(false);
     trigger_mode_on = false;
-    curr_cam->trigger_mode(false, &trigger_mode_on);
+    if (curr_cam) curr_cam->trigger_mode(false, &trigger_mode_on);
 
     ui->SOFTWARE_TRIGGER_BUTTON->setEnabled(false);
 }
@@ -3105,7 +3482,10 @@ void UserPanel::on_TRIGGER_RADIO_clicked()
     ui->TRIGGER_RADIO->setChecked(true);
     ui->SOFTWARE_CHECK->setEnabled(true);
     trigger_mode_on = true;
-    curr_cam->trigger_mode(false, &trigger_mode_on);
+    if (curr_cam) {
+        curr_cam->trigger_mode(false, &trigger_mode_on);
+        curr_cam->trigger_source(false, &trigger_by_software);
+    }
 
     ui->SOFTWARE_TRIGGER_BUTTON->setEnabled(start_grabbing && trigger_by_software);
 }
@@ -3115,7 +3495,7 @@ void UserPanel::on_SOFTWARE_CHECK_stateChanged(int arg1)
 {
     trigger_by_software = arg1;
     trigger_source = arg1 ? 1 : 2;
-    curr_cam->trigger_source(false, &trigger_by_software);
+    if (curr_cam) curr_cam->trigger_source(false, &trigger_by_software);
     ui->SOFTWARE_TRIGGER_BUTTON->setEnabled(start_grabbing && arg1);
 }
 
@@ -3159,6 +3539,27 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
         start_grabbing = false;
     }
 
+    // A camera SDK handle may still exist after a cable/network loss, but it
+    // must not be used for callbacks, parameter queries, or acquisition. Try
+    // the backend-specific reopen sequence before rebuilding the pipeline.
+    if (!curr_cam->is_connected()) {
+        const int reconnect_result = curr_cam->reconnect();
+        if (reconnect_result != 0 || !curr_cam->is_connected()) {
+            qWarning("Camera reconnect failed with error code: %d", reconnect_result);
+            start_grabbing = false;
+            device_on = false;
+            ui->SOURCE_DISPLAY->is_grabbing = false;
+            enable_controls(device_type > 0);
+            QMessageBox::warning(this, tr("PROMPT"),
+                                 tr("Camera disconnected. Reconnect it, then enumerate and start the camera again."));
+            return;
+        }
+
+        qInfo("Camera connection restored before grabbing restart");
+        on_SET_PARAMS_BUTTON_clicked();
+        trigger_mode_on ? on_TRIGGER_RADIO_clicked() : on_CONTINUOUS_RADIO_clicked();
+    }
+
     // Cam binds to StreamId::S0. Stop any other source already producing
     // there so the cam SDK doesn't push into a queue another producer is
     // also feeding.
@@ -3171,7 +3572,12 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
     m_router.stream(StreamId::S0).frame_info.reopen();
     m_router.stream(StreamId::S0).meta.source_type = SourceType::IndustrialCam;
     m_cam_sink = m_router.stream(StreamId::S0).sink();
-    curr_cam->set_user_pointer(&m_cam_sink);
+    if (curr_cam->set_user_pointer(&m_cam_sink) != 0) {
+        qWarning("Cannot register industrial camera frame callback");
+        m_router.stream(StreamId::S0).frames.close();
+        m_router.stream(StreamId::S0).frame_info.close();
+        return;
+    }
 
     // TODO complete BayerGB process & display
     curr_cam->pixel_type(true, &m_router.stream(StreamId::S0).meta.pixel_format);
@@ -3220,7 +3626,7 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
     m_router.display(DisplayId::Main).consumer = new ConsumerThread(m_pipeline, &m_router, &m_router.display(DisplayId::Main));
     if (m_router.display(DisplayId::Main).consumer == NULL) {
         m_router.display(DisplayId::Main).consumer_run = false;
-        QMessageBox::warning(this, "PROMPT", tr("Create thread fail"));
+        QMessageBox::warning(this, tr("PROMPT"), tr("Create thread fail"));
         return;
     }
     m_router.route(DisplayId::Main, StreamId::S0);
@@ -3251,6 +3657,7 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
 void UserPanel::on_STOP_GRABBING_BUTTON_clicked()
 {
 //    if (!device_on || !start_grabbing || curr_cam == NULL) return;
+    if (!curr_cam) return;
 
     const DisplayId cam_display = m_router.display_for(StreamId::S0);
     if (cam_display == DisplayId::Main) {
@@ -3877,7 +4284,7 @@ void UserPanel::save_config_to_file()
     syncPreferencesToConfig();
 
     if (!config->save_to_file(config_name)) {
-        QMessageBox::warning(this, "PROMPT", tr("Cannot save config file"));
+        QMessageBox::warning(this, tr("PROMPT"), tr("Cannot save config file"));
     }
 }
 
@@ -3887,12 +4294,17 @@ void UserPanel::prompt_for_config_file()
     load_config(config_filename);
 }
 
+void UserPanel::reload_default_config()
+{
+    load_config(QCoreApplication::applicationDirPath() + "/default.json");
+}
+
 void UserPanel::load_config(QString config_name)
 {
     if (config_name.isEmpty()) return;
 
     if (!config->load_from_file(config_name)) {
-        QMessageBox::warning(this, "PROMPT", tr("Cannot load config file"));
+        QMessageBox::warning(this, tr("PROMPT"), tr("Cannot load config file"));
         return;
     }
 
@@ -3906,6 +4318,36 @@ void UserPanel::load_config(QString config_name)
     update_laser_width();
     ui->MCP_SLIDER->setValue(std::round(m_device_mgr->tcu()->get(TCU::MCP)));
     on_SET_PARAMS_BUTTON_clicked();
+}
+
+void UserPanel::run_automatic_actions()
+{
+    const QStringList &urls = config->get_data().video.default_urls;
+    for (int display_idx = 1; display_idx <= 2; ++display_idx) {
+        const QString url = urls.value(display_idx - 1).trimmed();
+        if (url.isEmpty()) continue;
+        if (m_ffmpeg[display_idx]
+                && !m_ffmpeg[display_idx]->is_stopped()
+                && m_ffmpeg[display_idx]->current_url() == url) {
+            continue;
+        }
+
+        load_video_file(url, false,
+                        [](cv::Mat &frame, void *ptr) {
+                            static_cast<BoundedQueue<cv::Mat>*>(ptr)->push(frame.clone());
+                        },
+                        &m_router.stream(static_cast<StreamId>(display_idx)).frames,
+                        display_idx);
+    }
+
+    const bool tcp_server_connected =
+            (m_device_mgr->tcu()->get_port_status() & ControlPort::TCP_CONNECTED)
+         && (m_device_mgr->lens()->get_port_status() & ControlPort::TCP_CONNECTED)
+         && (m_device_mgr->rf()->get_port_status() & ControlPort::TCP_CONNECTED);
+    const QString server_ip = config->get_data().network.tcp_server_address.trimmed();
+    if (!tcp_server_connected && !server_ip.isEmpty()) {
+        m_device_mgr->connect_to_serial_server_tcp(server_ip);
+    }
 }
 
 
@@ -4076,7 +4518,13 @@ void UserPanel::syncPreferencesToConfig()
 
     // Sync UI settings
     data.ui.simplified = simple_ui;
-    data.ui.dark_theme = !app_theme; // app_theme seems to be inverted
+    data.ui.dark_mode = (app_color_mode == 0);
+    if (m_theme_combo && m_theme_combo->currentIndex() >= 0) {
+        const QString selected_theme = m_theme_combo->currentData().toString().trimmed();
+        if (!selected_theme.isEmpty()) data.ui.theme = selected_theme;
+    }
+    if (data.ui.theme.trimmed().isEmpty() || data.ui.theme == "default") data.ui.theme = "gruvbox";
+    data.ui.color_mode = app_color_mode ? "light" : "dark";
     data.ui.english = (lang == 0);
 
     // Sync camera settings
@@ -4129,8 +4577,19 @@ void UserPanel::syncConfigToPreferences()
     // Sync UI settings
     bool simplify_ui = data.ui.simplified;
     if (simple_ui != simplify_ui) switch_ui();
-    bool new_theme = data.ui.dark_theme ? 0 : 1;
-    if (new_theme != app_theme) set_theme();
+    QString theme_name = data.ui.theme.trimmed();
+    if (theme_name.isEmpty() || theme_name == "default") theme_name = "gruvbox";
+    const QString color_mode = data.ui.color_mode.compare("light", Qt::CaseInsensitive) == 0 ? QString("light") : QString("dark");
+    uchar new_color_mode = (color_mode == "dark") ? 0 : 1;
+    if (new_color_mode != app_color_mode) {
+        toggle_color_mode();
+    } else {
+        apply_theme_selection(theme_name, color_mode);
+    }
+    if (m_custom_title_label) {
+        m_custom_title_label->setText(data.ui.custom_title);
+        position_custom_title_label();
+    }
     lang = data.ui.english ? 0 : 1;
     if (!data.ui.english) switch_language();
 
@@ -4237,12 +4696,10 @@ void UserPanel::prompt_for_input_file()
 
 //    use_gray_format->setChecked(true);
 //    QLineEdit *file_path = new QLineEdit("rtsp://192.168.2.100/mainstream", &input_file_dialog);
-    grid.addWidget(new QLabel("video URL:", &input_file_dialog), 0, 0);
+    grid.addWidget(new QLabel(tr("video URL:"), &input_file_dialog), 0, 0);
 
     QComboBox *file_path_x = new QComboBox(&input_file_dialog);
-    static QStringList file_paths = (QStringList() << "rtsp://192.168.1.xxx/mainstream"
-                                     << "rtsp://admin:abcd1234@192.168.1.xxx:554/h264/ch1/main/av_stream"
-                                     << "rtsp://admin:abcd1234@192.168.1.xxx:554");
+    const QStringList file_paths = config->get_data().video.default_urls;
     static QStringList sp_paths = (QStringList() << "https://d3s7x6kmqcnb6b.cloudfront.net/hls/TW6CI6Y/m.m3u8"
                                    << "https://jmp2.uk/plu-64edf6eaa7ec0d000812f58c.m3u8"
                                    << "https://travelxp-travelxp-1-nz.samsung.wurl.tv/playlist.m3u8"
@@ -4252,7 +4709,7 @@ void UserPanel::prompt_for_input_file()
     file_path_x->setEditable(true);
     grid.addWidget(file_path_x, 1, 0, 1, 3);
 
-    QCheckBox *use_gray_format = new QCheckBox("gray", &input_file_dialog);
+    QCheckBox *use_gray_format = new QCheckBox(tr("gray"), &input_file_dialog);
     use_gray_format->setEnabled(sp_mode);
     grid.addWidget(use_gray_format, 2, 0);
 
@@ -4260,9 +4717,9 @@ void UserPanel::prompt_for_input_file()
     grid.addWidget(spacer, 2, 1);
 
     QComboBox *display_list = new QComboBox(&input_file_dialog);
-    static QStringList display_widgets = (QStringList() << "main display" << "alt 1" << "alt 2");
+    const QStringList display_widgets = QStringList() << tr("main display") << tr("alt 1") << tr("alt 2");
     display_list->addItems(display_widgets);
-    display_list->setCurrentIndex(1);
+    display_list->setCurrentIndex(0);
     grid.addWidget(display_list, 2, 2);
 
     QDialogButtonBox button_box(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, Qt::Horizontal, &input_file_dialog);
@@ -4624,6 +5081,165 @@ void UserPanel::change_gain(int val)
 
 // change_focus_speed, on_*_BTN_released → LensController (inline delegation in header)
 
+void UserPanel::update_udp709_device_status()
+{
+    if (!m_udp709_window || !m_device_mgr) return;
+
+    float horizontal = std::fmod(m_device_mgr->get_angle_h(), 360.0f);
+    if (horizontal < 0.0f) horizontal += 360.0f;
+
+    Udp709::DeviceStatusPayload status;
+    // G5 reports all three device states. G3 applies only VL and MWIR;
+    // its laser/NIR byte is display-only and G4 owns the laser channel.
+    status.timestampRaw = QDateTime::currentMSecsSinceEpoch();
+    status.visibleLightState = ui->VL_DEFOG_BTN->isChecked() ? 1 : 0;
+    status.midWaveInfraredState = ui->IR_POWER_BTN->isChecked() ? 1 : 0;
+    status.laserNirState = m_setup_overlay->w()->LASER_CHK_1->isChecked() ? 1 : 0;
+    status.azimuthHundredths = static_cast<quint16>(
+                qBound(0, static_cast<int>(std::lround(horizontal * 100.0f)), 35999));
+    status.elevationHundredths = static_cast<qint16>(
+                qBound(-18000, static_cast<int>(std::lround(m_device_mgr->get_angle_v() * 100.0f)), 18000));
+    status.trackingState = m_detection_auto_follow_active ? 0x00 : 0x01;
+    status.turretState = m_detection_auto_follow_active ? 0x0003 : 0x0000;
+    m_udp709_window->setAutomaticDeviceStatus(status);
+}
+
+void UserPanel::update_udp709_device_control(Udp709::TurretControlPayload payload)
+{
+    apply_udp709_channel_states(payload);
+    apply_udp709_turret_command(payload);
+    const bool lens_was_active = m_udp709_lens_operation >= 0;
+    apply_udp709_lens_command(payload.imagingLensControl);
+    if (lens_was_active && m_udp709_lens_operation < 0) {
+        // Lens STOP shares the UDP PTZ command stream. Restore the turret
+        // command immediately instead of waiting for the next G3 packet.
+        apply_udp709_turret_command(payload);
+    }
+}
+
+void UserPanel::apply_udp709_channel_states(const Udp709::TurretControlPayload &payload)
+{
+    ui->VL_DEFOG_BTN->setChecked(payload.visibleLightState != 0);
+
+    const bool ir_power_on = payload.midWaveInfraredState != 0;
+    if (ui->IR_POWER_BTN->isChecked() == ir_power_on) return;
+
+    const QSignalBlocker blocker(ui->IR_POWER_BTN);
+    ui->IR_POWER_BTN->setChecked(ir_power_on);
+    m_device_mgr->apply_vid_ir_power_state(ir_power_on);
+}
+
+void UserPanel::update_udp709_laser_nir_control(Udp709::LaserNirControlPayload payload)
+{
+    if (payload.laserEnabled > 1) {
+        qWarning() << "Clamping invalid UDP709 G4 laser enable value"
+                   << payload.laserEnabled;
+    }
+    if (payload.laserIntensity > 1000) {
+        qWarning() << "Clamping invalid UDP709 G4 laser width"
+                   << payload.laserIntensity;
+    }
+    if (payload.workingDistanceMeters > 25000) {
+        qWarning() << "Clamping invalid UDP709 G4 working distance"
+                   << payload.workingDistanceMeters;
+    }
+    if (payload.imagingDepthMeters > 1000) {
+        qWarning() << "Clamping invalid UDP709 G4 imaging depth"
+                   << payload.imagingDepthMeters;
+    }
+
+    m_tcu_ctrl->apply_laser_width(qMin<quint16>(payload.laserIntensity, 1000));
+    m_tcu_ctrl->apply_delay(static_cast<int>(
+        qMin<quint32>(payload.workingDistanceMeters, 25000u)));
+    m_tcu_ctrl->apply_gatewidth(qMin<int>(payload.imagingDepthMeters, 1000));
+    m_tcu_ctrl->change_mcp(payload.imagingGain);
+    apply_udp709_image_processing(payload.imageProcessing);
+    m_setup_overlay->w()->LASER_CHK_1->setChecked(payload.laserEnabled != 0);
+    update_udp709_device_status();
+}
+
+void UserPanel::apply_udp709_image_processing(quint8 control)
+{
+    const bool enhance = control & Udp709ImageEnhance;
+    const bool frame_average = control & Udp709DenoiseFrameAverage;
+    const bool ecc = control & Udp709DenoiseEcc;
+
+    {
+        QMutexLocker lk(&m_params_mutex);
+        PipelineConfig &pcfg = m_router.display(DisplayId::Main).pcfg;
+        pcfg.enhance_enabled = enhance;
+        pcfg.enhance_option = 7; // G4 enhancement is Dehaze_enh.
+
+        if (frame_average && ecc) {
+            qWarning() << "Ignoring conflicting UDP709 G4 denoise bits";
+        } else {
+            pcfg.frame_avg_enabled = frame_average || ecc;
+            if (frame_average) pcfg.frame_avg_mode = 0;
+            else if (ecc) pcfg.frame_avg_mode = 1;
+        }
+    }
+
+    if (m_picked_display == DisplayId::Main)
+        repopulate_general_widgets_from_picked();
+}
+
+void UserPanel::apply_udp709_turret_command(const Udp709::TurretControlPayload &payload)
+{
+    constexpr quint8 Standby = 0x00;
+    constexpr quint8 FixedAngle = 0x01;
+    constexpr quint8 ManualSearch = 0x02;
+
+    switch (payload.turretState) {
+    case Standby:
+        m_device_mgr->ptz_stop_btn_clicked();
+        break;
+    case FixedAngle:
+        m_device_mgr->send_ptz_angle(payload.azimuthRaw / 100.0f,
+                                     payload.elevationHundredths / 100.0f);
+        break;
+    case ManualSearch: {
+        const qint16 horizontal_velocity = static_cast<qint16>(payload.azimuthRaw);
+        m_device_mgr->ptz_move_velocity(horizontal_velocity / 100.0f,
+                                        payload.elevationHundredths / 100.0f);
+        break;
+    }
+    default:
+        qWarning() << "Ignoring unsupported UDP709 G3 turret state"
+                   << payload.turretState;
+        break;
+    }
+}
+
+void UserPanel::apply_udp709_lens_command(quint8 control)
+{
+    bool valid = false;
+    const int requested_operation = udp709LensOperation(control, &valid);
+    if (!valid) {
+        qWarning().nospace() << "Ignoring invalid or unsupported UDP709 G3 lens control 0x"
+                             << QString::number(control, 16).rightJustified(2, QLatin1Char('0'));
+    }
+
+    if (requested_operation == m_udp709_lens_operation) {
+        if (requested_operation >= 0 && m_device_mgr->udpptz()
+                && m_device_mgr->udpptz()->is_connected()) {
+            // Turret and channel-state commands share the UDP PTZ command
+            // stream, so reassert the held lens operation after each G3.
+            m_device_mgr->vid_camera_pressed(requested_operation);
+        }
+        return;
+    }
+    if (m_udp709_lens_operation >= 0) {
+        m_device_mgr->vid_camera_released();
+        m_udp709_lens_operation = -1;
+    }
+
+    if (!valid || requested_operation < 0) return;
+    if (!m_device_mgr->udpptz() || !m_device_mgr->udpptz()->is_connected()) return;
+
+    m_device_mgr->vid_camera_pressed(requested_operation);
+    m_udp709_lens_operation = requested_operation;
+}
+
 void UserPanel::keyPressEvent(QKeyEvent *event)
 {
     static QLineEdit *edit;
@@ -4829,18 +5445,23 @@ void UserPanel::keyPressEvent(QKeyEvent *event)
             else if (edit == ui->CURRENT_EDIT) {
                 update_current();
             }
-            else if (edit == ui->ANGLE_H_EDIT) {
-                float ah = ui->ANGLE_H_EDIT->text().toDouble();
-                ah = fmod(ah + 360.0, 360.0);
+            else if (edit == ui->ANGLE_H_EDIT || edit == ui->ANGLE_V_EDIT) {
+                bool h_ok = false;
+                bool v_ok = false;
+                const float display_h = ui->ANGLE_H_EDIT->text().toFloat(&h_ok);
+                float av = ui->ANGLE_V_EDIT->text().toFloat(&v_ok);
+
+                const float ah = h_ok
+                        ? m_device_mgr->to_device_ptz_angle_h(display_h)
+                        : m_device_mgr->get_angle_h();
+                if (!v_ok) av = m_device_mgr->get_angle_v();
+
                 m_device_mgr->set_angle_h(ah);
-                ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f", ah));
-                m_device_mgr->send_ptz_angle_h(ah);
-            }
-            else if (edit == ui->ANGLE_V_EDIT) {
-                float av = ui->ANGLE_V_EDIT->text().toDouble();
                 m_device_mgr->set_angle_v(av);
+                ui->ANGLE_H_EDIT->setText(QString::asprintf("%06.2f",
+                        m_device_mgr->to_display_ptz_angle_h(ah)));
                 ui->ANGLE_V_EDIT->setText(QString::asprintf("%05.2f", av));
-                m_device_mgr->send_ptz_angle_v(av);
+                m_device_mgr->send_ptz_angle(ah, av);
             }
             this->focusWidget()->clearFocus();
             break;
@@ -5061,12 +5682,13 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     // Floating panels live in CENTRAL; raise above the fps label to keep
     // their headers clickable. Anchor them per prototype v3:
     //   Optics + TCU → bottom-left  (Optics at x=10, TCU just to its right)
+    //   Addon        → matches the main display rectangle
     //   Console      → bottom-right (right-aligned in CENTRAL)
     if (!any_overlay) {
         const int central_w = ui->CENTRAL->width();
         const int central_h = ui->CENTRAL->height();
         const int bottom_pad = 10;
-        const int left_pad   = 10;
+        const int left_pad   = 0;
         const int right_pad  = 10;
         const int panel_gap  = 12;  // gap between Optics and TCU
         if (m_optics_panel) {
@@ -5103,10 +5725,12 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     if (QLabel* fps = m_router.display(DisplayId::Main).fps_label) fps->setVisible(!any_overlay);
     if (QLabel* sd = m_router.display(DisplayId::Main).source_dead_label)
         sd->setVisible(!any_overlay && m_router.display(DisplayId::Main).source_dead);
+    position_custom_title_label();
     qInfo("display region x: %d, y: %d, w: %d, h: %d", region.x(), region.y(), region.width(), region.height());
     m_router.display(DisplayId::Main).paint_mutex.unlock();
 
     position_panorama_panel();
+    position_addon_panel();
     if (!any_overlay) {
         raise_floating_panels();
     } else if (m_panorama_panel && m_panorama_panel->isVisible()) {
@@ -5123,6 +5747,11 @@ void UserPanel::mousePressEvent(QMouseEvent *event)
 
     if (event->button() != Qt::LeftButton) return;
     QPoint diff = event->globalPos() - pos();
+    if (diff.y() < ui->TITLE->height() && diff.x() > width() - 120) {
+        resize_place = 22;
+        mouse_pressed = false;
+        return;
+    }
     if (diff.y() < 5) {
         if (diff.x() < 5) resize_place = 11;
         else if (diff.x() > width() - 5) resize_place = 13;
@@ -5264,7 +5893,7 @@ void UserPanel::dropEvent(QDropEvent *event)
         QString file_name = event->mimeData()->urls().first().toLocalFile();
         QFileInfo file_info = QFileInfo(file_name);
         if (file_info.exists() && file_info.size() > 2e9) {
-            QMessageBox::warning(this, "PROMPT", tr("File size limit (2 GB) exceeded"));
+            QMessageBox::warning(this, tr("PROMPT"), tr("File size limit (2 GB) exceeded"));
             return;
         }
         // TODO: check file type before reading/processing file
@@ -5285,7 +5914,7 @@ void UserPanel::dropEvent(QDropEvent *event)
             if (init) init = !temp;
             result |= temp;
         }
-        if (!result) QMessageBox::warning(this, "PROMPT", tr("Some of the image files cannot be read"));
+        if (!result) QMessageBox::warning(this, tr("PROMPT"), tr("Some of the image files cannot be read"));
     }
 }
 
@@ -5984,7 +6613,7 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
     m_router.display(static_cast<DisplayId>(display_idx)).consumer = new ConsumerThread(m_pipeline, &m_router, &m_router.display(did));
     if (m_router.display(static_cast<DisplayId>(display_idx)).consumer == NULL) {
         m_router.display(static_cast<DisplayId>(display_idx)).consumer_run = false;
-        QMessageBox::warning(this, "PROMPT", tr("Cannot display image"));
+        QMessageBox::warning(this, tr("PROMPT"), tr("Cannot display image"));
         return;
     }
     m_router.route(did, sid);
@@ -6093,7 +6722,7 @@ void UserPanel::on_HIDE_BTN_clicked()
     hide_left ^= 1;
     ui->LEFT->setGeometry(10, 40, hide_left ? 0 : 210, 631);
 //    ui->HIDE_BTN->setText(hide_left ? ">" : "<");
-    ui->HIDE_BTN->setStyleSheet(QString::asprintf("padding: 2px; image: url(:/tools/%s/%s);", app_theme ? "light" : "dark", hide_left ? "right" : "left"));
+    setHideButtonDirection(ui->HIDE_BTN, hide_left);
     QResizeEvent e(this->size(), this->size());
     resizeEvent(&e);
 }
@@ -6187,7 +6816,7 @@ void UserPanel::on_FILE_PATH_EDIT_editingFinished()
 {
     QString temp_location = ui->FILE_PATH_EDIT->text();
     if (QDir(temp_location).exists() || QDir().mkdir(temp_location)) save_location = temp_location;
-    else QMessageBox::warning(this, "PROMPT", tr("cannot create directory"));
+    else QMessageBox::warning(this, tr("PROMPT"), tr("cannot create directory"));
     ui->FILE_PATH_EDIT->setText(save_location);
 }
 
@@ -6245,7 +6874,7 @@ void UserPanel::config_gatewidth(QString filename)
 {
     QFile config_file(filename);
     if (!config_file.open(QIODevice::ReadOnly)) {
-        QMessageBox::warning(this, "PROMPT", tr("cannot open config file"));
+        QMessageBox::warning(this, tr("PROMPT"), tr("cannot open config file"));
         return;
     }
 
@@ -6331,7 +6960,7 @@ void UserPanel::alt_display_control(int cmd)
             }
         }
         d.record_proc = !d.record_proc;
-        alt_ctrl_grp->button(cmd)->setText(d.record_proc ? "STOP" : "REC");
+        alt_ctrl_grp->button(cmd)->setText(d.record_proc ? tr("STOP") : tr("REC"));
         break;
     }
     default: break;
@@ -6340,18 +6969,44 @@ void UserPanel::alt_display_control(int cmd)
 
 void UserPanel::on_DUAL_LIGHT_BTN_clicked()
 {
-    QPluginLoader pluginLoader("plugins/hik_control/plugin_hik_control.dll");
-    QObject *plugin = pluginLoader.instance();
-    qDebug() << plugin;
-    if (plugin) {
-        pluginInterface = qobject_cast<PluginInterface *>(plugin);
-//        pluginInterface = (PluginInterface *)plugin;
-        qDebug() << pluginInterface;
-        if (pluginInterface) {
-            pluginInterface->create(ui->PLUGIN_DISPLAY_1);
-            pluginInterface->start();
-        }
+    if (!m_addon_panel) return;
+
+    const bool monitor_mode = (ui->TITLE->current_mode() == TopBar::Mode::Monitor);
+    if (!monitor_mode) return;
+
+    m_addon_panel_requested = true;
+    position_addon_panel();
+    m_addon_panel->setVisible(true);
+    m_addon_panel->raise();
+
+    if (pluginInterface) {
+        m_addon_panel->fitPluginChildren();
+        return;
     }
+
+    if (!m_addon_plugin_loader) {
+        m_addon_plugin_loader = new QPluginLoader("plugins/map_ais/plugin_map_ais.dll", this);
+    }
+
+    QObject *plugin = m_addon_plugin_loader->instance();
+    qDebug() << plugin;
+    if (!plugin) {
+        qWarning() << "Failed to load addon plugin:"
+                   << m_addon_plugin_loader->errorString();
+        return;
+    }
+
+    pluginInterface = qobject_cast<PluginInterface *>(plugin);
+//    pluginInterface = (PluginInterface *)plugin;
+    qDebug() << pluginInterface;
+    if (!pluginInterface) {
+        qWarning() << "Loaded addon plugin does not implement PluginInterface";
+        return;
+    }
+
+    pluginInterface->create(m_addon_panel->pluginHost());
+    m_addon_panel->fitPluginChildren();
+    pluginInterface->start();
 }
 
 void UserPanel::on_RESET_3D_BTN_clicked()
@@ -6364,11 +7019,21 @@ void UserPanel::on_RESET_3D_BTN_clicked()
 void UserPanel::display_fishnet_result(int result)
 {
     switch (result) {
-    case -1: ui->FISHNET_RESULT->setText("FISHNET<br>???"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;");            break;
-    case  0: ui->FISHNET_RESULT->setText("FISHNET<br>DOES NOT EXIST"), ui->FISHNET_RESULT->setStyleSheet("color: #B0C4DE;"); break;
-    case  1: ui->FISHNET_RESULT->setText("FISHNET<br>EXISTS"), ui->FISHNET_RESULT->setStyleSheet("color: #CD5C5C;");         break;
+    case -1:
+        ui->FISHNET_RESULT->setText(tr("FISHNET<br>???"));
+        ui->FISHNET_RESULT->setProperty("fishnetState", "neutral");
+        break;
+    case 0:
+        ui->FISHNET_RESULT->setText(tr("FISHNET<br>DOES NOT EXIST"));
+        ui->FISHNET_RESULT->setProperty("fishnetState", "neutral");
+        break;
+    case 1:
+        ui->FISHNET_RESULT->setText(tr("FISHNET<br>EXISTS"));
+        ui->FISHNET_RESULT->setProperty("fishnetState", "alert");
+        break;
     default: return;
     }
+    repolish(ui->FISHNET_RESULT);
 }
 
 // on_FIRE_LASER_BTN_clicked → LaserController (inline delegation in header)
@@ -6395,9 +7060,9 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
     QDialog image_region_dialog(this, Qt::FramelessWindowHint);
     QFormLayout form(&image_region_dialog);
     form.setRowWrapPolicy(QFormLayout::WrapAllRows);
-    form.addRow(new QLabel("Region select:", &image_region_dialog));
+    form.addRow(new QLabel(tr("Region select:"), &image_region_dialog));
 
-    QLabel *width = new QLabel("Width (max " + QString::number(max_w) + "): ", &image_region_dialog);
+    QLabel *width = new QLabel(tr("Width (max %1): ").arg(max_w), &image_region_dialog);
     QSpinBox *width_spinbox = new QSpinBox(&image_region_dialog);
     width_spinbox->resize(80, 20);
     width_spinbox->setRange(0, max_w);
@@ -6405,7 +7070,7 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
     width_spinbox->setValue(new_w);
     form.addRow(width, width_spinbox);
 
-    QLabel *height = new QLabel("Height (max " + QString::number(max_h) + "): ", &image_region_dialog);
+    QLabel *height = new QLabel(tr("Height (max %1): ").arg(max_h), &image_region_dialog);
     QSpinBox *height_spinbox = new QSpinBox(&image_region_dialog);
     height_spinbox->resize(80, 20);
     height_spinbox->setRange(0, max_h);
@@ -6413,7 +7078,7 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
     height_spinbox->setValue(new_h);
     form.addRow(height, height_spinbox);
 
-    QLabel *offset_x = new QLabel("Offset X (max " + QString::number(max_w - new_w)  + "): ", &image_region_dialog);
+    QLabel *offset_x = new QLabel(tr("Offset X (max %1): ").arg(max_w - new_w), &image_region_dialog);
     QSpinBox *x_spinbox = new QSpinBox(&image_region_dialog);
     x_spinbox->resize(80, 20);
     x_spinbox->setRange(0, max_w - new_w);
@@ -6421,12 +7086,12 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
     x_spinbox->setValue(new_x);
     form.addRow(offset_x, x_spinbox);
     connect(width_spinbox, &QSpinBox::editingFinished, x_spinbox,
-        [max_w, &offset_x, width_spinbox, x_spinbox]() {
+        [this, max_w, &offset_x, width_spinbox, x_spinbox]() {
             x_spinbox->setMaximum(max_w - width_spinbox->value());
-            offset_x->setText("Offset X (max " + QString::number(max_w - width_spinbox->value())  + "): ");
+            offset_x->setText(tr("Offset X (max %1): ").arg(max_w - width_spinbox->value()));
         });
 
-    QLabel *offset_y = new QLabel("Offset Y (max " + QString::number(max_h - new_h) + "): ", &image_region_dialog);
+    QLabel *offset_y = new QLabel(tr("Offset Y (max %1): ").arg(max_h - new_h), &image_region_dialog);
     QSpinBox *y_spinbox = new QSpinBox(&image_region_dialog);
     y_spinbox->resize(80, 20);
     y_spinbox->setRange(0, max_h - new_h);
@@ -6434,9 +7099,9 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
     y_spinbox->setValue(new_y);
     form.addRow(offset_y, y_spinbox);
     connect(height_spinbox, &QSpinBox::editingFinished, y_spinbox,
-        [max_h, &offset_y, height_spinbox, y_spinbox]() {
+        [this, max_h, &offset_y, height_spinbox, y_spinbox]() {
             y_spinbox->setMaximum(max_h - height_spinbox->value());
-            offset_y->setText("Offset Y (max " + QString::number(max_h - height_spinbox->value()) + "): ");
+            offset_y->setText(tr("Offset Y (max %1): ").arg(max_h - height_spinbox->value()));
         });
 
     connect(width_spinbox, static_cast<void (QSpinBox::*)(int i)>(&QSpinBox::valueChanged), this,

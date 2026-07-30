@@ -1,0 +1,1 @@
+C:\Qt\Qt5.12.12\5.12.12\msvc2015_64\bin\lrelease.exe zh_cn.ts -qm zh_cn.qm

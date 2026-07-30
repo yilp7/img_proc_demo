@@ -1,13 +1,13 @@
 #include "util.h"
 
-QFont monaco, consolas, yozai;
+QFont monaco, consolas, sans_heiti;
 
 QTextCodec *locale_codec = QTextCodec::codecForLocale();
 
-// 0: dark theme, 1: light theme
-uchar app_theme = 0;
+// 0: dark color mode, 1: light color mode
+uchar app_color_mode = 0;
 
-QByteArray theme_dark, theme_light;
+QByteArray stylesheet_dark, stylesheet_light;
 
 QCursor cursor_dark_pointer, cursor_dark_resize_h, cursor_dark_resize_v, cursor_dark_resize_md, cursor_dark_resize_sd;
 QCursor cursor_light_pointer, cursor_light_resize_h, cursor_light_resize_v, cursor_light_resize_md, cursor_light_resize_sd;

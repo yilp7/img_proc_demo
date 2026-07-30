@@ -85,6 +85,7 @@ public:
     // IPTZController interface
     void ptz_move(int direction, int speed) override;
     void ptz_move_2d(int direction, int h_speed, int v_speed) override;
+    void ptz_move_velocity(float h_velocity, float v_velocity);
     void ptz_stop() override;
     void ptz_set_angle(float h, float v) override;
     void ptz_set_angle_h(float h) override;

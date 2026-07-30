@@ -12,14 +12,24 @@ EbusCam::EbusCam() {
     ptr_user = NULL;
 
     is_streaming = false;
-    streaming_thread_state = false;
 }
-EbusCam::~EbusCam() {if (dev_handle) PvDevice::Free(dev_handle), dev_handle = NULL;}
+EbusCam::~EbusCam()
+{
+    shut_down();
+    clear_device_list();
+}
+
+void EbusCam::clear_device_list()
+{
+    for (PvDeviceInfoGEV *info : gige_dev_list) delete info;
+    for (PvDeviceInfoU3V *info : usb3_dev_list) delete info;
+    gige_dev_list.clear();
+    usb3_dev_list.clear();
+}
 
 int EbusCam::search_for_devices()
 {
-    gige_dev_list.clear();
-    usb3_dev_list.clear();
+    clear_device_list();
     PvSystem dev_system;
     if (!dev_system.Find().IsOK()) return 0;
 
@@ -43,19 +53,30 @@ int EbusCam::search_for_devices()
 
 int EbusCam::start(int idx) {
     curr_idx = idx;
+    const int device_count = static_cast<int>(gige_dev_list.size() + usb3_dev_list.size());
+    if (idx < 0 || idx >= device_count) return -1;
+    if (dev_handle || stream_handle) shut_down();
+
+    const PvDeviceInfo *device_info = idx < static_cast<int>(gige_dev_list.size())
+        ? static_cast<PvDeviceInfo*>(gige_dev_list[idx])
+        : static_cast<PvDeviceInfo*>(usb3_dev_list[idx - static_cast<int>(gige_dev_list.size())]);
     PvResult ret;
 
-    dev_handle = PvDevice::CreateAndConnect(idx < gige_dev_list.size() ?
-                                                (PvDeviceInfo*)gige_dev_list[idx] :
-                                                (PvDeviceInfo*)usb3_dev_list[gige_dev_list.size() - idx],
-                                            &ret);
-    if (!dev_handle) return -1;
+    dev_handle = PvDevice::CreateAndConnect(device_info, &ret);
+    if (!dev_handle || !ret.IsOK()) {
+        dev_handle = NULL;
+        return -1;
+    }
 
-    stream_handle = PvStream::CreateAndOpen(idx < gige_dev_list.size() ?
-                                                (PvDeviceInfo*)gige_dev_list[idx] :
-                                                (PvDeviceInfo*)usb3_dev_list[gige_dev_list.size() - idx],
-                                            &ret);
-    if (!stream_handle) return -1;
+    stream_handle = PvStream::CreateAndOpen(device_info, &ret);
+    if (!stream_handle || !ret.IsOK()) {
+        if (stream_handle) PvStream::Free(stream_handle);
+        stream_handle = NULL;
+        dev_handle->Disconnect();
+        PvDevice::Free(dev_handle);
+        dev_handle = NULL;
+        return -1;
+    }
 
     PvDeviceGEV* gige_dev = dynamic_cast<PvDeviceGEV *>(dev_handle);
     if (gige_dev) {
@@ -65,6 +86,7 @@ int EbusCam::start(int idx) {
     }
 
     PvGenParameterArray *dev_params = dev_handle->GetParameters();
+    dev_params->SetEnumValue("AcquisitionMode", "Continuous");
     dev_params->SetEnumValue("SensorDigitizationTaps", "Two");
     dev_params->SetEnumValue("Uart0BaudRate", "Baud115200");
     dev_params->SetEnumValue("Uart0NumOfStopBits", "One");
@@ -79,21 +101,51 @@ int EbusCam::start(int idx) {
 
 int EbusCam::shut_down()
 {
-    if (dev_handle == NULL) return 0;
+    stop_grabbing();
 
-    if (dev_serial_port->IsOpened()) dev_serial_port->Close();
-    delete dev_serial_port;
-    dev_serial_port = NULL;
-    delete dev_adapter;
-    dev_adapter = NULL;
+    if (dev_serial_port) {
+        if (dev_serial_port->IsOpened()) dev_serial_port->Close();
+        delete dev_serial_port;
+        dev_serial_port = NULL;
+    }
+    if (dev_adapter) {
+        delete dev_adapter;
+        dev_adapter = NULL;
+    }
 
     for (std::list<PvBuffer*>::iterator it = buffer_list.begin(); it != buffer_list.end(); it++) delete *it;
     buffer_list.clear();
 
-    dev_handle->Disconnect();
-    PvDevice::Free(dev_handle);
-    dev_handle = NULL;
+    if (stream_handle) {
+        stream_handle->Close();
+        PvStream::Free(stream_handle);
+        stream_handle = NULL;
+    }
+    if (dev_handle) {
+        if (dev_handle->IsConnected()) dev_handle->Disconnect();
+        PvDevice::Free(dev_handle);
+        dev_handle = NULL;
+    }
     return 0;
+}
+
+bool EbusCam::is_connected() const
+{
+    return dev_handle && stream_handle && dev_handle->IsConnected();
+}
+
+int EbusCam::reconnect()
+{
+    if (is_connected()) return 0;
+
+    const int selected_idx = curr_idx;
+    shut_down();
+    if (!search_for_devices()) return -1;
+    if (selected_idx < 0
+            || selected_idx >= static_cast<int>(gige_dev_list.size() + usb3_dev_list.size())) {
+        return -1;
+    }
+    return start(selected_idx);
 }
 
 int EbusCam::set_user_pointer(StreamFrameSink *sink)
@@ -103,42 +155,60 @@ int EbusCam::set_user_pointer(StreamFrameSink *sink)
 }
 
 int EbusCam::start_grabbing() {
+    if (!is_connected()) return -1;
+    if (is_streaming.load()) return 0;
+    if (streaming_thread.joinable()) streaming_thread.join();
+
+    for (PvBuffer *buffer : buffer_list) delete buffer;
+    buffer_list.clear();
+
     uint32_t buffer_size = dev_handle->GetPayloadSize();
     uint32_t buffer_count = (stream_handle->GetQueuedBufferMaximum() < 16) ? stream_handle->GetQueuedBufferMaximum() : 16;
+    if (!buffer_size || !buffer_count) return -1;
 
     for (uint32_t i = 0; i < buffer_count; i++) {
         PvBuffer *buffer = new PvBuffer;
         buffer->Alloc(static_cast<uint32_t>(buffer_size));
         buffer_list.push_back(buffer);
     }
-    for (PvBuffer* b: buffer_list) stream_handle->QueueBuffer(b);
+    for (PvBuffer *buffer : buffer_list) {
+        if (!stream_handle->QueueBuffer(buffer).IsOK()) {
+            stop_grabbing();
+            return -1;
+        }
+    }
 
     PvGenParameterArray *dev_params = dev_handle->GetParameters();
     PvGenCommand *cmd_start = dynamic_cast<PvGenCommand *>(dev_params->Get("AcquisitionStart"));
+    if (!cmd_start) {
+        stop_grabbing();
+        return -1;
+    }
 
-    dev_handle->StreamEnable();
-    cmd_start->Execute();
+    if (!dev_handle->StreamEnable().IsOK() || !cmd_start->Execute().IsOK()) {
+        stop_grabbing();
+        return -1;
+    }
 
     is_streaming = true;
-    std::thread t([this]() {
-        streaming_thread_state = true;
-        PvGenParameterArray *stream_params = stream_handle->GetParameters();
+    streaming_thread = std::thread([this]() {
+//        PvGenParameterArray *stream_params = stream_handle->GetParameters();
 
 //        PvGenFloat *lFrameRate = dynamic_cast<PvGenFloat *>(lStreamParams->Get("AcquisitionRate"));
 //        double lFrameRateVal = 0.0;
 //        PvGenFloat *lBandwidth = dynamic_cast<PvGenFloat *>(lStreamParams->Get("Bandwidth"));
 //        double lBandwidthVal = 0.0;
-        while (is_streaming) {
+        while (is_streaming.load()) {
             PvBuffer *buffer = NULL;
             PvResult op_result;
 
             PvResult ret = stream_handle->RetrieveBuffer(&buffer, &op_result, 1000);
 //            qDebug() << buffer << ret.GetCodeString().GetAscii() << op_result.GetCodeString().GetAscii();
-            if (ret.IsOK() && op_result.IsOK()) {
+            if (ret.IsOK() && buffer) {
 //                lFrameRate->GetValue( lFrameRateVal );
 //                lBandwidth->GetValue( lBandwidthVal );
 
-                if (buffer->GetPayloadType() == PvPayloadTypeImage) {
+                if (op_result.IsOK() && buffer->GetPayloadType() == PvPayloadTypeImage) {
                     PvImage *img = buffer->GetImage();
                     StreamFrameSink *sink = ptr_user;
                     if (sink) {
@@ -146,32 +216,40 @@ int EbusCam::start_grabbing() {
                         if (sink->frames)     sink->frames->push(cv::Mat(img->GetHeight(), img->GetWidth(), CV_8UC1, buffer->GetDataPointer()).clone());
                     }
                 }
+                if (is_streaming.load()) stream_handle->QueueBuffer(buffer);
             }
-            if (op_result.IsOK()) stream_handle->QueueBuffer(buffer);
         }
-        streaming_thread_state = false;
     });
-    t.detach();
 
     return 0;
 }
 
 int EbusCam::stop_grabbing() {
     is_streaming = false;
-    while (streaming_thread_state) QThread::msleep(5);
+    if (stream_handle) stream_handle->AbortQueuedBuffers();
+    if (streaming_thread.joinable()) streaming_thread.join();
 
-    PvGenParameterArray *device_params = dev_handle->GetParameters();
-    PvGenCommand *cmd_stop = dynamic_cast<PvGenCommand *>(device_params->Get("AcquisitionStop"));
-    cmd_stop->Execute();
-    dev_handle->StreamDisable();
-
-    stream_handle->AbortQueuedBuffers();
-    while (stream_handle->GetQueuedBufferCount() > 0) {
-        PvBuffer *buffer = NULL;
-        PvResult op_result;
-        stream_handle->RetrieveBuffer(&buffer, &op_result);
+    int result = 0;
+    if (dev_handle && dev_handle->IsConnected()) {
+        PvGenParameterArray *device_params = dev_handle->GetParameters();
+        PvGenCommand *cmd_stop = device_params
+            ? dynamic_cast<PvGenCommand *>(device_params->Get("AcquisitionStop")) : NULL;
+        if (cmd_stop && !cmd_stop->Execute().IsOK()) result = -1;
+        if (!dev_handle->StreamDisable().IsOK()) result = -1;
     }
-    return 0;
+
+    if (stream_handle) {
+        stream_handle->AbortQueuedBuffers();
+        while (stream_handle->GetQueuedBufferCount() > 0) {
+            PvBuffer *buffer = NULL;
+            PvResult op_result;
+            stream_handle->RetrieveBuffer(&buffer, &op_result, 100);
+        }
+    }
+
+    for (PvBuffer *buffer : buffer_list) delete buffer;
+    buffer_list.clear();
+    return result;
 }
 
 void EbusCam::get_max_frame_size(int *w, int *h)

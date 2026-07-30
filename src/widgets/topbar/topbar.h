@@ -20,6 +20,7 @@ class TopBar : public QFrame
 public:
     explicit TopBar(QWidget *parent = nullptr);
     void setup(QObject *ptr);
+    void apply_color_mode(bool light_mode);
 
     enum class Mode { Setup, Monitor, Scan };
     Mode current_mode() const { return m_current_mode; }
@@ -49,13 +50,14 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *event) override;
 
 public:
-    // right slot — action cluster + window controls
+    // right slot - action cluster + window controls
+    TopButton* addon;
     TopButton* url;
     TopButton* settings;
     TopButton* capture;
     TopButton* cls;
     TopButton* lang;
-    TopButton* theme;
+    TopButton* color_mode;
     TopButton* min;
     TopButton* max;
     TopButton* exit;
@@ -67,8 +69,11 @@ protected:
     QFrame* m_left_slot;
     QFrame* m_center_slot;
     QFrame* m_right_slot;
+    QFrame* m_window_controls;
 
 private:
+    void sync_window_control_state();
+
     // center slot — mode tabs, system selector, clock
     QButtonGroup* m_mode_group;
     QComboBox*    m_system_selector;
@@ -87,6 +92,7 @@ private:
     QLabel* m_resolution_label;
 
     bool     m_pressed;
+    bool     m_light_mode;
     QPoint   m_prev_pos;
     QRect    m_normal_geom;
     QObject* m_signal_receiver;

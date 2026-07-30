@@ -14,9 +14,9 @@ public:
 
 QT_BEGIN_NAMESPACE
 
-#define HikControlInterface_iid "com.zkss.glass.addons.hik-control"
+#define AddonPluginInterface_iid "com.zkss.glass.addons.plugin-interface"
 
-Q_DECLARE_INTERFACE(PluginInterface, HikControlInterface_iid)
+Q_DECLARE_INTERFACE(PluginInterface, AddonPluginInterface_iid)
 QT_END_NAMESPACE
 
 #endif // PLUGININTERFACE_H

@@ -23,9 +23,9 @@ public:
     // thumbnails. Either may be null (slot stays blank).
     void setup(Display *alt1, Display *alt2);
 
-    // Re-apply themed icons on the swap buttons. Call from UserPanel::set_theme
+    // Re-apply color-mode icons on the swap buttons. Call from UserPanel::toggle_color_mode
     // alongside the other :/tools/<variant>/switch refreshes.
-    void apply_theme(bool light_theme);
+    void apply_color_mode(bool light_mode);
 
 signals:
     // Emitted when the user clicks the swap-with-main button next to an alt

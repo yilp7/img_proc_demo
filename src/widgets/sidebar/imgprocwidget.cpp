@@ -12,7 +12,8 @@
 
 ImgProcWidget::ImgProcWidget(QWidget *parent)
     : QFrame(parent), m_tabs(nullptr),
-      m_models_page(nullptr), m_general_page(nullptr)
+      m_models_page(nullptr), m_general_page(nullptr),
+      m_auto_follow_check(nullptr)
 {
     setObjectName("IMG_PROC_WIDGET");
 
@@ -89,6 +90,15 @@ void ImgProcWidget::setup(QComboBox  *main_model,     QComboBox  *alt1_model,
         ++row;
         ++idx;
     }
+
+    m_auto_follow_check = new QCheckBox(tr("AUTO FOLLOW"), m_models_page);
+    m_auto_follow_check->setObjectName("YOLO_AUTO_FOLLOW_CHECK");
+    m_auto_follow_check->setChecked(false);
+    ml->addWidget(m_auto_follow_check, row, 0, 1, 3);
+    connect(m_auto_follow_check, &QCheckBox::toggled,
+            this, &ImgProcWidget::auto_follow_changed);
+    ++row;
+
     ml->setRowStretch(row, 1);
     ml->setColumnStretch(1, 1);
 
@@ -153,6 +163,11 @@ void ImgProcWidget::setup(QComboBox  *main_model,     QComboBox  *alt1_model,
     }
     gl->setRowStretch(grow, 1);
     gl->setColumnStretch(1, 1);
+}
+
+bool ImgProcWidget::auto_follow_enabled() const
+{
+    return m_auto_follow_check && m_auto_follow_check->isChecked();
 }
 
 void ImgProcWidget::set_model_status(int display_idx, int state)

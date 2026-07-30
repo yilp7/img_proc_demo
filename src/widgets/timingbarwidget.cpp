@@ -19,11 +19,25 @@ const int kLabelAreaPx  = 72;  // reserved left strip — label (line 1) + value
 const int kLabelGap     = 8;   // space between label strip and track
 const int kTrackHeight  = 10;  // visual track height (thin, prototype-like)
 const int kEndCapWidth  = 3;   // accent bar drawn at the fill's right edge
+
+bool updateColor(QColor &slot, const QColor &color)
+{
+    if (slot == color) return false;
+    slot = color;
+    return true;
+}
 }
 
 TimingBarWidget::TimingBarWidget(QWidget *parent) :
     QWidget(parent),
-    m_drag_bar(-1)
+    m_drag_bar(-1),
+    m_bg_color(0x12, 0x10, 0x0E),
+    m_track_bg_color(0x04, 0x03, 0x03),
+    m_track_edge_color(0x38, 0x2D, 0x25),
+    m_label_color(0x8F, 0x6B, 0x4D),
+    m_value_color(0xCD, 0xB2, 0x99),
+    m_gradient_start_factor(220),
+    m_gradient_end_factor(100)
 {
     qRegisterMetaType<TimingBarWidget::BarId>("TimingBarWidget::BarId");
 
@@ -91,7 +105,69 @@ void TimingBarWidget::setBarUnit(BarId id, const QString &unit)
 void TimingBarWidget::setBarColor(BarId id, const QColor &color)
 {
     if (id < 0 || id >= BarCount) return;
+    if (m_bars[id].color == color) return;
     m_bars[id].color = color;
+    update();
+}
+
+void TimingBarWidget::setBarBackgroundColor(const QColor &color)
+{
+    if (updateColor(m_bg_color, color)) update();
+}
+
+void TimingBarWidget::setBarTrackBackgroundColor(const QColor &color)
+{
+    if (updateColor(m_track_bg_color, color)) update();
+}
+
+void TimingBarWidget::setBarTrackBorderColor(const QColor &color)
+{
+    if (updateColor(m_track_edge_color, color)) update();
+}
+
+void TimingBarWidget::setBarLabelColor(const QColor &color)
+{
+    if (updateColor(m_label_color, color)) update();
+}
+
+void TimingBarWidget::setBarValueColor(const QColor &color)
+{
+    if (updateColor(m_value_color, color)) update();
+}
+
+void TimingBarWidget::setLaserColor(const QColor &color)
+{
+    setBarColor(LaserWidth, color);
+}
+
+void TimingBarWidget::setDistanceColor(const QColor &color)
+{
+    setBarColor(Distance, color);
+}
+
+void TimingBarWidget::setDovColor(const QColor &color)
+{
+    setBarColor(Dov, color);
+}
+
+void TimingBarWidget::setMcpColor(const QColor &color)
+{
+    setBarColor(Mcp, color);
+}
+
+void TimingBarWidget::setBarGradientStartFactor(int factor)
+{
+    const int bounded = qBound(100, factor, 300);
+    if (m_gradient_start_factor == bounded) return;
+    m_gradient_start_factor = bounded;
+    update();
+}
+
+void TimingBarWidget::setBarGradientEndFactor(int factor)
+{
+    const int bounded = qBound(100, factor, 300);
+    if (m_gradient_end_factor == bounded) return;
+    m_gradient_end_factor = bounded;
     update();
 }
 
@@ -148,16 +224,9 @@ int TimingBarWidget::endHandleAt(const QPoint &pos) const
 
 void TimingBarWidget::paintEvent(QPaintEvent *)
 {
-    // Theme tokens — match prototype v3 and resources/style_dark.qss.
-    static const QColor kBg        (0x12, 0x10, 0x0E);  // bg-raised
-    static const QColor kTrackBg   (0x04, 0x03, 0x03);  // bg-deepest
-    static const QColor kTrackEdge (0x38, 0x2D, 0x25);  // border-subtle
-    static const QColor kLabel     (0x8F, 0x6B, 0x4D);  // text-dim
-    static const QColor kValue     (0xCD, 0xB2, 0x99);  // readout
-
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
-    p.fillRect(rect(), kBg);
+    p.fillRect(rect(), m_bg_color);
 
     const int tw = trackWidth();
     const int rh = rowHeight();
@@ -192,12 +261,12 @@ void TimingBarWidget::paintEvent(QPaintEvent *)
                                kLabelAreaPx, line_h_value);
 
         p.setFont(base_font);
-        p.setPen(kLabel);
+        p.setPen(m_label_color);
         p.drawText(label_rect, Qt::AlignLeft | Qt::AlignVCenter,
                    fm_label.elidedText(b.label, Qt::ElideRight, label_rect.width()));
 
         p.setFont(value_font);
-        p.setPen(kValue);
+        p.setPen(m_value_color);
         p.drawText(value_rect, Qt::AlignLeft | Qt::AlignVCenter,
                    fm_value.elidedText(value_text, Qt::ElideRight, value_rect.width()));
         p.setFont(base_font);
@@ -206,14 +275,14 @@ void TimingBarWidget::paintEvent(QPaintEvent *)
         const QRectF track_rect(trackLeft(), track_y, tw, track_h);
         QPainterPath track_path;
         track_path.addRoundedRect(track_rect, track_h / 2.0, track_h / 2.0);
-        p.fillPath(track_path, kTrackBg);
+        p.fillPath(track_path, m_track_bg_color);
 
         const int seg_w = qMax(0, valueToPixel(b.value, tw, b.scale));
         if (seg_w > 0) {
             const QRectF seg_rect(track_rect.left(), track_y, seg_w, track_h);
             QLinearGradient g(seg_rect.topLeft(), seg_rect.topRight());
-            g.setColorAt(0.0, b.color.darker(220));
-            g.setColorAt(1.0, b.color);
+            g.setColorAt(0.0, b.color.darker(m_gradient_start_factor));
+            g.setColorAt(1.0, b.color.lighter(m_gradient_end_factor));
             QPainterPath seg_path;
             seg_path.addRoundedRect(seg_rect, track_h / 2.0, track_h / 2.0);
             p.save();
@@ -223,7 +292,7 @@ void TimingBarWidget::paintEvent(QPaintEvent *)
         }
 
         // Track outline.
-        p.setPen(kTrackEdge);
+        p.setPen(m_track_edge_color);
         p.setBrush(Qt::NoBrush);
         p.drawPath(track_path);
 

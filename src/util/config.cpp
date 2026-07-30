@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <QCoreApplication>
+#include <string>
 
 Config::Config(QObject *parent)
     : QObject(parent)
@@ -69,6 +70,9 @@ bool Config::load_from_file(const QString &filepath)
     if (root.contains("network") && root["network"].is_object()) {
         m_data.network = network_settings_from_json(root["network"]);
     }
+    if (root.contains("udp709") && root["udp709"].is_object()) {
+        m_data.udp709 = udp709_settings_from_json(root["udp709"]);
+    }
     
     // Load UI settings
     if (root.contains("ui") && root["ui"].is_object()) {
@@ -78,6 +82,22 @@ bool Config::load_from_file(const QString &filepath)
     // Load camera settings
     if (root.contains("camera") && root["camera"].is_object()) {
         m_data.camera = camera_settings_from_json(root["camera"]);
+    }
+
+    // Load video URL presets
+    if (root.contains("video") && root["video"].is_object()) {
+        m_data.video = video_settings_from_json(root["video"]);
+    }
+
+    // Load startup automation settings. Runtime config reloads store this
+    // value for the next launch but do not execute automatic actions.
+    if (root.contains("automatic") && root["automatic"].is_object()) {
+        m_data.automatic = automatic_settings_from_json(root["automatic"]);
+    }
+
+    // Load startup debug settings.
+    if (root.contains("debug") && root["debug"].is_object()) {
+        m_data.debug = debug_settings_from_json(root["debug"]);
     }
     
     // Load TCU settings
@@ -130,12 +150,18 @@ bool Config::save_to_file(const QString &filepath) const
     
     // Save network settings
     root["network"] = network_settings_to_json(m_data.network);
+    root["udp709"] = udp709_settings_to_json(m_data.udp709);
     
     // Save UI settings
     root["ui"] = ui_settings_to_json(m_data.ui);
     
     // Save camera settings
     root["camera"] = camera_settings_to_json(m_data.camera);
+
+    // Save video URL presets and startup automation
+    root["video"] = video_settings_to_json(m_data.video);
+    root["automatic"] = automatic_settings_to_json(m_data.automatic);
+    root["debug"] = debug_settings_to_json(m_data.debug);
     
     // Save TCU settings
     root["tcu"] = tcu_settings_to_json(m_data.tcu);
@@ -230,11 +256,44 @@ Config::NetworkSettings Config::network_settings_from_json(const nlohmann::json 
     return settings;
 }
 
+nlohmann::json Config::udp709_settings_to_json(const Udp709Settings &settings) const
+{
+    nlohmann::json obj;
+    obj["local_ip"] = settings.local_ip.toStdString();
+    obj["local_port"] = settings.local_port;
+    obj["peer_ip"] = settings.peer_ip.toStdString();
+    obj["peer_port"] = settings.peer_port;
+    return obj;
+}
+
+Config::Udp709Settings Config::udp709_settings_from_json(const nlohmann::json &obj) const
+{
+    Udp709Settings settings;
+    if (obj.contains("local_ip") && obj["local_ip"].is_string()) {
+        settings.local_ip = QString::fromStdString(obj["local_ip"].get<std::string>());
+    }
+    if (obj.contains("local_port") && obj["local_port"].is_number_integer()) {
+        settings.local_port = qBound(1, obj["local_port"].get<int>(), 65535);
+    }
+    if (obj.contains("peer_ip") && obj["peer_ip"].is_string()) {
+        settings.peer_ip = QString::fromStdString(obj["peer_ip"].get<std::string>());
+    }
+    if (obj.contains("peer_port") && obj["peer_port"].is_number_integer()) {
+        settings.peer_port = qBound(1, obj["peer_port"].get<int>(), 65535);
+    }
+    return settings;
+}
+
 nlohmann::json Config::ui_settings_to_json(const UISettings &settings) const
 {
     nlohmann::json obj;
+    QString color_mode = settings.color_mode.trimmed().toLower();
+    if (color_mode != "light") color_mode = "dark";
+    const QByteArray custom_title_utf8 = settings.custom_title.toUtf8();
     obj["simplified"] = settings.simplified;
-    obj["dark_theme"] = settings.dark_theme;
+    obj["theme"] = settings.theme.toStdString();
+    obj["color_mode"] = color_mode.toStdString();
+    obj["custom title"] = std::string(custom_title_utf8.constData(), custom_title_utf8.size());
     obj["english"] = settings.english;
     return obj;
 }
@@ -242,14 +301,37 @@ nlohmann::json Config::ui_settings_to_json(const UISettings &settings) const
 Config::UISettings Config::ui_settings_from_json(const nlohmann::json &obj) const
 {
     UISettings settings;
+    auto apply_color_mode = [&settings](QString mode) {
+        mode = mode.trimmed().toLower();
+        settings.color_mode = (mode == "light") ? "light" : "dark";
+        settings.dark_mode = (settings.color_mode == "dark");
+    };
+
     if (obj.contains("simplified") && obj["simplified"].is_boolean()) {
         settings.simplified = obj["simplified"].get<bool>();
     }
-    if (obj.contains("dark_theme") && obj["dark_theme"].is_boolean()) {
-        settings.dark_theme = obj["dark_theme"].get<bool>();
+    if (obj.contains("theme") && obj["theme"].is_string()) {
+        settings.theme = QString::fromStdString(obj["theme"].get<std::string>()).trimmed();
+    } else if (obj.contains("theme_name") && obj["theme_name"].is_string()) {
+        settings.theme = QString::fromStdString(obj["theme_name"].get<std::string>()).trimmed();
+    }
+    if (settings.theme.isEmpty() || settings.theme == "default") {
+        settings.theme = "gruvbox";
+    }
+
+    if (obj.contains("color_mode") && obj["color_mode"].is_string()) {
+        apply_color_mode(QString::fromStdString(obj["color_mode"].get<std::string>()));
+    } else if (obj.contains("theme_mode") && obj["theme_mode"].is_string()) {
+        apply_color_mode(QString::fromStdString(obj["theme_mode"].get<std::string>()));
+    } else if (obj.contains("dark_theme") && obj["dark_theme"].is_boolean()) {
+        apply_color_mode(obj["dark_theme"].get<bool>() ? "dark" : "light");
     }
     if (obj.contains("english") && obj["english"].is_boolean()) {
         settings.english = obj["english"].get<bool>();
+    }
+    if (obj.contains("custom title") && obj["custom title"].is_string()) {
+        const std::string text = obj["custom title"].get<std::string>();
+        settings.custom_title = QString::fromUtf8(text.data(), static_cast<int>(text.size()));
     }
     return settings;
 }
@@ -278,6 +360,58 @@ Config::CameraSettings Config::camera_settings_from_json(const nlohmann::json &o
     }
     if (obj.contains("gain") && obj["gain"].is_number()) {
         settings.gain = static_cast<float>(obj["gain"].get<double>());
+    }
+    return settings;
+}
+
+nlohmann::json Config::video_settings_to_json(const VideoSettings &settings) const
+{
+    nlohmann::json obj;
+    obj["default_urls"] = nlohmann::json::array();
+    for (const QString &url : settings.default_urls) {
+        obj["default_urls"].push_back(url.toStdString());
+    }
+    return obj;
+}
+
+Config::VideoSettings Config::video_settings_from_json(const nlohmann::json &obj) const
+{
+    VideoSettings settings;
+    if (obj.contains("default_urls") && obj["default_urls"].is_array()) {
+        settings.default_urls.clear();
+        for (const auto &url : obj["default_urls"]) {
+            if (url.is_string()) {
+                settings.default_urls.append(QString::fromStdString(url.get<std::string>()));
+            }
+        }
+    }
+    return settings;
+}
+
+nlohmann::json Config::automatic_settings_to_json(const AutomaticSettings &settings) const
+{
+    return nlohmann::json{{"enabled", settings.enabled}};
+}
+
+Config::AutomaticSettings Config::automatic_settings_from_json(const nlohmann::json &obj) const
+{
+    AutomaticSettings settings;
+    if (obj.contains("enabled") && obj["enabled"].is_boolean()) {
+        settings.enabled = obj["enabled"].get<bool>();
+    }
+    return settings;
+}
+
+nlohmann::json Config::debug_settings_to_json(const DebugSettings &settings) const
+{
+    return nlohmann::json{{"generate_dmp", settings.generate_dmp}};
+}
+
+Config::DebugSettings Config::debug_settings_from_json(const nlohmann::json &obj) const
+{
+    DebugSettings settings;
+    if (obj.contains("generate_dmp") && obj["generate_dmp"].is_boolean()) {
+        settings.generate_dmp = obj["generate_dmp"].get<bool>();
     }
     return settings;
 }

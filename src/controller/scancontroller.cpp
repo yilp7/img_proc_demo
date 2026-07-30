@@ -36,12 +36,33 @@ void ScanController::init(QString *save_location, int *w, int *h)
     connect(this, SIGNAL(update_scan(bool)), SLOT(enable_scan_options(bool)), Qt::QueuedConnection);
 }
 
+void ScanController::refresh_current_values()
+{
+    if (!m_tcu_ctrl || !m_device_mgr || !m_device_mgr->tcu()) return;
+
+    m_params.starting_delay = static_cast<int>(std::lround(
+            m_device_mgr->tcu()->get(TCU::DELAY_A)));
+    m_params.starting_gw = static_cast<int>(std::lround(
+            m_device_mgr->tcu()->get(TCU::GATE_WIDTH_A)));
+    m_params.rep_freq = m_tcu_ctrl->get_rep_freq();
+
+    const float h = m_device_mgr->to_display_ptz_angle_h(m_device_mgr->get_angle_h());
+    const float v = m_device_mgr->get_angle_v();
+    m_params.starting_h = h;
+    m_params.starting_v = v;
+}
+
 void ScanController::on_SCAN_BUTTON_clicked()
 {
     bool start_scan = !scan;
 
     if (start_scan) {
         const bool panorama_scan = (m_params.ptz_scan_mode == ScanParams::PTZ_SCAN_PANORAMA);
+        if (!panorama_scan && !m_params.scan_delay_enabled
+                && !m_params.scan_gate_width_enabled && !m_params.scan_ptz_enabled) {
+            m_params.scan_ptz_enabled = true;
+        }
+        if (!panorama_scan && m_params.frame_count < 1) m_params.frame_count = 1;
         if (panorama_scan) update_panorama_fov_from_zoom(m_params);
         scan_3d = cv::Mat::zeros(*m_h, *m_w, CV_64F);
         scan_sum = cv::Mat::zeros(*m_h, *m_w, CV_64F);
@@ -51,19 +72,40 @@ void ScanController::on_SCAN_BUTTON_clicked()
             scan_idx = 0;
             scan_ptz_idx = -1;
             scan_tcu_idx = -1;
-            scan_ptz_route = panorama_scan ? get_panorama_route(m_params) : get_ptz_route(m_params);
+            scan_ptz_route = panorama_scan ? get_panorama_route(m_params)
+                : (m_params.scan_ptz_enabled
+                   ? get_ptz_route(m_params)
+                   : std::vector<std::pair<float, float>>{std::make_pair(
+                         m_device_mgr->get_angle_h(), m_device_mgr->get_angle_v())});
+            if (!panorama_scan && m_params.scan_ptz_enabled) {
+                for (std::pair<float, float> &position : scan_ptz_route)
+                    position.first = m_device_mgr->to_device_ptz_angle_h(position.first);
+            }
             if (panorama_scan) {
                 scan_tcu_route.clear();
+                scan_gate_width_route.clear();
                 scan_step = 0;
             } else {
-                scan_tcu_route = get_tcu_route(m_params);
-                scan_step = m_params.step_size_delay * m_tcu_ctrl->get_dist_ns();
+                const int profile_count = (m_params.scan_delay_enabled || m_params.scan_gate_width_enabled)
+                    ? m_params.frame_count : 1;
+                scan_tcu_route = m_params.scan_delay_enabled
+                    ? get_tcu_route(m_params)
+                    : std::vector<float>(profile_count, m_device_mgr->tcu()->get(TCU::DELAY_A));
+                scan_gate_width_route = m_params.scan_gate_width_enabled
+                    ? get_gate_width_route(m_params)
+                    : std::vector<float>(profile_count, m_device_mgr->tcu()->get(TCU::GATE_WIDTH_A));
+                scan_step = m_params.scan_delay_enabled
+                    ? m_params.step_size_delay * m_tcu_ctrl->get_dist_ns() : 0;
             }
         }
 
         if (!panorama_scan) {
-            m_tcu_ctrl->set_rep_freq(m_params.rep_freq);
-            m_tcu_ctrl->set_delay_dist(m_params.starting_delay * m_tcu_ctrl->get_dist_ns());
+            if (m_params.scan_delay_enabled) {
+                m_tcu_ctrl->set_rep_freq(m_params.rep_freq);
+                m_tcu_ctrl->set_delay_dist(m_params.starting_delay * m_tcu_ctrl->get_dist_ns());
+            }
+            if (m_params.scan_gate_width_enabled)
+                m_tcu_ctrl->set_depth_of_view(m_params.starting_gw * m_tcu_ctrl->get_dist_ns());
         }
 
         QString name = QString(panorama_scan ? "panorama_" : "scan_")
@@ -105,6 +147,13 @@ void ScanController::on_SCAN_BUTTON_clicked()
                                  .arg(get_panorama_fusion_name(m_params.panorama_fusion_mode))
                                  .toUtf8());
             } else {
+                params.write(QString("delay scan:        %1\n"
+                                     "gate width scan:   %2\n"
+                                     "PTZ scan:          %3\n")
+                                 .arg(m_params.scan_delay_enabled ? "enabled" : "current")
+                                 .arg(m_params.scan_gate_width_enabled ? "enabled" : "current")
+                                 .arg(m_params.scan_ptz_enabled ? "enabled" : "current")
+                                 .toUtf8());
                 params.write(QString::asprintf("starting delay:     %06d ns\n"
                                                "ending delay:       %06d ns\n"
                                                "frames count:       %06d\n"

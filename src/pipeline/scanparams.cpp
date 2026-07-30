@@ -190,6 +190,15 @@ std::vector<float> get_tcu_route(const ScanParams &p)
     return delay_value;
 }
 
+std::vector<float> get_gate_width_route(const ScanParams &p)
+{
+    std::vector<float> gate_width_value;
+    for (int k = 0; k < p.frame_count; ++k) {
+        gate_width_value.push_back(p.starting_gw + k * p.step_size_gw);
+    }
+    return gate_width_value;
+}
+
 std::pair<float, float> get_panorama_fov(float zoom, const std::vector<PanoramaZoomFovPoint> &points)
 {
     std::vector<PanoramaCalibrationPoint> valid;

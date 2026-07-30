@@ -22,6 +22,17 @@ class QPaintEvent;
 class TimingBarWidget : public QWidget
 {
     Q_OBJECT
+    Q_PROPERTY(QColor barBackgroundColor READ barBackgroundColor WRITE setBarBackgroundColor)
+    Q_PROPERTY(QColor barTrackBackgroundColor READ barTrackBackgroundColor WRITE setBarTrackBackgroundColor)
+    Q_PROPERTY(QColor barTrackBorderColor READ barTrackBorderColor WRITE setBarTrackBorderColor)
+    Q_PROPERTY(QColor barLabelColor READ barLabelColor WRITE setBarLabelColor)
+    Q_PROPERTY(QColor barValueColor READ barValueColor WRITE setBarValueColor)
+    Q_PROPERTY(QColor laserColor READ laserColor WRITE setLaserColor)
+    Q_PROPERTY(QColor distanceColor READ distanceColor WRITE setDistanceColor)
+    Q_PROPERTY(QColor dovColor READ dovColor WRITE setDovColor)
+    Q_PROPERTY(QColor mcpColor READ mcpColor WRITE setMcpColor)
+    Q_PROPERTY(int barGradientStartFactor READ barGradientStartFactor WRITE setBarGradientStartFactor)
+    Q_PROPERTY(int barGradientEndFactor READ barGradientEndFactor WRITE setBarGradientEndFactor)
 public:
     enum BarId {
         LaserWidth = 0,  // ns
@@ -43,6 +54,30 @@ public:
     void    setBarLabel(BarId id, const QString &label);
     void    setBarUnit(BarId id,  const QString &unit);
     void    setBarColor(BarId id, const QColor  &color);
+
+    QColor barBackgroundColor() const { return m_bg_color; }
+    QColor barTrackBackgroundColor() const { return m_track_bg_color; }
+    QColor barTrackBorderColor() const { return m_track_edge_color; }
+    QColor barLabelColor() const { return m_label_color; }
+    QColor barValueColor() const { return m_value_color; }
+    QColor laserColor() const { return m_bars[LaserWidth].color; }
+    QColor distanceColor() const { return m_bars[Distance].color; }
+    QColor dovColor() const { return m_bars[Dov].color; }
+    QColor mcpColor() const { return m_bars[Mcp].color; }
+    int barGradientStartFactor() const { return m_gradient_start_factor; }
+    int barGradientEndFactor() const { return m_gradient_end_factor; }
+
+    void setBarBackgroundColor(const QColor &color);
+    void setBarTrackBackgroundColor(const QColor &color);
+    void setBarTrackBorderColor(const QColor &color);
+    void setBarLabelColor(const QColor &color);
+    void setBarValueColor(const QColor &color);
+    void setLaserColor(const QColor &color);
+    void setDistanceColor(const QColor &color);
+    void setDovColor(const QColor &color);
+    void setMcpColor(const QColor &color);
+    void setBarGradientStartFactor(int factor);
+    void setBarGradientEndFactor(int factor);
 
     // Pure math helpers — testable without constructing a widget.
     static quint64 pixelToValue(int px, int widthPx, quint64 scaleMax);
@@ -76,6 +111,13 @@ private:
 
     Bar m_bars[BarCount];
     int m_drag_bar;   // -1 when not dragging
+    QColor m_bg_color;
+    QColor m_track_bg_color;
+    QColor m_track_edge_color;
+    QColor m_label_color;
+    QColor m_value_color;
+    int m_gradient_start_factor;
+    int m_gradient_end_factor;
 };
 
 #endif // TIMINGBARWIDGET_H

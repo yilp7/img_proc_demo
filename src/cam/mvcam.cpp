@@ -7,9 +7,38 @@ MvCam::MvCam()
 {
     device_type = 1;
     dev_handle = NULL;
+    reconnect_required = false;
     curr_idx = 0;
 }
 MvCam::~MvCam() {if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;}
+
+void MvCam::configure_device()
+{
+    if (!dev_handle) return;
+
+    MV_CC_RegisterExceptionCallBack(dev_handle, exception_cb, this);
+    reconnect_required = false;
+
+    int size = MV_CC_GetOptimalPacketSize(dev_handle);
+    if (size >= MV_OK) MV_CC_SetIntValueEx(dev_handle, "GevSCPSPacketSize", size);
+
+    // Keep the acquisition engine armed for repeated frames. TriggerMode can
+    // still be enabled separately; this only prevents one-shot acquisition.
+    MV_CC_SetEnumValueByString(dev_handle, "AcquisitionMode", "Continuous");
+    MV_CC_SetPixelFormat(dev_handle, PixelType_Gvsp_Mono8);
+    MV_CC_SetEnumValue(dev_handle, "ExposureMode", MV_EXPOSURE_MODE_TIMED);
+    MV_CC_SetEnumValue(dev_handle, "ExposureAuto", MV_EXPOSURE_AUTO_MODE_OFF);
+    MV_CC_SetEnumValue(dev_handle, "GainAuto", 0);
+    MV_CC_SetBoolValue(dev_handle, "AcquisitionFrameRateEnable", true);
+    MV_CC_SetEnumValue(dev_handle, "BinningHorizontal", 1);
+    MV_CC_SetEnumValue(dev_handle, "BinningVertical", 1);
+}
+
+void __stdcall MvCam::exception_cb(unsigned int message_type, void *user_data)
+{
+    if (message_type != MV_EXCEPTION_DEV_DISCONNECT || !user_data) return;
+    static_cast<MvCam*>(user_data)->reconnect_required = true;
+}
 
 int MvCam::search_for_devices()
 {
@@ -25,23 +54,58 @@ int MvCam::search_for_devices()
 
 int MvCam::start(int idx) {
     curr_idx = idx;
-    if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;
-    int ret = MV_CC_CreateHandle(&dev_handle, idx < gige_dev_list.nDeviceNum ? gige_dev_list.pDeviceInfo[idx] : usb3_dev_list.pDeviceInfo[idx - gige_dev_list.nDeviceNum]);
+    MV_CC_DEVICE_INFO *device_info = NULL;
+    if (idx >= 0 && idx < static_cast<int>(gige_dev_list.nDeviceNum)) {
+        device_info = gige_dev_list.pDeviceInfo[idx];
+    } else {
+        const int usb_idx = idx - static_cast<int>(gige_dev_list.nDeviceNum);
+        if (usb_idx >= 0 && usb_idx < static_cast<int>(usb3_dev_list.nDeviceNum))
+            device_info = usb3_dev_list.pDeviceInfo[usb_idx];
+    }
+    if (!device_info) return MV_E_PARAMETER;
+
+    if (dev_handle) {
+        MV_CC_CloseDevice(dev_handle);
+        MV_CC_DestroyHandle(dev_handle);
+        dev_handle = NULL;
+    }
+
+    int ret = MV_CC_CreateHandle(&dev_handle, device_info);
+    if (ret != MV_OK) {
+        dev_handle = NULL;
+        return ret;
+    }
 
     ret = MV_CC_OpenDevice(dev_handle);
+    if (ret != MV_OK) {
+        MV_CC_DestroyHandle(dev_handle);
+        dev_handle = NULL;
+        return ret;
+    }
 
-    int size = MV_CC_GetOptimalPacketSize(dev_handle);
-    if (size >= MV_OK) MV_CC_SetIntValueEx(dev_handle, "GevSCPSPacketSize", size);
-
-    MV_CC_SetPixelFormat(dev_handle, PixelType_Gvsp_Mono8);
-    MV_CC_SetEnumValue(dev_handle, "ExposureMode", MV_EXPOSURE_MODE_TIMED);
-    MV_CC_SetEnumValue(dev_handle, "ExposureAuto", MV_EXPOSURE_AUTO_MODE_OFF);
-    MV_CC_SetEnumValue(dev_handle, "GainAuto", 0);
-    MV_CC_SetBoolValue(dev_handle, "AcquisitionFrameRateEnable", true);
-    MV_CC_SetEnumValue(dev_handle, "BinningHorizontal", 1);
-    MV_CC_SetEnumValue(dev_handle, "BinningVertical", 1);
+    configure_device();
 
     // qDebug() << "start cam:" << hex << (uint)ret;
+    return ret;
+}
+
+bool MvCam::is_connected() const
+{
+    if (!dev_handle || reconnect_required.load()) return false;
+    const bool connected = MV_CC_IsDeviceConnected(dev_handle);
+    if (!connected) reconnect_required = true;
+    return connected;
+}
+
+int MvCam::reconnect()
+{
+    if (!dev_handle) return MV_E_HANDLE;
+    if (is_connected()) return MV_OK;
+
+    // Required by the MVS SDK after an exceptional GigE disconnect.
+    MV_CC_CloseDevice(dev_handle);
+    const int ret = MV_CC_OpenDevice(dev_handle);
+    if (ret == MV_OK) configure_device();
     return ret;
 }
 
@@ -58,15 +122,18 @@ int MvCam::shut_down()
 
 int MvCam::set_user_pointer(StreamFrameSink *sink)
 {
+    if (!is_connected()) return MV_E_HANDLE;
     void *user = sink;
     return MV_CC_RegisterImageCallBackEx(dev_handle, frame_cb, user);
 }
 
 int MvCam::start_grabbing() {
+    if (!is_connected()) return MV_E_HANDLE;
     return MV_CC_StartGrabbing(dev_handle);
 }
 
 int MvCam::stop_grabbing() {
+    if (!is_connected()) return MV_E_HANDLE;
     return MV_CC_StopGrabbing(dev_handle);
 }
 

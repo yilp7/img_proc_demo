@@ -1,5 +1,17 @@
 #include "topbar.h"
 
+#include <QStyle>
+
+namespace {
+void repolish(QWidget *w)
+{
+    if (!w || !w->style()) return;
+    w->style()->unpolish(w);
+    w->style()->polish(w);
+    w->update();
+}
+}
+
 // ----- TopButton -----
 
 TopButton::TopButton(QString icon, QWidget *parent)
@@ -7,19 +19,20 @@ TopButton::TopButton(QString icon, QWidget *parent)
 
 void TopButton::mouseMoveEvent(QMouseEvent *event)
 {
-    Q_UNUSED(event);
     setCursor(cursor_curr_pointer);
+    QPushButton::mouseMoveEvent(event);
 }
 
 // ----- TopBar -----
 
 TopBar::TopBar(QWidget *parent)
     : QFrame(parent),
-      url(nullptr), settings(nullptr), capture(nullptr),
-      cls(nullptr), lang(nullptr), theme(nullptr),
+      addon(nullptr), url(nullptr), settings(nullptr), capture(nullptr),
+      cls(nullptr), lang(nullptr), color_mode(nullptr),
       min(nullptr), max(nullptr), exit(nullptr),
       is_maximized(false),
       m_left_slot(nullptr), m_center_slot(nullptr), m_right_slot(nullptr),
+      m_window_controls(nullptr),
       m_mode_group(nullptr), m_system_selector(nullptr),
       m_clock_timer(nullptr), m_clock_label(nullptr),
       m_current_mode(Mode::Monitor),
@@ -27,6 +40,7 @@ TopBar::TopBar(QWidget *parent)
       m_laser_dot(nullptr), m_ptz_dot(nullptr),
       m_pixel_depth_label(nullptr), m_resolution_label(nullptr),
       m_pressed(false),
+      m_light_mode(false),
       m_signal_receiver(nullptr)
 {
     setObjectName("TOP_BAR");
@@ -120,24 +134,43 @@ TopBar::TopBar(QWidget *parent)
     auto *rl = new QHBoxLayout(m_right_slot);  rl->setContentsMargins(0, 0, 0, 0); rl->setSpacing(4);
 
     // window-control trio is created in the constructor (no signal_receiver dependency)
-    min  = new TopButton(":/tools/min",  m_right_slot);
-    max  = new TopButton(":/tools/max",  m_right_slot);
-    exit = new TopButton(":/tools/exit", m_right_slot);
+    m_window_controls = new QFrame(m_right_slot);
+    m_window_controls->setObjectName("TOP_WINDOW_CONTROLS");
+    m_window_controls->setFixedWidth(120);
+    m_window_controls->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    m_window_controls->setMouseTracking(true);
+    auto *wl = new QHBoxLayout(m_window_controls);
+    wl->setContentsMargins(0, 0, 0, 0);
+    wl->setSpacing(0);
+
+    min  = new TopButton("", m_window_controls);
+    max  = new TopButton("", m_window_controls);
+    exit = new TopButton("", m_window_controls);
     min ->setObjectName("MIN_BTN");
     max ->setObjectName("MAX_BTN");
     exit->setObjectName("EXIT_BTN");
-    min ->setFixedSize(40, 30);
-    max ->setFixedSize(40, 30);
-    exit->setFixedSize(40, 30);
+    max ->setProperty("windowState", "normal");
+    min ->setFixedWidth(40);
+    max ->setFixedWidth(40);
+    exit->setFixedWidth(40);
+    min ->setMinimumHeight(30);
+    max ->setMinimumHeight(30);
+    exit->setMinimumHeight(30);
+    min ->setIconSize(QSize(16, 16));
+    max ->setIconSize(QSize(16, 16));
+    exit->setIconSize(QSize(16, 16));
+    min ->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    max ->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    exit->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
     min ->setMouseTracking(true);
     max ->setMouseTracking(true);
     exit->setMouseTracking(true);
-
     // action cluster pushed in setup(); for now reserve their layout slots so spacing matches once populated
     rl->addStretch(1);
-    rl->addWidget(min);
-    rl->addWidget(max);
-    rl->addWidget(exit);
+    wl->addWidget(min);
+    wl->addWidget(max);
+    wl->addWidget(exit);
+    rl->addWidget(m_window_controls);
 
     root->addWidget(m_left_slot,   1);
     root->addWidget(m_center_slot, 1);
@@ -146,6 +179,8 @@ TopBar::TopBar(QWidget *parent)
     connect(min,  &QPushButton::clicked, this, [this]{ window()->showMinimized(); });
     connect(max,  &QPushButton::clicked, this, &TopBar::process_maximize);
     connect(exit, &QPushButton::clicked, this, [this]{ window()->close(); });
+
+    apply_color_mode(false);
 }
 
 void TopBar::setup(QObject *ptr)
@@ -154,28 +189,31 @@ void TopBar::setup(QObject *ptr)
 
     auto *rl = qobject_cast<QHBoxLayout*>(m_right_slot->layout());
 
-    // build the action cluster (URL / SETTINGS / CAP / CLS / LANG / THEME) and insert before min/max/exit
+    // build the action cluster (ADDON / URL / SETTINGS / CAP / CLS / LANG / COLOR MODE) and insert before min/max/exit
     auto append_action = [&](TopButton *&btn, const char *obj_name) {
         btn = new TopButton("", m_right_slot);
         btn->setObjectName(obj_name);
         btn->setFixedSize(20, 20);
         btn->setMouseTracking(true);
-        // insert ahead of min (which is at index = stretch + 0 = 1; but we keep prepending so order is left→right: url, settings, cap, cls, lang, theme, min, max, exit)
-        rl->insertWidget(rl->count() - 3, btn);
+        // Insert ahead of the zero-spacing window-controls group so the
+        // action icons keep normal spacing, while MIN/MAX/EXIT stay flush.
+        rl->insertWidget(rl->count() - 1, btn);
     };
 
+    append_action(addon,    "ADDON_BTN");
     append_action(url,      "URL_BTN");
     append_action(settings, "SETTINGS_BTN");
     append_action(capture,  "CAPTURE_BTN");
     append_action(cls,      "CLS_BTN");
     append_action(lang,     "LANGUAGE_BTN");
-    append_action(theme,    "THEME_BTN");
+    append_action(color_mode, "COLOR_MODE_BTN");
 
+    connect(addon,   SIGNAL(clicked()), m_signal_receiver, SLOT(on_DUAL_LIGHT_BTN_clicked()));
     connect(url,     SIGNAL(clicked()), m_signal_receiver, SLOT(prompt_for_input_file()));
     connect(capture, SIGNAL(clicked()), m_signal_receiver, SLOT(screenshot()));
     connect(cls,     SIGNAL(clicked()), m_signal_receiver, SLOT(clean()));
     connect(lang,    SIGNAL(clicked()), m_signal_receiver, SLOT(switch_language()));
-    connect(theme,   SIGNAL(clicked()), m_signal_receiver, SLOT(set_theme()));
+    connect(color_mode, SIGNAL(clicked()), m_signal_receiver, SLOT(toggle_color_mode()));
 
     // settings menu — port from TitleBar::setup verbatim
     QMenu *settings_menu = new QMenu(settings);
@@ -193,11 +231,39 @@ void TopBar::setup(QObject *ptr)
 
 void TopBar::process_maximize()
 {
-    if (!is_maximized) m_normal_geom = window()->geometry();
-    max->setIcon(is_maximized ? QIcon(":/tools/max") : QIcon(":/tools/restore"));
-    if (is_maximized) window()->setGeometry(m_normal_geom);
-    else              window()->setGeometry(QApplication::desktop()->availableGeometry());
-    is_maximized ^= 1;
+    QWidget *w = window();
+    if (!w) return;
+
+    if (!is_maximized) {
+        m_normal_geom = w->geometry();
+        w->setWindowState(w->windowState() | Qt::WindowMaximized);
+        is_maximized = true;
+        sync_window_control_state();
+        return;
+    }
+
+    w->setWindowState(w->windowState() & ~Qt::WindowMaximized);
+    w->setGeometry(m_normal_geom);
+    is_maximized = false;
+    sync_window_control_state();
+}
+
+void TopBar::apply_color_mode(bool light_mode)
+{
+    m_light_mode = light_mode;
+    const QString mode_dir = m_light_mode ? "light" : "dark";
+    if (min)  min ->setIcon(QIcon(":/tools/" + mode_dir + "/min"));
+    if (exit) exit->setIcon(QIcon(":/tools/" + mode_dir + "/exit"));
+    sync_window_control_state();
+}
+
+void TopBar::sync_window_control_state()
+{
+    if (!max) return;
+    const QString mode_dir = m_light_mode ? "light" : "dark";
+    max->setIcon(QIcon(":/tools/" + mode_dir + "/" + QString(is_maximized ? "restore" : "max")));
+    max->setProperty("windowState", is_maximized ? "maximized" : "normal");
+    repolish(max);
 }
 
 void TopBar::mousePressEvent(QMouseEvent *event)

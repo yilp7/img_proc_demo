@@ -1722,9 +1722,6 @@
          <property name="text">
           <string>Switch to IR</string>
          </property>
-         <property name="checkable">
-          <bool>true</bool>
-         </property>
         </widget>
         <widget class="QPushButton" name="OSD_BTN">
          <property name="geometry">

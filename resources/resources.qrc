@@ -14,6 +14,18 @@
         <file>style_dark.qss</file>
         <file>style_light.qss</file>
     </qresource>
+    <qresource prefix="/themes/gruvbox">
+        <file alias="dark.json">themes/gruvbox/dark.json</file>
+        <file alias="light.json">themes/gruvbox/light.json</file>
+    </qresource>
+    <qresource prefix="/themes/nord">
+        <file alias="dark.json">themes/nord/dark.json</file>
+        <file alias="light.json">themes/nord/light.json</file>
+    </qresource>
+    <qresource prefix="/themes/graphite">
+        <file alias="dark.json">themes/graphite/dark.json</file>
+        <file alias="light.json">themes/graphite/light.json</file>
+    </qresource>
     <qresource prefix="/tools/dark">
         <file alias="brush">tools/dark/brush.png</file>
         <file alias="brush_hover">tools/dark/brush_hover.png</file>
@@ -37,6 +49,12 @@
         <file alias="url_hover">tools/dark/url_hover.png</file>
         <file alias="switch">tools/dark/switch.png</file>
         <file alias="ptz">tools/dark/ptz.png</file>
+        <file alias="exit">tools/dark/exit.png</file>
+        <file alias="max">tools/dark/max.png</file>
+        <file alias="min">tools/dark/min.png</file>
+        <file alias="restore">tools/dark/restore.png</file>
+        <file alias="addon">tools/dark/addon.png</file>
+        <file alias="addon_hover">tools/dark/addon_hover.png</file>
     </qresource>
     <qresource prefix="/cursor/dark">
         <file alias="cursor">cursor/dark/cursor.png</file>
@@ -48,7 +66,6 @@
     <qresource prefix="/fonts">
         <file alias="consolas">fonts/consola.ttf</file>
         <file alias="monaco">fonts/monaco.ttf</file>
-        <file alias="smileysans">fonts/smileysans.ttf</file>
     </qresource>
     <qresource prefix="/qt">
         <file>etc/qt.conf</file>
@@ -70,10 +87,10 @@
         <file alias="down_right">directions/dark/direction_8.png</file>
     </qresource>
     <qresource prefix="/tools">
-        <file alias="exit">tools/exit.png</file>
-        <file alias="max">tools/max.png</file>
-        <file alias="min">tools/min.png</file>
-        <file alias="restore">tools/restore.png</file>
+        <file alias="exit">tools/light/exit.png</file>
+        <file alias="max">tools/light/max.png</file>
+        <file alias="min">tools/light/min.png</file>
+        <file alias="restore">tools/light/restore.png</file>
         <file alias="toggle_dark">tools/toggle_dark.png</file>
         <file alias="toggle_light">tools/toggle_light.png</file>
     </qresource>
@@ -97,6 +114,12 @@
         <file alias="url">tools/light/url.png</file>
         <file alias="url_hover">tools/light/url_hover.png</file>
         <file alias="switch">tools/light/switch.png</file>
+        <file alias="exit">tools/light/exit.png</file>
+        <file alias="max">tools/light/max.png</file>
+        <file alias="min">tools/light/min.png</file>
+        <file alias="restore">tools/light/restore.png</file>
+        <file alias="addon">tools/light/addon.png</file>
+        <file alias="addon_hover">tools/light/addon_hover.png</file>
     </qresource>
     <qresource prefix="/cursor/light">
         <file alias="cursor">cursor/light/cursor.png</file>

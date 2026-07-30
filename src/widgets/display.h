@@ -28,6 +28,7 @@ protected:
 signals:
     void set_pixmap(const QPixmap& pm);
     void widget_resized();   // emitted after resize; UserPanel re-snapshots ProcessingParams
+    void view_changed();     // emitted after zoom/pan/selection changes
     // idx: 0: curr_pos, 1: start_pos, 2: shape_size, 3: ptz_target
     void updated_pos(int idx, QPoint pos);
     void curr_pos(QPoint pos);

@@ -50,6 +50,7 @@ void Display::clear()
 
     selection_v2.x = selection_v1.x = 0;
     selection_v2.y = selection_v1.y = 0;
+    emit view_changed();
 }
 
 void Display::mousePressEvent(QMouseEvent *event)
@@ -77,6 +78,7 @@ void Display::mousePressEvent(QMouseEvent *event)
             selection_v2.y = selection_v1.y = curr_pos.y();
     //        emit start_pos(event->pos());
             emit updated_pos(1, curr_pos);
+            emit view_changed();
         }
         break;
     }
@@ -100,7 +102,10 @@ void Display::mouseMoveEvent(QMouseEvent *event)
 //    qDebug("pos: %d, %d\n", event->globalX(), event->globalY());
 //    qDebug("%s selecting\n", qPrintable(this->objectName()));
 
-    if (!mode) update_roi(ori_pos + QPoint((int)(scale[curr_scale] * this->width()), (int)(scale[curr_scale] * this->height())) / 2 - (event->pos() - prev_pos) * scale[curr_scale]);
+    if (!mode) {
+        update_roi(ori_pos + QPoint((int)(scale[curr_scale] * this->width()), (int)(scale[curr_scale] * this->height())) / 2 - (event->pos() - prev_pos) * scale[curr_scale]);
+        emit view_changed();
+    }
 //    prev_pos = event->pos();
 
     static QPoint curr_pos;
@@ -114,6 +119,7 @@ void Display::mouseMoveEvent(QMouseEvent *event)
 //        emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
         emit updated_pos(2, curr_pos - QPoint(selection_v1.x, selection_v1.y));
         emit updated_pos(4, (event->pos() + QPoint(selection_v1.x, selection_v1.y) - QPoint(this->width(), this->height())) / 2);
+        emit view_changed();
     }
 }
 
@@ -131,6 +137,7 @@ void Display::mouseReleaseEvent(QMouseEvent *event)
 //        emit shape_size(event->pos() - QPoint(selection_v1.x, selection_v1.y));
         emit updated_pos(2, event->pos() - QPoint(selection_v1.x, selection_v1.y));
         emit updated_pos(4, (event->pos() + QPoint(selection_v1.x, selection_v1.y) - QPoint(this->width(), this->height())) / 2);
+        emit view_changed();
     }
 }
 
@@ -155,6 +162,7 @@ void Display::wheelEvent(QWheelEvent *event)
     qDebug("current scale: %dx%d", (int)(scale[curr_scale] * this->width()), (int)(scale[curr_scale] * this->height()));
 
     update_roi(roi_center);
+    emit view_changed();
 //    selection_v1 *= scale[curr_scale];
     //    selection_v2 *= scale[curr_scale];
 }

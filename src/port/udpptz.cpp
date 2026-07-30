@@ -241,6 +241,11 @@ void UDPPTZ::ptz_move_2d(int direction, int h_speed, int v_speed)
     dispatch_manual_velocity(h_vel, v_vel, Qt::QueuedConnection);
 }
 
+void UDPPTZ::ptz_move_velocity(float h_velocity, float v_velocity)
+{
+    dispatch_manual_velocity(h_velocity, v_velocity, Qt::QueuedConnection);
+}
+
 void UDPPTZ::ptz_stop()
 {
     // Stop semantics are still being characterised per device — currently

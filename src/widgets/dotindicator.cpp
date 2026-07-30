@@ -30,9 +30,30 @@ void DotIndicator::setState(State s)
     update();
 }
 
+void DotIndicator::setOffColor(const QColor &color)
+{
+    setColorForState(Off, color);
+}
+
+void DotIndicator::setOkColor(const QColor &color)
+{
+    setColorForState(Ok, color);
+}
+
+void DotIndicator::setWarnColor(const QColor &color)
+{
+    setColorForState(Warn, color);
+}
+
+void DotIndicator::setErrColor(const QColor &color)
+{
+    setColorForState(Err, color);
+}
+
 void DotIndicator::setColorForState(State s, const QColor &color)
 {
     if (s < 0 || s > Err) return;
+    if (m_colors[s] == color) return;
     m_colors[s] = color;
     if (s == m_state) update();
 }

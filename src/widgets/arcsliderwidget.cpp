@@ -12,6 +12,13 @@ const int kMarginBottom = 10;
 const int kThumbRadius  = 9;
 const double kArcBulge  = 22.0; // horizontal bulge of the arc track in px
 const double kTrackWidthPx = 5.0;
+
+bool updateColor(QColor &slot, const QColor &color)
+{
+    if (slot == color) return false;
+    slot = color;
+    return true;
+}
 }
 
 ArcSliderWidget::ArcSliderWidget(QWidget *parent) :
@@ -23,7 +30,9 @@ ArcSliderWidget::ArcSliderWidget(QWidget *parent) :
     m_speed_mode(false),
     m_max_speed(0),
     m_last_signed_speed(0),
-    m_active_color(0xE0, 0x92, 0x4A) // default: accent
+    m_active_color(0xE0, 0x92, 0x4A),
+    m_inactive_track_color(0x5C, 0x4A, 0x3D),
+    m_thumb_edge_color(0x12, 0x10, 0x0E)
 {
     setObjectName("ArcSliderWidget");
     setAttribute(Qt::WA_StyledBackground, true);
@@ -33,9 +42,17 @@ ArcSliderWidget::ArcSliderWidget(QWidget *parent) :
 
 void ArcSliderWidget::setActiveColor(const QColor &c)
 {
-    if (m_active_color == c) return;
-    m_active_color = c;
-    update();
+    if (updateColor(m_active_color, c)) update();
+}
+
+void ArcSliderWidget::setInactiveTrackColor(const QColor &c)
+{
+    if (updateColor(m_inactive_track_color, c)) update();
+}
+
+void ArcSliderWidget::setThumbEdgeColor(const QColor &c)
+{
+    if (updateColor(m_thumb_edge_color, c)) update();
 }
 
 void ArcSliderWidget::setRange(int min, int max)
@@ -162,12 +179,8 @@ void ArcSliderWidget::paintEvent(QPaintEvent *)
     const double t = th > 0 ? (thumb_y - top) / double(th) : 0.0;
     const double thumb_x = cx + 3.0 * t * (1.0 - t) * kArcBulge;
 
-    // Inactive track: visible mid-tone so the arc reads clearly even at v=0.
-    static const QColor kInactiveTrack(0x5C, 0x4A, 0x3D);  // text-dim
-    static const QColor kThumbEdge    (0x12, 0x10, 0x0E);  // bg-raised (dark ring)
-
     // Inactive (full path): visible neutral.
-    p.setPen(QPen(kInactiveTrack, kTrackWidthPx, Qt::SolidLine, Qt::RoundCap));
+    p.setPen(QPen(m_inactive_track_color, kTrackWidthPx, Qt::SolidLine, Qt::RoundCap));
     p.drawPath(path);
 
     // Active (from bottom up to thumb): per-slider color.
@@ -178,7 +191,7 @@ void ArcSliderWidget::paintEvent(QPaintEvent *)
     p.restore();
 
     // Thumb positioned on the arc.
-    p.setPen(QPen(kThumbEdge, 1.5));
+    p.setPen(QPen(m_thumb_edge_color, 1.5));
     p.setBrush(m_active_color);
     p.drawEllipse(QPointF(thumb_x, thumb_y), kThumbRadius, kThumbRadius);
 }

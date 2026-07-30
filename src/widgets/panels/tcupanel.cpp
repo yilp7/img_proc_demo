@@ -1,6 +1,7 @@
 #include "tcupanel.h"
 
 #include <QButtonGroup>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
@@ -75,6 +76,9 @@ void TCUPanel::setup(QWidget *tcu_static, QWidget *laser_btn, QWidget *fire_btn)
     auto *gl = new QVBoxLayout(m_guru_page);
     gl->setContentsMargins(4, 4, 4, 4);
     if (tcu_static) {
+        if (auto *group = qobject_cast<QGroupBox*>(tcu_static)) {
+            group->setTitle(QString());
+        }
         tcu_static->setParent(m_guru_page);
         gl->addWidget(tcu_static);
     }

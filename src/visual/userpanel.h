@@ -39,7 +39,9 @@
 #include "widgets/panels/opticspanel.h"
 #include "widgets/panels/tcupanel.h"
 #include "widgets/panels/consolepanel.h"
+#include "widgets/panels/addonpanel.h"
 #include "widgets/panels/panoramapanel.h"
+#include "widgets/udp709window.h"
 #include "widgets/sidebar/rightstackcontainer.h"
 #include "widgets/sidebar/imgprocwidget.h"
 #include "widgets/sidebar/ptzradarwidget.h"
@@ -65,8 +67,11 @@
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class UserPanel; }
+class QLabel;
+class QComboBox;
 class QLineEdit;
 class QPushButton;
+class QPluginLoader;
 QT_END_NAMESPACE
 
 class UserPanel;
@@ -127,12 +132,13 @@ public:
 
 public slots:
     // signaled by Titlebar button
-    void set_theme();
+    void toggle_color_mode();
     void switch_language();
     void screenshot();
     void clean();
     void save_config_to_file();
     void prompt_for_config_file();
+    void reload_default_config();
     void load_config(QString config_name);
     void generate_preset_data(int idx = -1);
     void apply_preset(nlohmann::json preset_data);
@@ -392,8 +398,18 @@ private:
     void position_display_overlays(DisplayId did);
     void set_source_dead_overlay(DisplayId did, bool dead);
     void position_panorama_panel();
+    void position_addon_panel();
+    void position_custom_title_label();
     void raise_floating_panels();
     void set_panorama_panel_visible(bool visible);
+    void apply_theme_selection(const QString &theme_name, const QString &color_mode);
+    void update_udp709_device_status();
+    void update_udp709_device_control(Udp709::TurretControlPayload payload);
+    void update_udp709_laser_nir_control(Udp709::LaserNirControlPayload payload);
+    void apply_udp709_channel_states(const Udp709::TurretControlPayload &payload);
+    void apply_udp709_turret_command(const Udp709::TurretControlPayload &payload);
+    void apply_udp709_lens_command(quint8 control);
+    void apply_udp709_image_processing(quint8 control);
 
     // Lens operations delegated to LensController
     void lens_stop() { m_lens_ctrl->lens_stop(); }
@@ -428,10 +444,11 @@ private:
 
     // read device config by config
     void read_gatewidth_lookup_table(QFile *fp);
-    
+
     // config sync functions
     void syncConfigToPreferences();
     void syncPreferencesToConfig();
+    void run_automatic_actions();
 
     // TCP server connection delegated to DeviceManager
 
@@ -459,8 +476,14 @@ private:
     OpticsPanel*    m_optics_panel;
     TCUPanel*       m_tcu_panel;
     ConsolePanel*   m_console_panel;
+    AddonPanel*     m_addon_panel;
+    bool            m_addon_panel_requested;
     PanoramaPanel*  m_panorama_panel;
+    Udp709Window*   m_udp709_window;
     QPushButton*    m_scan_panorama_toggle;
+    QLabel*         m_theme_label;
+    QComboBox*      m_theme_combo;
+    QLabel*         m_custom_title_label;
     bool            m_panorama_panel_user_placed;
     bool            m_panorama_scan_active;
     RightStackContainer* m_right_stack;
@@ -555,11 +578,14 @@ private:
     // TEMP ONLY
     // TODO move to addons
     PluginInterface*        pluginInterface;            // for ir with visible light
+    QPluginLoader*          m_addon_plugin_loader;
 
     // YOLO Detection — detectors live per DisplaySlot now. Init-mutex stays
     // singleton since it only protects detector construction.
     QMutex                  m_yolo_init_mutex;
     QVector<QRect>          m_main_detection_boxes;
+    bool                    m_detection_auto_follow_active = false;
+    int                     m_udp709_lens_operation = -1;
 
     // Thread-safe snapshots of UI widget state and Config for the consumers.
     QMutex                  m_params_mutex;

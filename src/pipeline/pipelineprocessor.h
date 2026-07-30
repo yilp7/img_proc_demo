@@ -99,6 +99,7 @@ signals:
     void finish_scan_signal();
     void save_screenshot_signal(QString path);
     void update_delay_in_thread();
+    void update_gate_width_in_thread();
     void update_dist_mat(cv::Mat, double, double);
     void task_queue_full();
     // state: 0=none (no model), 1=loaded (running), 2=failed (load error, no retry).
@@ -125,7 +126,7 @@ private:
     // metadata + queues) and DisplaySlot (per-display pcfg + recorders +
     // runtime caches) directly; no SharedState indirection.
     bool acquire_frame(StreamSlot& stream, DisplaySlot& display,
-        cv::Mat& prev_img, bool& updated, int& packets_lost);
+        const PipelineConfig& pcfg, cv::Mat& prev_img, bool& updated, int& packets_lost);
     void preprocess_frame(StreamSlot& stream, DisplaySlot& display,
         const ProcessingParams& params, const PipelineConfig& pcfg,
         int& _w, int& _h);

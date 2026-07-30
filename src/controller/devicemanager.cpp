@@ -1,8 +1,64 @@
 #include "controller/devicemanager.h"
 #include "util/util.h"
 
+#include <algorithm>
 #include <cmath>
 #include <QTimer>
+
+namespace {
+QString portStyleState(bool serial_connected, bool network_connected = false)
+{
+    QString state = (serial_connected || network_connected) ? QStringLiteral("connected") : QStringLiteral("error");
+    if (network_connected) state += QStringLiteral("|network");
+    return state;
+}
+
+QString portStyleState(qint32 status)
+{
+    return portStyleState(status & ControlPort::SERIAL_CONNECTED,
+                          status & ControlPort::TCP_CONNECTED);
+}
+
+QString activeState(bool active)
+{
+    return active ? QStringLiteral("active") : QStringLiteral("inactive");
+}
+
+float normalizeHorizontalAngle(float angle)
+{
+    float normalized = std::fmod(angle, 360.0f);
+    if (normalized < 0.0f) normalized += 360.0f;
+    return normalized;
+}
+
+int directionForVelocity(float h_velocity, float v_velocity)
+{
+    const bool left = h_velocity < 0.0f;
+    const bool right = h_velocity > 0.0f;
+    const bool down = v_velocity < 0.0f;
+    const bool up = v_velocity > 0.0f;
+
+    if (up && left) return IPTZController::DIR_UP_LEFT;
+    if (up && right) return IPTZController::DIR_UP_RIGHT;
+    if (down && left) return IPTZController::DIR_DOWN_LEFT;
+    if (down && right) return IPTZController::DIR_DOWN_RIGHT;
+    if (up) return IPTZController::DIR_UP;
+    if (down) return IPTZController::DIR_DOWN;
+    if (left) return IPTZController::DIR_LEFT;
+    if (right) return IPTZController::DIR_RIGHT;
+    return -1;
+}
+
+int normalizedPtzSpeed(float velocity)
+{
+    constexpr float MaxProtocolVelocity = 60.0f;
+    constexpr float MaxDeviceSpeed = 64.0f;
+    const float magnitude = std::min(std::abs(velocity), MaxProtocolVelocity);
+    if (magnitude < 0.005f) return 0;
+    return std::max(1, static_cast<int>(std::lround(magnitude * MaxDeviceSpeed
+                                                    / MaxProtocolVelocity)));
+}
+}
 
 DeviceManager::DeviceManager(Config *config, QObject *parent)
     : QObject(parent),
@@ -218,7 +274,7 @@ void DeviceManager::setup_serial_port(QSerialPort **port, int id, QString port_n
         (*port)->clear();
         qDebug("COM%s connected\n", qPrintable(port_num));
         serial_port_connected[id] = true;
-        emit port_label_style_changed(id, app_theme ? "color: #180D1C;" : "color: #B0C4DE;");
+        emit port_label_style_changed(id, portStyleState(true));
 
         (*port)->setBaudRate(baud_rate);
         (*port)->setDataBits(QSerialPort::Data8);
@@ -241,7 +297,7 @@ void DeviceManager::setup_serial_port(QSerialPort **port, int id, QString port_n
     }
     else {
         serial_port_connected[id] = false;
-        emit port_label_style_changed(id, "color: #CD5C5C;");
+        emit port_label_style_changed(id, portStyleState(false));
     }
 }
 
@@ -257,9 +313,7 @@ void DeviceManager::update_port_status(int port_idx)
     default: return;
     }
     qint32 port_status = port->get_port_status();
-    QString style = QString(port_status & ControlPort::SERIAL_CONNECTED ? (app_theme ? "color: #180D1C;" : "color: #B0C4DE;") : "color: #CD5C5C;") +
-                    QString(port_status & ControlPort::TCP_CONNECTED ? "text-decoration:underline;" : "");
-    emit port_label_style_changed(port_idx, style);
+    emit port_label_style_changed(port_idx, portStyleState(port_status));
 }
 
 void DeviceManager::update_port_status(int connected_status, bool dummy)
@@ -285,14 +339,23 @@ void DeviceManager::update_ptz_angle(float _h, float _v)
 {
     angle_h.store(_h);
     angle_v.store(_v);
-    float display_h = _h < 0 ? _h + 360.0f : _h;
+    const float display_h = to_display_ptz_angle_h(_h);
     emit angle_display_updated(QString::asprintf("%06.2f", display_h), QString::asprintf("%05.2f", _v));
     emit ptz_angle_changed(_h, _v);
 }
 
+float DeviceManager::to_display_ptz_angle_h(float device_angle) const
+{
+    return normalizeHorizontalAngle(device_angle - m_config->get_data().device.ptz_zero_angle_h);
+}
+
+float DeviceManager::to_device_ptz_angle_h(float display_angle) const
+{
+    return normalizeHorizontalAngle(display_angle + m_config->get_data().device.ptz_zero_angle_h);
+}
+
 void DeviceManager::update_ptz_status()
 {
-    QString style;
     bool connected = false;
     bool is_network = false;
 
@@ -309,11 +372,8 @@ void DeviceManager::update_ptz_status()
         break;
     }
 
-    // Apply the same styling as other ControlPort labels
-    style = QString(connected && !is_network ? (app_theme ? "color: #180D1C;" : "color: #B0C4DE;") : "color: #CD5C5C;") +
-            QString(connected && is_network ? "text-decoration:underline;" : "");
-
-    emit port_label_style_changed(3, style); // 3 = PTZ_COM
+    emit port_label_style_changed(3, portStyleState(connected && !is_network,
+                                                    connected && is_network)); // 3 = PTZ_COM
 }
 
 void DeviceManager::ptz_button_pressed(int id)
@@ -321,7 +381,7 @@ void DeviceManager::ptz_button_pressed(int id)
     int ptz_type = m_config->get_data().device.ptz_type;
 
     if (id == 4) {
-        if (QMessageBox::warning(nullptr, "PTZ", QObject::tr("Initialize?"), QMessageBox::StandardButton::Ok | QMessageBox::StandardButton::Cancel) != QMessageBox::StandardButton::Ok) return;
+        if (QMessageBox::warning(nullptr, tr("PTZ"), tr("Initialize?"), QMessageBox::StandardButton::Ok | QMessageBox::StandardButton::Cancel) != QMessageBox::StandardButton::Ok) return;
         switch (ptz_type) {
         case 0: emit send_ptz_msg(PTZ::SELF_CHECK); break;
         case 1:
@@ -407,6 +467,32 @@ void DeviceManager::ptz_move_hv(int id, int h_speed, int v_speed)
     // it to manually (its role here is a "max speed" override).
 }
 
+void DeviceManager::ptz_move_velocity(float h_velocity, float v_velocity)
+{
+    constexpr float MaxProtocolVelocity = 60.0f;
+    h_velocity = std::max(-MaxProtocolVelocity, std::min(MaxProtocolVelocity, h_velocity));
+    v_velocity = std::max(-MaxProtocolVelocity, std::min(MaxProtocolVelocity, v_velocity));
+
+    const int ptz_type = m_config->get_data().device.ptz_type;
+    if (ptz_type == 2) {
+        if (p_udpptz && p_udpptz->is_connected()) {
+            p_udpptz->ptz_move_velocity(h_velocity, v_velocity);
+        }
+        return;
+    }
+
+    const int direction = directionForVelocity(h_velocity, v_velocity);
+    if (direction < 0) {
+        ptz_button_released(-1);
+        return;
+    }
+
+    // Pelco and USB-CAN expose the application's normalized 1..64 speed
+    // range rather than physical angular velocity, so scale the G3 range.
+    ptz_move_hv(direction, normalizedPtzSpeed(h_velocity),
+                normalizedPtzSpeed(v_velocity));
+}
+
 void DeviceManager::set_ptz_angle()
 {
     if (m_config->get_data().device.ptz_type == 0) {
@@ -473,19 +559,20 @@ void DeviceManager::vid_camera_released()
 
 void DeviceManager::vid_defog_toggled(bool checked)
 {
+    emit vid_btn_style_changed("VL_DEFOG_BTN", activeState(checked));
     if (!p_udpptz || !p_udpptz->is_connected()) return;
     p_udpptz->emit transmit(checked ? UDPPTZ::VL_DEFOG_ON : UDPPTZ::VL_DEFOG_OFF);
-    emit vid_btn_style_changed("VL_DEFOG_BTN", checked ? "background-color: #5B8C5B;" : "");
 }
 
 void DeviceManager::vid_ir_power_toggled(bool checked)
 {
     if (!p_udpptz || !p_udpptz->is_connected()) return;
 
-    // Confirm before powering off IR
+    // Manual IR power-off requires confirmation. Protocol-driven state
+    // updates call apply_vid_ir_power_state() directly and bypass this prompt.
     if (!checked) {
-        QMessageBox::StandardButton reply = QMessageBox::question(
-            qobject_cast<QWidget*>(parent()), "Confirm", "Power off IR?",
+        const QMessageBox::StandardButton reply = QMessageBox::question(
+            qobject_cast<QWidget*>(parent()), tr("Confirm"), tr("Power off IR?"),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
         if (reply != QMessageBox::Yes) {
             emit ir_power_btn_revert();
@@ -493,8 +580,14 @@ void DeviceManager::vid_ir_power_toggled(bool checked)
         }
     }
 
+    apply_vid_ir_power_state(checked);
+}
+
+void DeviceManager::apply_vid_ir_power_state(bool checked)
+{
+    emit vid_btn_style_changed("IR_POWER_BTN", activeState(checked));
+    if (!p_udpptz || !p_udpptz->is_connected()) return;
     p_udpptz->emit transmit(checked ? UDPPTZ::IR_POWER_ON : UDPPTZ::IR_POWER_OFF);
-    emit vid_btn_style_changed("IR_POWER_BTN", checked ? "background-color: #5B8C5B;" : "");
 }
 
 void DeviceManager::vid_ir_auto_focus_clicked()
@@ -507,21 +600,21 @@ void DeviceManager::vid_ldm_toggled(bool checked)
 {
     if (!p_udpptz || !p_udpptz->is_connected()) return;
     p_udpptz->emit transmit(checked ? UDPPTZ::LASER_ON : UDPPTZ::LASER_OFF);
-    emit vid_btn_style_changed("LDM_BTN", checked ? "background-color: #5B8C5B;" : "");
+    emit vid_btn_style_changed("LDM_BTN", activeState(checked));
 }
 
 void DeviceManager::vid_video_source_toggled(bool checked)
 {
     if (!p_udpptz || !p_udpptz->is_connected()) return;
     p_udpptz->emit transmit(checked ? UDPPTZ::SWITCH_IR : UDPPTZ::SWITCH_VL);
-    emit vid_btn_text_changed("VIDEO_SOURCE_BTN", checked ? "Switch to VL" : "Switch to IR");
+    emit vid_btn_text_changed("VIDEO_SOURCE_BTN", checked ? tr("Switch to VL") : tr("Switch to IR"));
 }
 
 void DeviceManager::vid_osd_toggled(bool checked)
 {
     if (!p_udpptz || !p_udpptz->is_connected()) return;
     p_udpptz->emit transmit(checked ? UDPPTZ::OSD_FULL : UDPPTZ::OSD_HIDE);
-    emit vid_btn_style_changed("OSD_BTN", checked ? "background-color: #5B8C5B;" : "");
+    emit vid_btn_style_changed("OSD_BTN", activeState(checked));
 }
 
 void DeviceManager::set_baudrate(int idx, int baudrate)

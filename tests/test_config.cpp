@@ -2,6 +2,7 @@
 #include <QTemporaryDir>
 #include <QFile>
 #include <QTextStream>
+#include <QByteArray>
 #include "util/config.h"
 
 class TestConfig : public QObject
@@ -21,13 +22,24 @@ private slots:
 
         // Network defaults
         QCOMPARE(d.network.tcp_server_address, QString("192.168.1.233"));
+        QCOMPARE(d.udp709.local_ip, QString("192.168.1.100"));
+        QCOMPARE(d.udp709.local_port, 20841);
+        QCOMPARE(d.udp709.peer_ip, QString("192.168.1.209"));
+        QCOMPARE(d.udp709.peer_port, 20841);
 
         // UI defaults
-        QCOMPARE(d.ui.dark_theme, true);
+        QCOMPARE(d.ui.theme, QString("gruvbox"));
+        QCOMPARE(d.ui.color_mode, QString("dark"));
+        QCOMPARE(d.ui.dark_mode, true);
         QCOMPARE(d.ui.english, true);
 
         // Camera defaults
         QCOMPARE(d.camera.time_exposure, 95000.0f);
+
+        // Video and startup automation defaults
+        QCOMPARE(d.video.default_urls.size(), 3);
+        QCOMPARE(d.automatic.enabled, false);
+        QCOMPARE(d.debug.generate_dmp, true);
 
         // TCU defaults
         QCOMPARE(d.tcu.type, 0);
@@ -65,8 +77,21 @@ private slots:
         config1.get_data().com_tcu.port = "COM3";
         config1.get_data().com_tcu.baudrate = 115200;
         config1.get_data().network.udp_target_port = 40000;
-        config1.get_data().ui.dark_theme = false;
+        config1.get_data().udp709.local_ip = "10.70.9.100";
+        config1.get_data().udp709.local_port = 30901;
+        config1.get_data().udp709.peer_ip = "10.70.9.209";
+        config1.get_data().udp709.peer_port = 30902;
+        config1.get_data().ui.theme = "gruvbox";
+        config1.get_data().ui.color_mode = "light";
+        config1.get_data().ui.dark_mode = false;
+        const QString monitor_title = QString::fromUtf8(QByteArray::fromHex("4d6f6e69746f7220e6a087e9a298"));
+        config1.get_data().ui.custom_title = monitor_title;
         config1.get_data().camera.frequency = 30;
+        config1.get_data().video.default_urls = QStringList()
+                << "rtsp://camera-one/live"
+                << "rtsp://camera-two/live";
+        config1.get_data().automatic.enabled = true;
+        config1.get_data().debug.generate_dmp = false;
         config1.get_data().tcu.type = 2;
         config1.get_data().device.ptz_zero_angle_h = 123.5f;
         config1.get_data().panorama_optics.zoom_fov.clear();
@@ -82,8 +107,20 @@ private slots:
         QCOMPARE(d.com_tcu.port, QString("COM3"));
         QCOMPARE(d.com_tcu.baudrate, 115200);
         QCOMPARE(d.network.udp_target_port, 40000);
-        QCOMPARE(d.ui.dark_theme, false);
+        QCOMPARE(d.udp709.local_ip, QString("10.70.9.100"));
+        QCOMPARE(d.udp709.local_port, 30901);
+        QCOMPARE(d.udp709.peer_ip, QString("10.70.9.209"));
+        QCOMPARE(d.udp709.peer_port, 30902);
+        QCOMPARE(d.ui.theme, QString("gruvbox"));
+        QCOMPARE(d.ui.color_mode, QString("light"));
+        QCOMPARE(d.ui.dark_mode, false);
+        QCOMPARE(d.ui.custom_title, monitor_title);
         QCOMPARE(d.camera.frequency, 30);
+        QCOMPARE(d.video.default_urls.size(), 2);
+        QCOMPARE(d.video.default_urls.at(0), QString("rtsp://camera-one/live"));
+        QCOMPARE(d.video.default_urls.at(1), QString("rtsp://camera-two/live"));
+        QCOMPARE(d.automatic.enabled, true);
+        QCOMPARE(d.debug.generate_dmp, false);
         QCOMPARE(d.tcu.type, 2);
         QCOMPARE(d.device.ptz_zero_angle_h, 123.5f);
         QCOMPARE(static_cast<int>(d.panorama_optics.zoom_fov.size()), 2);
@@ -102,7 +139,7 @@ private slots:
         QVERIFY(tmpDir.isValid());
         QString tmpFile = tmpDir.path() + "/partial.json";
 
-        // Write minimal JSON with only version and ui.dark_theme
+        // Write minimal legacy JSON with only version and ui.dark_theme
         QFile file(tmpFile);
         QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
         QTextStream out(&file);
@@ -115,17 +152,24 @@ private slots:
         const Config::ConfigData &d = config.get_data();
 
         // Explicitly set field
-        QCOMPARE(d.ui.dark_theme, false);
+        QCOMPARE(d.ui.theme, QString("gruvbox"));
+        QCOMPARE(d.ui.color_mode, QString("light"));
+        QCOMPARE(d.ui.dark_mode, false);
 
         // All other fields should remain at defaults
         QCOMPARE(d.com_tcu.port, QString("COM0"));
         QCOMPARE(d.com_tcu.baudrate, 9600);
         QCOMPARE(d.network.tcp_server_address, QString("192.168.1.233"));
         QCOMPARE(d.network.udp_target_port, 30000);
+        QCOMPARE(d.udp709.local_ip, QString("192.168.1.100"));
+        QCOMPARE(d.udp709.peer_ip, QString("192.168.1.209"));
         QCOMPARE(d.ui.english, true);
         QCOMPARE(d.ui.simplified, false);
         QCOMPARE(d.camera.time_exposure, 95000.0f);
         QCOMPARE(d.camera.frequency, 10);
+        QCOMPARE(d.video.default_urls.size(), 3);
+        QCOMPARE(d.automatic.enabled, false);
+        QCOMPARE(d.debug.generate_dmp, true);
         QCOMPARE(d.tcu.type, 0);
         QCOMPARE(d.tcu.ab_lock, true);
         QCOMPARE(d.tcu.max_dist, 15000.0f);
@@ -222,10 +266,16 @@ private slots:
         config.get_data().com_tcu.port = "COM5";
         config.get_data().com_tcu.baudrate = 57600;
         config.get_data().network.tcp_server_address = "10.0.0.1";
-        config.get_data().ui.dark_theme = false;
+        config.get_data().udp709.local_ip = "10.0.0.100";
+        config.get_data().ui.theme = "other";
+        config.get_data().ui.color_mode = "light";
+        config.get_data().ui.dark_mode = false;
+        config.get_data().ui.custom_title = QString::fromUtf8(QByteArray::fromHex("e697a7e6a087e9a298"));
         config.get_data().ui.english = false;
         config.get_data().camera.frequency = 60;
         config.get_data().camera.time_exposure = 5000.0f;
+        config.get_data().video.default_urls = QStringList() << "rtsp://temporary/live";
+        config.get_data().automatic.enabled = true;
         config.get_data().tcu.type = 3;
         config.get_data().tcu.ab_lock = false;
         config.get_data().tcu.max_dist = 9999.0f;
@@ -240,10 +290,16 @@ private slots:
         QCOMPARE(d.com_tcu.port, QString("COM0"));
         QCOMPARE(d.com_tcu.baudrate, 9600);
         QCOMPARE(d.network.tcp_server_address, QString("192.168.1.233"));
-        QCOMPARE(d.ui.dark_theme, true);
+        QCOMPARE(d.udp709.local_ip, QString("192.168.1.100"));
+        QCOMPARE(d.ui.theme, QString("gruvbox"));
+        QCOMPARE(d.ui.color_mode, QString("dark"));
+        QCOMPARE(d.ui.dark_mode, true);
+        QCOMPARE(d.ui.custom_title, QString());
         QCOMPARE(d.ui.english, true);
         QCOMPARE(d.camera.frequency, 10);
         QCOMPARE(d.camera.time_exposure, 95000.0f);
+        QCOMPARE(d.video.default_urls.size(), 3);
+        QCOMPARE(d.automatic.enabled, false);
         QCOMPARE(d.tcu.type, 0);
         QCOMPARE(d.tcu.ab_lock, true);
         QCOMPARE(d.tcu.max_dist, 15000.0f);

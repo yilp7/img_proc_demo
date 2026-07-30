@@ -1,0 +1,1 @@
+C:\Qt\Qt5.12.12\5.12.12\msvc2015_64\bin\lupdate.exe src -ts zh_cn.ts -disable-heuristic sametext -source-language en_US -target-language zh_CN

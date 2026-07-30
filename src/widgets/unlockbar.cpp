@@ -10,6 +10,13 @@ const int    kMarginH          = 4;
 const int    kMarginV          = 4;
 const int    kDefaultRelockMs  = 3000;
 const double kDefaultThreshold = 0.9;
+
+bool updateColor(QColor &slot, const QColor &color)
+{
+    if (slot == color) return false;
+    slot = color;
+    return true;
+}
 }
 
 UnlockBar::UnlockBar(QWidget *parent) :
@@ -20,7 +27,14 @@ UnlockBar::UnlockBar(QWidget *parent) :
     m_pressed(false),
     m_thumb_x(0),
     m_press_dx(0),
-    m_relock_timer(new QTimer(this))
+    m_relock_timer(new QTimer(this)),
+    m_track_bg_color(0x12, 0x10, 0x0E),
+    m_stripe_color(0xE6, 0xB3, 0x45),
+    m_track_edge_color(0x38, 0x2D, 0x25),
+    m_thumb_locked_color(0x1C, 0x18, 0x15),
+    m_thumb_unlocked_color(0x1C, 0x18, 0x15),
+    m_thumb_edge_armed_color(0x8F, 0x6B, 0x4D),
+    m_thumb_edge_pass_color(0x8F, 0x6B, 0x4D)
 {
     setObjectName("UnlockBar");
     setAttribute(Qt::WA_StyledBackground, true);
@@ -43,6 +57,41 @@ void UnlockBar::setRelockMs(int ms)
     if (ms < 0) ms = 0;
     m_relock_ms = ms;
     if (ms == 0) m_relock_timer->stop();
+}
+
+void UnlockBar::setTrackBackgroundColor(const QColor &color)
+{
+    if (updateColor(m_track_bg_color, color)) update();
+}
+
+void UnlockBar::setStripeColor(const QColor &color)
+{
+    if (updateColor(m_stripe_color, color)) update();
+}
+
+void UnlockBar::setTrackEdgeColor(const QColor &color)
+{
+    if (updateColor(m_track_edge_color, color)) update();
+}
+
+void UnlockBar::setThumbLockedColor(const QColor &color)
+{
+    if (updateColor(m_thumb_locked_color, color)) update();
+}
+
+void UnlockBar::setThumbUnlockedColor(const QColor &color)
+{
+    if (updateColor(m_thumb_unlocked_color, color)) update();
+}
+
+void UnlockBar::setThumbEdgeArmedColor(const QColor &color)
+{
+    if (updateColor(m_thumb_edge_armed_color, color)) update();
+}
+
+void UnlockBar::setThumbEdgePassColor(const QColor &color)
+{
+    if (updateColor(m_thumb_edge_pass_color, color)) update();
 }
 
 int UnlockBar::trackLeft() const  { return kMarginH; }
@@ -90,16 +139,6 @@ void UnlockBar::onRelockTimeout()
 
 void UnlockBar::paintEvent(QPaintEvent *)
 {
-    // Theme tokens — match prototype v3 and resources/style_dark.qss.
-    // Custom-painted widget: QSS background-color does not apply.
-    static const QColor kTrackBg     (0x12, 0x10, 0x0E);  // bg-raised (stripe gap)
-    static const QColor kStripeAmber (0xE6, 0xB3, 0x45);  // warning — safety stripe
-    static const QColor kTrackEdge   (0x38, 0x2D, 0x25);  // border-default
-    static const QColor kThumbLocked (0x1C, 0x18, 0x15);  // bg-elevated
-    static const QColor kThumbUnlocked(0x00,0xff, 0x7f);  // positive
-    static const QColor kThumbEdgeArmed(0x8F,0x6B, 0x4D); // border-strong (locked, "grab me")
-    static const QColor kThumbEdgePass (0x57,0x99, 0x72); // readout (unlocked, "passed")
-
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
 
@@ -110,9 +149,9 @@ void UnlockBar::paintEvent(QPaintEvent *)
     // Striped background (bg-raised + warning-amber, 45° stripes).
     p.save();
     p.setClipRect(track_rect);
-    p.fillRect(track_rect, kTrackBg);
+    p.fillRect(track_rect, m_track_bg_color);
     p.setPen(Qt::NoPen);
-    p.setBrush(kStripeAmber);
+    p.setBrush(m_stripe_color);
     const int stripe_w = 10;
     for (int x = track_rect.left() - track_rect.height();
          x < track_rect.right();
@@ -126,17 +165,18 @@ void UnlockBar::paintEvent(QPaintEvent *)
     }
     p.restore();
 
-    // Thumb.
-    const QRect thumb_rect(m_thumb_x, kMarginV,
-                           thumbWidth(), height() - 2 * kMarginV);
-    p.setPen(QPen(m_unlocked ? kThumbEdgePass : kThumbEdgeArmed, 1.5));
-    p.setBrush(m_unlocked ? kThumbUnlocked : kThumbLocked);
-    p.drawRoundedRect(thumb_rect, 4, 4);
-
     // Border around the track.
-    p.setPen(QPen(kTrackEdge, 1.0));
+    p.setPen(QPen(m_track_edge_color, 1.0));
     p.setBrush(Qt::NoBrush);
     p.drawRect(track_rect);
+
+    // Thumb is drawn last so the track border and stripes never sit on top
+    // of the draggable handle.
+    const QRect thumb_rect(m_thumb_x, kMarginV,
+                           thumbWidth(), height() - 2 * kMarginV);
+    p.setPen(QPen(m_unlocked ? m_thumb_edge_pass_color : m_thumb_edge_armed_color, 1.5));
+    p.setBrush(m_unlocked ? m_thumb_unlocked_color : m_thumb_locked_color);
+    p.drawRoundedRect(thumb_rect, 4, 4);
 }
 
 void UnlockBar::mousePressEvent(QMouseEvent *event)

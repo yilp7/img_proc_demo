@@ -16,7 +16,7 @@ public:
     explicit LaserControl(QWidget *parent = nullptr, Lens *p_lens = nullptr);
     ~LaserControl();
 
-    void set_theme();
+    void apply_color_mode();
 
 signals:
     void send_lens_msg_addr(qint32 lens, uchar addr, uchar speed);

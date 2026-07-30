@@ -12,6 +12,10 @@ class DotIndicator : public QWidget
 {
     Q_OBJECT
     Q_PROPERTY(State state READ state WRITE setState)
+    Q_PROPERTY(QColor offColor READ offColor WRITE setOffColor)
+    Q_PROPERTY(QColor okColor READ okColor WRITE setOkColor)
+    Q_PROPERTY(QColor warnColor READ warnColor WRITE setWarnColor)
+    Q_PROPERTY(QColor errColor READ errColor WRITE setErrColor)
 public:
     enum State {
         Off  = 0,
@@ -25,6 +29,16 @@ public:
 
     State state() const { return m_state; }
     void  setState(State s);
+
+    QColor offColor() const { return m_colors[Off]; }
+    QColor okColor() const { return m_colors[Ok]; }
+    QColor warnColor() const { return m_colors[Warn]; }
+    QColor errColor() const { return m_colors[Err]; }
+
+    void setOffColor(const QColor &color);
+    void setOkColor(const QColor &color);
+    void setWarnColor(const QColor &color);
+    void setErrColor(const QColor &color);
 
     // Per-state color override; defaults ship as neutral placeholders so
     // Sprint 20 QSS can replace them without touching this class.

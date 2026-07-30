@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <utility>
 #include <opencv2/imgproc.hpp>
 
 PipelineProcessor::PipelineProcessor(PipelineGlobals globals, QObject* parent)
@@ -177,7 +178,7 @@ int PipelineProcessor::run(DisplayRouter& router, DisplaySlot& display) {
         PipelineConfig pcfg;
         { QMutexLocker lk(m_g.params_mutex); params = *m_g.processing_params; pcfg = display.pcfg; }
 
-        if (!acquire_frame(stream, display, display.avg_state.prev_img, updated, packets_lost)) continue;
+        if (!acquire_frame(stream, display, pcfg, display.avg_state.prev_img, updated, packets_lost)) continue;
 
         if (display.source_dead) {
             display.source_dead = false;
@@ -232,7 +233,7 @@ int PipelineProcessor::run(DisplayRouter& router, DisplaySlot& display) {
 }
 
 bool PipelineProcessor::acquire_frame(StreamSlot& stream, DisplaySlot& display,
-    cv::Mat& prev_img, bool& updated, int& packets_lost)
+    const PipelineConfig& pcfg, cv::Mat& prev_img, bool& updated, int& packets_lost)
 {
     // BoundedQueue handles drop-oldest internally on push.
     cv::Mat frame;
@@ -247,6 +248,18 @@ bool PipelineProcessor::acquire_frame(StreamSlot& stream, DisplaySlot& display,
 #endif
     }
 
+    int popped_frames = 1;
+    const bool low_latency_ecc = pcfg.frame_avg_enabled
+        && pcfg.frame_avg_mode == 1
+        && !source_repush_on_pause(stream.meta.source_type);
+    if (low_latency_ecc) {
+        cv::Mat newer_frame;
+        while (stream.frames.try_pop(newer_frame)) {
+            frame = std::move(newer_frame);
+            ++popped_frames;
+        }
+    }
+
     {
         QMutexLocker mlk(&stream.meta_mutex);
         stream.latest_raw = frame;
@@ -254,9 +267,10 @@ bool PipelineProcessor::acquire_frame(StreamSlot& stream, DisplaySlot& display,
 
     int packets_lost_frame = 0;
     if (source_has_frame_info(stream.meta.source_type)) {
-        int info = 0;
-        if (stream.frame_info.try_pop(info)) {
-            packets_lost_frame = info;
+        for (int i = 0; i < popped_frames; ++i) {
+            int info = 0;
+            if (!stream.frame_info.try_pop(info)) break;
+            packets_lost_frame += info;
         }
     }
     packets_lost += packets_lost_frame;
@@ -1178,13 +1192,16 @@ void PipelineProcessor::advance_scan_main(DisplayRouter& router, StreamSlot& mai
         float fps = 0.0f;
         { QMutexLocker mlk(&main_stream.meta_mutex); fps = main_stream.meta.fps; }
         if (fps <= 0.0f) fps = 1.0f; // safety floor
-        scan_img_count = fps * (m_g.scan_params->ptz_wait_time + save_img_num / fps);
+        const int wait_time = m_g.scan_params->scan_ptz_enabled
+            ? m_g.scan_params->ptz_wait_time : 0;
+        scan_img_count = fps * (wait_time + save_img_num / fps);
 
         int tcu_idx = m_g.scan_ctrl->get_scan_tcu_idx();
         int ptz_idx = m_g.scan_ctrl->get_scan_ptz_idx();
         const auto tcu_route = m_g.scan_ctrl->get_scan_tcu_route();
+        const auto gate_width_route = m_g.scan_ctrl->get_scan_gate_width_route();
         const auto ptz_route = m_g.scan_ctrl->get_scan_ptz_route();
-        if (tcu_route.empty() || ptz_route.empty()) {
+        if (tcu_route.empty() || gate_width_route.size() != tcu_route.size() || ptz_route.empty()) {
             scan_img_count = -1;
             emit finish_scan_signal();
             return;
@@ -1197,7 +1214,8 @@ void PipelineProcessor::advance_scan_main(DisplayRouter& router, StreamSlot& mai
             m_g.scan_ctrl->set_scan_ptz_idx(ptz_idx);
 
             if (ptz_idx < (int)ptz_route.size()) {
-                m_g.device_mgr->send_ptz_angle(ptz_route[ptz_idx].first, ptz_route[ptz_idx].second);
+                if (m_g.scan_params->scan_ptz_enabled)
+                    m_g.device_mgr->send_ptz_angle(ptz_route[ptz_idx].first, ptz_route[ptz_idx].second);
 
                 scan_save_path_a = *m_g.save_location + "/" + m_g.scan_ctrl->get_scan_name() + "/" + QString::number(ptz_idx);
                 QDir().mkdir(scan_save_path_a);
@@ -1218,17 +1236,36 @@ void PipelineProcessor::advance_scan_main(DisplayRouter& router, StreamSlot& mai
 
         tcu_idx = m_g.scan_ctrl->get_scan_tcu_idx() + 1;
         m_g.scan_ctrl->set_scan_tcu_idx(tcu_idx);
-        m_g.tcu_ctrl->set_delay_dist(tcu_route[tcu_idx] * m_g.tcu_ctrl->get_dist_ns());
-        scan_save_path = scan_save_path_a + "/" + QString::number(tcu_route[tcu_idx], 'f', 2) + " ns";
+        if (m_g.scan_params->scan_delay_enabled)
+            m_g.tcu_ctrl->set_delay_dist(tcu_route[tcu_idx] * m_g.tcu_ctrl->get_dist_ns());
+        if (m_g.scan_params->scan_gate_width_enabled)
+            m_g.tcu_ctrl->set_depth_of_view(gate_width_route[tcu_idx] * m_g.tcu_ctrl->get_dist_ns());
+
+        QString profile_name;
+        if (m_g.scan_params->scan_delay_enabled && m_g.scan_params->scan_gate_width_enabled) {
+            profile_name = QString("%1 ns - gw %2 ns")
+                .arg(tcu_route[tcu_idx], 0, 'f', 2)
+                .arg(gate_width_route[tcu_idx], 0, 'f', 2);
+        } else if (m_g.scan_params->scan_delay_enabled) {
+            profile_name = QString::number(tcu_route[tcu_idx], 'f', 2) + " ns";
+        } else if (m_g.scan_params->scan_gate_width_enabled) {
+            profile_name = "gw " + QString::number(gate_width_route[tcu_idx], 'f', 2) + " ns";
+        } else {
+            profile_name = "current";
+        }
+        scan_save_path = scan_save_path_a + "/" + profile_name;
         QDir().mkdir(scan_save_path);
         QDir().mkdir(scan_save_path + "/ori_bmp");
         QDir().mkdir(scan_save_path + "/res_bmp");
 
+#if 0
         // Alt1 contributes a side capture if it's currently routed.
         StreamId alt1_stream = router.stream_routed_to(DisplayId::Alt1);
         if (alt1_stream != StreamId::None) QDir().mkdir(scan_save_path + "/alt_bmp");
 
-        emit update_delay_in_thread();
+        if (m_g.scan_params->scan_delay_enabled) emit update_delay_in_thread();
+        if (m_g.scan_params->scan_gate_width_enabled) emit update_gate_width_in_thread();
+#endif
     }
 }
 
@@ -1330,8 +1367,10 @@ void PipelineProcessor::advance_panorama_scan_main(DisplayRouter& router, Stream
     QDir().mkdir(scan_save_path + "/ori_bmp");
     QDir().mkdir(scan_save_path + "/res_bmp");
 
+#if 0
     StreamId alt1_stream = router.stream_routed_to(DisplayId::Alt1);
     if (alt1_stream != StreamId::None) QDir().mkdir(scan_save_path + "/alt_bmp");
+#endif
 
     panorama_position_started_ms = QDateTime::currentMSecsSinceEpoch();
     scan_img_count = 0;
@@ -1469,6 +1508,7 @@ void PipelineProcessor::save_scan_img(DisplayRouter& router, StreamSlot& main_st
         }
     }
 
+#if 0
     StreamId alt1_stream = router.stream_routed_to(DisplayId::Alt1);
     if (alt1_stream != StreamId::None) {
         StreamSlot& alt1 = router.stream(alt1_stream);
@@ -1479,6 +1519,7 @@ void PipelineProcessor::save_scan_img(DisplayRouter& router, StreamSlot& main_st
             m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), alt1.latest_raw.clone(), path + "/alt_bmp/" + name));
         }
     }
+#endif
 }
 
 void PipelineProcessor::draw_yolo_boxes(DisplaySlot& display,

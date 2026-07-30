@@ -70,4 +70,5 @@ private:
     std::vector<int> imgSize;
     float rectConfidenceThreshold;
     float iouThreshold;
+    std::string lastError;
 };

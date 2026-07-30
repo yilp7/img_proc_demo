@@ -223,6 +223,40 @@ void TCUController::change_gatewidth(int val)
     update_gate_width();
 }
 
+void TCUController::apply_laser_width(float val)
+{
+    laser_width = qBound(0.0f, val, m_config->get_data().tcu.max_laser_width);
+
+    uint us, ns, ps;
+    split_value_by_unit(laser_width, us, ns, ps);
+    emit laser_width_display_updated(
+        QString::asprintf(  "%d", us),
+        QString::asprintf("%03d", ns),
+        QString::asprintf("%03d", ps));
+    emit send_double_tcu_msg(TCU::LASER_USR, laser_width);
+}
+
+void TCUController::apply_delay(int val)
+{
+    const int max_dist = qMax(0, static_cast<int>(m_config->get_data().tcu.max_dist));
+    const int applied = qBound(0, val, max_dist);
+    delay_dist.store(applied);
+
+    emit delay_slider_value_changed(applied);
+    emit est_dist_text_updated(QString::asprintf("%.2f m", delay_dist.load()));
+    emit send_double_tcu_msg(TCU::EST_DIST, delay_dist.load());
+}
+
+void TCUController::apply_gatewidth(int val)
+{
+    const int max_dov = qMax(0, static_cast<int>(m_config->get_data().tcu.max_dov));
+    const int applied = qBound(0, val, max_dov);
+    depth_of_view = applied;
+
+    emit gw_slider_value_changed(applied);
+    emit send_double_tcu_msg(TCU::EST_DOV, depth_of_view);
+}
+
 // --- apply_distance (called by UserPanel::on_DIST_BTN_clicked) ---
 
 void TCUController::apply_distance(int dist)

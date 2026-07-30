@@ -1,8 +1,9 @@
 #ifndef JOYSTICKWIDGET_H
 #define JOYSTICKWIDGET_H
 
-#include <QWidget>
+#include <QColor>
 #include <QPointF>
+#include <QWidget>
 
 class QMouseEvent;
 class QPaintEvent;
@@ -16,6 +17,14 @@ class QPaintEvent;
 class JoystickWidget : public QWidget
 {
     Q_OBJECT
+    Q_PROPERTY(QColor baseEdgeColor READ baseEdgeColor WRITE setBaseEdgeColor)
+    Q_PROPERTY(QColor baseDarkColor READ baseDarkColor WRITE setBaseDarkColor)
+    Q_PROPERTY(QColor baseLightColor READ baseLightColor WRITE setBaseLightColor)
+    Q_PROPERTY(QColor baseGrooveColor READ baseGrooveColor WRITE setBaseGrooveColor)
+    Q_PROPERTY(QColor glyphColor READ glyphColor WRITE setGlyphColor)
+    Q_PROPERTY(QColor handleEdgeColor READ handleEdgeColor WRITE setHandleEdgeColor)
+    Q_PROPERTY(QColor domeDarkColor READ domeDarkColor WRITE setDomeDarkColor)
+    Q_PROPERTY(QColor domeLightColor READ domeLightColor WRITE setDomeLightColor)
 public:
     explicit JoystickWidget(QWidget *parent = nullptr);
 
@@ -26,6 +35,24 @@ public:
     double deadzone() const { return m_deadzone_frac; }
 
     QPointF direction() const { return m_direction; }
+
+    QColor baseEdgeColor() const { return m_base_edge_color; }
+    QColor baseDarkColor() const { return m_base_dark_color; }
+    QColor baseLightColor() const { return m_base_light_color; }
+    QColor baseGrooveColor() const { return m_base_groove_color; }
+    QColor glyphColor() const { return m_glyph_color; }
+    QColor handleEdgeColor() const { return m_handle_edge_color; }
+    QColor domeDarkColor() const { return m_dome_dark_color; }
+    QColor domeLightColor() const { return m_dome_light_color; }
+
+    void setBaseEdgeColor(const QColor &color);
+    void setBaseDarkColor(const QColor &color);
+    void setBaseLightColor(const QColor &color);
+    void setBaseGrooveColor(const QColor &color);
+    void setGlyphColor(const QColor &color);
+    void setHandleEdgeColor(const QColor &color);
+    void setDomeDarkColor(const QColor &color);
+    void setDomeLightColor(const QColor &color);
 
     // Pure math helpers — testable without constructing a widget.
     // Clamp a vector's magnitude to `radius`.
@@ -58,6 +85,14 @@ private:
     QPointF m_direction;     // last emitted (dx, dy)
     double  m_deadzone_frac;
     bool    m_pressed;
+    QColor  m_base_edge_color;
+    QColor  m_base_dark_color;
+    QColor  m_base_light_color;
+    QColor  m_base_groove_color;
+    QColor  m_glyph_color;
+    QColor  m_handle_edge_color;
+    QColor  m_dome_dark_color;
+    QColor  m_dome_light_color;
 };
 
 #endif // JOYSTICKWIDGET_H

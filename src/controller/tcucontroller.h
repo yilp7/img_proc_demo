@@ -79,6 +79,12 @@ public slots:
     void change_delay(int val);
     void change_gatewidth(int val);
 
+    // External controls must update the UI even when the normal slider
+    // debounce is active. Values are clamped to the configured limits.
+    void apply_laser_width(float val);
+    void apply_delay(int val);
+    void apply_gatewidth(int val);
+
     // Called by UserPanel::on_DIST_BTN_clicked after obtaining distance
     void apply_distance(int dist);
 

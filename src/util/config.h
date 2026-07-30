@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <vector>
 #include "util/version.h"
 #include "nlohmann/json.hpp"
@@ -28,9 +29,19 @@ public:
         int udpptz_protocol = 530;
     };
 
+    struct Udp709Settings {
+        QString local_ip = "192.168.1.100";
+        int local_port = 20841;
+        QString peer_ip = "192.168.1.209";
+        int peer_port = 20841;
+    };
+
     struct UISettings {
         bool simplified = false;
-        bool dark_theme = true;
+        bool dark_mode = true;
+        QString theme = "gruvbox";
+        QString color_mode = "dark";
+        QString custom_title;
         bool english = true;
     };
 
@@ -39,6 +50,22 @@ public:
         int frequency = 10;
         float time_exposure = 95000.0f;
         float gain = 0.0f;
+    };
+
+    struct VideoSettings {
+        QStringList default_urls = {
+            "rtsp://192.168.1.xxx/mainstream",
+            "rtsp://admin:abcd1234@192.168.1.xxx:554/h264/ch1/main/av_stream",
+            "rtsp://admin:abcd1234@192.168.1.xxx:554"
+        };
+    };
+
+    struct AutomaticSettings {
+        bool enabled = false;
+    };
+
+    struct DebugSettings {
+        bool generate_dmp = true;
     };
 
     struct TCUSettings {
@@ -162,8 +189,12 @@ public:
         ComSettings com_range;
         ComSettings com_ptz;
         NetworkSettings network;
+        Udp709Settings udp709;
         UISettings ui;
         CameraSettings camera;
+        VideoSettings video;
+        AutomaticSettings automatic;
+        DebugSettings debug;
         TCUSettings tcu;
         DeviceSettings device;
         SaveSettings save;
@@ -206,11 +237,23 @@ private:
     nlohmann::json network_settings_to_json(const NetworkSettings &settings) const;
     NetworkSettings network_settings_from_json(const nlohmann::json &obj) const;
 
+    nlohmann::json udp709_settings_to_json(const Udp709Settings &settings) const;
+    Udp709Settings udp709_settings_from_json(const nlohmann::json &obj) const;
+
     nlohmann::json ui_settings_to_json(const UISettings &settings) const;
     UISettings ui_settings_from_json(const nlohmann::json &obj) const;
 
     nlohmann::json camera_settings_to_json(const CameraSettings &settings) const;
     CameraSettings camera_settings_from_json(const nlohmann::json &obj) const;
+
+    nlohmann::json video_settings_to_json(const VideoSettings &settings) const;
+    VideoSettings video_settings_from_json(const nlohmann::json &obj) const;
+
+    nlohmann::json automatic_settings_to_json(const AutomaticSettings &settings) const;
+    AutomaticSettings automatic_settings_from_json(const nlohmann::json &obj) const;
+
+    nlohmann::json debug_settings_to_json(const DebugSettings &settings) const;
+    DebugSettings debug_settings_from_json(const nlohmann::json &obj) const;
 
     nlohmann::json tcu_settings_to_json(const TCUSettings &settings) const;
     TCUSettings tcu_settings_from_json(const nlohmann::json &obj) const;

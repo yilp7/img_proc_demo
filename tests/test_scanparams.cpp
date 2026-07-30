@@ -23,6 +23,9 @@ private slots:
         QCOMPARE(p.step_size_gw,    1.0f);
         QCOMPARE(p.frame_count,     1);
         QCOMPARE(p.rep_freq,        10.0f);
+        QCOMPARE(p.scan_delay_enabled, true);
+        QCOMPARE(p.scan_gate_width_enabled, true);
+        QCOMPARE(p.scan_ptz_enabled, true);
 
         QCOMPARE(p.capture_scan_ori, true);
         QCOMPARE(p.capture_scan_res, false);
@@ -110,6 +113,21 @@ private slots:
         QCOMPARE(route[1], 2.5f);
         QCOMPARE(route[2], 5.0f);
         QCOMPARE(route[3], 7.5f);
+    }
+
+    void gateWidthRouteBasic()
+    {
+        ScanParams p;
+        p.starting_gw = 50;
+        p.step_size_gw = 2.5f;
+        p.frame_count = 4;
+
+        auto route = get_gate_width_route(p);
+        QCOMPARE(route.size(), (size_t)4);
+        QCOMPARE(route[0], 50.0f);
+        QCOMPARE(route[1], 52.5f);
+        QCOMPARE(route[2], 55.0f);
+        QCOMPARE(route[3], 57.5f);
     }
 
     // TC-SP-020: get_ptz_route with default ScanParams (1×1 grid) yields a

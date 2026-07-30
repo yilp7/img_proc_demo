@@ -1,6 +1,7 @@
 #ifndef UNLOCKBAR_H
 #define UNLOCKBAR_H
 
+#include <QColor>
 #include <QWidget>
 
 class QMouseEvent;
@@ -13,6 +14,13 @@ class QTimer;
 class UnlockBar : public QWidget
 {
     Q_OBJECT
+    Q_PROPERTY(QColor trackBackgroundColor READ trackBackgroundColor WRITE setTrackBackgroundColor)
+    Q_PROPERTY(QColor stripeColor READ stripeColor WRITE setStripeColor)
+    Q_PROPERTY(QColor trackEdgeColor READ trackEdgeColor WRITE setTrackEdgeColor)
+    Q_PROPERTY(QColor thumbLockedColor READ thumbLockedColor WRITE setThumbLockedColor)
+    Q_PROPERTY(QColor thumbUnlockedColor READ thumbUnlockedColor WRITE setThumbUnlockedColor)
+    Q_PROPERTY(QColor thumbEdgeArmedColor READ thumbEdgeArmedColor WRITE setThumbEdgeArmedColor)
+    Q_PROPERTY(QColor thumbEdgePassColor READ thumbEdgePassColor WRITE setThumbEdgePassColor)
 public:
     explicit UnlockBar(QWidget *parent = nullptr);
 
@@ -27,6 +35,22 @@ public:
     int  relockMs() const { return m_relock_ms; }
 
     bool isUnlocked() const { return m_unlocked; }
+
+    QColor trackBackgroundColor() const { return m_track_bg_color; }
+    QColor stripeColor() const { return m_stripe_color; }
+    QColor trackEdgeColor() const { return m_track_edge_color; }
+    QColor thumbLockedColor() const { return m_thumb_locked_color; }
+    QColor thumbUnlockedColor() const { return m_thumb_unlocked_color; }
+    QColor thumbEdgeArmedColor() const { return m_thumb_edge_armed_color; }
+    QColor thumbEdgePassColor() const { return m_thumb_edge_pass_color; }
+
+    void setTrackBackgroundColor(const QColor &color);
+    void setStripeColor(const QColor &color);
+    void setTrackEdgeColor(const QColor &color);
+    void setThumbLockedColor(const QColor &color);
+    void setThumbUnlockedColor(const QColor &color);
+    void setThumbEdgeArmedColor(const QColor &color);
+    void setThumbEdgePassColor(const QColor &color);
 
 public slots:
     // Force the bar back to the locked state. Safe to call when already
@@ -62,6 +86,13 @@ private:
     int     m_thumb_x;     // left edge of thumb, in widget-local coords
     int     m_press_dx;    // offset from thumb-left to press point
     QTimer *m_relock_timer;
+    QColor  m_track_bg_color;
+    QColor  m_stripe_color;
+    QColor  m_track_edge_color;
+    QColor  m_thumb_locked_color;
+    QColor  m_thumb_unlocked_color;
+    QColor  m_thumb_edge_armed_color;
+    QColor  m_thumb_edge_pass_color;
 };
 
 #endif // UNLOCKBAR_H

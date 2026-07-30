@@ -4,10 +4,14 @@
 #include "cam.h"
 
 #include <MvCameraControl.h>
+#include <atomic>
 
 class MvCam : public Cam {
 private:
     void* dev_handle;
+    mutable std::atomic_bool reconnect_required;
+    void configure_device();
+    static void __stdcall exception_cb(unsigned int message_type, void *user_data);
 
 public:
     MV_CC_DEVICE_INFO_LIST gige_dev_list;
@@ -21,6 +25,8 @@ public:
 
     int start(int idx = 0);
     int shut_down();
+    bool is_connected() const override;
+    int reconnect() override;
 
     int set_user_pointer(StreamFrameSink *sink);
 

@@ -28,6 +28,7 @@ public:
     // here from widget edits; pipeline reads via SharedState::scan_params.
     const ScanParams& params() const { return m_params; }
     ScanParams&       params()       { return m_params; }
+    void refresh_current_values();
 
     // Getters (mutex-protected for cross-thread access)
     bool is_scanning() const { QMutexLocker lk(&m_scan_mutex); return scan; }
@@ -41,6 +42,7 @@ public:
     int get_scan_idx() const { QMutexLocker lk(&m_scan_mutex); return scan_idx; }
     std::vector<std::pair<float,float>> get_scan_ptz_route() const { QMutexLocker lk(&m_scan_mutex); return scan_ptz_route; }
     std::vector<float> get_scan_tcu_route() const { QMutexLocker lk(&m_scan_mutex); return scan_tcu_route; }
+    std::vector<float> get_scan_gate_width_route() const { QMutexLocker lk(&m_scan_mutex); return scan_gate_width_route; }
     int get_scan_ptz_idx() const { QMutexLocker lk(&m_scan_mutex); return scan_ptz_idx; }
     int get_scan_tcu_idx() const { QMutexLocker lk(&m_scan_mutex); return scan_tcu_idx; }
 
@@ -88,6 +90,7 @@ private:
     int   scan_idx;
     std::vector<std::pair<float,float>> scan_ptz_route;
     std::vector<float> scan_tcu_route;
+    std::vector<float> scan_gate_width_route;
     int   scan_ptz_idx;
     int   scan_tcu_idx;
 };

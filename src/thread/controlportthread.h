@@ -51,7 +51,7 @@ public:
     void set_tcp_status(bool use_tcp);
     void share_port_from(ControlPortThread *port);
     int get_port_status();
-    void set_theme();
+    void apply_color_mode();
     void quit_thread();
     void send_data(PortData d);
 

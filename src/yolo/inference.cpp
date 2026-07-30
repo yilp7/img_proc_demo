@@ -1,5 +1,6 @@
 #include "inference.h"
 #include <regex>
+#include <stdexcept>
 
 #define benchmark
 
@@ -99,12 +100,39 @@ char* DCSP_CORE::CreateSession(DCSP_INIT_PARAM& iParams) {
 
         // Get input node names
         size_t inputNodesNum = session->GetInputCount();
+        if (inputNodesNum == 0) {
+            throw std::runtime_error("Model has no input nodes.");
+        }
         for (size_t i = 0; i < inputNodesNum; i++) {
             Ort::AllocatedStringPtr input_node_name = session->GetInputNameAllocated(i, allocator);
             char* temp_buf = new char[50];
             strcpy(temp_buf, input_node_name.get());
             inputNodeNames.push_back(temp_buf);
         }
+
+        const std::vector<int64_t> inputShape = session->GetInputTypeInfo(0)
+            .GetTensorTypeAndShapeInfo().GetShape();
+        if (inputShape.size() != 4) {
+            throw std::runtime_error("Expected a four-dimensional NCHW model input.");
+        }
+        if (imgSize.size() != 2 || imgSize[0] <= 0 || imgSize[1] <= 0) {
+            throw std::runtime_error("Configured input width and height must be positive.");
+        }
+
+        const int configuredWidth = imgSize[0];
+        const int configuredHeight = imgSize[1];
+        const int resolvedWidth = inputShape[3] > 0
+            ? static_cast<int>(inputShape[3]) : configuredWidth;
+        const int resolvedHeight = inputShape[2] > 0
+            ? static_cast<int>(inputShape[2]) : configuredHeight;
+        if (resolvedWidth != configuredWidth || resolvedHeight != configuredHeight) {
+            std::cout << "[WARNING] Model input is fixed at "
+                      << resolvedWidth << "x" << resolvedHeight
+                      << "; overriding configured "
+                      << configuredWidth << "x" << configuredHeight << "."
+                      << std::endl;
+        }
+        imgSize = {resolvedWidth, resolvedHeight};
 
         // Get output node names
         size_t OutputNodesNum = session->GetOutputCount();
@@ -120,9 +148,9 @@ char* DCSP_CORE::CreateSession(DCSP_INIT_PARAM& iParams) {
         return RET_OK;
     }
     catch (const std::exception& e) {
-        std::string error = "[DCSP_ONNX]: " + std::string(e.what());
-        std::cout << error << std::endl;
-        return const_cast<char*>("[DCSP_ONNX]: Create session failed.");
+        lastError = "[DCSP_ONNX]: " + std::string(e.what());
+        std::cout << lastError << std::endl;
+        return const_cast<char*>(lastError.c_str());
     }
 }
 
@@ -137,7 +165,7 @@ char* DCSP_CORE::RunSession(cv::Mat& iImg, std::vector<DCSP_RESULT>& oResult) {
     // All models use the same processing
     float* blob = new float[processedImg.total() * 3];
     BlobFromImage(processedImg, blob);
-    std::vector<int64_t> inputNodeDims = {1, 3, imgSize.at(0), imgSize.at(1)};
+    std::vector<int64_t> inputNodeDims = {1, 3, imgSize.at(1), imgSize.at(0)};
     TensorProcess(starttime_1, iImg, blob, inputNodeDims, oResult);
 
     return RET_OK;
@@ -276,7 +304,7 @@ char* DCSP_CORE::WarmUpSession() {
 
     float* blob = new float[iImg.total() * 3];
     BlobFromImage(processedImg, blob);
-    std::vector<int64_t> YOLO_input_node_dims = {1, 3, imgSize.at(0), imgSize.at(1)};
+    std::vector<int64_t> YOLO_input_node_dims = {1, 3, imgSize.at(1), imgSize.at(0)};
     Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
         Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU), blob,
         3 * imgSize.at(0) * imgSize.at(1),

@@ -6,6 +6,7 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPalette>
 #include <QPointF>
 #include <QPixmap>
 #include <QPushButton>
@@ -36,7 +37,7 @@ PanoramaPanel::PanoramaPanel(QWidget *parent)
       m_resize_press_global(),
       m_resize_press_geometry()
 {
-    setTitle("Panorama");
+    setTitle(tr("Panorama"));
     setMinimumSize(360, 130);
 
     QWidget *header = findChild<QWidget*>("FloatingPanelHeader");
@@ -47,11 +48,11 @@ PanoramaPanel::PanoramaPanel(QWidget *parent)
     m_status->setFixedHeight(18);
     m_status->setVisible(false);
 
-    m_reset_button = new QPushButton("reset", header ? header : this);
+    m_reset_button = new QPushButton(tr("reset"), header ? header : this);
     m_reset_button->setObjectName("FloatingPanelReset");
     m_reset_button->setFixedSize(40, 20);
     m_reset_button->setFocusPolicy(Qt::NoFocus);
-    m_reset_button->setToolTip("Reset panorama panel");
+    m_reset_button->setToolTip(tr("Reset panorama panel"));
     connect(m_reset_button, &QPushButton::clicked,
             this, &PanoramaPanel::resetRequested);
 
@@ -79,10 +80,10 @@ PanoramaPanel::PanoramaPanel(QWidget *parent)
 
     m_preview = new QLabel(m_scroll);
     m_preview->setObjectName("PANORAMA_PREVIEW");
+    m_preview->setAttribute(Qt::WA_StyledBackground, true);
     m_preview->setAlignment(Qt::AlignCenter);
     m_preview->setMinimumSize(1, 1);
     m_preview->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    m_preview->setStyleSheet("background: #03070A;");
     m_scroll->setWidget(m_preview);
     m_scroll->viewport()->installEventFilter(this);
     m_preview->installEventFilter(this);
@@ -94,7 +95,7 @@ PanoramaPanel::PanoramaPanel(QWidget *parent)
     m_resize_handle->setAttribute(Qt::WA_StyledBackground, true);
     m_resize_handle->setFixedSize(kResizeHandleSize, kResizeHandleSize);
     m_resize_handle->setCursor(Qt::SizeFDiagCursor);
-    m_resize_handle->setToolTip("Resize panorama panel");
+    m_resize_handle->setToolTip(tr("Resize panorama panel"));
     m_resize_handle->installEventFilter(this);
     m_resize_handle->raise();
 
@@ -104,9 +105,11 @@ PanoramaPanel::PanoramaPanel(QWidget *parent)
 void PanoramaPanel::clearPreview()
 {
     resetView();
-    QPixmap blank(960, 120);
-    blank.fill(Qt::black);
-    setPreviewPixmap(blank);
+    m_source_pixmap = QPixmap();
+    if (m_preview) {
+        m_preview->clear();
+        m_preview->update();
+    }
 }
 
 void PanoramaPanel::setPreviewPixmap(const QPixmap &pixmap)
@@ -122,7 +125,7 @@ void PanoramaPanel::setGenerating()
     m_panning = false;
     resetView();
     if (m_status) {
-        m_status->setText("panorama generating");
+        m_status->setText(tr("panorama generating"));
         m_status->setVisible(true);
     }
     if (m_preview) m_preview->setCursor(Qt::ArrowCursor);
@@ -136,7 +139,7 @@ void PanoramaPanel::setGenerated()
     m_panning = false;
     resetView();
     if (m_status) {
-        m_status->setText("panorama generated");
+        m_status->setText(tr("panorama generated"));
         m_status->setVisible(true);
     }
     if (m_preview) m_preview->setCursor(Qt::OpenHandCursor);
@@ -303,7 +306,7 @@ void PanoramaPanel::updatePreviewPixmap()
     if (target.width() <= 0 || target.height() <= 0) return;
 
     QPixmap canvas(target);
-    canvas.fill(Qt::black);
+    canvas.fill(m_preview->palette().color(QPalette::Window));
 
     QSize scaled_size = m_source_pixmap.size().scaled(target, Qt::KeepAspectRatio);
     if (m_interactive) {

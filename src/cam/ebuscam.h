@@ -17,6 +17,8 @@
 #include <PvDeviceAdapter.h>
 
 #include <QtCore>
+#include <atomic>
+#include <thread>
 
 class EbusCam : public Cam {
 private:
@@ -30,8 +32,10 @@ private:
 
     std::list<PvBuffer*> buffer_list;
     StreamFrameSink*     ptr_user;
-    bool                 is_streaming;
-    bool                 streaming_thread_state;
+    std::atomic_bool     is_streaming;
+    std::thread          streaming_thread;
+
+    void clear_device_list();
 
 public:
     std::vector<PvDeviceInfoGEV*> gige_dev_list;
@@ -45,6 +49,8 @@ public:
 
     int start(int idx = 0);
     int shut_down();
+    bool is_connected() const override;
+    int reconnect() override;
 
     int set_user_pointer(StreamFrameSink *sink);
 

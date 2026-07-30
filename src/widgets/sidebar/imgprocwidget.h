@@ -44,11 +44,16 @@ public:
     // display_idx: 0=MAIN, 1=ALT1, 2=ALT2.
     // state: 0=none (gray), 1=loaded (green), 2=failed (red).
     void set_model_status(int display_idx, int state);
+    bool auto_follow_enabled() const;
+
+signals:
+    void auto_follow_changed(bool enabled);
 
 private:
     QTabWidget *m_tabs;
     QFrame     *m_models_page;
     QFrame     *m_general_page;
+    QCheckBox  *m_auto_follow_check;
     QFrame     *m_status[3] = {nullptr, nullptr, nullptr};
 };
 

@@ -8,19 +8,16 @@ FloatingWindow::FloatingWindow() :
     w(1920),
     h(1080)
 {
+    setObjectName("FloatingWindow");
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint | Qt::WindowStaysOnTopHint);
     setMouseTracking(true);
     this->setMinimumSize(240, 135);
     this->resize(480, 270);
 
     frame = new QFrame(this);
-//    frame->setObjectName("FRAME");
+    frame->setObjectName("FLOATING_WINDOW_CHROME");
+    frame->setAttribute(Qt::WA_StyledBackground, true);
     frame->resize(this->size());
-    // Override the dark theme's .QFrame { background-color: #12100E } rule
-    // (style_dark.qss:57) so the chrome overlay doesn't paint opaque over
-    // the Display content below. The frame only hosts corner widgets
-    // (exit button + QSizeGrip); its surface was never meant to be visible.
-    frame->setStyleSheet("background: transparent; border: none;");
     QGridLayout *layout = new QGridLayout(frame);
     layout->setContentsMargins(0, 0, 0, 0);
 
@@ -33,14 +30,13 @@ FloatingWindow::FloatingWindow() :
 //    connect(capture, &QPushButton::clicked, this, [this](){ hide(); });
 //    capture->setFixedSize(20, 20);
 //    capture->setIconSize(QSize(16, 16));
-//    capture->setStyleSheet("background-color: transparent; border: none;");
 //    layout->addWidget(capture, 0, 7, Qt::AlignTop | Qt::AlignRight);
 
     QPushButton *exit = new QPushButton(QIcon(":/tools/exit"), "", frame);
+    exit->setObjectName("FLOATING_WINDOW_EXIT");
     connect(exit, &QPushButton::clicked, this, [this](){ hide(); });
     exit->setFixedSize(20, 20);
     exit->setIconSize(QSize(16, 16));
-    exit->setStyleSheet("background-color: transparent; border: none;");
     layout->addWidget(exit, 0, 1, Qt::AlignTop | Qt::AlignRight);
 
     disp = new Display(this);

@@ -16,9 +16,9 @@ VisionWidget::VisionWidget(QWidget *parent)
     root->setContentsMargins(6, 6, 6, 6);
     root->setSpacing(4);
 
-    m_main_row = makeRow("MAIN", &m_main_chk, this);
-    m_alt1_row = makeRow("ALT1", &m_alt1_chk, this);
-    m_alt2_row = makeRow("ALT2", &m_alt2_chk, this);
+    m_main_row = makeRow("MAIN", tr("MAIN"), &m_main_chk, this);
+    m_alt1_row = makeRow("ALT1", tr("ALT1"), &m_alt1_chk, this);
+    m_alt2_row = makeRow("ALT2", tr("ALT2"), &m_alt2_chk, this);
     root->addWidget(m_main_row);
     root->addWidget(m_alt1_row);
     root->addWidget(m_alt2_row);
@@ -33,16 +33,16 @@ VisionWidget::VisionWidget(QWidget *parent)
     connect(m_alt2_chk, &QCheckBox::toggled, this, &VisionWidget::alt2EnabledChanged);
 }
 
-QFrame *VisionWidget::makeRow(const QString &label, QCheckBox **out_chk, QFrame *parent)
+QFrame *VisionWidget::makeRow(const QString &key, const QString &label, QCheckBox **out_chk, QFrame *parent)
 {
     auto *row = new QFrame(parent);
-    row->setObjectName(QString("VISION_ROW_%1").arg(label));
+    row->setObjectName(QString("VISION_ROW_%1").arg(key));
     auto *l = new QHBoxLayout(row);
     l->setContentsMargins(2, 2, 2, 2);
     l->setSpacing(6);
 
     auto *chk = new QCheckBox(label, row);
-    chk->setObjectName(QString("VISION_%1_CHK").arg(label));
+    chk->setObjectName(QString("VISION_%1_CHK").arg(key));
     *out_chk = chk;
 
     l->addWidget(chk);

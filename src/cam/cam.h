@@ -21,6 +21,11 @@ public:
     virtual int start(int idx = 0) = 0;
     virtual int shut_down() = 0;
 
+    // Connection health is separate from object/handle existence: SDK handles
+    // can remain allocated after a physical or network disconnect.
+    virtual bool is_connected() const { return true; }
+    virtual int reconnect() { return -1; }
+
     // Cam SDK callbacks push frames through this sink. The sink lives on a
     // StreamSlot owned by UserPanel; cam adapter just stores the pointer and
     // hands it to its SDK as the user_data parameter.

@@ -38,7 +38,7 @@ signals:
     void alt2EnabledChanged(bool enabled);
 
 private:
-    QFrame *makeRow(const QString &label, QCheckBox **out_chk, QFrame *parent);
+    QFrame *makeRow(const QString &key, const QString &label, QCheckBox **out_chk, QFrame *parent);
 
     QFrame *m_main_row;
     QFrame *m_alt1_row;

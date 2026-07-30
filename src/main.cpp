@@ -1,4 +1,6 @@
 #include "visual/userpanel.h"
+#include "util/config.h"
+#include "util/thememanager.h"
 #include "util/version.h"
 
 //#define _DEBUG
@@ -6,6 +8,10 @@
 
 #ifdef WIN32
 #include <DbgHelp.h>
+
+namespace {
+QString g_dump_directory;
+}
 
 #if BUILD_STATIC
 #include <QtCore/QtPlugin>
@@ -16,7 +22,9 @@ Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
 int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
 {
     // check if dmp folder exists
-    DWORD dwStatus = GetFileAttributesA("dmp");
+    const QString native_dump_directory = QDir::toNativeSeparators(g_dump_directory);
+    DWORD dwStatus = GetFileAttributesW(
+        reinterpret_cast<LPCWSTR>(native_dump_directory.utf16()));
     if ((dwStatus == INVALID_FILE_ATTRIBUTES) || !(dwStatus & FILE_ATTRIBUTE_DIRECTORY)) return EXCEPTION_EXECUTE_HANDLER;
 
     // define function ptr
@@ -31,7 +39,7 @@ int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
         );
     // load function MiniDumpWriteDump from DbgHelp.dll
     MiniDumpWriteDumpT pfnMiniDumpWriteDump = NULL;
-    HMODULE hDbgHelp = LoadLibrary("DbgHelp.dll");
+    HMODULE hDbgHelp = LoadLibraryW(L"DbgHelp.dll");
     if (NULL == hDbgHelp)
     {
         return EXCEPTION_CONTINUE_EXECUTION;
@@ -44,8 +52,13 @@ int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
         return EXCEPTION_CONTINUE_EXECUTION;
     }
     // create dump file
-    HANDLE hDumpFile = CreateFile(("dmp/DumpFile" + QDateTime::currentDateTime().toString("-yyyyMMdd-hhmmss") + ".dmp").toUtf8().constData(),
-                                  GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
+    const QString dump_file_path = QDir::toNativeSeparators(
+        QDir(g_dump_directory).filePath(
+            "DumpFile" + QDateTime::currentDateTime().toString("-yyyyMMdd-hhmmss") + ".dmp"));
+    HANDLE hDumpFile = CreateFileW(reinterpret_cast<LPCWSTR>(dump_file_path.utf16()),
+                                   GENERIC_READ | GENERIC_WRITE,
+                                   FILE_SHARE_WRITE | FILE_SHARE_READ,
+                                   0, CREATE_ALWAYS, 0, 0);
     if (INVALID_HANDLE_VALUE == hDumpFile)
     {
         FreeLibrary(hDbgHelp);
@@ -113,6 +126,22 @@ int main(int argc, char *argv[])
 
     QApplication a(argc, argv);
 
+#ifdef WIN32
+    Config startup_config;
+    const QString default_config_path = QCoreApplication::applicationDirPath() + "/default.json";
+    if (QFile::exists(default_config_path)) {
+        startup_config.load_from_file(default_config_path);
+    }
+    if (startup_config.get_data().debug.generate_dmp) {
+        g_dump_directory = QDir(QCoreApplication::applicationDirPath()).filePath("dmp");
+        if (QDir().mkpath(g_dump_directory)) {
+            SetUnhandledExceptionFilter(ExceptionFilter);
+        } else {
+            qWarning() << "Cannot create dump directory:" << g_dump_directory;
+        }
+    }
+#endif
+
 //    QPixmap pixmap("screen.png");
 //    QSplashScreen screen(pixmap);
 //    screen.show();
@@ -120,27 +149,59 @@ int main(int argc, char *argv[])
 //    timer.start();
 //    while(timer.elapsed() < (2000)) a.processEvents();
 
-    int monaco_id = QFontDatabase::addApplicationFont(":/fonts/monaco");
-    int consolas_id = QFontDatabase::addApplicationFont(":/fonts/consolas");
-    monaco = QFont(QFontDatabase::applicationFontFamilies(monaco_id).at(0));
-    monaco.setPixelSize(11);
+    auto load_app_font = [](const QString &path, const QString &fallback, int pixel_size) {
+        const int id = QFontDatabase::addApplicationFont(path);
+        const QStringList families = QFontDatabase::applicationFontFamilies(id);
+        QFont font(families.isEmpty() ? fallback : families.at(0));
+        font.setPixelSize(pixel_size);
+        return font;
+    };
+    auto available_system_sans_families = []() {
+        const QStringList preferred_families = QStringList()
+            << "Source Han Sans SC"
+            << "Source Han Sans CN"
+            << "Noto Sans CJK SC"
+            << "Noto Sans SC"
+            << "Microsoft YaHei UI"
+            << "Microsoft YaHei"
+            << "SimHei"
+            << "Heiti SC";
+        const QStringList available_families = QFontDatabase().families();
+        QStringList families;
+        for (const QString &candidate : preferred_families) {
+            if (available_families.contains(candidate, Qt::CaseInsensitive)) {
+                families << candidate;
+            }
+        }
+        if (families.isEmpty()) families << "Microsoft YaHei";
+        return families;
+    };
+
+    auto load_system_sans_font = [](const QStringList &families, int pixel_size) {
+        QFont font(families.isEmpty() ? QString("Microsoft YaHei") : families.first());
+        font.setStyleHint(QFont::SansSerif);
+        font.setPixelSize(pixel_size);
+        return font;
+    };
+
+    monaco = load_app_font(":/fonts/monaco", "Monaco", 11);
 //    monaco.setLetterSpacing(QFont::PercentageSpacing, 120);
-    consolas = QFont(QFontDatabase::applicationFontFamilies(consolas_id).at(0));
-    consolas.setPixelSize(12);
+    consolas = load_app_font(":/fonts/consolas", "Consolas", 12);
+    const QStringList cjk_fallback_families = available_system_sans_families();
+    sans_heiti = load_system_sans_font(cjk_fallback_families, 10);
+    QFont::insertSubstitutions(monaco.family(), cjk_fallback_families);
+    QFont::insertSubstitutions("Monaco", cjk_fallback_families);
+    QFont::insertSubstitutions(consolas.family(), cjk_fallback_families);
+    QFont::insertSubstitutions("Consolas", cjk_fallback_families);
 //    consolas.setLetterSpacing(QFont::PercentageSpacing, 120);
 
     a.setFont(monaco);
 
-    QFile style(":/style/style_dark.qss");
-    style.open(QIODevice::ReadOnly);
-    theme_dark = style.readAll();
-    style.close();
-    style.setFileName(":/style/style_light.qss");
-    style.open(QIODevice::ReadOnly);
-    theme_light = style.readAll();
-    style.close();
+    stylesheet_dark = ThemeManager::instance().buildStyleSheet("gruvbox", "dark");
+    stylesheet_light = ThemeManager::instance().buildStyleSheet("gruvbox", "light");
+    ThemeManager::instance().setCurrentTheme("gruvbox", "dark");
 
-    app_theme = 0;
+    app_color_mode = 0;
 
     cursor_dark_pointer   = QCursor(QPixmap(":/cursor/dark/cursor").scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation), 0, 0);
     cursor_dark_resize_h  = QCursor(QPixmap(":/cursor/dark/resize_h").scaled(20, 20));
@@ -154,24 +215,19 @@ int main(int argc, char *argv[])
     cursor_light_resize_md = QCursor(QPixmap(":/cursor/light/resize_md").scaled(16, 16));
     cursor_light_resize_sd = QCursor(QPixmap(":/cursor/light/resize_sd").scaled(16, 16));
 
-    // Theme will be loaded from JSON config in UserPanel initialization
-    // Default to dark theme
-    app_theme = 0;
+    // Theme family and color mode will be loaded from default.json in UserPanel initialization.
+    app_color_mode = 0;
 
-    a.setStyleSheet(app_theme ? theme_light : theme_dark);
-    cursor_curr_pointer   = app_theme ? cursor_light_pointer   : cursor_dark_pointer;
-    cursor_curr_resize_h  = app_theme ? cursor_light_resize_h  : cursor_dark_resize_h;
-    cursor_curr_resize_v  = app_theme ? cursor_light_resize_v  : cursor_dark_resize_v;
-    cursor_curr_resize_md = app_theme ? cursor_light_resize_md : cursor_dark_resize_md;
-    cursor_curr_resize_sd = app_theme ? cursor_light_resize_sd : cursor_dark_resize_sd;
+    a.setStyleSheet(app_color_mode ? stylesheet_light : stylesheet_dark);
+    cursor_curr_pointer   = app_color_mode ? cursor_light_pointer   : cursor_dark_pointer;
+    cursor_curr_resize_h  = app_color_mode ? cursor_light_resize_h  : cursor_dark_resize_h;
+    cursor_curr_resize_v  = app_color_mode ? cursor_light_resize_v  : cursor_dark_resize_v;
+    cursor_curr_resize_md = app_color_mode ? cursor_light_resize_md : cursor_dark_resize_md;
+    cursor_curr_resize_sd = app_color_mode ? cursor_light_resize_sd : cursor_dark_resize_sd;
 
 //    a.setWindowIcon(QIcon(":/tools/brush"));
 
 //    qInstallMessageHandler(log_message);
-
-#ifdef WIN32
-    SetUnhandledExceptionFilter(ExceptionFilter);
-#endif
 
     UserPanel w;
 

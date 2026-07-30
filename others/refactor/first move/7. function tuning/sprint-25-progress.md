@@ -16,7 +16,7 @@ Open list — tasks added as field testing surfaces them. Each task lands as a s
 
 - New features
 - Architecture changes
-- i18n sweep
+- Full i18n audit
 
 ---
 
@@ -203,3 +203,24 @@ Background: RTSP streams decoded through the extracted `FfmpegSource` path showe
 **Verification:**
 - `git diff --check` passed, aside from the repo's existing CRLF normalization warnings.
 - Local compile was attempted with `cmake --build build-Desktop_Qt_5_12_12_MSVC2015_64bit-RelWithDebInfo --config RelWithDebInfo --target GLI_user_panel`, but the configured generator requires `jom`, which was not available in the shell. Runtime RTSP verification still needs to be done in the Qt/MSVC environment.
+
+### T6 - Addon plugin floating panel
+
+Background: the legacy addon hook lived inside the console/addon page and was not suitable for the monitor workflow. User wanted a monitor-only floating panel, opened from a dedicated top-bar addon button, with the panel resizable like the panorama panel but behaving like the existing Optics / TCU / Console floating windows.
+
+**Fix:**
+- [x] Added a resizable `AddonPanel` floating window hosted on the monitor view.
+- [x] Moved addon activation to a top-bar button placed before the URL button; current icon is temporary and can be replaced later.
+- [x] Default position/size now matches the main display rectangle.
+- [x] Hard-wired the current plugin target to `plugins/map_ais/plugin_map_ais.dll`, matching the requested `plugin_map_ais` name.
+- [x] Loaded the DLL through `QPluginLoader`, verified it implements `PluginInterface`, then calls `create(panelHost)` and `start()`.
+- [x] Kept the panel hidden outside monitor mode and restored/fitted the plugin child when the panel is shown or resized.
+- [x] Added short implementation guidance for external programs that want to implement the plugin interface.
+
+### T7 - Theme / translation polish
+
+Status: WIP.
+
+- [ ] Theme work: tokenized QSS, `gruvbox` theme folder, theme selector in Setup > Presets.
+- [ ] Translation work: wrap key runtime strings with `tr()` and lock fragile widget heights.
+- [ ] Still tuning visual parity between dark/light modes.
