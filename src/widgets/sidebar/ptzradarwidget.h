@@ -4,6 +4,9 @@
 #include <QColor>
 #include <QFrame>
 
+class QPushButton;
+class QTimer;
+
 class PtzRadarWidget : public QFrame
 {
     Q_OBJECT
@@ -36,19 +39,35 @@ public:
     void setRadarMutedColor(const QColor &color);
     void setRadarAccentColor(const QColor &color);
 
+    bool isNorthReferenced() const;
+
 public slots:
     void setAngle(float h, float v = 0.0f);
     void setZeroAngle(float h);
+    // Heading reference, clockwise from true north, from whichever source is
+    // feeding it. Only consulted while north reference is on; ptz_zero_angle_h
+    // keeps applying either way. A reference that stops arriving expires.
+    void setHeading(float heading_deg, bool valid);
+    void setNorthReferenced(bool enabled);
+
+signals:
+    void northReferenceChanged(bool enabled);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 private:
     static float normalizeAngle(float angle);
+    float displayedAngle() const;
 
     float m_angle_h;
     float m_angle_v;
     float m_zero_angle_h;
+    float m_heading = 0.0f;
+    bool  m_heading_valid = false;
+    QTimer *m_heading_timeout = nullptr;
+    QPushButton *m_north_button = nullptr;
     QColor m_bg_color;
     QColor m_border_color;
     QColor m_grid_color;

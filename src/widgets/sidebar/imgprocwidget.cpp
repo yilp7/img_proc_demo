@@ -80,7 +80,6 @@ void ImgProcWidget::setup(QComboBox  *main_model,     QComboBox  *alt1_model,
         QFrame *dot = new QFrame(m_models_page);
         dot->setObjectName(QString("MODEL_STATUS_%1").arg(idx));
         dot->setFixedSize(11, 11);
-        dot->setToolTip("Model loaded state");
         dot->setStyleSheet(QString(
             "QFrame#MODEL_STATUS_%1 { background-color: #888888;"
             " border: 1px solid #555555; border-radius: 5px; }").arg(idx));
@@ -184,5 +183,4 @@ void ImgProcWidget::set_model_status(int display_idx, int state)
     dot->setStyleSheet(QString("QFrame#%1 { background-color: %2;"
                                " border: 1px solid %3; border-radius: 5px; }")
                        .arg(dot->objectName(), bg, brd));
-    dot->setToolTip(tip);
 }

@@ -25,7 +25,6 @@ QPushButton* make_swap_button(QWidget *parent)
     // the correct variant on theme switch.
     btn->setIcon(QIcon(":/tools/dark/switch"));
     btn->setIconSize(QSize(14, 14));
-    btn->setToolTip(SideDisplayWidget::tr("Swap with main display"));
     btn->setCursor(Qt::PointingHandCursor);
     btn->setFocusPolicy(Qt::NoFocus);
     return btn;

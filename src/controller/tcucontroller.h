@@ -2,6 +2,7 @@
 #define TCUCONTROLLER_H
 
 #include <QObject>
+#include <QTimer>
 #include <atomic>
 
 #include "port/tcu.h"
@@ -32,6 +33,9 @@ public:
     int   get_aliasing_level() const{ return aliasing_level; }
     float get_c() const             { return c; }
     float get_dist_ns() const       { return dist_ns; }
+    // The delay floor in metres at the current light speed. The config keeps
+    // it in ns because it is a timing limit of the TCU, not a range.
+    float min_delay_dist() const    { return m_config->get_data().tcu.min_delay * dist_ns; }
     bool  get_auto_mcp() const      { return auto_mcp; }
     bool  get_frame_a_3d() const    { return frame_a_3d.load(); }
     int   get_distance() const      { return distance; }
@@ -60,6 +64,7 @@ public slots:
     void setup_stepping(int base_unit);
     void setup_max_dist(float max_dist);
     void setup_max_dov(float max_dov);
+    void setup_min_delay();
     void update_delay_offset(float dist_offset);
     void update_gate_width_offset(float dov_offset);
     void update_laser_offset(float laser_offset);
@@ -79,8 +84,8 @@ public slots:
     void change_delay(int val);
     void change_gatewidth(int val);
 
-    // External controls must update the UI even when the normal slider
-    // debounce is active. Values are clamped to the configured limits.
+    // External controls: the UI follows at once and values are clamped to
+    // the configured limits.
     void apply_laser_width(float val);
     void apply_delay(int val);
     void apply_gatewidth(int val);
@@ -112,6 +117,7 @@ signals:
     void freq_display_updated(QString unit_text, QString value_text);
     void stepping_display_updated(QString unit_text, QString value_text);
     void delay_slider_max_changed(int max);
+    void delay_slider_min_changed(int min);
     void gw_slider_max_changed(int max);
     void mcp_slider_max_changed(int max);
     void mcp_display_updated(int slider_val, QString edit_text);
@@ -143,6 +149,21 @@ signals:
 private:
     void split_value_by_unit(float val, uint &us, uint &ns, uint &ps, int idx = -1);
 
+    // One-deep mailbox per continuously driven command. The flow control it
+    // implements is described above request() in the .cpp.
+    struct Mailbox {
+        double desired   = 0;      // latest requested value
+        double sent      = -1;     // last dispatched value; < 0 = none since readback
+        bool   pending   = false;  // a request arrived while a command was in flight
+        bool   in_flight = false;  // dispatched, echo not yet seen
+        QTimer watchdog;
+    };
+    void request(Mailbox &box, qint32 param, double val);
+    void dispatch(Mailbox &box, qint32 param);
+    bool accept_echo(Mailbox &box, qint32 param, double echoed);
+    void echo_timeout(Mailbox &box, qint32 param);
+    void resync(Mailbox &box);
+
     Config*         m_config;
     DeviceManager*  m_device_mgr;
     Aliasing*       m_aliasing;
@@ -162,6 +183,9 @@ private:
     bool            auto_mcp;
     std::atomic<bool> frame_a_3d{false};
     int             distance;
+
+    Mailbox         m_delay_box;
+    Mailbox         m_dov_box;
 };
 
 #endif // TCUCONTROLLER_H

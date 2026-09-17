@@ -11,6 +11,7 @@ private:
     void* dev_handle;
     mutable std::atomic_bool reconnect_required;
     void configure_device();
+    int release_handle();
     static void __stdcall exception_cb(unsigned int message_type, void *user_data);
 
 public:

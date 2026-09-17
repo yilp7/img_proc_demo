@@ -70,6 +70,16 @@ void Display::mousePressEvent(QMouseEvent *event)
         if (curr_pos.x() > this->rect().right()) curr_pos.setX(this->rect().right());
         if (curr_pos.y() > this->rect().bottom()) curr_pos.setY(this->rect().bottom());
 
+        // Alt+drag in PTZ mode designates the follow gate. Held off the zoom
+        // pan path below so dragging a gate does not also scroll the view.
+        if (mode == 2 && event->modifiers().testFlag(Qt::AltModifier)) {
+            gate_dragging = true;
+            gate_origin = curr_pos;
+            gate_rubber_band = QRect(curr_pos, curr_pos);
+            update();
+            return;
+        }
+
         pressed = true;
         prev_pos = event->pos();
         ori_pos = lefttop;
@@ -97,6 +107,12 @@ void Display::mouseMoveEvent(QMouseEvent *event)
     if (!is_grabbing) return;
 //    if (geometry().contains(event->pos())) emit curr_pos(event->pos());
     if (geometry().contains(event->pos())) emit updated_pos(0, event->pos());
+
+    if (gate_dragging) {
+        gate_rubber_band = QRect(gate_origin, event->pos()).normalized();
+        update();
+        return;
+    }
     if (!pressed) return;
 //    qDebug("pos: %d, %d\n", event->x(), event->y());
 //    qDebug("pos: %d, %d\n", event->globalX(), event->globalY());
@@ -129,6 +145,26 @@ void Display::mouseReleaseEvent(QMouseEvent *event)
 
     if(event->button() != Qt::LeftButton) return;
     if (!is_grabbing) return;
+
+    if (gate_dragging) {
+        gate_dragging = false;
+        const QRect gate = QRect(gate_origin, event->pos()).normalized().intersected(rect());
+        gate_rubber_band = QRect();
+        update();
+        // Deliberately silent for tiny drags. An Alt+double-click sends
+        // press/release pairs through here on its way to ptz_target, and
+        // emitting an empty gate would tear down the follow it is engaging.
+        if (gate.width() >= 8 && gate.height() >= 8) emit gate_selected(gate);
+        return;
+    }
+
+    // Plain click in PTZ mode clears the gate. Alt is excluded so the
+    // Alt+double-click follow gesture is not cancelled by its own first click,
+    // and a drag is excluded so panning does not count as a click.
+    if (mode == 2 && !event->modifiers().testFlag(Qt::AltModifier)
+            && (event->pos() - prev_pos).manhattanLength() < 6) {
+        emit gate_cleared();
+    }
 
     pressed = false;
     if (mode == 1) {
@@ -180,13 +216,38 @@ void Display::resizeEvent(QResizeEvent *event)
     emit widget_resized();
 }
 
+void Display::set_follow_gate(const QRect &gate)
+{
+    if (follow_gate == gate) return;
+    follow_gate = gate;
+    update();
+}
+
+void Display::paintEvent(QPaintEvent *event)
+{
+    QLabel::paintEvent(event);
+    if (follow_gate.isEmpty() && gate_rubber_band.isEmpty()) return;
+
+    QPainter painter(this);
+    if (!follow_gate.isEmpty()) {
+        painter.setPen(QPen(QColor(255, 196, 0), 2));
+        painter.drawRect(follow_gate);
+    }
+    if (!gate_rubber_band.isEmpty()) {
+        painter.setPen(QPen(QColor(255, 196, 0), 1, Qt::DashLine));
+        painter.drawRect(gate_rubber_band);
+    }
+}
+
 void Display::mouseDoubleClickEvent(QMouseEvent *event)
 {
     QLabel::mouseDoubleClickEvent(event);
 
     if (mode == 2) {
         pressed = false;
-        if (event->button() == Qt::LeftButton && is_grabbing) emit ptz_target(event->pos());
+        // Alt selects closed-loop follow; plain click keeps the device's own.
+        if (event->button() == Qt::LeftButton && is_grabbing)
+            emit ptz_target(event->pos(), event->modifiers().testFlag(Qt::AltModifier));
         return; // PTZ tool: follow target instead of fullscreen on double-click
     }
 

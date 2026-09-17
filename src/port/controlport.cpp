@@ -150,7 +150,7 @@ void ControlPort::disconnect_from_port(bool tcp)
 
 void ControlPort::try_communicate()
 {
-    qDebug() << "triggered at " << QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+//    qDebug() << "triggered at " << QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
     return;
 }
 

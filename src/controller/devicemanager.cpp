@@ -531,14 +531,21 @@ void DeviceManager::send_ptz_angle_v(float v)
 
 void DeviceManager::point_ptz_to_target(QPoint target, int display_width, int display_height)
 {
-    if (m_config->get_data().device.ptz_type != 2 || !p_udpptz || !p_udpptz->is_connected())
-        return;
-
     // Map click position to relative offset angles
     // Left edge: -9.6°, right edge: +9.6° (horizontal FOV = 19.2°)
     // Top edge: +5.4°, bottom edge: -5.4° (vertical FOV = 10.8°)
     float h = (static_cast<float>(target.x()) / display_width - 0.5f) * 19.2f;
     float v = (0.5f - static_cast<float>(target.y()) / display_height) * 10.8f;
+
+    ptz_follow_offset(h, v);
+}
+
+void DeviceManager::ptz_follow_offset(float h, float v)
+{
+    // FOLLOW (0x05) parameters are an offset from the frame centre, not an
+    // absolute bearing — (0, 0) therefore means "track whatever is centred".
+    if (m_config->get_data().device.ptz_type != 2 || !p_udpptz || !p_udpptz->is_connected())
+        return;
 
     p_udpptz->ptz_follow(h, v);
 }
@@ -546,12 +553,16 @@ void DeviceManager::point_ptz_to_target(QPoint target, int display_width, int di
 void DeviceManager::vid_camera_pressed(int operation)
 {
     if (!p_udpptz || !p_udpptz->is_connected()) return;
+    // Zoom and focus are continuous: they hold the single command slot until
+    // released, so anything else driving that slot has to stand down.
+    vid_camera_held_flag.store(true);
     emit vid_camera_btn_text(operation, "x");
     p_udpptz->emit transmit(operation);
 }
 
 void DeviceManager::vid_camera_released()
 {
+    vid_camera_held_flag.store(false);
     if (!p_udpptz || !p_udpptz->is_connected()) return;
     emit vid_camera_buttons_reset();
     p_udpptz->emit transmit(UDPPTZ::STOP);

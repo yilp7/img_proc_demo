@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <QCoreApplication>
+#include <algorithm>
 #include <string>
 
 Config::Config(QObject *parent)
@@ -70,10 +71,6 @@ bool Config::load_from_file(const QString &filepath)
     if (root.contains("network") && root["network"].is_object()) {
         m_data.network = network_settings_from_json(root["network"]);
     }
-    if (root.contains("udp709") && root["udp709"].is_object()) {
-        m_data.udp709 = udp709_settings_from_json(root["udp709"]);
-    }
-    
     // Load UI settings
     if (root.contains("ui") && root["ui"].is_object()) {
         m_data.ui = ui_settings_from_json(root["ui"]);
@@ -120,6 +117,14 @@ bool Config::load_from_file(const QString &filepath)
         m_data.panorama_optics = panorama_optics_settings_from_json(root["panorama_optics"]);
     }
 
+    if (root.contains("pid_follow") && root["pid_follow"].is_object()) {
+        m_data.pid_follow = pid_follow_settings_from_json(root["pid_follow"]);
+    }
+
+    if (root.contains("gate_tracking") && root["gate_tracking"].is_object()) {
+        m_data.gate_tracking = gate_tracking_settings_from_json(root["gate_tracking"]);
+    }
+
     // Load image processing settings
     if (root.contains("image_proc") && root["image_proc"].is_object()) {
         m_data.image_proc = image_proc_settings_from_json(root["image_proc"]);
@@ -150,7 +155,6 @@ bool Config::save_to_file(const QString &filepath) const
     
     // Save network settings
     root["network"] = network_settings_to_json(m_data.network);
-    root["udp709"] = udp709_settings_to_json(m_data.udp709);
     
     // Save UI settings
     root["ui"] = ui_settings_to_json(m_data.ui);
@@ -174,6 +178,10 @@ bool Config::save_to_file(const QString &filepath) const
 
     // Save panorama optics calibration
     root["panorama_optics"] = panorama_optics_settings_to_json(m_data.panorama_optics);
+
+    root["pid_follow"] = pid_follow_settings_to_json(m_data.pid_follow);
+
+    root["gate_tracking"] = gate_tracking_settings_to_json(m_data.gate_tracking);
 
     // Save image processing settings
     root["image_proc"] = image_proc_settings_to_json(m_data.image_proc);
@@ -256,31 +264,68 @@ Config::NetworkSettings Config::network_settings_from_json(const nlohmann::json 
     return settings;
 }
 
-nlohmann::json Config::udp709_settings_to_json(const Udp709Settings &settings) const
+nlohmann::json Config::pid_follow_settings_to_json(const PidFollowSettings &settings) const
 {
     nlohmann::json obj;
-    obj["local_ip"] = settings.local_ip.toStdString();
-    obj["local_port"] = settings.local_port;
-    obj["peer_ip"] = settings.peer_ip.toStdString();
-    obj["peer_port"] = settings.peer_port;
+    obj["kp_h"] = settings.kp_h;
+    obj["ki_h"] = settings.ki_h;
+    obj["kd_h"] = settings.kd_h;
+    obj["kp_v"] = settings.kp_v;
+    obj["ki_v"] = settings.ki_v;
+    obj["kd_v"] = settings.kd_v;
+    obj["deadband_deg"] = settings.deadband_deg;
+    obj["max_velocity_deg_s"] = settings.max_velocity_deg_s;
+    obj["integral_limit_deg_s"] = settings.integral_limit_deg_s;
+    obj["derivative_filter"] = settings.derivative_filter;
+    obj["coast_ms"] = settings.coast_ms;
+    obj["compensate_turret_motion"] = settings.compensate_turret_motion;
     return obj;
 }
 
-Config::Udp709Settings Config::udp709_settings_from_json(const nlohmann::json &obj) const
+Config::PidFollowSettings Config::pid_follow_settings_from_json(const nlohmann::json &obj) const
 {
-    Udp709Settings settings;
-    if (obj.contains("local_ip") && obj["local_ip"].is_string()) {
-        settings.local_ip = QString::fromStdString(obj["local_ip"].get<std::string>());
-    }
-    if (obj.contains("local_port") && obj["local_port"].is_number_integer()) {
-        settings.local_port = qBound(1, obj["local_port"].get<int>(), 65535);
-    }
-    if (obj.contains("peer_ip") && obj["peer_ip"].is_string()) {
-        settings.peer_ip = QString::fromStdString(obj["peer_ip"].get<std::string>());
-    }
-    if (obj.contains("peer_port") && obj["peer_port"].is_number_integer()) {
-        settings.peer_port = qBound(1, obj["peer_port"].get<int>(), 65535);
-    }
+    PidFollowSettings settings;
+    const auto number = [&obj](const char *key, double fallback) {
+        return obj.contains(key) && obj[key].is_number() ? obj[key].get<double>() : fallback;
+    };
+    settings.kp_h = number("kp_h", settings.kp_h);
+    settings.ki_h = number("ki_h", settings.ki_h);
+    settings.kd_h = number("kd_h", settings.kd_h);
+    settings.kp_v = number("kp_v", settings.kp_v);
+    settings.ki_v = number("ki_v", settings.ki_v);
+    settings.kd_v = number("kd_v", settings.kd_v);
+    settings.deadband_deg = std::max(0.0, number("deadband_deg", settings.deadband_deg));
+    settings.max_velocity_deg_s = qBound(0.1, number("max_velocity_deg_s",
+                                                     settings.max_velocity_deg_s), 60.0);
+    settings.integral_limit_deg_s = std::max(0.0, number("integral_limit_deg_s",
+                                                         settings.integral_limit_deg_s));
+    settings.derivative_filter = qBound(0.0, number("derivative_filter",
+                                                    settings.derivative_filter), 1.0);
+    if (obj.contains("coast_ms") && obj["coast_ms"].is_number_integer())
+        settings.coast_ms = qBound(0, obj["coast_ms"].get<int>(), 5000);
+    if (obj.contains("compensate_turret_motion") && obj["compensate_turret_motion"].is_boolean())
+        settings.compensate_turret_motion = obj["compensate_turret_motion"].get<bool>();
+    return settings;
+}
+
+nlohmann::json Config::gate_tracking_settings_to_json(const GateTrackingSettings &settings) const
+{
+    nlohmann::json obj;
+    obj["mode"] = settings.mode;
+    obj["forward_backward_check"] = settings.forward_backward_check;
+    obj["multi_scale"] = settings.multi_scale;
+    return obj;
+}
+
+Config::GateTrackingSettings Config::gate_tracking_settings_from_json(const nlohmann::json &obj) const
+{
+    GateTrackingSettings settings;
+    if (obj.contains("mode") && obj["mode"].is_number_integer())
+        settings.mode = qBound(0, obj["mode"].get<int>(), 1);
+    if (obj.contains("forward_backward_check") && obj["forward_backward_check"].is_boolean())
+        settings.forward_backward_check = obj["forward_backward_check"].get<bool>();
+    if (obj.contains("multi_scale") && obj["multi_scale"].is_boolean())
+        settings.multi_scale = obj["multi_scale"].get<bool>();
     return settings;
 }
 
@@ -426,6 +471,7 @@ nlohmann::json Config::tcu_settings_to_json(const TCUSettings &settings) const
     obj["hz_unit"] = settings.hz_unit;
     obj["base_unit"] = settings.base_unit;
     obj["max_dist"] = static_cast<double>(settings.max_dist);
+    obj["min_delay"] = static_cast<double>(settings.min_delay);
     obj["delay_offset"] = static_cast<double>(settings.delay_offset);
     obj["max_dov"] = static_cast<double>(settings.max_dov);
     obj["gate_width_offset"] = static_cast<double>(settings.gate_width_offset);
@@ -465,6 +511,9 @@ Config::TCUSettings Config::tcu_settings_from_json(const nlohmann::json &obj) co
     }
     if (obj.contains("max_dist") && obj["max_dist"].is_number()) {
         settings.max_dist = static_cast<float>(obj["max_dist"].get<double>());
+    }
+    if (obj.contains("min_delay") && obj["min_delay"].is_number()) {
+        settings.min_delay = static_cast<float>(obj["min_delay"].get<double>());
     }
     if (obj.contains("delay_offset") && obj["delay_offset"].is_number()) {
         settings.delay_offset = static_cast<float>(obj["delay_offset"].get<double>());
@@ -583,6 +632,7 @@ Config::SaveSettings Config::save_settings_from_json(const nlohmann::json &obj) 
 nlohmann::json Config::panorama_optics_settings_to_json(const PanoramaOpticsSettings &settings) const
 {
     nlohmann::json obj;
+    obj["sensor_diagonal_mm"] = settings.sensor_diagonal_mm;
     nlohmann::json zoomFovArray = nlohmann::json::array();
     for (const ZoomFovPoint &pt : settings.zoom_fov) {
         nlohmann::json item;
@@ -599,6 +649,10 @@ nlohmann::json Config::panorama_optics_settings_to_json(const PanoramaOpticsSett
 Config::PanoramaOpticsSettings Config::panorama_optics_settings_from_json(const nlohmann::json &obj) const
 {
     PanoramaOpticsSettings settings;
+    if (obj.contains("sensor_diagonal_mm") && obj["sensor_diagonal_mm"].is_number()) {
+        const double diagonal = obj["sensor_diagonal_mm"].get<double>();
+        if (diagonal > 0.0) settings.sensor_diagonal_mm = diagonal;
+    }
     if (!obj.contains("zoom_fov") || !obj["zoom_fov"].is_array()) return settings;
 
     std::vector<ZoomFovPoint> points;

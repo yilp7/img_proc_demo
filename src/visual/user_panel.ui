@@ -2131,6 +2131,9 @@
      <property name="text">
       <string>info</string>
      </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
     </widget>
     <widget class="QLabel" name="FISHNET_RESULT">
      <property name="geometry">

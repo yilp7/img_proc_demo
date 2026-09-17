@@ -33,7 +33,6 @@ AddonPanel::AddonPanel(QWidget *parent)
     m_resize_handle->setAttribute(Qt::WA_StyledBackground, true);
     m_resize_handle->setFixedSize(kResizeHandleSize, kResizeHandleSize);
     m_resize_handle->setCursor(Qt::SizeFDiagCursor);
-    m_resize_handle->setToolTip(tr("Resize addon panel"));
     m_resize_handle->installEventFilter(this);
     m_resize_handle->raise();
 }

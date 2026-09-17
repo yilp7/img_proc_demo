@@ -148,8 +148,14 @@ set(SOURCE_FILES
     src/util/timedqueue.h
     src/util/config.h
     src/util/config.cpp
+    src/util/targetclasstable.h
+    src/util/targetclasstable.cpp
+    src/util/targetestimator.h
+    src/util/targetestimator.cpp
     src/util/thememanager.h
     src/util/thememanager.cpp
+    src/plugins/plugininterface.h
+    src/plugins/addonhost.h
     src/widgets/display.h
     src/widgets/display.cpp
     src/widgets/floatingwindow.h
@@ -180,8 +186,10 @@ set(SOURCE_FILES
     src/widgets/panels/addonpanel.cpp
     src/widgets/panels/panoramapanel.h
     src/widgets/panels/panoramapanel.cpp
-    src/widgets/udp709window.h
-    src/widgets/udp709window.cpp
+    src/widgets/targetclasswindow.h
+    src/widgets/targetclasswindow.cpp
+    src/widgets/pidtuningwindow.h
+    src/widgets/pidtuningwindow.cpp
     src/widgets/sidebar/rightstackcontainer.h
     src/widgets/sidebar/rightstackcontainer.cpp
     src/widgets/sidebar/imgprocwidget.h
@@ -223,6 +231,8 @@ set(SOURCE_FILES
     src/image/imageproc.cpp
     src/image/imageio.h
     src/image/imageio.cpp
+    src/image/nafnetenhancer.h
+    src/image/nafnetenhancer.cpp
     src/cam/cam.h
     src/cam/mvcam.h
     src/cam/mvcam.cpp
@@ -255,6 +265,10 @@ set(SOURCE_FILES
     src/automation/autoscan.cpp
     src/yolo/yolo_detector.h
     src/yolo/yolo_detector.cpp
+    src/yolo/targettracker.h
+    src/yolo/targettracker.cpp
+    src/yolo/gatetracker.h
+    src/yolo/gatetracker.cpp
     src/yolo/inference.h
     src/yolo/inference.cpp
     src/yolo/yolo_app_config.h
@@ -263,16 +277,15 @@ set(SOURCE_FILES
     src/pipeline/pipelineprocessor.h
     src/pipeline/pipelineprocessor.cpp
     src/pipeline/routing.h
+    src/pipeline/detectedtarget.h
     src/pipeline/ffmpegsource.h
     src/pipeline/ffmpegsource.cpp
     src/pipeline/scanparams.h
     src/pipeline/scanparams.cpp
-    src/protocol709/packetcodec.h
-    src/protocol709/packetcodec.cpp
-    src/protocol709/udp709service.h
-    src/protocol709/udp709service.cpp
     src/controller/devicemanager.h
     src/controller/devicemanager.cpp
+    src/controller/ptzfollowcontroller.h
+    src/controller/ptzfollowcontroller.cpp
     src/controller/tcucontroller.h
     src/controller/tcucontroller.cpp
     src/controller/lenscontroller.h
@@ -538,27 +551,6 @@ if(BUILD_TESTS)
     target_include_directories(test_scanparams PRIVATE src)
     target_link_libraries(test_scanparams Qt${QT_VERSION_MAJOR}::Test)
     add_test(NAME scanparams COMMAND test_scanparams)
-
-    add_executable(test_udp709_packetcodec
-        tests/test_udp709_packetcodec.cpp
-        src/protocol709/packetcodec.h
-        src/protocol709/packetcodec.cpp)
-    target_include_directories(test_udp709_packetcodec PRIVATE src)
-    target_link_libraries(test_udp709_packetcodec Qt${QT_VERSION_MAJOR}::Core)
-    add_test(NAME udp709_packetcodec COMMAND test_udp709_packetcodec)
-
-    add_executable(test_udp709_service
-        tests/test_udp709_service.cpp
-        src/protocol709/packetcodec.h
-        src/protocol709/packetcodec.cpp
-        src/protocol709/udp709service.h
-        src/protocol709/udp709service.cpp)
-    target_include_directories(test_udp709_service PRIVATE src)
-    target_link_libraries(test_udp709_service
-        Qt${QT_VERSION_MAJOR}::Test
-        Qt${QT_VERSION_MAJOR}::Core
-        Qt${QT_VERSION_MAJOR}::Network)
-    add_test(NAME udp709_service COMMAND test_udp709_service)
 
     add_executable(test_imageio tests/test_imageio.cpp src/image/imageio.h src/image/imageio.cpp)
     target_include_directories(test_imageio PRIVATE src)

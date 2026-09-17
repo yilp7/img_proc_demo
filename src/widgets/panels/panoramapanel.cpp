@@ -52,7 +52,6 @@ PanoramaPanel::PanoramaPanel(QWidget *parent)
     m_reset_button->setObjectName("FloatingPanelReset");
     m_reset_button->setFixedSize(40, 20);
     m_reset_button->setFocusPolicy(Qt::NoFocus);
-    m_reset_button->setToolTip(tr("Reset panorama panel"));
     connect(m_reset_button, &QPushButton::clicked,
             this, &PanoramaPanel::resetRequested);
 
@@ -95,7 +94,6 @@ PanoramaPanel::PanoramaPanel(QWidget *parent)
     m_resize_handle->setAttribute(Qt::WA_StyledBackground, true);
     m_resize_handle->setFixedSize(kResizeHandleSize, kResizeHandleSize);
     m_resize_handle->setCursor(Qt::SizeFDiagCursor);
-    m_resize_handle->setToolTip(tr("Resize panorama panel"));
     m_resize_handle->installEventFilter(this);
     m_resize_handle->raise();
 

@@ -4,6 +4,7 @@
 #include <QMetaType>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QRect>
 #include <QWaitCondition>
 #include <QString>
 #include <atomic>
@@ -15,11 +16,15 @@
 
 #include "pipeline/pipelineconfig.h"
 #include "pipeline/processingparams.h"
+#include "yolo/targettracker.h"
+#include "yolo/gatetracker.h"
+#include "util/targetestimator.h"
 
 class Display;
 class QLabel;
 class TimedQueue;
 class YoloDetector;
+class NafNetEnhancer;
 class ConsumerThread;
 
 // =============================================================================
@@ -275,6 +280,30 @@ struct DisplaySlot {
     // YOLO (per-display since T1)
     YoloDetector* yolo       = nullptr;
     int           yolo_last_model = -1;
+    // Learned enhance option, created on first selection so the ONNX session
+    // is not paid for by installations that never pick it.
+    NafNetEnhancer* nafnet   = nullptr;
+    TargetTracker tracker;
+    // Source-frame size the tracker's boxes are expressed in. Range and
+    // bearing need it; the display geometry cannot supply it after cropping.
+    cv::Size      tracker_frame_size;
+
+    // Range-on-label snapshot, pushed from the GUI thread. Heights are indexed
+    // by class id for the currently selected model, so the pipeline needs no
+    // class-name lookup and no access to the table.
+    QMutex        label_mutex;
+    bool          range_label_enabled = false;
+    std::vector<double> class_heights;
+    TargetEstimator::Optics label_optics;
+
+    // Operator-designated follow gate, for closed-loop follow with no detector.
+    // The request crosses from the GUI thread, so it is guarded; the tracker
+    // itself is only ever touched by the pipeline thread.
+    GateTracker   gate_tracker;
+    QMutex        gate_mutex;
+    QRect         gate_request;          // display-space; empty request clears
+    bool          gate_request_pending = false;
+    GateTracker::Settings gate_settings; // method and options, from the setup panel
 
     // Per-display pipeline config (not persisted to config file).
     PipelineConfig pcfg;

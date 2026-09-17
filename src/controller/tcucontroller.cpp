@@ -3,6 +3,7 @@
 #include "visual/aliasing.h"
 #include "util/constants.h"
 
+#include <QDebug>
 #include <QElapsedTimer>
 #include <QSlider>
 #include <cmath>
@@ -36,6 +37,86 @@ TCUController::TCUController(Config *config, DeviceManager *device_mgr, QObject 
       distance(0)
 {
     dist_ns = c * 1e-9 / 2;
+
+    m_delay_box.watchdog.setSingleShot(true);
+    m_dov_box.watchdog.setSingleShot(true);
+    connect(&m_delay_box.watchdog, &QTimer::timeout, this,
+            [this] { echo_timeout(m_delay_box, TCU::EST_DIST); });
+    connect(&m_dov_box.watchdog, &QTimer::timeout, this,
+            [this] { echo_timeout(m_dov_box, TCU::EST_DOV); });
+}
+
+// --- Command flow control ---
+//
+// EST_DIST and EST_DOV are the commands the operator drives continuously,
+// from key auto-repeat or a slider drag, faster than the serial link can take
+// them: one command is two or three register writes of 10-20 ms each. The
+// port echoes every one back through update_tcu_params once its transaction
+// is done, and that echo is the signal that the link is free. One command is
+// in flight per parameter; requests that arrive meanwhile collapse into a
+// single pending send of the latest value, released by the echo. A request
+// is never dropped, only superseded by a newer one for the same parameter,
+// and no other command ever waits behind a backlog of these. How the port
+// fans a command out into the A and B registers, with or without AB lock, is
+// not touched here: the mailbox only decides when the command is sent.
+
+// Well past the longest transaction the port can take, so it only fires on a
+// lost echo. Firing early costs one redundant command, nothing worse.
+static constexpr int EchoWatchdogMs = 500;
+
+void TCUController::request(Mailbox &box, qint32 param, double val)
+{
+    box.desired = val;
+    if (box.in_flight) {
+        box.pending = true;
+        return;
+    }
+    dispatch(box, param);
+}
+
+void TCUController::dispatch(Mailbox &box, qint32 param)
+{
+    box.sent = box.desired;
+    box.pending = false;
+    box.in_flight = true;
+    box.watchdog.start(EchoWatchdogMs);
+    emit send_double_tcu_msg(param, box.sent);
+}
+
+// Whether the echo may refresh the local value and the slider. The port copies
+// the value verbatim, so the command in flight echoes back exactly; any other
+// value is a superseded command, or the duplicate the port emits under AB
+// lock, and is ignored. The echo of the command in flight frees the link, but
+// when a newer request is waiting it does not refresh the UI either: the
+// operator has already moved past it, and that rewind is the flash-back this
+// exists to prevent.
+bool TCUController::accept_echo(Mailbox &box, qint32 param, double echoed)
+{
+    if (box.sent < 0) return true;
+    if (std::abs(echoed - box.sent) > 1e-3) return false;
+    box.in_flight = false;
+    box.watchdog.stop();
+    if (box.pending) {
+        dispatch(box, param);
+        return false;
+    }
+    return true;
+}
+
+void TCUController::echo_timeout(Mailbox &box, qint32 param)
+{
+    qWarning() << "TCU param" << param << "did not echo within" << EchoWatchdogMs << "ms";
+    box.in_flight = false;
+    if (box.pending) dispatch(box, param);
+}
+
+// A full readback takes the device as truth, so no earlier command counts
+// against the echoes it produces.
+void TCUController::resync(Mailbox &box)
+{
+    box.sent = -1;
+    box.in_flight = false;
+    box.watchdog.stop();
 }
 
 void TCUController::init(Aliasing *aliasing)
@@ -75,6 +156,11 @@ void TCUController::setup_max_dist(float max_dist)
 void TCUController::setup_max_dov(float max_dov)
 {
     emit gw_slider_max_changed(max_dov);
+}
+
+void TCUController::setup_min_delay()
+{
+    emit delay_slider_min_changed(qRound(min_delay_dist()));
 }
 
 void TCUController::update_delay_offset(float dist_offset)
@@ -160,7 +246,10 @@ void TCUController::update_tcu_params(qint32 tcu_param)
                 QString::asprintf("%03d", ps));
             break;
         case TCU::EST_DIST:
-            delay_dist.store(m_device_mgr->tcu()->get(TCU::EST_DIST));
+        {
+            const double echoed = m_device_mgr->tcu()->get(TCU::EST_DIST);
+            if (!accept_echo(m_delay_box, TCU::EST_DIST, echoed)) break;
+            delay_dist.store(echoed);
             emit est_dist_text_updated(QString::asprintf("%.2f m", delay_dist.load()));
             rep_freq = m_device_mgr->tcu()->get(TCU::REPEATED_FREQ);
             setup_hz(hz_unit);
@@ -174,8 +263,12 @@ void TCUController::update_tcu_params(qint32 tcu_param)
             }
             emit delay_slider_value_changed(delay_dist.load());
             break;
+        }
         case TCU::EST_DOV:
-            depth_of_view = m_device_mgr->tcu()->get(TCU::EST_DOV);
+        {
+            const double echoed = m_device_mgr->tcu()->get(TCU::EST_DOV);
+            if (!accept_echo(m_dov_box, TCU::EST_DOV, echoed)) break;
+            depth_of_view = echoed;
             {
                 uint au, an, ap, bu, bn, bp;
                 split_value_by_unit(m_device_mgr->tcu()->get(TCU::GATE_WIDTH_A), au, an, ap, 0);
@@ -187,11 +280,18 @@ void TCUController::update_tcu_params(qint32 tcu_param)
             }
             emit gw_slider_value_changed(depth_of_view);
             break;
+        }
         case TCU::NO_PARAM:
+            // See resync(). A request that was waiting on the link when the
+            // readback happened still goes out after it.
+            resync(m_delay_box);
+            resync(m_dov_box);
             update_tcu_params(TCU::LASER_USR);
             update_tcu_params(TCU::EST_DIST);
             update_tcu_params(TCU::EST_DOV);
             emit mcp_display_updated(m_device_mgr->tcu()->get(TCU::MCP), "");
+            if (m_delay_box.pending) dispatch(m_delay_box, TCU::EST_DIST);
+            if (m_dov_box.pending)   dispatch(m_dov_box,   TCU::EST_DOV);
         default: break;
     }
 }
@@ -238,13 +338,14 @@ void TCUController::apply_laser_width(float val)
 
 void TCUController::apply_delay(int val)
 {
+    const int min_dist = qRound(min_delay_dist());
     const int max_dist = qMax(0, static_cast<int>(m_config->get_data().tcu.max_dist));
-    const int applied = qBound(0, val, max_dist);
+    const int applied = qBound(min_dist, val, max_dist);
     delay_dist.store(applied);
 
     emit delay_slider_value_changed(applied);
     emit est_dist_text_updated(QString::asprintf("%.2f m", delay_dist.load()));
-    emit send_double_tcu_msg(TCU::EST_DIST, delay_dist.load());
+    request(m_delay_box, TCU::EST_DIST, delay_dist.load());
 }
 
 void TCUController::apply_gatewidth(int val)
@@ -254,7 +355,7 @@ void TCUController::apply_gatewidth(int val)
     depth_of_view = applied;
 
     emit gw_slider_value_changed(applied);
-    emit send_double_tcu_msg(TCU::EST_DOV, depth_of_view);
+    request(m_dov_box, TCU::EST_DOV, depth_of_view);
 }
 
 // --- apply_distance (called by UserPanel::on_DIST_BTN_clicked) ---
@@ -343,33 +444,29 @@ void TCUController::update_laser_width()
 
 void TCUController::update_delay()
 {
-    static QElapsedTimer t;
-    if (throttle_check(t)) return;
-
-    delay_dist.store(qBound(0.0f, delay_dist.load(), m_config->get_data().tcu.max_dist));
+    delay_dist.store(qBound(min_delay_dist(), delay_dist.load(), m_config->get_data().tcu.max_dist));
 
     if (!aliasing_mode) {
+        // Slider and estimate follow the operator at once. The A/B register
+        // fields wait for the echo, since they show what the device holds.
         if (!qobject_cast<QSlider*>(sender()))
             emit delay_slider_value_changed(delay_dist.load());
-        emit send_double_tcu_msg(TCU::EST_DIST, delay_dist.load());
+        emit est_dist_text_updated(QString::asprintf("%.2f m", delay_dist.load()));
+        request(m_delay_box, TCU::EST_DIST, delay_dist.load());
     }
     else {
         aliasing_mode = false;
-        emit send_double_tcu_msg(TCU::EST_DIST, m_device_mgr->tcu()->get(TCU::EST_DIST));
+        request(m_delay_box, TCU::EST_DIST, m_device_mgr->tcu()->get(TCU::EST_DIST));
     }
 }
 
 void TCUController::update_gate_width() {
-#ifndef LVTONG
-    static QElapsedTimer t;
-    if (throttle_check(t)) return;
-#endif
     depth_of_view = qBound(0.0f, depth_of_view, m_config->get_data().tcu.max_dov);
 
     if (!qobject_cast<QSlider*>(sender()))
         emit gw_slider_value_changed(depth_of_view);
 
-    emit send_double_tcu_msg(TCU::EST_DOV, depth_of_view);
+    request(m_dov_box, TCU::EST_DOV, depth_of_view);
 }
 
 void TCUController::update_light_speed(bool uw)
@@ -380,14 +477,14 @@ void TCUController::update_light_speed(bool uw)
     // Preferences::dist_ns via the dist_ns_changed signal (see userpanel.cpp).
     emit dist_ns_changed(dist_ns);
     emit update_distance_display_requested();
+    // The floor is fixed in ns, so its position in metres moves with dist_ns.
+    setup_min_delay();
     emit send_double_tcu_msg(TCU::LIGHT_SPEED, dist_ns);
-    // Re-push EST_DIST / EST_DOV directly so the port reconverts meters→ns
-    // using the new dist_ns. Bypasses the slider-debounce throttle in
-    // update_delay()/update_gate_width(), which would otherwise drop the
-    // re-push on rapid underwater toggles and leave the device with stale
-    // register values.
-    emit send_double_tcu_msg(TCU::EST_DIST, delay_dist.load());
-    emit send_double_tcu_msg(TCU::EST_DOV, depth_of_view);
+    // Re-push EST_DIST / EST_DOV so the port reconverts meters→ns using the
+    // new dist_ns. The mailbox holds the re-push until the link is free, so
+    // rapid underwater toggles cannot drop it.
+    request(m_delay_box, TCU::EST_DIST, delay_dist.load());
+    request(m_dov_box,   TCU::EST_DOV,  depth_of_view);
 }
 
 void TCUController::update_current(float current_value)

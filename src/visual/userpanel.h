@@ -1,6 +1,7 @@
 #ifndef USERPANEL_H
 #define USERPANEL_H
 
+#include <QElapsedTimer>
 #include <QRect>
 #include <QVector>
 
@@ -41,7 +42,14 @@
 #include "widgets/panels/consolepanel.h"
 #include "widgets/panels/addonpanel.h"
 #include "widgets/panels/panoramapanel.h"
-#include "widgets/udp709window.h"
+#include "widgets/targetclasswindow.h"
+#include "widgets/pidtuningwindow.h"
+#include "controller/ptzfollowcontroller.h"
+#include "pipeline/detectedtarget.h"
+#include "util/targetestimator.h"
+
+#include <QHash>
+#include <QSet>
 #include "widgets/sidebar/rightstackcontainer.h"
 #include "widgets/sidebar/imgprocwidget.h"
 #include "widgets/sidebar/ptzradarwidget.h"
@@ -399,17 +407,31 @@ private:
     void set_source_dead_overlay(DisplayId did, bool dead);
     void position_panorama_panel();
     void position_addon_panel();
+    void load_addons();
     void position_custom_title_label();
     void raise_floating_panels();
     void set_panorama_panel_visible(bool visible);
     void apply_theme_selection(const QString &theme_name, const QString &color_mode);
-    void update_udp709_device_status();
-    void update_udp709_device_control(Udp709::TurretControlPayload payload);
-    void update_udp709_laser_nir_control(Udp709::LaserNirControlPayload payload);
-    void apply_udp709_channel_states(const Udp709::TurretControlPayload &payload);
-    void apply_udp709_turret_command(const Udp709::TurretControlPayload &payload);
-    void apply_udp709_lens_command(quint8 control);
-    void apply_udp709_image_processing(quint8 control);
+    void update_main_targets(QVector<DetectedTarget> targets);
+    void update_detection_auto_follow(const QVector<DetectedTarget> &targets);
+    // Closed-loop follow: drives UDPPTZ velocity from the target's offset off
+    // the optical axis, instead of handing the device a FOLLOW offset.
+    void update_pid_follow(const QVector<DetectedTarget> &targets);
+    void engage_pid_follow(int track_id);
+    void disengage_pid_follow();
+    int track_id_at(const QPoint &display_pos) const;
+    // Single source of the optics used by every estimate — range on labels,
+    // G6 reports and the follow loop all go through here.
+    TargetEstimator::Optics current_optics() const;
+    // Snapshots the label settings into the pipeline, which cannot reach the
+    // class table or the zoom field itself.
+    void push_range_label_settings();
+    // Same for the gate tracker's method and options.
+    void push_gate_tracking_settings();
+    void request_follow_gate(const QRect &display_gate);
+    void update_follow_gate(QRect displayBox, QRect sourceBox, QSize sourceSize, bool active);
+    // Runs the loop against whichever source is holding the target.
+    void drive_pid_follow(const QRect &sourceBox, const QSize &sourceSize, bool have_target);
 
     // Lens operations delegated to LensController
     void lens_stop() { m_lens_ctrl->lens_stop(); }
@@ -479,7 +501,11 @@ private:
     AddonPanel*     m_addon_panel;
     bool            m_addon_panel_requested;
     PanoramaPanel*  m_panorama_panel;
-    Udp709Window*   m_udp709_window;
+    // Addons. The panel implements AddonHost once, through the adapter, and
+    // hands it to every addon; after start() it never calls one.
+    class AddonHostAdapter;
+    AddonHostAdapter* m_addon_host;
+    QVector<PluginInterface*> m_addons;
     QPushButton*    m_scan_panorama_toggle;
     QLabel*         m_theme_label;
     QComboBox*      m_theme_combo;
@@ -577,15 +603,31 @@ private:
 
     // TEMP ONLY
     // TODO move to addons
-    PluginInterface*        pluginInterface;            // for ir with visible light
-    QPluginLoader*          m_addon_plugin_loader;
+    PluginInterface*        pluginInterface;            // the panel addon, once instantiated
+    QPluginLoader*          m_addon_plugin_loader;      // the panel addon's loader, found at startup
+    QList<QPluginLoader*>   m_addon_loaders;            // window addons, loaded at startup
 
     // YOLO Detection — detectors live per DisplaySlot now. Init-mutex stays
     // singleton since it only protects detector construction.
     QMutex                  m_yolo_init_mutex;
     QVector<QRect>          m_main_detection_boxes;
     bool                    m_detection_auto_follow_active = false;
-    int                     m_udp709_lens_operation = -1;
+    // Track currently being followed. Auto-follow aims once per acquisition,
+    // so this is what distinguishes "still the same target" from "a new one".
+    int                     m_auto_follow_track_id = -1;
+    PtzFollowController*    m_pid_follow;
+    PidTuningWindow*        m_pid_tuning_window;
+    // Latest tracked targets, kept so a click can be resolved to a track id.
+    QVector<DetectedTarget> m_main_targets;
+    // Follow gate state mirrored from the pipeline. Track id -1 with an active
+    // gate means the loop is running off the gate rather than a detection.
+    QRect                   m_follow_gate_source;
+    QSize                   m_follow_gate_frame;
+    bool                    m_follow_gate_active = false;
+    // Follow gate track id, distinct from any YOLO id.
+    static constexpr int    GateTrackId = -2;
+
+    TargetClassWindow*      m_target_class_window;
 
     // Thread-safe snapshots of UI widget state and Config for the consumers.
     QMutex                  m_params_mutex;

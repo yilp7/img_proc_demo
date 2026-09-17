@@ -8,6 +8,7 @@
 #include "widgets/floatingwindow.h"
 #include "image/imageio.h"
 #include "image/imageproc.h"
+#include "image/nafnetenhancer.h"
 #include "util/threadpool.h"
 #include "util/constants.h"
 #include "util/timedqueue.h"
@@ -20,6 +21,7 @@
 #include <QCoreApplication>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <utility>
 #include <opencv2/imgproc.hpp>
@@ -27,6 +29,101 @@
 PipelineProcessor::PipelineProcessor(PipelineGlobals globals, QObject* parent)
     : QObject(parent), m_g(globals)
 {
+}
+
+// Maps a source-frame box through crop / resize / letterbox into widget
+// coordinates. Returns an empty rect when the box falls outside the visible
+// region — the target still exists, it is just not on screen.
+static QRect map_box_to_display(const cv::Rect& box,
+    const ProcessingParams& params,
+    const cv::Size& result_size,
+    const cv::Size& render_size,
+    const cv::Rect& region)
+{
+    if (result_size.width <= 0 || result_size.height <= 0
+            || render_size.width <= 0 || render_size.height <= 0
+            || params.display_width <= 0 || params.display_height <= 0
+            || region.width <= 0 || region.height <= 0) {
+        return QRect();
+    }
+
+    const cv::Rect image_rect(0, 0, result_size.width, result_size.height);
+    const cv::Rect visible_region = region & image_rect;
+    if (visible_region.width <= 0 || visible_region.height <= 0) return QRect();
+
+    const cv::Rect clipped = box & visible_region;
+    if (clipped.width <= 0 || clipped.height <= 0) return QRect();
+
+    const double crop_scale_x = static_cast<double>(render_size.width) / visible_region.width;
+    const double crop_scale_y = static_cast<double>(render_size.height) / visible_region.height;
+
+    const double fit_scale = std::min(static_cast<double>(params.display_width) / render_size.width,
+                                      static_cast<double>(params.display_height) / render_size.height);
+    const int fit_w = static_cast<int>(std::round(render_size.width * fit_scale));
+    const int fit_h = static_cast<int>(std::round(render_size.height * fit_scale));
+    const int offset_x = (params.display_width - fit_w) / 2;
+    const int offset_y = (params.display_height - fit_h) / 2;
+    const double display_scale_x = static_cast<double>(fit_w) / render_size.width;
+    const double display_scale_y = static_cast<double>(fit_h) / render_size.height;
+
+    const double crop_x1 = (clipped.x - visible_region.x) * crop_scale_x;
+    const double crop_y1 = (clipped.y - visible_region.y) * crop_scale_y;
+    const double crop_x2 = (clipped.x + clipped.width - visible_region.x) * crop_scale_x;
+    const double crop_y2 = (clipped.y + clipped.height - visible_region.y) * crop_scale_y;
+
+    const int x1 = offset_x + static_cast<int>(std::floor(crop_x1 * display_scale_x));
+    const int y1 = offset_y + static_cast<int>(std::floor(crop_y1 * display_scale_y));
+    const int x2 = offset_x + static_cast<int>(std::ceil(crop_x2 * display_scale_x));
+    const int y2 = offset_y + static_cast<int>(std::ceil(crop_y2 * display_scale_y));
+    const QRect rect(x1, y1, x2 - x1, y2 - y1);
+    const QRect display_rect(0, 0, params.display_width, params.display_height);
+    if (rect.isEmpty() || !rect.intersects(display_rect)) return QRect();
+    return rect;
+}
+
+// Inverse of map_box_to_display: widget coordinates back to source-frame.
+// Needed because the operator designates the follow gate on screen but the
+// tracker and the follow loop both work in the source frame.
+static cv::Rect map_display_to_source(const QRect& rect,
+    const ProcessingParams& params,
+    const cv::Size& result_size,
+    const cv::Size& render_size,
+    const cv::Rect& region)
+{
+    if (rect.isEmpty()
+            || result_size.width <= 0 || result_size.height <= 0
+            || render_size.width <= 0 || render_size.height <= 0
+            || params.display_width <= 0 || params.display_height <= 0
+            || region.width <= 0 || region.height <= 0) {
+        return cv::Rect();
+    }
+
+    const cv::Rect image_rect(0, 0, result_size.width, result_size.height);
+    const cv::Rect visible_region = region & image_rect;
+    if (visible_region.width <= 0 || visible_region.height <= 0) return cv::Rect();
+
+    const double fit_scale = std::min(static_cast<double>(params.display_width) / render_size.width,
+                                      static_cast<double>(params.display_height) / render_size.height);
+    const int fit_w = static_cast<int>(std::round(render_size.width * fit_scale));
+    const int fit_h = static_cast<int>(std::round(render_size.height * fit_scale));
+    const int offset_x = (params.display_width - fit_w) / 2;
+    const int offset_y = (params.display_height - fit_h) / 2;
+    if (fit_w <= 0 || fit_h <= 0) return cv::Rect();
+
+    const double render_x1 = (rect.left() - offset_x) * static_cast<double>(render_size.width) / fit_w;
+    const double render_y1 = (rect.top() - offset_y) * static_cast<double>(render_size.height) / fit_h;
+    const double render_x2 = (rect.right() - offset_x) * static_cast<double>(render_size.width) / fit_w;
+    const double render_y2 = (rect.bottom() - offset_y) * static_cast<double>(render_size.height) / fit_h;
+
+    const double crop_scale_x = static_cast<double>(visible_region.width) / render_size.width;
+    const double crop_scale_y = static_cast<double>(visible_region.height) / render_size.height;
+
+    const int x1 = visible_region.x + static_cast<int>(std::floor(render_x1 * crop_scale_x));
+    const int y1 = visible_region.y + static_cast<int>(std::floor(render_y1 * crop_scale_y));
+    const int x2 = visible_region.x + static_cast<int>(std::ceil(render_x2 * crop_scale_x));
+    const int y2 = visible_region.y + static_cast<int>(std::ceil(render_y2 * crop_scale_y));
+
+    return cv::Rect(x1, y1, x2 - x1, y2 - y1) & image_rect;
 }
 
 static QVector<QRect> map_yolo_boxes_to_display(const std::vector<YoloResult>& results,
@@ -123,7 +220,16 @@ int PipelineProcessor::run(DisplayRouter& router, DisplaySlot& display) {
                 emit recorder_finalized(static_cast<int>(display.id), 1, display.proc_path);
             }
             display.modified_result.release();
-            if (display.id == DisplayId::Main) emit main_detection_boxes_updated(QVector<QRect>());
+            // A route change means a different scene: existing tracks cannot
+            // survive it, and their ids must not be reused for whatever the
+            // new stream shows.
+            display.tracker.reset();
+            display.tracker_frame_size = cv::Size();
+            display.gate_tracker.clear();
+            if (display.id == DisplayId::Main) {
+                emit main_detection_boxes_updated(QVector<QRect>());
+                emit main_targets_updated(QVector<DetectedTarget>());
+            }
             display.last_route_gen = snap.gen;
             // Route change clears the dead-source observation. Subsequent
             // iterations re-set it from the new stream's queue state.
@@ -228,6 +334,10 @@ int PipelineProcessor::run(DisplayRouter& router, DisplaySlot& display) {
 #ifdef LVTONG
     emit set_model_list_enabled(true);
 #endif
+    // The CUDA session holds device memory, so it is released with the thread
+    // that created it rather than left for process exit.
+    delete display.nafnet;
+    display.nafnet = nullptr;
     display.consumer_state = false;
     return 0;
 }
@@ -400,6 +510,8 @@ std::vector<YoloResult> PipelineProcessor::detect_yolo(StreamSlot& stream, Displ
             det_input = stream.latest_raw;
         }
         yolo->run(det_input, results);
+        display.tracker.update(results);
+        display.tracker_frame_size = cv::Size(det_input.cols, det_input.rows);
     }
     return results;
 }
@@ -438,6 +550,28 @@ void PipelineProcessor::frame_average_and_3d(StreamSlot& stream, DisplaySlot& di
 
         if (avg_mode == 0) {
             avg_state.seq_sum.convertTo(result, CV_MAKETYPE(CV_8U, is_color ? 3 : 1), 1. / (4 * (1 << (_pixel_depth - 8))));
+        }
+        else if (avg_mode == 2) {
+            // Learned single-frame denoise. Unlike the other two modes it does
+            // not accumulate, so it runs off the current frame alone; the
+            // sequence sums above are still maintained because the 3D stage
+            // reads them.
+            if (updated) {
+                if (!display.nafnet) {
+                    display.nafnet = new NafNetEnhancer();
+                    // The GUI hides this option unless the model and the CUDA
+                    // provider are both present, so a failure here means they
+                    // went away after startup or the CUDA libraries do not load.
+                    if (!display.nafnet->ensure_loaded(NafNetEnhancer::default_model_path())) {
+                        qWarning() << "LightNAFNet unavailable for display"
+                                   << static_cast<int>(display.id)
+                                   << "-" << display.nafnet->last_error();
+                    }
+                }
+                latest.convertTo(result, CV_MAKETYPE(CV_8U, is_color ? 3 : 1),
+                                 1. / (1 << (_pixel_depth - 8)));
+                display.nafnet->enhance(result);
+            }
         }
         else {
             if (updated) {
@@ -704,17 +838,99 @@ void PipelineProcessor::render_and_display(StreamSlot& stream, DisplaySlot& disp
         emit set_hist_pixmap(QPixmap::fromImage(QImage(hist_mat.data, hist_mat.cols, hist_mat.rows, static_cast<int>(hist_mat.step), QImage::Format_RGB888).scaled(params.hist_display_size, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     }
 
+    // The snapshot carries a zero size while the main display is being laid
+    // out or is hidden. The crop below divides by it.
+    if (params.display_width <= 0 || params.display_height <= 0) return;
+
     cv::Rect region(cv::Point(params.display_region.tl().x * ww / params.display_width,
                               params.display_region.tl().y * hh / params.display_height),
                     cv::Point(params.display_region.br().x * ww / params.display_width,
                               params.display_region.br().y * hh / params.display_height));
     if (region.height + region.y > result.rows) region.height = result.rows - region.y;
     if (region.width + region.x > result.cols) region.width = result.cols - region.x;
+    if (display.id == DisplayId::Main && updated) {
+        // Follow gate. The request arrives in widget coordinates because that
+        // is where the operator drew it, so it is converted here where the
+        // render geometry is known, then tracked in source-frame coordinates
+        // like everything else the follow loop consumes.
+        QRect requested;
+        bool has_request = false;
+        GateTracker::Settings gate_settings;
+        {
+            QMutexLocker lk(&display.gate_mutex);
+            gate_settings = display.gate_settings;
+            if (display.gate_request_pending) {
+                requested = display.gate_request;
+                has_request = true;
+                display.gate_request_pending = false;
+                display.gate_request = QRect();
+            }
+        }
+        // Applied before the seed so a request lands on the selected method;
+        // switching method drops any live track, which is what setSettings does.
+        display.gate_tracker.setSettings(gate_settings);
+
+        cv::Mat gate_gray;
+        if (!stream.latest_raw.empty()) {
+            if (stream.latest_raw.channels() == 1) gate_gray = stream.latest_raw;
+            else cv::cvtColor(stream.latest_raw, gate_gray, cv::COLOR_BGR2GRAY);
+        }
+
+        if (has_request) {
+            if (requested.isEmpty()) {
+                display.gate_tracker.clear();
+            } else {
+                const cv::Rect seed = map_display_to_source(
+                    requested, params, cv::Size(result.cols, result.rows),
+                    cv::Size(ww, hh), region);
+                display.gate_tracker.seed(gate_gray, seed);
+            }
+        } else if (display.gate_tracker.active()) {
+            display.gate_tracker.update(gate_gray);
+        }
+
+        QRect gate_display;
+        if (display.gate_tracker.active()) {
+            const cv::Rect gate = display.gate_tracker.box();
+            gate_display = map_box_to_display(gate, params, cv::Size(result.cols, result.rows),
+                                              cv::Size(ww, hh), region);
+        }
+        emit follow_gate_updated(gate_display,
+                                 QRect(display.gate_tracker.box().x, display.gate_tracker.box().y,
+                                       display.gate_tracker.box().width,
+                                       display.gate_tracker.box().height),
+                                 QSize(gate_gray.cols, gate_gray.rows),
+                                 display.gate_tracker.active());
+    }
+
     QVector<QRect> main_detection_boxes;
+    QVector<DetectedTarget> main_targets;
     if (display.id == DisplayId::Main && updated) {
         main_detection_boxes = map_yolo_boxes_to_display(
             yolo_results, params, cv::Size(result.cols, result.rows),
             cv::Size(ww, hh), region);
+
+        const cv::Size source_size = display.tracker_frame_size;
+        for (const TargetTrack &track : display.tracker.tracks()) {
+            DetectedTarget target;
+            target.trackId = track.id;
+            target.classId = track.classId;
+            target.modelIdx = pcfg.model_idx;
+            if (display.yolo && track.classId >= 0
+                    && track.classId < static_cast<int>(display.yolo->getClassNames().size())) {
+                target.className = QString::fromStdString(
+                            display.yolo->getClassNames()[track.classId]);
+            }
+            target.confidence = track.confidence;
+            target.confirmed = track.confirmed;
+            target.lost = track.justLost;
+            target.sourceBox = QRect(track.box.x, track.box.y, track.box.width, track.box.height);
+            target.sourceSize = QSize(source_size.width, source_size.height);
+            target.displayBox = map_box_to_display(track.box, params,
+                                                   cv::Size(result.cols, result.rows),
+                                                   cv::Size(ww, hh), region);
+            main_targets.push_back(target);
+        }
     }
     result = result(region);
     cv::resize(result, result, cv::Size(ww, hh));
@@ -758,7 +974,10 @@ void PipelineProcessor::render_and_display(StreamSlot& stream, DisplaySlot& disp
 
     QImage stream_img = QImage(img_display.data, img_display.cols, img_display.rows, static_cast<int>(img_display.step), is_color || pcfg.pseudocolor ? QImage::Format_RGB888 : QImage::Format_Indexed8);
     if (disp) disp->emit set_pixmap(QPixmap::fromImage(stream_img.scaled(disp->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
-    if (display.id == DisplayId::Main && updated) emit main_detection_boxes_updated(main_detection_boxes);
+    if (display.id == DisplayId::Main && updated) {
+        emit main_detection_boxes_updated(main_detection_boxes);
+        emit main_targets_updated(main_targets);
+    }
 
     if (display.id == DisplayId::Main && params.dual_display && m_g.secondary_display) {
         cv::Mat ori_img_display;
@@ -1531,18 +1750,58 @@ void PipelineProcessor::draw_yolo_boxes(DisplaySlot& display,
     if (image.channels() == 1) cv::cvtColor(image, draw_image, cv::COLOR_GRAY2BGR);
     else                       draw_image = image;
 
+    bool show_range = false;
+    std::vector<double> class_heights;
+    TargetEstimator::Optics optics;
+    {
+        QMutexLocker lk(&display.label_mutex);
+        show_range = display.range_label_enabled;
+        if (show_range) {
+            class_heights = display.class_heights;
+            optics = display.label_optics;
+        }
+    }
+
+    // Range divides the frame diagonal by the box height, so both must be in
+    // the SAME frame or resolution stops cancelling. The boxes are in detector
+    // input coordinates, which is not necessarily the size of the image being
+    // drawn on, so the detector's frame size is used rather than image.size().
+    const cv::Size detect_size = display.tracker_frame_size.area() > 0
+            ? display.tracker_frame_size
+            : image.size();
+
     YoloDetector* det_for_labels = display.yolo;
     for (const auto& det : results) {
         cv::Scalar color(0, 255, 0);
         cv::rectangle(draw_image, det.box, color, 2);
 
         std::string label;
-        if (det_for_labels && det.classId < static_cast<int>(det_for_labels->getClassNames().size())) {
+        if (det_for_labels && det.classId >= 0
+                && det.classId < static_cast<int>(det_for_labels->getClassNames().size())) {
             label = det_for_labels->getClassNames()[det.classId];
         } else {
             label = "class_" + std::to_string(det.classId);
         }
         label += ": " + std::to_string(static_cast<int>(det.confidence * 100)) + "%";
+
+        if (show_range && det.classId >= 0
+                && det.classId < static_cast<int>(class_heights.size())) {
+            const QRect box(det.box.x, det.box.y, det.box.width, det.box.height);
+            const double range = TargetEstimator::rangeMeters(
+                class_heights[det.classId], box,
+                QSize(detect_size.width, detect_size.height), optics);
+            // Zero means the class has no configured height, which is not the
+            // same as a target at zero range — nothing is appended for it.
+            if (range > 0.0) {
+                char range_text[32];
+                if (range >= 1000.0)
+                    std::snprintf(range_text, sizeof(range_text), "  %.1fkm", range / 1000.0);
+                else
+                    std::snprintf(range_text, sizeof(range_text), "  %dm",
+                                  static_cast<int>(std::lround(range)));
+                label += range_text;
+            }
+        }
 
         int baseline = 0;
         cv::Size text_size = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseline);

@@ -441,7 +441,7 @@ void SetupOverlay::bind()
 //[4] save
     connect(u->SAVE_INFO_CHK, &QCheckBox::stateChanged, this, [this](int arg1){ if (m_config) m_config->get_data().save.save_info = arg1; });
     QFont temp_f(consolas);
-    temp_f.setPixelSize(11);
+    temp_f.setPixelSize(12);
     u->CUSTOM_INFO_EDT->setFont(temp_f);
     connect(u->CUSTOM_INFO_CHK, &QCheckBox::stateChanged, this,
             [this, u](int arg1){ if (m_config) m_config->get_data().save.custom_topleft_info = arg1; u->CUSTOM_INFO_EDT->setEnabled(arg1); });

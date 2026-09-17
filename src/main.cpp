@@ -86,6 +86,9 @@ LONG WINAPI ExceptionFilter(LPEXCEPTION_POINTERS lpExceptionInfo)
 }
 #endif
 
+// Qt's own handler, kept so the IDE console still shows what goes to the file.
+static QtMessageHandler g_console_handler = nullptr;
+
 void log_message(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
     static QMutex mutex;
@@ -110,12 +113,13 @@ void log_message(QtMsgType type, const QMessageLogContext &context, const QStrin
     }
 
 //    QString message = text + QString::asprintf("File:(%s) Line (%d), ", context.file, context.line) + msg + "\n";
-    static QFile file("./GLI_logs/log");
+    static QFile file("./GLI_logs/log" + QDateTime::currentDateTime().toString("_yyyy-MM-dd@hh.mm.ss.log"));
     file.open(QIODevice::WriteOnly | QIODevice::Append);
     file.write((text + msg + "\n").toUtf8());
     file.flush();
     file.close();
     mutex.unlock();
+    if (g_console_handler) g_console_handler(type, context, msg);
 }
 
 int main(int argc, char *argv[])
@@ -184,9 +188,9 @@ int main(int argc, char *argv[])
         return font;
     };
 
-    monaco = load_app_font(":/fonts/monaco", "Monaco", 11);
+    monaco = load_app_font(":/fonts/monaco", "Monaco", 12);
 //    monaco.setLetterSpacing(QFont::PercentageSpacing, 120);
-    consolas = load_app_font(":/fonts/consolas", "Consolas", 12);
+    consolas = load_app_font(":/fonts/consolas", "Consolas", 13);
     const QStringList cjk_fallback_families = available_system_sans_families();
     sans_heiti = load_system_sans_font(cjk_fallback_families, 10);
     QFont::insertSubstitutions(monaco.family(), cjk_fallback_families);
@@ -227,12 +231,15 @@ int main(int argc, char *argv[])
 
 //    a.setWindowIcon(QIcon(":/tools/brush"));
 
-//    qInstallMessageHandler(log_message);
+    // A field session leaves nothing to read otherwise. The file lands in
+    // GLI_logs next to the working directory, alongside the SDK's own log.
+    QDir().mkpath("GLI_logs");
+    g_console_handler = qInstallMessageHandler(log_message);
 
     UserPanel w;
 
     w.init();
     w.show();
-    
+
     return a.exec();
 }

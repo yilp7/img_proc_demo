@@ -3,7 +3,12 @@
 #include "ui_preferences.h"
 #include "util/constants.h"
 #include "util/thememanager.h"
+#include "image/nafnetenhancer.h"
+#include "plugins/addonhost.h"
 #include <QCheckBox>
+#include <QCoreApplication>
+#include <QDir>
+#include <QJsonObject>
 #include <QComboBox>
 #include <QDebug>
 #include <QGridLayout>
@@ -21,7 +26,11 @@
 #include <QStyleOptionComboBox>
 #include <QStylePainter>
 #include <QVBoxLayout>
+#include <QtMath>
 
+#include "pipeline/scanparams.h"
+
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -98,53 +107,6 @@ QPoint detectionFollowPoint(const QRect &box)
                   box.y() + box.height() * 2 / 3);
 }
 
-constexpr quint8 Udp709LensZoomIn = 0x80;
-constexpr quint8 Udp709LensZoomOut = 0x40;
-constexpr quint8 Udp709LensFocusNear = 0x20;
-constexpr quint8 Udp709LensFocusFar = 0x10;
-constexpr quint8 Udp709LensVisibleLight = 0x08;
-constexpr quint8 Udp709LensInfrared = 0x04;
-constexpr quint8 Udp709LensLaserNir = 0x02;
-constexpr quint8 Udp709ImageEnhance = 0x80;
-constexpr quint8 Udp709DenoiseFrameAverage = 0x40;
-constexpr quint8 Udp709DenoiseEcc = 0x20;
-
-int udp709LensOperation(quint8 control, bool *valid)
-{
-    const bool zoom_in = control & Udp709LensZoomIn;
-    const bool zoom_out = control & Udp709LensZoomOut;
-    const bool focus_near = control & Udp709LensFocusNear;
-    const bool focus_far = control & Udp709LensFocusFar;
-    const int action_count = static_cast<int>(zoom_in) + static_cast<int>(zoom_out)
-            + static_cast<int>(focus_near) + static_cast<int>(focus_far);
-
-    if (action_count == 0) {
-        *valid = true;
-        return -1;
-    }
-
-    const bool visible_light = control & Udp709LensVisibleLight;
-    const bool infrared = control & Udp709LensInfrared;
-    const bool laser_nir = control & Udp709LensLaserNir;
-    const int channel_count = static_cast<int>(visible_light) + static_cast<int>(infrared)
-            + static_cast<int>(laser_nir);
-    if (action_count != 1 || channel_count != 1 || laser_nir) {
-        *valid = false;
-        return -1;
-    }
-
-    *valid = true;
-    if (visible_light) {
-        if (zoom_in) return UDPPTZ::VL_ZOOM_IN;
-        if (zoom_out) return UDPPTZ::VL_ZOOM_OUT;
-        if (focus_near) return UDPPTZ::VL_FOCUS_NEAR;
-        return UDPPTZ::VL_FOCUS_FAR;
-    }
-    if (zoom_in) return UDPPTZ::IR_ZOOM_IN;
-    if (zoom_out) return UDPPTZ::IR_ZOOM_OUT;
-    if (focus_near) return UDPPTZ::IR_FOCUS_NEAR;
-    return UDPPTZ::IR_FOCUS_FAR;
-}
 }
 
 static bool throttle_check(QElapsedTimer &t)
@@ -162,6 +124,131 @@ static void setup_slider(QSlider *slider, int min, int max, int step, int page, 
     slider->setPageStep(page);
     slider->setValue(initial);
 }
+
+// The addons' view of the panel. Everything an addon may read or set on the
+// application goes through here, so no addon sees a widget.
+class UserPanel::AddonHostAdapter : public AddonHost
+{
+public:
+    explicit AddonHostAdapter(UserPanel *panel) : AddonHost(panel), m_panel(panel) {}
+
+    bool visible_light_on() const override { return m_panel->ui->VL_DEFOG_BTN->isChecked(); }
+    bool infrared_on() const override { return m_panel->ui->IR_POWER_BTN->isChecked(); }
+    bool laser_enabled() const override { return m_panel->m_setup_overlay->w()->LASER_CHK_1->isChecked(); }
+    bool device_tracking() const override { return m_panel->m_detection_auto_follow_active; }
+
+    float ptz_angle_h() const override { return m_panel->m_device_mgr->get_angle_h(); }
+    float ptz_angle_v() const override { return m_panel->m_device_mgr->get_angle_v(); }
+    float ptz_display_angle_h(float device_angle_h) const override
+    {
+        return m_panel->m_device_mgr->to_display_ptz_angle_h(device_angle_h);
+    }
+    float ptz_device_angle_h(float display_angle_h) const override
+    {
+        return m_panel->m_device_mgr->to_device_ptz_angle_h(display_angle_h);
+    }
+    float ptz_zero_angle_h() const override { return m_panel->config->get_data().device.ptz_zero_angle_h; }
+    bool ptz_connected() const override
+    {
+        UDPPTZ *ptz = m_panel->m_device_mgr->udpptz();
+        return ptz && ptz->is_connected();
+    }
+    void ptz_send_angle(float h, float v) override { m_panel->m_device_mgr->send_ptz_angle(h, v); }
+    void ptz_move_velocity(float h, float v) override { m_panel->m_device_mgr->ptz_move_velocity(h, v); }
+    void ptz_stop() override { m_panel->m_device_mgr->ptz_stop_btn_clicked(); }
+    void ptz_follow_centre() override { m_panel->m_device_mgr->ptz_follow_offset(0.0f, 0.0f); }
+
+    void lens_press(LensOperation operation) override
+    {
+        // Same order as the enum.
+        static const int codes[] = {
+            UDPPTZ::VL_ZOOM_IN, UDPPTZ::VL_ZOOM_OUT, UDPPTZ::VL_FOCUS_NEAR, UDPPTZ::VL_FOCUS_FAR,
+            UDPPTZ::IR_ZOOM_IN, UDPPTZ::IR_ZOOM_OUT, UDPPTZ::IR_FOCUS_NEAR, UDPPTZ::IR_FOCUS_FAR
+        };
+        m_panel->m_device_mgr->vid_camera_pressed(codes[operation]);
+    }
+    void lens_release() override { m_panel->m_device_mgr->vid_camera_released(); }
+
+    void set_laser_width(float ns) override { m_panel->m_tcu_ctrl->apply_laser_width(ns); }
+    void set_delay(int metres) override { m_panel->m_tcu_ctrl->apply_delay(metres); }
+    void set_gate_width(int metres) override { m_panel->m_tcu_ctrl->apply_gatewidth(metres); }
+    void set_gain(int value) override { m_panel->m_tcu_ctrl->change_mcp(value); }
+
+    bool target_class(int model_idx, const QString &class_name,
+                      int *type, int *category, double *height_m) const override
+    {
+        TargetClassEntry entry;
+        bool found = false;
+        const QString model = TargetClassTable::modelForIndex(model_idx);
+        if (m_panel->m_target_class_window && !model.isEmpty() && !class_name.isEmpty())
+            found = m_panel->m_target_class_window->table().lookup(model, class_name, &entry);
+        *type = entry.targetType;
+        *category = entry.targetCategory;
+        *height_m = entry.heightMeters;
+        return found;
+    }
+    void target_offset_deg(const QRect &box, const QSize &frame,
+                           double *horizontal, double *vertical) const override
+    {
+        TargetEstimator::offsetFromCentreDeg(box, frame, m_panel->current_optics(), horizontal, vertical);
+    }
+    double target_range_m(double height_m, const QRect &box, const QSize &frame) const override
+    {
+        if (!m_panel->m_target_class_window) return 0.0;
+        // As it was in the 709 report builder, still under verification.
+        const StreamMeta &meta = m_panel->m_router.stream(StreamId::S0).meta;
+        TargetEstimator::Optics temp_focal{static_cast<float>(m_panel->m_target_class_window->currentZoom()), pow(pow(meta.height, 2) + pow(meta.width, 2), 1/2)};
+        return TargetEstimator::rangeMeters(height_m, box, frame, temp_focal);
+    }
+
+    void set_channel_states(bool visible_light, bool infrared) override
+    {
+        Ui::UserPanel *ui = m_panel->ui;
+        ui->VL_DEFOG_BTN->setChecked(visible_light);
+
+        if (ui->IR_POWER_BTN->isChecked() == infrared) return;
+        const QSignalBlocker blocker(ui->IR_POWER_BTN);
+        ui->IR_POWER_BTN->setChecked(infrared);
+        m_panel->m_device_mgr->apply_vid_ir_power_state(infrared);
+    }
+
+    void set_laser_enabled(bool enabled) override
+    {
+        m_panel->m_setup_overlay->w()->LASER_CHK_1->setChecked(enabled);
+    }
+
+    void set_enhance(bool enabled, int option) override
+    {
+        {
+            QMutexLocker lk(&m_panel->m_params_mutex);
+            PipelineConfig &pcfg = m_panel->m_router.display(DisplayId::Main).pcfg;
+            pcfg.enhance_enabled = enabled;
+            pcfg.enhance_option = option;
+        }
+        if (m_panel->m_picked_display == DisplayId::Main)
+            m_panel->repopulate_general_widgets_from_picked();
+    }
+
+    void set_frame_average(bool enabled, int mode) override
+    {
+        {
+            QMutexLocker lk(&m_panel->m_params_mutex);
+            PipelineConfig &pcfg = m_panel->m_router.display(DisplayId::Main).pcfg;
+            pcfg.frame_avg_enabled = enabled;
+            if (mode >= 0) pcfg.frame_avg_mode = mode;
+        }
+        if (m_panel->m_picked_display == DisplayId::Main)
+            m_panel->repopulate_general_widgets_from_picked();
+    }
+
+    void set_heading_reference(float heading_deg, bool valid) override
+    {
+        if (m_panel->m_ptz_radar) m_panel->m_ptz_radar->setHeading(heading_deg, valid);
+    }
+
+private:
+    UserPanel *m_panel;
+};
 
 ConsumerThread::ConsumerThread(PipelineProcessor *pipeline, DisplayRouter *router, DisplaySlot *display)
     : m_pipeline(pipeline), m_router(router), m_display(display)
@@ -437,7 +524,10 @@ UserPanel::UserPanel(QWidget *parent) :
     m_addon_panel(nullptr),
     m_addon_panel_requested(false),
     m_panorama_panel(nullptr),
-    m_udp709_window(nullptr),
+    m_addon_host(nullptr),
+    m_target_class_window(nullptr),
+    m_pid_follow(nullptr),
+    m_pid_tuning_window(nullptr),
     m_scan_panorama_toggle(nullptr),
     m_theme_label(nullptr),
     m_theme_combo(nullptr),
@@ -670,7 +760,7 @@ UserPanel::UserPanel(QWidget *parent) :
     }
 
     QFont temp_f(consolas);
-    temp_f.setPixelSize(11);
+    temp_f.setPixelSize(12);
 
     // connect title bar to the main window (UserPanel*)
     ui->TITLE->setup(this);
@@ -678,11 +768,39 @@ UserPanel::UserPanel(QWidget *parent) :
     // initialize config system
     config = new Config(this);
 
-    m_udp709_window = new Udp709Window(config, this);
-    auto *udp709Shortcut = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_9), this);
-    udp709Shortcut->setContext(Qt::ApplicationShortcut);
-    connect(udp709Shortcut, &QShortcut::activated,
-            m_udp709_window, &Udp709Window::toggleVisible);
+    m_addon_host = new AddonHostAdapter(this);
+    m_target_class_window = new TargetClassWindow(config, this);
+    m_pid_follow = new PtzFollowController(this);
+    m_pid_follow->setSettings(config->get_data().pid_follow);
+    m_pid_tuning_window = new PidTuningWindow(config, m_pid_follow, this);
+    // The pipeline cannot read the class table or the zoom field, so every
+    // input to the range label is re-snapshotted whenever one of them moves.
+    connect(m_target_class_window, &TargetClassWindow::showRangeOnLabelsChanged,
+            this, [this](bool) { push_range_label_settings(); });
+    connect(m_target_class_window, &TargetClassWindow::tableChanged,
+            this, [this]() { push_range_label_settings(); });
+    connect(m_target_class_window, &TargetClassWindow::currentZoomChanged,
+            this, [this](double) { push_range_label_settings(); });
+    // Any reload of default.json can change the optics constants, so the
+    // pushed snapshot has to be rebuilt from the new values.
+    connect(config, &Config::config_loaded, this, [this]() {
+        push_range_label_settings();
+        // The delay floor has no Setup field, so a loaded file is the only
+        // way it changes at runtime.
+        if (m_tcu_ctrl) m_tcu_ctrl->setup_min_delay();
+    });
+    // The window loads its table in its constructor, before these connections
+    // exist, so the first snapshot is taken explicitly.
+    push_range_label_settings();
+    push_gate_tracking_settings();
+    auto *targetClassShortcut = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_T), this);
+    targetClassShortcut->setContext(Qt::ApplicationShortcut);
+    connect(targetClassShortcut, &QShortcut::activated,
+            m_target_class_window, &TargetClassWindow::toggleVisible);
+    auto *pidTuningShortcut = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_P), this);
+    pidTuningShortcut->setContext(Qt::ApplicationShortcut);
+    connect(pidTuningShortcut, &QShortcut::activated,
+            m_pid_tuning_window, &PidTuningWindow::toggleVisible);
 
     // SETUP overlay -- owns the legacy Preferences widgets (built via
     // Ui::Preferences::setupUi on a hidden form root, then re-parented into
@@ -763,6 +881,11 @@ UserPanel::UserPanel(QWidget *parent) :
     enhance_options->setCurrentIndex(0);
     calc_avg_options->addItem("a");
     calc_avg_options->addItem("ECC");
+    // Offered only when it can actually run. The model is CUDA-only, so on a
+    // machine without the provider — or without the model deployed — the option
+    // would sit in the list and silently do nothing.
+    if (NafNetEnhancer::supported(NafNetEnhancer::default_model_path()))
+        calc_avg_options->addItem("LightNAFNet");
     calc_avg_options->setCurrentIndex(0);
 
     // COM label/edit arrays → DeviceManager
@@ -890,11 +1013,35 @@ UserPanel::UserPanel(QWidget *parent) :
             default: break;
             }
         });
+    // Alt+drag designates a follow gate. This is the no-detector path: the
+    // gate is tracked by optical flow, so it does not need YOLO at all.
+    connect(ui->SOURCE_DISPLAY, &Display::gate_selected, this, [this](QRect gate) {
+        request_follow_gate(gate);
+        engage_pid_follow(GateTrackId);
+    });
+    connect(ui->SOURCE_DISPLAY, &Display::gate_cleared, this, [this]() {
+        // Only the gate follow is cancelled here; a detection-driven follow is
+        // not something a click on empty video should tear down.
+        if (m_pid_follow && m_pid_follow->trackId() == GateTrackId) disengage_pid_follow();
+        else request_follow_gate(QRect());
+    });
     connect(ui->SOURCE_DISPLAY, &Display::ptz_target, this,
-        [this](QPoint pos) {
+        [this](QPoint pos, bool closed_loop) {
             Display *disp = ui->SOURCE_DISPLAY;
             if (!disp || !m_device_mgr) return;
 
+            if (closed_loop) {
+                // Closed-loop follow needs a tracked target to close on, so
+                // the click has to land on one. Without that there is no error
+                // signal and the plain device follow is the only option.
+                const int track_id = track_id_at(pos);
+                if (track_id >= 0) {
+                    engage_pid_follow(track_id);
+                    return;
+                }
+            }
+
+            disengage_pid_follow();
             QPoint target = pos;
             int best_area = 0;
             for (const QRect& box : m_main_detection_boxes) {
@@ -944,13 +1091,15 @@ UserPanel::UserPanel(QWidget *parent) :
         ui->MISC_OPTION_2->setCurrentIndex(3);
         ui->MISC_OPTION_3->setCurrentIndex(5);
 
-        QFont misc_f("consolas", 8);
+        // The popup lists inherit the application font. They were pinned to
+        // 8 pt, the smallest text in the app.
+//        QFont misc_f("consolas", 8);
         connect(ui->MISC_OPTION_1, SIGNAL(selected()), ui->MISC_RADIO_1, SLOT(click()));
         connect(ui->MISC_OPTION_2, SIGNAL(selected()), ui->MISC_RADIO_2, SLOT(click()));
         connect(ui->MISC_OPTION_3, SIGNAL(selected()), ui->MISC_RADIO_3, SLOT(click()));
-        ui->MISC_OPTION_1->view()->setFont(misc_f);
-        ui->MISC_OPTION_2->view()->setFont(misc_f);
-        ui->MISC_OPTION_3->view()->setFont(misc_f);
+//        ui->MISC_OPTION_1->view()->setFont(misc_f);
+//        ui->MISC_OPTION_2->view()->setFont(misc_f);
+//        ui->MISC_OPTION_3->view()->setFont(misc_f);
 
         QButtonGroup *display_grp = new QButtonGroup(this);
         display_grp->addButton(ui->MISC_RADIO_1);
@@ -1067,7 +1216,12 @@ UserPanel::UserPanel(QWidget *parent) :
         if (!enabled && m_detection_auto_follow_active && m_device_mgr) {
             m_device_mgr->ptz_stop_btn_clicked();
         }
-        if (!enabled) m_detection_auto_follow_active = false;
+        if (!enabled) {
+            m_detection_auto_follow_active = false;
+            // Cleared so re-enabling re-aims at the current target instead of
+            // treating it as already followed.
+            m_auto_follow_track_id = -1;
+        }
     });
 
     // SaveOptionsWidget slots are (capture ORI, capture RES, record ORI, record RES).
@@ -1319,6 +1473,83 @@ UserPanel::UserPanel(QWidget *parent) :
         camera->show();
         r1->addWidget(camera);
 
+        // ----- Row 2: Gate Tracking (right of Camera) -----
+        // Method for the Alt+drag follow gate. The two methods are exclusive and
+        // each option belongs to exactly one of them, so the irrelevant pair is
+        // disabled rather than silently ignored.
+        auto *gate_grp = new QGroupBox(tr("Gate Tracking"), r1_parent);
+        gate_grp->setObjectName("GATE_TRACKING_GRP");
+        auto *gate_l = new QGridLayout(gate_grp);
+        gate_l->setContentsMargins(8, 18, 8, 8);
+        gate_l->setHorizontalSpacing(12);
+        gate_l->setVerticalSpacing(4);
+
+        auto *gate_flow_radio = new QRadioButton(tr("Optical flow"), gate_grp);
+        auto *gate_tmpl_radio = new QRadioButton(tr("Template match"), gate_grp);
+        auto *gate_fb_chk = new QCheckBox(tr("Forward-backward check"), gate_grp);
+        auto *gate_scale_chk = new QCheckBox(tr("Multi-scale search"), gate_grp);
+        gate_flow_radio->setObjectName("GATE_FLOW_RADIO");
+        gate_tmpl_radio->setObjectName("GATE_TEMPLATE_RADIO");
+        gate_fb_chk->setObjectName("GATE_FB_CHK");
+        gate_scale_chk->setObjectName("GATE_MULTISCALE_CHK");
+
+        gate_l->addWidget(gate_flow_radio, 0, 0);
+        gate_l->addWidget(gate_fb_chk,     0, 1);
+        gate_l->addWidget(gate_tmpl_radio, 1, 0);
+        gate_l->addWidget(gate_scale_chk,  1, 1);
+        gate_l->setColumnStretch(1, 1);
+        gate_l->setRowStretch(2, 1);
+
+        {
+            const Config::GateTrackingSettings &gt = config->get_data().gate_tracking;
+            gate_flow_radio->setChecked(gt.mode != 1);
+            gate_tmpl_radio->setChecked(gt.mode == 1);
+            gate_fb_chk->setChecked(gt.forward_backward_check);
+            gate_scale_chk->setChecked(gt.multi_scale);
+            gate_fb_chk->setEnabled(gt.mode != 1);
+            gate_scale_chk->setEnabled(gt.mode == 1);
+        }
+
+        auto commit_gate_tracking = [this, gate_tmpl_radio, gate_fb_chk, gate_scale_chk]() {
+            if (!config) return;
+            Config::GateTrackingSettings &gt = config->get_data().gate_tracking;
+            gt.mode = gate_tmpl_radio->isChecked() ? 1 : 0;
+            gt.forward_backward_check = gate_fb_chk->isChecked();
+            gt.multi_scale = gate_scale_chk->isChecked();
+            gate_fb_chk->setEnabled(gt.mode != 1);
+            gate_scale_chk->setEnabled(gt.mode == 1);
+            push_gate_tracking_settings();
+            config->auto_save();
+        };
+        connect(gate_tmpl_radio, &QRadioButton::toggled, this,
+                [commit_gate_tracking](bool) { commit_gate_tracking(); });
+        connect(gate_fb_chk, &QCheckBox::toggled, this,
+                [commit_gate_tracking](bool) { commit_gate_tracking(); });
+        connect(gate_scale_chk, &QCheckBox::toggled, this,
+                [commit_gate_tracking](bool) { commit_gate_tracking(); });
+
+        // A reload of default.json can change these under the card, so it
+        // repopulates without writing the freshly read values straight back.
+        connect(config, &Config::config_loaded, this,
+                [this, gate_flow_radio, gate_tmpl_radio, gate_fb_chk, gate_scale_chk]() {
+            if (!config) return;
+            const Config::GateTrackingSettings &gt = config->get_data().gate_tracking;
+            const QList<QWidget*> widgets = {gate_flow_radio, gate_tmpl_radio,
+                                             gate_fb_chk, gate_scale_chk};
+            for (QWidget *w : widgets) w->blockSignals(true);
+            gate_flow_radio->setChecked(gt.mode != 1);
+            gate_tmpl_radio->setChecked(gt.mode == 1);
+            gate_fb_chk->setChecked(gt.forward_backward_check);
+            gate_scale_chk->setChecked(gt.multi_scale);
+            gate_fb_chk->setEnabled(gt.mode != 1);
+            gate_scale_chk->setEnabled(gt.mode == 1);
+            for (QWidget *w : widgets) w->blockSignals(false);
+            push_gate_tracking_settings();
+        });
+
+        gate_grp->show();
+        r1->addWidget(gate_grp);
+
         r0->addStretch(1);
         r1->addStretch(1);
         // Row 2 (index 2) gets its full-width Image Processing card from
@@ -1363,7 +1594,9 @@ UserPanel::UserPanel(QWidget *parent) :
         auto le = [](QWidget *parent, const QString &init = QString()) -> QLineEdit* {
             auto *e = new QLineEdit(parent);
             e->setAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
-            e->setFixedWidth(36);
+            // Room for four digits at whatever the application font is, so a
+            // font change cannot push the leading digit out of view.
+            e->setFixedWidth(e->fontMetrics().horizontalAdvance(QStringLiteral("0000")) + 10);
             if (!init.isEmpty()) e->setText(init);
             return e;
         };
@@ -1978,13 +2211,9 @@ UserPanel::UserPanel(QWidget *parent) :
         if (!ui->ANGLE_V_EDIT->hasFocus()) ui->ANGLE_V_EDIT->setText(v);
     });
     connect(m_device_mgr, &DeviceManager::ptz_angle_changed,
-            this, [this](float, float) { update_udp709_device_status(); });
-    update_udp709_device_status();
-    connect(m_device_mgr, &DeviceManager::ptz_angle_changed,
             m_ptz_radar, &PtzRadarWidget::setAngle);
-    connect(m_udp709_window, &Udp709Window::turretControlReceived, this, &UserPanel::update_udp709_device_control);
-    connect(m_udp709_window, &Udp709Window::laserNirControlReceived,
-            this, &UserPanel::update_udp709_laser_nir_control);
+    connect(m_device_mgr, &DeviceManager::ptz_angle_changed,
+            m_addon_host, &AddonHost::publish_ptz_angle);
     if (m_ptz_radar) {
         m_ptz_radar->setAngle(m_device_mgr->ptz()->get(PTZ::ANGLE_H),
                               m_device_mgr->ptz()->get(PTZ::ANGLE_V));
@@ -2074,8 +2303,21 @@ UserPanel::UserPanel(QWidget *parent) :
         ptz_grp->addButton(ui->DOWN_BTN, 7);
         ui->DOWN_RIGHT_BTN->setIcon(QIcon(":/directions/" + mode_dir + "/down_right"));
         ptz_grp->addButton(ui->DOWN_RIGHT_BTN, 8);
+        // Manual controls take the shared UDP PTZ command slot away from the
+        // 709 link and from the closed loop, which would otherwise keep
+        // steering against the operator.
+        connect(ptz_grp, QOverload<int>::of(&QButtonGroup::buttonPressed), this,
+                [this](int) {
+            m_addon_host->notify_operator_took_turret();
+            disengage_pid_follow();
+        });
         connect(ptz_grp, QOverload<int>::of(&QButtonGroup::buttonPressed), m_device_mgr, &DeviceManager::ptz_button_pressed);
         connect(ptz_grp, QOverload<int>::of(&QButtonGroup::buttonReleased), m_device_mgr, &DeviceManager::ptz_button_released);
+        connect(ui->STOP_BTN, &QPushButton::clicked, this,
+                [this]() {
+            m_addon_host->notify_operator_took_turret();
+            disengage_pid_follow();
+        });
         connect(ui->STOP_BTN, &QPushButton::clicked, m_device_mgr, &DeviceManager::ptz_stop_btn_clicked);
 
         QButtonGroup *vid_grp = new QButtonGroup(this);
@@ -2087,8 +2329,13 @@ UserPanel::UserPanel(QWidget *parent) :
         vid_grp->addButton(ui->IR_ZOOM_IN_BTN, UDPPTZ::IR_ZOOM_IN);
         vid_grp->addButton(ui->IR_FOCUS_FAR_BTN, UDPPTZ::IR_FOCUS_FAR);
         vid_grp->addButton(ui->IR_FOCUS_NEAR_BTN, UDPPTZ::IR_FOCUS_NEAR);
+        connect(vid_grp, QOverload<int>::of(&QButtonGroup::buttonPressed), this,
+                [this](int) { m_addon_host->notify_operator_took_lens(); });
         connect(vid_grp, QOverload<int>::of(&QButtonGroup::buttonPressed), m_device_mgr, &DeviceManager::vid_camera_pressed);
-        connect(vid_grp, QOverload<int>::of(&QButtonGroup::buttonReleased), this, [this](int) { m_device_mgr->vid_camera_released(); });
+        connect(vid_grp, QOverload<int>::of(&QButtonGroup::buttonReleased), this, [this](int) {
+            m_addon_host->notify_operator_took_lens();
+            m_device_mgr->vid_camera_released();
+        });
 
         setup_slider(ui->PTZ_SPEED_SLIDER, 1, 64, 1, 4, 32);
         connect(ui->PTZ_SPEED_SLIDER, &QSlider::valueChanged, m_device_mgr, &DeviceManager::set_ptz_speed);
@@ -2135,6 +2382,9 @@ UserPanel::UserPanel(QWidget *parent) :
         ui->STEPPING_EDIT->setText(val);
     });
     connect(m_tcu_ctrl, &TCUController::delay_slider_max_changed, ui->DELAY_SLIDER, &QSlider::setMaximum);
+    connect(m_tcu_ctrl, &TCUController::delay_slider_min_changed, ui->DELAY_SLIDER, &QSlider::setMinimum);
+    // The slider was built with a zero floor before the controller existed.
+    m_tcu_ctrl->setup_min_delay();
     connect(m_tcu_ctrl, &TCUController::gw_slider_max_changed, ui->GW_SLIDER, &QSlider::setMaximum);
     connect(m_tcu_ctrl, &TCUController::mcp_slider_max_changed, ui->MCP_SLIDER, &QSlider::setMaximum);
     connect(m_tcu_ctrl, &TCUController::mcp_display_updated, this, [this](int val, QString text) {
@@ -2666,31 +2916,20 @@ UserPanel::UserPanel(QWidget *parent) :
     // Connect PipelineProcessor signals
     // packet_lost_updated: discarded in UI redesign (Sprint 16)
     qRegisterMetaType<QVector<QRect>>("QVector<QRect>");
+    qRegisterMetaType<QVector<DetectedTarget>>("QVector<DetectedTarget>");
+    connect(m_pipeline, &PipelineProcessor::main_targets_updated,
+            this, &UserPanel::update_main_targets, Qt::QueuedConnection);
+    connect(m_pipeline, &PipelineProcessor::follow_gate_updated,
+            this, &UserPanel::update_follow_gate, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::update_mcp_in_thread, this, &UserPanel::change_mcp, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::set_hist_pixmap, ui->HIST_DISPLAY, &Display::setPixmap, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::panorama_preview_updated, m_panorama_panel, &PanoramaPanel::setPreviewPixmap, Qt::QueuedConnection);
+    // Auto-follow moved to update_detection_auto_follow(), which is driven by
+    // the tracked signal — deciding "same target" needs track identity, which
+    // a bare box list cannot express. This handler now only caches the boxes
+    // for click-to-follow hit-testing.
     connect(m_pipeline, &PipelineProcessor::main_detection_boxes_updated, this, [this](QVector<QRect> boxes) {
         m_main_detection_boxes = boxes;
-        Display *disp = ui->SOURCE_DISPLAY;
-        const bool should_follow = boxes.size() == 1
-                && m_img_proc && m_img_proc->auto_follow_enabled()
-                && disp && disp->is_grabbing && m_device_mgr
-                && config && config->get_data().device.ptz_type == 2
-                && m_device_mgr->udpptz() && m_device_mgr->udpptz()->is_connected()
-                && ui->TITLE->current_mode() == TopBar::Mode::Monitor;
-        if (!should_follow) {
-            if (m_detection_auto_follow_active && m_device_mgr) {
-                m_device_mgr->ptz_stop_btn_clicked();
-            }
-            m_detection_auto_follow_active = false;
-            update_udp709_device_status();
-            return;
-        }
-
-        m_device_mgr->point_ptz_to_target(detectionFollowPoint(boxes.first()),
-                                          disp->width(), disp->height());
-        m_detection_auto_follow_active = true;
-        update_udp709_device_status();
     }, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::finish_scan_signal, m_scan_ctrl, &ScanController::on_SCAN_BUTTON_clicked, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::save_screenshot_signal, this, [this](QString path) {
@@ -2858,6 +3097,7 @@ UserPanel::~UserPanel()
         if (m_cv_run[i]) m_cv_run[i]->store(false);
     }
     if (curr_cam && start_grabbing) curr_cam->stop_grabbing();
+    for (PluginInterface *addon : m_addons) addon->stop();
 
     for (int i = 0; i < 3; i++) {
         if (m_router.display(static_cast<DisplayId>(i)).fps_calc) {
@@ -2916,8 +3156,13 @@ void UserPanel::init()
     // Combobox changes write directly into the affected DisplaySlot's pcfg
     // under m_params_mutex (the per-display equivalent of update_processing_params).
     connect(ui->MAIN_MODEL_LIST, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
-        QMutexLocker lk(&m_params_mutex);
-        m_router.display(DisplayId::Main).pcfg.model_idx = index;
+        {
+            QMutexLocker lk(&m_params_mutex);
+            m_router.display(DisplayId::Main).pcfg.model_idx = index;
+        }
+        // Class ids are per model, so the height vector has to be rebuilt for
+        // the new class list or the labels would use the previous model's.
+        push_range_label_settings();
     });
     connect(ui->ALT1_MODEL_LIST, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
         QMutexLocker lk(&m_params_mutex);
@@ -3033,6 +3278,9 @@ void UserPanel::init()
     // Start maximized so the SETUP overlay shows full content (the FlowLayout
     // in IMG_PROC wraps narrowly without enough viewport width).
     ui->TITLE->process_maximize();
+
+    // Everything the addons need exists by now, so they start here.
+    load_addons();
 
     // Automatic mode is evaluated once per process launch. Config reloads may
     // update its stored value for the next launch, but never run these actions.
@@ -3224,7 +3472,7 @@ void UserPanel::toggle_color_mode()
     setPortLabelStatus(ui->RANGE_COM, m_device_mgr->rf()->get_port_status());
 
     QFont temp_f(consolas);
-    temp_f.setPixelSize(11);
+    temp_f.setPixelSize(12);
     ui->DATA_EXCHANGE->setFont(temp_f);
 
     setCursor(cursor_curr_pointer);
@@ -3414,8 +3662,9 @@ void UserPanel::on_START_BUTTON_clicked()
         return;
     }
 
-    if (curr_cam->start(config->get_data().tcu.type)) {
-        QMessageBox::warning(this, tr("PROMPT"), tr("start failed"));
+    const int start_result = curr_cam->start(config->get_data().tcu.type);
+    if (start_result) {
+        QMessageBox::warning(this, tr("PROMPT"), tr("start failed") + QString::asprintf(" (SDK 0x%08X)", static_cast<unsigned>(start_result)));
         return;
     }
     device_on = true;
@@ -3572,10 +3821,13 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
     m_router.stream(StreamId::S0).frame_info.reopen();
     m_router.stream(StreamId::S0).meta.source_type = SourceType::IndustrialCam;
     m_cam_sink = m_router.stream(StreamId::S0).sink();
-    if (curr_cam->set_user_pointer(&m_cam_sink) != 0) {
-        qWarning("Cannot register industrial camera frame callback");
+    const int register_result = curr_cam->set_user_pointer(&m_cam_sink);
+    if (register_result != 0) {
+        qWarning("Cannot register industrial camera frame callback: 0x%08X", static_cast<unsigned>(register_result));
         m_router.stream(StreamId::S0).frames.close();
         m_router.stream(StreamId::S0).frame_info.close();
+        QMessageBox::warning(this, tr("PROMPT"),
+                             tr("Cannot register the camera frame callback.") + QString::asprintf(" (SDK 0x%08X)", static_cast<unsigned>(register_result)));
         return;
     }
 
@@ -3610,6 +3862,17 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
 
     // adjust display size according to frame size
     curr_cam->frame_size(true, &m_router.stream(StreamId::S0).meta.width, &m_router.stream(StreamId::S0).meta.height);
+    if (m_router.stream(StreamId::S0).meta.width <= 0 || m_router.stream(StreamId::S0).meta.height <= 0) {
+        // A link that still answers the connection check but not register
+        // reads hands back nothing usable. Sizing the frame buffer and the
+        // display from it is where the restart crash starts.
+        qWarning("Camera did not report a frame size");
+        m_router.stream(StreamId::S0).frames.close();
+        m_router.stream(StreamId::S0).frame_info.close();
+        QMessageBox::warning(this, tr("PROMPT"),
+                             tr("The camera did not report a frame size. Stop the camera, then enumerate and start it again."));
+        return;
+    }
     ui->TITLE->set_resolution(m_router.stream(StreamId::S0).meta.width, m_router.stream(StreamId::S0).meta.height);
     qInfo("frame w: %d, h: %d", m_router.stream(StreamId::S0).meta.width, m_router.stream(StreamId::S0).meta.height);
     //    QRect region = ui->SOURCE_DISPLAY->geometry();
@@ -3634,7 +3897,8 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
     m_router.stream(StreamId::S0).producer_run = true;
     m_router.display(DisplayId::Main).consumer->start();
 
-    if (curr_cam->start_grabbing()) {
+    const int grab_result = curr_cam->start_grabbing();
+    if (grab_result) {
         m_router.display(DisplayId::Main).consumer_run = false;
         if (m_router.display(DisplayId::Main).consumer) {
             m_router.display(DisplayId::Main).consumer->quit();
@@ -3643,6 +3907,9 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
             m_router.display(DisplayId::Main).consumer = NULL;
         }
         m_router.unroute(StreamId::S0);
+        qWarning("Camera start grabbing failed: 0x%08X", static_cast<unsigned>(grab_result));
+        QMessageBox::warning(this, tr("PROMPT"),
+                             tr("The camera did not start grabbing.") + QString::asprintf(" (SDK 0x%08X)", static_cast<unsigned>(grab_result)));
         return;
     }
     start_grabbing = true;
@@ -5000,7 +5267,8 @@ void UserPanel::on_DIST_BTN_clicked() {
     }
     else {
         bool ok = false;
-        distance_value = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", 100, 100, config->get_data().tcu.max_dist, 100, &ok, Qt::FramelessWindowHint);
+        const int floor = qMax(100, qRound(m_tcu_ctrl->min_delay_dist()));
+        distance_value = QInputDialog::getInt(this, "DISTANCE INPUT", "DETECTED DISTANCE: ", floor, floor, config->get_data().tcu.max_dist, 100, &ok, Qt::FramelessWindowHint);
         if (!ok) return;
     }
 
@@ -5081,163 +5349,263 @@ void UserPanel::change_gain(int val)
 
 // change_focus_speed, on_*_BTN_released → LensController (inline delegation in header)
 
-void UserPanel::update_udp709_device_status()
+void UserPanel::update_detection_auto_follow(const QVector<DetectedTarget> &targets)
 {
-    if (!m_udp709_window || !m_device_mgr) return;
+    // Closed-loop follow owns the turret while engaged; the two must not both
+    // be writing the command slot.
+    if (m_pid_follow && m_pid_follow->engaged()) return;
 
-    float horizontal = std::fmod(m_device_mgr->get_angle_h(), 360.0f);
-    if (horizontal < 0.0f) horizontal += 360.0f;
-
-    Udp709::DeviceStatusPayload status;
-    // G5 reports all three device states. G3 applies only VL and MWIR;
-    // its laser/NIR byte is display-only and G4 owns the laser channel.
-    status.timestampRaw = QDateTime::currentMSecsSinceEpoch();
-    status.visibleLightState = ui->VL_DEFOG_BTN->isChecked() ? 1 : 0;
-    status.midWaveInfraredState = ui->IR_POWER_BTN->isChecked() ? 1 : 0;
-    status.laserNirState = m_setup_overlay->w()->LASER_CHK_1->isChecked() ? 1 : 0;
-    status.azimuthHundredths = static_cast<quint16>(
-                qBound(0, static_cast<int>(std::lround(horizontal * 100.0f)), 35999));
-    status.elevationHundredths = static_cast<qint16>(
-                qBound(-18000, static_cast<int>(std::lround(m_device_mgr->get_angle_v() * 100.0f)), 18000));
-    status.trackingState = m_detection_auto_follow_active ? 0x00 : 0x01;
-    status.turretState = m_detection_auto_follow_active ? 0x0003 : 0x0000;
-    m_udp709_window->setAutomaticDeviceStatus(status);
-}
-
-void UserPanel::update_udp709_device_control(Udp709::TurretControlPayload payload)
-{
-    apply_udp709_channel_states(payload);
-    apply_udp709_turret_command(payload);
-    const bool lens_was_active = m_udp709_lens_operation >= 0;
-    apply_udp709_lens_command(payload.imagingLensControl);
-    if (lens_was_active && m_udp709_lens_operation < 0) {
-        // Lens STOP shares the UDP PTZ command stream. Restore the turret
-        // command immediately instead of waiting for the next G3 packet.
-        apply_udp709_turret_command(payload);
-    }
-}
-
-void UserPanel::apply_udp709_channel_states(const Udp709::TurretControlPayload &payload)
-{
-    ui->VL_DEFOG_BTN->setChecked(payload.visibleLightState != 0);
-
-    const bool ir_power_on = payload.midWaveInfraredState != 0;
-    if (ui->IR_POWER_BTN->isChecked() == ir_power_on) return;
-
-    const QSignalBlocker blocker(ui->IR_POWER_BTN);
-    ui->IR_POWER_BTN->setChecked(ir_power_on);
-    m_device_mgr->apply_vid_ir_power_state(ir_power_on);
-}
-
-void UserPanel::update_udp709_laser_nir_control(Udp709::LaserNirControlPayload payload)
-{
-    if (payload.laserEnabled > 1) {
-        qWarning() << "Clamping invalid UDP709 G4 laser enable value"
-                   << payload.laserEnabled;
-    }
-    if (payload.laserIntensity > 1000) {
-        qWarning() << "Clamping invalid UDP709 G4 laser width"
-                   << payload.laserIntensity;
-    }
-    if (payload.workingDistanceMeters > 25000) {
-        qWarning() << "Clamping invalid UDP709 G4 working distance"
-                   << payload.workingDistanceMeters;
-    }
-    if (payload.imagingDepthMeters > 1000) {
-        qWarning() << "Clamping invalid UDP709 G4 imaging depth"
-                   << payload.imagingDepthMeters;
+    const DetectedTarget *candidate = nullptr;
+    int live_count = 0;
+    for (const DetectedTarget &target : targets) {
+        if (!target.confirmed || target.lost) continue;
+        ++live_count;
+        candidate = &target;
     }
 
-    m_tcu_ctrl->apply_laser_width(qMin<quint16>(payload.laserIntensity, 1000));
-    m_tcu_ctrl->apply_delay(static_cast<int>(
-        qMin<quint32>(payload.workingDistanceMeters, 25000u)));
-    m_tcu_ctrl->apply_gatewidth(qMin<int>(payload.imagingDepthMeters, 1000));
-    m_tcu_ctrl->change_mcp(payload.imagingGain);
-    apply_udp709_image_processing(payload.imageProcessing);
-    m_setup_overlay->w()->LASER_CHK_1->setChecked(payload.laserEnabled != 0);
-    update_udp709_device_status();
-}
+    Display *disp = ui->SOURCE_DISPLAY;
+    const bool should_follow = live_count == 1
+            && m_img_proc && m_img_proc->auto_follow_enabled()
+            && disp && disp->is_grabbing && m_device_mgr
+            && config && config->get_data().device.ptz_type == 2
+            && m_device_mgr->udpptz() && m_device_mgr->udpptz()->is_connected()
+            && ui->TITLE->current_mode() == TopBar::Mode::Monitor;
 
-void UserPanel::apply_udp709_image_processing(quint8 control)
-{
-    const bool enhance = control & Udp709ImageEnhance;
-    const bool frame_average = control & Udp709DenoiseFrameAverage;
-    const bool ecc = control & Udp709DenoiseEcc;
-
-    {
-        QMutexLocker lk(&m_params_mutex);
-        PipelineConfig &pcfg = m_router.display(DisplayId::Main).pcfg;
-        pcfg.enhance_enabled = enhance;
-        pcfg.enhance_option = 7; // G4 enhancement is Dehaze_enh.
-
-        if (frame_average && ecc) {
-            qWarning() << "Ignoring conflicting UDP709 G4 denoise bits";
-        } else {
-            pcfg.frame_avg_enabled = frame_average || ecc;
-            if (frame_average) pcfg.frame_avg_mode = 0;
-            else if (ecc) pcfg.frame_avg_mode = 1;
-        }
-    }
-
-    if (m_picked_display == DisplayId::Main)
-        repopulate_general_widgets_from_picked();
-}
-
-void UserPanel::apply_udp709_turret_command(const Udp709::TurretControlPayload &payload)
-{
-    constexpr quint8 Standby = 0x00;
-    constexpr quint8 FixedAngle = 0x01;
-    constexpr quint8 ManualSearch = 0x02;
-
-    switch (payload.turretState) {
-    case Standby:
-        m_device_mgr->ptz_stop_btn_clicked();
-        break;
-    case FixedAngle:
-        m_device_mgr->send_ptz_angle(payload.azimuthRaw / 100.0f,
-                                     payload.elevationHundredths / 100.0f);
-        break;
-    case ManualSearch: {
-        const qint16 horizontal_velocity = static_cast<qint16>(payload.azimuthRaw);
-        m_device_mgr->ptz_move_velocity(horizontal_velocity / 100.0f,
-                                        payload.elevationHundredths / 100.0f);
-        break;
-    }
-    default:
-        qWarning() << "Ignoring unsupported UDP709 G3 turret state"
-                   << payload.turretState;
-        break;
-    }
-}
-
-void UserPanel::apply_udp709_lens_command(quint8 control)
-{
-    bool valid = false;
-    const int requested_operation = udp709LensOperation(control, &valid);
-    if (!valid) {
-        qWarning().nospace() << "Ignoring invalid or unsupported UDP709 G3 lens control 0x"
-                             << QString::number(control, 16).rightJustified(2, QLatin1Char('0'));
-    }
-
-    if (requested_operation == m_udp709_lens_operation) {
-        if (requested_operation >= 0 && m_device_mgr->udpptz()
-                && m_device_mgr->udpptz()->is_connected()) {
-            // Turret and channel-state commands share the UDP PTZ command
-            // stream, so reassert the held lens operation after each G3.
-            m_device_mgr->vid_camera_pressed(requested_operation);
-        }
+    if (!should_follow) {
+        if (m_detection_auto_follow_active && m_device_mgr) m_device_mgr->ptz_stop_btn_clicked();
+        m_detection_auto_follow_active = false;
+        m_auto_follow_track_id = -1;
+        m_addon_host->notify_tracking_state_changed();
         return;
     }
-    if (m_udp709_lens_operation >= 0) {
-        m_device_mgr->vid_camera_released();
-        m_udp709_lens_operation = -1;
+
+    // Aim once per acquisition. While the same track persists the device owns
+    // the tracking, so re-sending an offset derived from the moving box would
+    // fight its own follow loop rather than help it. A target cropped out of
+    // the display has no usable point, so the aim waits until it is visible.
+    if (candidate->trackId == m_auto_follow_track_id) return;
+    if (candidate->displayBox.isEmpty()) return;
+
+    m_device_mgr->point_ptz_to_target(detectionFollowPoint(candidate->displayBox),
+                                      disp->width(), disp->height());
+    m_auto_follow_track_id = candidate->trackId;
+    m_detection_auto_follow_active = true;
+    m_addon_host->notify_tracking_state_changed();
+}
+
+int UserPanel::track_id_at(const QPoint &display_pos) const
+{
+    int best_id = -1;
+    int best_area = 0;
+    for (const DetectedTarget &target : m_main_targets) {
+        if (target.lost || target.displayBox.isEmpty()) continue;
+        if (!target.displayBox.contains(display_pos)) continue;
+        const int area = target.displayBox.width() * target.displayBox.height();
+        if (best_area == 0 || area < best_area) {
+            best_area = area;
+            best_id = target.trackId;
+        }
+    }
+    return best_id;
+}
+
+void UserPanel::engage_pid_follow(int track_id)
+{
+    if (!m_pid_follow) return;
+    m_pid_follow->setSettings(config->get_data().pid_follow);
+    m_pid_follow->engage(track_id);
+}
+
+void UserPanel::disengage_pid_follow()
+{
+    if (!m_pid_follow || !m_pid_follow->engaged()) return;
+    const bool was_gate = m_pid_follow->trackId() == GateTrackId;
+    m_pid_follow->disengage();
+    // The last velocity keeps being retransmitted, so releasing the loop has
+    // to command a stop rather than simply stop commanding.
+    if (m_device_mgr) m_device_mgr->ptz_move_velocity(0.0f, 0.0f);
+    // Dropping the gate too, so the overlay does not keep showing a box that
+    // nothing is steering by.
+    if (was_gate) request_follow_gate(QRect());
+}
+
+TargetEstimator::Optics UserPanel::current_optics() const
+{
+    TargetEstimator::Optics optics;
+    if (!m_target_class_window || !config) return optics;
+
+    const Config::PanoramaOpticsSettings &po = config->get_data().panorama_optics;
+    const double zoom = m_target_class_window->currentZoom();
+    optics.sensorDiagonalMm = po.sensor_diagonal_mm;
+
+    std::vector<PanoramaZoomFovPoint> points;
+    for (const Config::ZoomFovPoint &pt : po.zoom_fov)
+        points.push_back(PanoramaZoomFovPoint(pt.zoom, pt.focal_length_mm, pt.fov_h, pt.fov_v));
+
+    const std::pair<float, float> fov = get_panorama_fov(static_cast<float>(zoom), points);
+    optics.fovHorizontalDeg = fov.first;
+    optics.fovVerticalDeg = fov.second;
+
+    // Focal comes from the same calibration rather than a hardcoded 10 x zoom,
+    // so recalibrating the table moves range and bearing together. Linear
+    // interpolation between the bracketing points, clamped at the ends.
+    std::vector<Config::ZoomFovPoint> sorted(po.zoom_fov.begin(), po.zoom_fov.end());
+    sorted.erase(std::remove_if(sorted.begin(), sorted.end(),
+                                [](const Config::ZoomFovPoint &p) {
+                                    return p.zoom <= 0.0f || p.focal_length_mm <= 0.0f;
+                                }), sorted.end());
+    if (sorted.empty()) return optics;
+    std::sort(sorted.begin(), sorted.end(),
+              [](const Config::ZoomFovPoint &a, const Config::ZoomFovPoint &b) {
+                  return a.zoom < b.zoom;
+              });
+
+    if (zoom <= sorted.front().zoom) {
+        optics.focalLengthMm = sorted.front().focal_length_mm;
+    } else if (zoom >= sorted.back().zoom) {
+        optics.focalLengthMm = sorted.back().focal_length_mm;
+    } else {
+        for (size_t i = 1; i < sorted.size(); ++i) {
+            if (zoom > sorted[i].zoom) continue;
+            const double span = sorted[i].zoom - sorted[i - 1].zoom;
+            const double t = span > 0.0 ? (zoom - sorted[i - 1].zoom) / span : 0.0;
+            optics.focalLengthMm = sorted[i - 1].focal_length_mm
+                    + t * (sorted[i].focal_length_mm - sorted[i - 1].focal_length_mm);
+            break;
+        }
+    }
+    return optics;
+}
+
+void UserPanel::push_range_label_settings()
+{
+    if (!m_target_class_window) return;
+
+    const bool enabled = m_target_class_window->showRangeOnLabels();
+    DisplaySlot &display = m_router.display(DisplayId::Main);
+
+    std::vector<double> heights;
+    if (enabled) {
+        // Indexed by class id, which is the class file's line order, so the
+        // pipeline can look up a height without touching the table.
+        const QString model = TargetClassTable::modelForIndex(display.pcfg.model_idx);
+        if (!model.isEmpty()) {
+            const QVector<TargetClassEntry> entries = m_target_class_window->table().entries(model);
+            heights.reserve(entries.size());
+            for (const TargetClassEntry &entry : entries)
+                heights.push_back(entry.heightMeters);
+        }
     }
 
-    if (!valid || requested_operation < 0) return;
-    if (!m_device_mgr->udpptz() || !m_device_mgr->udpptz()->is_connected()) return;
+    QMutexLocker lk(&display.label_mutex);
+    display.range_label_enabled = enabled;
+    display.class_heights = heights;
+    display.label_optics = current_optics();
+}
 
-    m_device_mgr->vid_camera_pressed(requested_operation);
-    m_udp709_lens_operation = requested_operation;
+void UserPanel::push_gate_tracking_settings()
+{
+    if (!config) return;
+    const Config::GateTrackingSettings &src = config->get_data().gate_tracking;
+
+    GateTracker::Settings settings;
+    settings.mode = src.mode == 1 ? GateTracker::Mode::Template
+                                  : GateTracker::Mode::OpticalFlow;
+    settings.forward_backward_check = src.forward_backward_check;
+    settings.multi_scale = src.multi_scale;
+
+    DisplaySlot &display = m_router.display(DisplayId::Main);
+    QMutexLocker lk(&display.gate_mutex);
+    display.gate_settings = settings;
+}
+
+void UserPanel::request_follow_gate(const QRect &display_gate)
+{
+    DisplaySlot &display = m_router.display(DisplayId::Main);
+    QMutexLocker lk(&display.gate_mutex);
+    display.gate_request = display_gate;
+    display.gate_request_pending = true;
+}
+
+void UserPanel::update_follow_gate(QRect displayBox, QRect sourceBox, QSize sourceSize, bool active)
+{
+    m_follow_gate_source = sourceBox;
+    m_follow_gate_frame = sourceSize;
+    m_follow_gate_active = active;
+    if (ui->SOURCE_DISPLAY) ui->SOURCE_DISPLAY->set_follow_gate(active ? displayBox : QRect());
+
+    // The gate only drives the loop when no detection is doing so.
+    if (m_pid_follow && m_pid_follow->trackId() == GateTrackId)
+        drive_pid_follow(sourceBox, sourceSize, active);
+}
+
+void UserPanel::update_pid_follow(const QVector<DetectedTarget> &targets)
+{
+    if (!m_pid_follow || !m_pid_follow->engaged()) return;
+    if (m_pid_follow->trackId() == GateTrackId) return;   // driven by the gate signal
+
+    const DetectedTarget *followed = nullptr;
+    for (const DetectedTarget &target : targets) {
+        if (target.trackId != m_pid_follow->trackId()) continue;
+        if (target.lost) break;
+        followed = &target;
+        break;
+    }
+
+    if (followed) drive_pid_follow(followed->sourceBox, followed->sourceSize, true);
+    else drive_pid_follow(QRect(), QSize(), false);
+}
+
+void UserPanel::drive_pid_follow(const QRect &sourceBox, const QSize &sourceSize, bool have_target)
+{
+    if (!m_pid_follow || !m_pid_follow->engaged()) return;
+
+    // Mode 2 is the PTZ tool. Checked here as well as at the tool buttons so
+    // any other path that changes the mode cannot leave the loop driving.
+    Display *disp = ui->SOURCE_DISPLAY;
+    const bool usable = m_device_mgr && config && disp && disp->mode == 2
+            && config->get_data().device.ptz_type == 2
+            && m_device_mgr->udpptz() && m_device_mgr->udpptz()->is_connected();
+    if (!usable) {
+        disengage_pid_follow();
+        return;
+    }
+
+    // Lens wins: zoom and focus need continuous ownership of the single UDPPTZ
+    // command slot, and velocity writes every cycle would chop them up.
+    m_pid_follow->setPaused(m_device_mgr->vid_camera_held());
+    if (m_pid_follow->paused()) return;
+
+    PtzFollowController::Output out;
+    if (!have_target || sourceSize.isEmpty() || sourceBox.isEmpty()) {
+        out = m_pid_follow->updateMissing();
+    } else {
+        const TargetEstimator::Optics optics = current_optics();
+
+        // The closed loop always centres what it was given, gate or detection
+        // box. The 2/3 waterline convention belongs to the device follow only.
+        const QRect aim(sourceBox.x() + sourceBox.width() / 2,
+                        sourceBox.y() + sourceBox.height() / 2,
+                        1, 1);
+
+        double error_h = 0.0;
+        double error_v = 0.0;
+        TargetEstimator::offsetFromCentreDeg(aim, sourceSize, optics, &error_h, &error_v);
+        out = m_pid_follow->update(error_h, error_v);
+    }
+
+    if (out.valid) {
+        m_device_mgr->ptz_move_velocity(static_cast<float>(out.horizontalVelocity),
+                                        static_cast<float>(out.verticalVelocity));
+    }
+}
+
+void UserPanel::update_main_targets(QVector<DetectedTarget> targets)
+{
+    m_main_targets = targets;
+    update_pid_follow(targets);
+    update_detection_auto_follow(targets);
+    m_addon_host->publish_targets(targets);
 }
 
 void UserPanel::keyPressEvent(QKeyEvent *event)
@@ -5635,12 +6003,15 @@ void UserPanel::resizeEvent(QResizeEvent *event)
         width_constraint = height_constraint * ww / hh;
 //    qDebug("width_constraint %d, height_constraint %d\n", width_constraint, height_constraint);
     if (width < width_constraint) width_constraint = width, height_constraint = width_constraint * hh / ww;
+    // The previous width scales the view centre; it is zero before the
+    // display has ever been laid out.
+    const int previous_width = qMax(1, region.width());
     if (height > height_constraint) {
-        center = center * width_constraint / region.width();
+        center = center * width_constraint / previous_width;
         region.setRect(10 + (width - width_constraint) / 2, 40, width_constraint, height_constraint);
     }
     else {
-        center = center * width / region.width();
+        center = center * width / previous_width;
         region.setRect(10, 40, width, height);
     }
     ui->TITLE->resize(this->width(), 30);
@@ -6794,6 +7165,8 @@ void UserPanel::on_ZOOM_TOOL_clicked()
     ui->PTZ_TOOL->setChecked(false);
     ui->SOURCE_DISPLAY->mode = 0;
     ui->SOURCE_DISPLAY->setContextMenuPolicy(Qt::PreventContextMenu);
+    // Follow is a PTZ-tool behaviour; leaving the tool releases the turret.
+    disengage_pid_follow();
 }
 
 void UserPanel::on_SELECT_TOOL_clicked()
@@ -6802,6 +7175,7 @@ void UserPanel::on_SELECT_TOOL_clicked()
     ui->PTZ_TOOL->setChecked(false);
     ui->SOURCE_DISPLAY->mode = 1;
     ui->SOURCE_DISPLAY->setContextMenuPolicy(Qt::ActionsContextMenu);
+    disengage_pid_follow();
 }
 
 void UserPanel::on_PTZ_TOOL_clicked()
@@ -6985,7 +7359,8 @@ void UserPanel::on_DUAL_LIGHT_BTN_clicked()
     }
 
     if (!m_addon_plugin_loader) {
-        m_addon_plugin_loader = new QPluginLoader("plugins/map_ais/plugin_map_ais.dll", this);
+        qWarning() << "No panel addon found under plugins/";
+        return;
     }
 
     QObject *plugin = m_addon_plugin_loader->instance();
@@ -7006,7 +7381,58 @@ void UserPanel::on_DUAL_LIGHT_BTN_clicked()
 
     pluginInterface->create(m_addon_panel->pluginHost());
     m_addon_panel->fitPluginChildren();
+    pluginInterface->attach(m_addon_host);
     pluginInterface->start();
+    m_addons.push_back(pluginInterface);
+}
+
+// Every Qt plugin under <exe dir>/plugins/<name>/ is an addon. Its metadata
+// says where it lives: a window addon starts now with the main window as its
+// parent; a panel addon is kept for the addon panel to instantiate when it
+// opens, the way the map has always been loaded.
+void UserPanel::load_addons()
+{
+    const QDir root(QCoreApplication::applicationDirPath() + "/plugins");
+    const QStringList dirs = root.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    for (const QString &dir : dirs) {
+        const QDir plugin_dir(root.filePath(dir));
+        const QStringList libraries = plugin_dir.entryList(QStringList() << "*.dll" << "*.so",
+                                                           QDir::Files, QDir::Name);
+        for (const QString &library : libraries) {
+            auto *loader = new QPluginLoader(plugin_dir.filePath(library), this);
+            // Read without loading: a dependency DLL dropped next to a plugin
+            // has no metadata and is skipped quietly.
+            const QJsonObject meta = loader->metaData();
+            if (meta.isEmpty()) {
+                delete loader;
+                continue;
+            }
+            const QJsonObject info = meta.value("MetaData").toObject();
+            const QString name = info.value("name").toString(library);
+            const QString kind = info.value("kind").toString("window");
+
+            if (kind == "panel") {
+                // The addon panel hosts one; the first found wins.
+                if (m_addon_plugin_loader) delete loader;
+                else m_addon_plugin_loader = loader;
+                continue;
+            }
+
+            QObject *instance = loader->instance();
+            PluginInterface *addon = instance ? qobject_cast<PluginInterface*>(instance) : nullptr;
+            if (!addon) {
+                qWarning() << "Addon" << name << "failed to load:" << loader->errorString();
+                delete loader;
+                continue;
+            }
+            addon->create(this);
+            addon->attach(m_addon_host);
+            addon->start();
+            m_addons.push_back(addon);
+            m_addon_loaders.push_back(loader);
+            qInfo() << "Addon loaded:" << name;
+        }
+    }
 }
 
 void UserPanel::on_RESET_3D_BTN_clicked()
@@ -7045,6 +7471,10 @@ void UserPanel::on_IMG_REGION_BTN_clicked()
     curr_cam->get_max_frame_size(&max_w, &max_h);
     curr_cam->frame_size(true, &new_w, &new_h, &inc_w, &inc_h);
     curr_cam->frame_offset(true, &new_x, &new_y, &inc_x, &inc_y);
+    // Increments read as zero when the camera does not answer, and every
+    // rounding below divides by them.
+    inc_w = qMax(1, inc_w); inc_h = qMax(1, inc_h);
+    inc_x = qMax(1, inc_x); inc_y = qMax(1, inc_y);
     new_w = ui->SHAPE_INFO->pair.x();
     new_h = ui->SHAPE_INFO->pair.y();
     new_x += ui->START_COORD->pair.x();

@@ -62,6 +62,7 @@ public:
     void send_ptz_angle_v(float v);
     void ptz_move_velocity(float h_velocity, float v_velocity);
     void point_ptz_to_target(QPoint target, int display_width, int display_height);
+    void ptz_follow_offset(float h, float v);
     float to_display_ptz_angle_h(float device_angle) const;
     float to_device_ptz_angle_h(float display_angle) const;
     float get_angle_h() const { return angle_h.load(); }
@@ -91,6 +92,7 @@ public slots:
     // VID camera control slots
     void vid_camera_pressed(int operation);
     void vid_camera_released();
+    bool vid_camera_held() const { return vid_camera_held_flag.load(); }
     void vid_defog_toggled(bool checked);
     void vid_ir_power_toggled(bool checked);
     void apply_vid_ir_power_state(bool checked);
@@ -177,6 +179,7 @@ private:
     int             ptz_speed;
     std::atomic<float> angle_h{0.0f};
     std::atomic<float> angle_v{0.0f};
+    std::atomic<bool> vid_camera_held_flag{false};
 };
 
 #endif // DEVICEMANAGER_H

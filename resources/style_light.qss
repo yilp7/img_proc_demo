@@ -481,7 +481,7 @@ Coordinate InfoLabel {
 }
 
 /* === Spin box ========================================== */
-QSpinBox {
+QSpinBox, QDoubleSpinBox {
     padding-right: 12px;
     border: 1px solid ${border-subtle};
     background-color: ${bg-base};
@@ -491,11 +491,11 @@ QSpinBox {
     border-radius: 2px;
 }
 
-QSpinBox::focus {
+QSpinBox::focus, QDoubleSpinBox::focus {
     border: 1px solid ${accent-glow-33};
 }
 
-QSpinBox::up-button {
+QSpinBox::up-button, QDoubleSpinBox::up-button {
     subcontrol-origin: border;
     subcontrol-position: center right;
     width: 12px;
@@ -503,7 +503,7 @@ QSpinBox::up-button {
     image: url(:/tools/light/up);
 }
 
-QSpinBox::down-button {
+QSpinBox::down-button, QDoubleSpinBox::down-button {
     subcontrol-origin: border;
     subcontrol-position: center right;
     width: 12px;
@@ -686,14 +686,14 @@ TopButton:pressed {
 #TOP_BAR_CLOCK {
     color: ${readout};
     font-family: Consolas;
-    font-size: 11px;
+    font-size: 12px;
     background: transparent;
 }
 
 #PIXEL_DEPTH_LABEL, #RESOLUTION_LABEL {
     color: ${text-muted};
     background: transparent;
-    font-size: 10px;
+    font-size: 11px;
 }
 
 DotIndicator {
@@ -720,7 +720,7 @@ DotIndicator {
     border: 1px solid ${border-subtle};
     padding: 3px 12px;
     font-weight: 700;
-    font-size: 10px;
+    font-size: 11px;
 }
 
 #MODE_SETUP:hover, #MODE_MONITOR:hover, #MODE_SCAN:hover {
@@ -752,7 +752,7 @@ DotIndicator {
 #FloatingPanelTitle {
     color: ${accent};
     font-weight: 700;
-    font-size: 10px;
+    font-size: 11px;
     background: transparent;
     padding-left: 2px;
 }
@@ -762,7 +762,7 @@ DotIndicator {
     color: ${text-muted};
     border: none;
     border-radius: 2px;
-    font-size: 9px;
+    font-size: 10px;
 }
 
 #FloatingPanelPin:hover, #FloatingPanelHide:hover, #FloatingPanelReset:hover {
@@ -809,7 +809,7 @@ DotIndicator {
 
 #PANORAMA_STATUS {
     color: ${text-muted};
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
     background: transparent;
     padding-right: 2px;
@@ -838,7 +838,7 @@ DotIndicator {
     border: 1px solid ${border-subtle};
     border-radius: 2px;
     padding: 2px 8px;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
 }
 
@@ -878,7 +878,7 @@ DotIndicator {
     border: 1px solid ${border-subtle};
     border-radius: 2px;
     padding: 2px 6px;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
 }
 
@@ -923,6 +923,18 @@ DotIndicator {
     qproperty-radarAccentColor: ${accent};
 }
 
+/* True-north reference toggle: checkable, but reads as a small indicator. */
+#PTZ_RADAR_NORTH_BTN {
+    background-color: ${bg-deepest};
+    border: 1px solid ${border-default};
+    border-radius: 2px;
+}
+#PTZ_RADAR_NORTH_BTN:hover  { border-color: ${accent}; }
+#PTZ_RADAR_NORTH_BTN:checked {
+    background-color: ${accent};
+    border-color: ${accent};
+}
+
 /* === Side zone (SideDisplay + Mapbox) ================== */
 #SIDE_DISPLAY_WIDGET, #MAPBOX_WIDGET {
     background-color: ${bg-deepest};
@@ -933,7 +945,7 @@ DotIndicator {
 #SIDE_DISPLAY_PLACEHOLDER, #MAPBOX_PLACEHOLDER {
     color: ${text-dim};
     background: transparent;
-    font-size: 10px;
+    font-size: 11px;
 }
 
 #SIDE_DISPLAY_SECTION_LBL, #PREVIEW_THUMB_LBL {
@@ -1020,7 +1032,7 @@ DotIndicator {
 #SCAN_CARD_TTL > QLabel {
     color: ${accent};
     font-weight: 700;
-    font-size: 10px;
+    font-size: 11px;
     background: transparent;
 }
 
@@ -1049,7 +1061,7 @@ DotIndicator {
     border: 1px solid ${border-default};
     border-radius: 3px;
     padding: 6px 0;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
 }
@@ -1102,20 +1114,20 @@ DotIndicator {
 
 /* === Modern PTZ labels (joystick + arc sliders) ======== */
 #JoyLabel {
-    font-size: 9px;
+    font-size: 10px;
     color: ${text-dim};             /* text-dim */
     background: transparent;
 }
 
 #ArcLabel {
-    font-size: 8px;
+    font-size: 10px;
     color: ${text-dim};             /* text-dim */
     background: transparent;
 }
 
 #ArcValue {
     font-family: "Consolas";
-    font-size: 9px;
+    font-size: 10px;
     color: ${text-secondary};             /* readout */
     background: transparent;
 }
@@ -1152,7 +1164,7 @@ ArcSliderWidget[lensRole="iris"] {
 /* === TCU Normal-mode DIST readout ======================= */
 #TcuDistLabel {
     font-family: "Consolas";
-    font-size: 10px;
+    font-size: 11px;
     color: ${border-strong};             /* readout-dim */
     background: transparent;
 }
@@ -1188,7 +1200,7 @@ TimingBarWidget {
     border: 1px solid ${negative-hover-bg};  /* negative-dim */
     border-radius: 3px;
     padding: 6px 12px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
 }
 

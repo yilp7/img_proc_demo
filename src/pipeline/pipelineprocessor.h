@@ -16,6 +16,7 @@
 
 #include "pipeline/processingparams.h"
 #include "pipeline/pipelineconfig.h"
+#include "pipeline/detectedtarget.h"
 #include "pipeline/routing.h"
 #include "yolo/yolo_detector.h"
 
@@ -96,6 +97,12 @@ signals:
     void set_hist_pixmap(QPixmap pm);
     void panorama_preview_updated(QPixmap pm);
     void main_detection_boxes_updated(QVector<QRect> boxes);
+    // Tracked equivalent of the above: carries identity, class and source-frame
+    // geometry, which the plain box list cannot express.
+    void main_targets_updated(QVector<DetectedTarget> targets);
+    // Follow gate state: box in widget coords for drawing, box and frame size
+    // in source coords for the follow loop.
+    void follow_gate_updated(QRect displayBox, QRect sourceBox, QSize sourceSize, bool active);
     void finish_scan_signal();
     void save_screenshot_signal(QString path);
     void update_delay_in_thread();

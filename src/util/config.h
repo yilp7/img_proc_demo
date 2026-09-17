@@ -29,13 +29,6 @@ public:
         int udpptz_protocol = 530;
     };
 
-    struct Udp709Settings {
-        QString local_ip = "192.168.1.100";
-        int local_port = 20841;
-        QString peer_ip = "192.168.1.209";
-        int peer_port = 20841;
-    };
-
     struct UISettings {
         bool simplified = false;
         bool dark_mode = true;
@@ -76,6 +69,9 @@ public:
         int hz_unit = 0;
         int base_unit = 0;
         float max_dist = 15000.0f;
+        // Stored in ns, unlike max_dist: this is a timing floor of the TCU, so
+        // it must not move when the light speed (dist_ns) changes.
+        float min_delay = 1000.0f;
         float delay_offset = 0.0f;
         // Stored in meters (matches max_dist pattern). UI displays in ns via /m_dist_ns.
         // 750 m == 5000 ns gate width at dist_ns = c·1e-9/2 = 0.15 m/ns.
@@ -117,7 +113,47 @@ public:
             : zoom(z), focal_length_mm(focal), fov_h(h), fov_v(v) {}
     };
 
+    // Closed-loop PTZ follow. Error is the target's angular offset from the
+    // optical axis in degrees, output is a velocity command in deg/s, so the
+    // gains are zoom-independent.
+    struct PidFollowSettings {
+        double kp_h = 0.8;
+        double ki_h = 0.05;
+        double kd_h = 0.0;
+        double kp_v = 0.8;
+        double ki_v = 0.05;
+        double kd_v = 0.0;
+        // Errors below this are treated as zero, so the loop stops chasing
+        // centroid jitter and the servo is not asked for unreachable speeds.
+        double deadband_deg = 0.15;
+        double max_velocity_deg_s = 20.0;
+        // Integral clamp, in deg/s of contributed output.
+        double integral_limit_deg_s = 5.0;
+        // Low-pass on the derivative term; 0 disables D entirely.
+        double derivative_filter = 0.3;
+        // Detection gaps shorter than this coast on the last output; longer
+        // ones disengage rather than slew blind.
+        int coast_ms = 700;
+        // Subtracts the turret's own reported motion from the measured error,
+        // so the loop closes on target motion rather than apparent motion.
+        bool compensate_turret_motion = true;
+    };
+
+    // Method and options for the operator-designated follow gate.
+    struct GateTrackingSettings {
+        // 0 = Lucas-Kanade optical flow, 1 = template matching. Exclusive.
+        int mode = 0;
+        // Optical flow only.
+        bool forward_backward_check = true;
+        // Template matching only.
+        bool multi_scale = true;
+    };
+
     struct PanoramaOpticsSettings {
+        // Sensor diagonal in mm, used with focal length to derive pixel pitch
+        // for range estimation. 8.93 is the nominal 1/1.8" value; recalibrate
+        // against a known-distance target before relying on the numbers.
+        double sensor_diagonal_mm = 8.93;
         std::vector<ZoomFovPoint> zoom_fov = {
             ZoomFovPoint(1.0f, 10.0f, 38.4f, 22.5f),
             ZoomFovPoint(86.0f, 860.0f, 0.49f, 0.28f)
@@ -189,7 +225,6 @@ public:
         ComSettings com_range;
         ComSettings com_ptz;
         NetworkSettings network;
-        Udp709Settings udp709;
         UISettings ui;
         CameraSettings camera;
         VideoSettings video;
@@ -199,6 +234,8 @@ public:
         DeviceSettings device;
         SaveSettings save;
         PanoramaOpticsSettings panorama_optics;
+        PidFollowSettings pid_follow;
+        GateTrackingSettings gate_tracking;
         ImageProcSettings image_proc;
         YoloSettings yolo;
 
@@ -237,9 +274,6 @@ private:
     nlohmann::json network_settings_to_json(const NetworkSettings &settings) const;
     NetworkSettings network_settings_from_json(const nlohmann::json &obj) const;
 
-    nlohmann::json udp709_settings_to_json(const Udp709Settings &settings) const;
-    Udp709Settings udp709_settings_from_json(const nlohmann::json &obj) const;
-
     nlohmann::json ui_settings_to_json(const UISettings &settings) const;
     UISettings ui_settings_from_json(const nlohmann::json &obj) const;
 
@@ -266,6 +300,10 @@ private:
 
     nlohmann::json panorama_optics_settings_to_json(const PanoramaOpticsSettings &settings) const;
     PanoramaOpticsSettings panorama_optics_settings_from_json(const nlohmann::json &obj) const;
+    nlohmann::json pid_follow_settings_to_json(const PidFollowSettings &settings) const;
+    PidFollowSettings pid_follow_settings_from_json(const nlohmann::json &obj) const;
+    nlohmann::json gate_tracking_settings_to_json(const GateTrackingSettings &settings) const;
+    GateTrackingSettings gate_tracking_settings_from_json(const nlohmann::json &obj) const;
 
     nlohmann::json image_proc_settings_to_json(const ImageProcSettings &settings) const;
     ImageProcSettings image_proc_settings_from_json(const nlohmann::json &obj) const;

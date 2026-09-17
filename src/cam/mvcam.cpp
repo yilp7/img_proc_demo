@@ -10,7 +10,22 @@ MvCam::MvCam()
     reconnect_required = false;
     curr_idx = 0;
 }
-MvCam::~MvCam() {if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;}
+MvCam::~MvCam() { release_handle(); }
+
+// Stop, close, destroy, in the order the SDK expects. Stop is issued even when
+// the link is down: after a disconnect the handle still has an acquisition
+// armed, and reopening or destroying it in that state is where the restart
+// crash starts. On a dead link the stop times out inside the SDK, which costs
+// a moment and nothing else.
+int MvCam::release_handle()
+{
+    if (!dev_handle) return MV_E_HANDLE;
+    MV_CC_StopGrabbing(dev_handle);
+    const int ret = MV_CC_CloseDevice(dev_handle);
+    MV_CC_DestroyHandle(dev_handle);
+    dev_handle = NULL;
+    return ret;
+}
 
 void MvCam::configure_device()
 {
@@ -64,11 +79,7 @@ int MvCam::start(int idx) {
     }
     if (!device_info) return MV_E_PARAMETER;
 
-    if (dev_handle) {
-        MV_CC_CloseDevice(dev_handle);
-        MV_CC_DestroyHandle(dev_handle);
-        dev_handle = NULL;
-    }
+    if (dev_handle) release_handle();
 
     int ret = MV_CC_CreateHandle(&dev_handle, device_info);
     if (ret != MV_OK) {
@@ -102,7 +113,9 @@ int MvCam::reconnect()
     if (!dev_handle) return MV_E_HANDLE;
     if (is_connected()) return MV_OK;
 
-    // Required by the MVS SDK after an exceptional GigE disconnect.
+    // Required by the MVS SDK after an exceptional GigE disconnect. The stop
+    // comes first for the same reason as in release_handle().
+    MV_CC_StopGrabbing(dev_handle);
     MV_CC_CloseDevice(dev_handle);
     const int ret = MV_CC_OpenDevice(dev_handle);
     if (ret == MV_OK) configure_device();
@@ -111,13 +124,7 @@ int MvCam::reconnect()
 
 int MvCam::shut_down()
 {
-    if (dev_handle == NULL) return MV_E_HANDLE;
-
-    int ret = MV_CC_CloseDevice(dev_handle);
-
-    MV_CC_DestroyHandle(dev_handle);
-    dev_handle = NULL;
-    return ret;
+    return release_handle();
 }
 
 int MvCam::set_user_pointer(StreamFrameSink *sink)
@@ -132,34 +139,42 @@ int MvCam::start_grabbing() {
     return MV_CC_StartGrabbing(dev_handle);
 }
 
+// Not gated on the connection check: a stop after a link loss is exactly the
+// one the SDK needs before the handle is reused.
 int MvCam::stop_grabbing() {
-    if (!is_connected()) return MV_E_HANDLE;
+    if (!dev_handle) return MV_E_HANDLE;
     return MV_CC_StopGrabbing(dev_handle);
 }
 
+// Dimensions read back as zero on any failure, so a caller can tell a dead
+// link from a real size instead of building a buffer from stack garbage.
 void MvCam::get_max_frame_size(int *w, int *h)
 {
-    MVCC_INTVALUE int_value;
-    MV_CC_GetIntValue(dev_handle, "WidthMax", &int_value);
-    *w = int_value.nCurValue;
-    MV_CC_GetIntValue(dev_handle, "HeightMax", &int_value);
-    *h = int_value.nCurValue;
+    MVCC_INTVALUE width_value = {0};
+    MVCC_INTVALUE height_value = {0};
+    *w = MV_CC_GetIntValue(dev_handle, "WidthMax", &width_value) == MV_OK ? width_value.nCurValue : 0;
+    *h = MV_CC_GetIntValue(dev_handle, "HeightMax", &height_value) == MV_OK ? height_value.nCurValue : 0;
 }
 
 void MvCam::frame_size(bool read, int *w, int *h, int *inc_w, int *inc_h)
 {
     if (read) {
-        MVCC_INTVALUE int_value;
-        MV_CC_GetIntValue(dev_handle, "Width", &int_value);
-        *w = int_value.nCurValue;
-        if (inc_w) *inc_w = int_value.nInc;
-        MV_CC_GetIntValue(dev_handle, "Height", &int_value);
-        *h = int_value.nCurValue;
-        if (inc_h) *inc_h = int_value.nInc;
+        MVCC_INTVALUE width_value = {0};
+        MVCC_INTVALUE height_value = {0};
+        const bool ok_w = MV_CC_GetIntValue(dev_handle, "Width", &width_value) == MV_OK;
+        const bool ok_h = MV_CC_GetIntValue(dev_handle, "Height", &height_value) == MV_OK;
+        *w = ok_w ? width_value.nCurValue : 0;
+        *h = ok_h ? height_value.nCurValue : 0;
+        if (inc_w) *inc_w = ok_w ? width_value.nInc : 0;
+        if (inc_h) *inc_h = ok_h ? height_value.nInc : 0;
     }
     else {
         MV_CC_SetIntValue(dev_handle, "Width", *w);
         MV_CC_SetIntValue(dev_handle, "Height", *h);
+    }
+    if (*w <= 0 || *h <= 0) {
+        mv_img.release();
+        return;
     }
     MVCC_ENUMVALUE temp = {0};
     MV_CC_GetPixelFormat(dev_handle, &temp);
@@ -185,7 +200,7 @@ void MvCam::frame_size(bool read, int *w, int *h, int *inc_w, int *inc_h)
 void MvCam::frame_offset(bool read, int *x, int *y, int *inc_x, int *inc_y)
 {
     if (read) {
-        MVCC_INTVALUE int_value;
+        MVCC_INTVALUE int_value = {0};
         MV_CC_GetIntValue(dev_handle, "OffsetX", &int_value);
         *x = int_value.nCurValue;
         if (inc_x) *inc_x = int_value.nInc;
@@ -202,7 +217,7 @@ void MvCam::frame_offset(bool read, int *x, int *y, int *inc_x, int *inc_y)
 void MvCam::time_exposure(bool read, float *val)
 {
     if (read) {
-        MVCC_FLOATVALUE f_val;
+        MVCC_FLOATVALUE f_val = {0};
         MV_CC_GetFloatValue(dev_handle, "ExposureTime", &f_val);
         *val = f_val.fCurValue;
     }
@@ -212,7 +227,7 @@ void MvCam::time_exposure(bool read, float *val)
 void MvCam::frame_rate(bool read, float *val)
 {
     if (read) {
-        MVCC_FLOATVALUE f_val;
+        MVCC_FLOATVALUE f_val = {0};
         MV_CC_GetFloatValue(dev_handle, "ResultingFrameRate", &f_val);
         *val = f_val.fCurValue;
     }
@@ -222,7 +237,7 @@ void MvCam::frame_rate(bool read, float *val)
 void MvCam::gain_analog(bool read, float *val)
 {
     if (read) {
-        MVCC_FLOATVALUE f_val;
+        MVCC_FLOATVALUE f_val = {0};
         MV_CC_GetFloatValue(dev_handle, "Gain", &f_val);
         *val = f_val.fCurValue;
     }
@@ -232,7 +247,7 @@ void MvCam::gain_analog(bool read, float *val)
 void MvCam::trigger_mode(bool read, bool *val)
 {
     if (read) {
-        MVCC_ENUMVALUE enum_val;
+        MVCC_ENUMVALUE enum_val = {0};
         MV_CC_GetEnumValue(dev_handle, "TriggerMode", &enum_val);
         *val = enum_val.nCurValue;
     }
@@ -242,7 +257,7 @@ void MvCam::trigger_mode(bool read, bool *val)
 void MvCam::trigger_source(bool read, bool *val)
 {
     if (read) {
-        MVCC_ENUMVALUE enum_val;
+        MVCC_ENUMVALUE enum_val = {0};
         MV_CC_GetEnumValue(dev_handle, "TriggerSource", &enum_val);
         *val = enum_val.nCurValue == MV_TRIGGER_SOURCE_SOFTWARE;
     }
@@ -273,7 +288,7 @@ int MvCam::ip_address(bool read, int idx, int *ip, int *gateway, int *nic_addres
         return 0;
     }
     else {
-        if (dev_handle) MV_CC_DestroyHandle(dev_handle), dev_handle = NULL;
+        release_handle();
         int ret = MV_CC_CreateHandle(&dev_handle, idx < gige_dev_list.nDeviceNum ? gige_dev_list.pDeviceInfo[idx] : usb3_dev_list.pDeviceInfo[idx - gige_dev_list.nDeviceNum]);
         ret = MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
 //        qDebug() << "modify ip: " << hex << ret;
@@ -341,7 +356,7 @@ int MvCam::usb3_device_num()
 void MvCam::binning(bool read, int *val)
 {
     if (read) {
-        MVCC_ENUMVALUE enum_val;
+        MVCC_ENUMVALUE enum_val = {0};
         MV_CC_GetEnumValue(dev_handle, "BinningHorizontal", &enum_val);
         MV_CC_GetEnumValue(dev_handle, "BinningVertical", &enum_val);
         *val = enum_val.nCurValue;
