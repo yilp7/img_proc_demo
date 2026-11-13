@@ -18,6 +18,8 @@ Open list — tasks added as field testing surfaces them. Each task lands as a s
 - Architecture changes
 - Full i18n audit
 
+Both feature and architecture exclusions were lifted during the sprint as field work surfaced them: T3 (routing refactor) by explicit approval, T8–T18 one at a time. The i18n exclusion held; T7 wrapped runtime strings only.
+
 ---
 
 ## Tasks
@@ -90,7 +92,7 @@ User wanted a per-display "model loaded" dot next to each model combobox in the 
 - [x] Deletions: `display_thread_idx[]`, "fallback to 0" guards, `h_grab_thread[ti]->display_idx(false, ...)` callback machinery, `cam->set_user_pointer(&cam_union)` hardcoded q_img[0]. Industrial cam now points at `m_cam_sink` (a stable `StreamFrameSink` aimed at `StreamId::S0`).
 - [x] Cam callback redirected through `StreamFrameSink` (all three SDK adapters push direct).
 - [x] cv:// branch + cam callback redirected through `StreamFrameSink`. cv:// path: when `display=true` the capture thread builds a `StreamFrameSink` for the routed `StreamSlot` and pushes frames into `sink.frames` directly; the display-less export path keeps the legacy `process_frame` callback (offline conversion pipeline).
-- [ ] Cam stop+restart crash: structural fix in place (cam SDK `stop_grabbing()` runs before queue `close()`+`clear()` in `on_STOP_GRABBING_BUTTON_clicked`, so callbacks deregister before the queue tears down). Repro verification deferred to walkthrough.
+- [x] Cam stop+restart crash: structural fix in place (cam SDK `stop_grabbing()` runs before queue `close()`+`clear()` in `on_STOP_GRABBING_BUTTON_clicked`, so callbacks deregister before the queue tears down). Verified in walkthrough finding #1 below; the broken-connection variant is T16.
 - [x] Proxy-shim removal: all `_PxXxx` structs and their member instances deleted from `UserPanel.h`; ~265 array-style callsites in `UserPanel.cpp` rewritten to direct `m_router.stream(static_cast<StreamId>(i))` / `m_router.display(static_cast<DisplayId>(i))` access with the strongly-typed enum at compile-known sites (`StreamId::S0`, `DisplayId::Main`, etc.). One collateral bug from a substring collision (`h[0]` → `pixel_depth` accidentally rewritten to `pixel_deptm_router…meta.height`) caught and fixed.
 
 **Adjacent fixes that landed inside C1a (not part of original C1a scope, surfaced during walkthrough):**
@@ -212,15 +214,161 @@ Background: the legacy addon hook lived inside the console/addon page and was no
 - [x] Added a resizable `AddonPanel` floating window hosted on the monitor view.
 - [x] Moved addon activation to a top-bar button placed before the URL button; current icon is temporary and can be replaced later.
 - [x] Default position/size now matches the main display rectangle.
-- [x] Hard-wired the current plugin target to `plugins/map_ais/plugin_map_ais.dll`, matching the requested `plugin_map_ais` name.
-- [x] Loaded the DLL through `QPluginLoader`, verified it implements `PluginInterface`, then calls `create(panelHost)` and `start()`.
+- [x] ~~Hard-wired the current plugin target to `plugins/map_ais/plugin_map_ais.dll`, matching the requested `plugin_map_ais` name.~~ Superseded by T14: the panel plugin is whichever DLL under `plugins/` declares `"kind": "panel"`.
+- [x] Loaded the DLL through `QPluginLoader`, verified it implements `PluginInterface`, then calls `create(panelHost)`, `attach(host)` (since T14) and `start()`.
 - [x] Kept the panel hidden outside monitor mode and restored/fitted the plugin child when the panel is shown or resized.
 - [x] Added short implementation guidance for external programs that want to implement the plugin interface.
 
 ### T7 - Theme / translation polish
 
-Status: WIP.
+Status: DONE (dark/light parity is a visual check, user-driven).
 
-- [ ] Theme work: tokenized QSS, `gruvbox` theme folder, theme selector in Setup > Presets.
-- [ ] Translation work: wrap key runtime strings with `tr()` and lock fragile widget heights.
-- [ ] Still tuning visual parity between dark/light modes.
+- [x] Theme work: `ThemeManager` ([thememanager.h](src/util/thememanager.h)) substitutes tokens from `:/themes/<name>/{dark,light}.json` into the two QSS files; `gruvbox`, `nord`, `graphite` shipped; selector in Setup > Presets writes `ui.theme` / `ui.color_mode` and restyles live. The old "theme" naming now means colour mode throughout (`app_color_mode`, `apply_color_mode()`, `stylesheet_dark/light`), and window-control + addon icons come in per-mode variants.
+- [x] Custom widgets expose their colours as `Q_PROPERTY` so QSS drives them: `TimingBarWidget`, `JoystickWidget`, `ArcSliderWidget`, `UnlockBar`, `DotIndicator`, `PtzRadarWidget`.
+- [x] Translation work: runtime strings wrapped (`tr()` sites in `src` 87 → 189); `lupdate.bat` / `lrelease.bat` added; `zh_cn.ts` 303 → 411 entries, none unfinished.
+- [ ] Dark/light visual parity: user-driven walkthrough.
+
+### T8 - PTZ panorama scan mode
+
+Status: DONE.
+
+Background: the grid scan walks a PTZ lattice with the TCU stepping at each stop. Field work wanted a single horizontal sweep at a fixed elevation that stitches the stops into a preview, with the step derived from the lens FOV at the current zoom rather than typed in.
+
+- [x] `ScanParams` gained `ptz_scan_mode` (grid / panorama), the panorama fields (start / optional end / fixed V / step / count / direction / wait / zoom / fusion mode) and a `panorama_zoom_fov` calibration table ([scanparams.h](src/pipeline/scanparams.h)). `get_panorama_route()`, `get_panorama_fov()` (interpolated from zoom), `update_panorama_fov_from_zoom()`, sweep / stop-count helpers.
+- [x] Grid scan dimensions individually switchable (`scan_delay_enabled` / `scan_gate_width_enabled` / `scan_ptz_enabled`); a disabled dimension keeps the device value active at scan start. Gate width now has its own route (`get_gate_width_route()`, `ScanController::get_scan_gate_width_route()`).
+- [x] SCAN overlay: mode radios, per-card enable checkboxes, a panorama card with CW/CCW direction and a fusion combo ([scanoverlay.h](src/widgets/overlays/scanoverlay.h)).
+- [x] Pipeline: `PanoramaCanvas` accumulates each stop into a degree-indexed canvas with `advance_panorama_scan_main()`; fusion modes none / gain / matching; preview emitted via `panorama_preview_updated` and saved with the scan output.
+- [x] `PanoramaPanel` floating window ([panoramapanel.h](src/widgets/panels/panoramapanel.h)): zoom, pan, reset, user-resizable; generating / generated status.
+- [x] Tests: seven new `test_scanparams` cases (gate-width route, panorama route default / endpoint / CCW wrap / step fallback / ending-H, zoom-FOV interpolation).
+
+### T9 - PTZ radar widget
+
+Status: DONE.
+
+- [x] `PtzRadarWidget` in the right stack ([ptzradarwidget.h](src/widgets/sidebar/ptzradarwidget.h)) draws the current pan / tilt on a ring; fed from `DeviceManager::ptz_angle_changed`.
+- [x] Zero-angle offset `device.ptz_zero_angle_h` in config, with `DeviceManager::to_display_ptz_angle_h()` / `to_device_ptz_angle_h()` as the single conversion pair.
+- [x] North reference: `setHeading(deg, valid)` is source-agnostic (the 709 addon feeds it today; anything else may). The reference expires 5 s after the last valid sample, so a dead feed does not leave a stale north on the dial. Toggle button on the widget.
+
+### T10 - Closed-loop PTZ target follow
+
+Status: DONE. One design item carried (see below).
+
+Background: the UDP turret takes velocity commands and `TargetEstimator::offsetFromCentreDeg()` already converts a box to angular error, so a PID on that error closes the loop without per-zoom retuning.
+
+- [x] `PtzFollowController` ([ptzfollowcontroller.h](src/controller/ptzfollowcontroller.h)): per-axis PID in degrees → deg/s with deadband, integral clamp, derivative filter, coast-then-disengage on missing detections, pause without losing state, own-motion compensation from the last command (the 530 status rate bytes are deliberately not parsed).
+- [x] Actuator path: `DeviceManager::ptz_move_velocity()` / `ptz_follow_offset()`; `UDPPTZ` gained `apply_manual_velocity` / `apply_follow_target` / `apply_angle_target` with thread-safe dispatch ([udpptz.h](src/port/udpptz.h)).
+- [x] Engagement: auto-follow checkbox on the GENERAL tab (`ImgProcWidget::auto_follow_changed`) follows the first confirmed track; PTZ-tool click with `closed_loop` engages a specific one; any manual PTZ / STOP press disengages and notifies addons (`notify_operator_took_turret`).
+- [x] `PidTuningWindow` (Ctrl+P): gains and limits apply immediately, save separately; live error / output telemetry. Settings persisted as `pid_follow`.
+- Carried: manual VL/IR lens holds and follow commands share `UDPPTZ::current_operation` with no arbiter; today the follow loop pauses on operator input, but a held lens operation arriving mid-follow is not sequenced.
+
+### T11 - Operator-designated follow gate
+
+Status: DONE.
+
+Background: follow should also work with no detector loaded, from a region the operator draws.
+
+- [x] `Display`: Alt+drag in PTZ mode rubber-bands a gate (`gate_selected`), a plain click drops it (`gate_cleared`); both drawn in `paintEvent` ([display.h](src/widgets/display.h)).
+- [x] `GateTracker` ([gatetracker.h](src/yolo/gatetracker.h)): Lucas-Kanade optical flow with optional forward-backward check, or normalized cross-correlation template matching with optional multi-scale search and an untouched anchor patch for recovery. Both estimate scale. Lives on `DisplaySlot`, touched only by the pipeline thread; the GUI hands requests over under `gate_mutex`.
+- [x] SETUP > Gate Tracking group selects the method and options; persisted as `gate_tracking`. Gate follow engages the PID loop under the reserved `GateTrackId`.
+
+### T12 - Target tracking, class table and estimation
+
+Status: DONE with open items.
+
+- [x] `TargetTracker` ([targettracker.h](src/yolo/targettracker.h)): greedy IOU association with a centroid gate, confirm-after-N, coast-then-drop, one-shot `justLost`. No motion model by design. Per display, on `DisplaySlot`.
+- [x] `DetectedTarget` ([detectedtarget.h](src/pipeline/detectedtarget.h)) + `PipelineProcessor::main_targets_updated`: id, class, source-frame geometry; feeds the addon host's `publish_targets`.
+- [x] `TargetClassTable` ([targetclasstable.h](src/util/targetclasstable.h)): per-model class attributes (height in m, 709 type / category) attached to names the model files define; entries survive model swaps. `TargetClassWindow` (Ctrl+T) edits them, holds the operator-entered zoom (the device reports none) and the range-on-labels toggle.
+- [x] `TargetEstimator` ([targetestimator.h](src/util/targetestimator.h)): range from class height and box height, tangent-projection angular offset, hull→geographic rotation (inverse of the G1 rotation). Range printed on YOLO labels when enabled; class heights snapshotted onto `DisplaySlot` under `label_mutex` so the pipeline needs no table access.
+- [ ] **Open:** the addon-host adapter's range path ([userpanel.cpp:200](src/visual/userpanel.cpp#L200)) builds `Optics` with `pow(..., 1/2)`; integer division makes the exponent 0, so the sensor diagonal is always 1. Carried from the 709 report builder, flagged, not yet fixed.
+- [ ] **Open:** range accuracy at high zoom unverified against a known-distance target; `sensor_diagonal_mm` is the nominal 1/1.8" value.
+
+### T13 - LightNAFNet learned enhancer
+
+Status: DONE.
+
+- [x] `NafNetEnhancer` ([nafnetenhancer.h](src/image/nafnetenhancer.h)) wraps the delivered gray model (others/jiaofu) through ONNX Runtime CUDA as a frame-average option; colour frames are enhanced per channel. Full-frame preprocessing per the delivery's MODEL_CONTRACT so output matches input size.
+- [x] The "LightNAFNet" option is added to the frame-average combo only when `NafNetEnhancer::supported()` passes (model file next to the exe, CUDA provider listed), so installations without it see no change. Session created lazily per `DisplaySlot` on first selection; load failure is sticky.
+- Note: `models/lightnafnet_gray_best.onnx` is not copied by the build; it has to be placed next to the executable by hand (root cause of the "no effect" report during the sprint).
+
+### T14 - Addon host and runtime plugin loading
+
+Status: DONE. Addon-side behaviours carried in the addon project.
+
+Background: UDP709 was first built into this project behind a bridge, then behind a CMake option. Decision: addons are separate projects, discovered at runtime, and this project ships no protocol code.
+
+- [x] `PluginInterface` v2 ([plugininterface.h](src/plugins/plugininterface.h)): `create(parent)` / `attach(host)` / `start()` / `stop()`, IID `com.zkss.glass.addons.plugin-interface/2`. Copies in each addon project are verbatim.
+- [x] `AddonHost` ([addonhost.h](src/plugins/addonhost.h)): the service surface an addon gets: PTZ angles / velocity / stop / follow-centre, lens press / release, channel and laser state, TCU delay / gate width / laser width / gain, enhance and frame-average, target class lookup, offset and range, heading reference; publishers for targets, PTZ angle, operator-took-turret / lens, tracking state. Implemented by a private `UserPanel::AddonHostAdapter`.
+- [x] `UserPanel::load_addons()` scans `<exe>/plugins/<name>/*.dll`, reads `QPluginLoader::metaData()` without instantiating, treats `"kind": "window"` plugins as autostarted services and keeps the first `"kind": "panel"` plugin for the T6 AddonPanel button.
+- [x] Map/AIS plugin (`Demo_map_AIS`) migrated to v2 (`attach` / `stop`, `plugin.json`).
+- [x] UDP709 moved wholesale to the sibling project `Addon_udp709` (plugin DLL, standalone tool, the two codec / service tests, the Python test tool); `protocol709/`, `udp709window`, the `Udp709Settings` config section and the `ENABLE_UDP709` option are gone from this repo. Addon settings live in `plugins/udp709/udp709.json`.
+- Carried (addon project): targets are reported whenever the socket is bound and the form is not manual, with no operator toggle; reports carry a zero attitude when no valid one has arrived.
+
+### T15 - TCU command flow control and delay floor
+
+Status: DONE.
+
+Background: holding a delay / gate-width key made the slider and value jump back and forth. Cause: the port echoes every completed write back through `update_tcu_params`, so the echo of an older command overwrote the newer local value, and the first throttle attempt could drop the last step of a burst.
+
+- [x] Per-parameter `Mailbox` in `TCUController` ([tcucontroller.h](src/controller/tcucontroller.h)): one command in flight for EST_DIST / EST_DOV, later requests collapse into a single pending send released by the echo; a request is superseded, never dropped. Echoes that do not match the command in flight (superseded values, the AB-lock duplicate) do not touch the UI. Watchdog re-arms on a lost echo; a full readback resyncs. AB / AB-lock fan-out in `TCU::set_user_param` untouched.
+- [x] `tcu.min_delay` (ns, default 1000) as a TCU timing floor, unaffected by light speed; `min_delay_dist()`, `delay_slider_min_changed`, clamps in `apply_delay` / `update_delay` and the DIST dialog. `default.json` updated.
+- [x] `apply_laser_width` / `apply_delay` / `apply_gatewidth` slots for external control (addon host) with UI follow-through and clamping.
+
+### T16 - Industrial camera hardening
+
+Status: DONE for the tier-one fixes; root causes for the long-connection break carried.
+
+Background (field report): connections longer than ~10 min sometimes break; the first connect + start after launch showed no image; stop + restart after a broken connection crashed. Evidence: MVS SDK log (socket mode after "Driver Version Match failed", jumbo packets, heartbeat timeouts, write timeouts, packet loss) and six crash dumps: August dumps were an integer divide-by-zero in the pipeline crop with display size 0; July dumps were access violations in `cv::Mat::clone` / `convertTo` on a freed frame buffer.
+
+- [x] `Cam::is_connected()` / `reconnect()` ([cam.h](src/cam/cam.h)); `mvcam` registers an exception callback that flags `reconnect_required`, `release_handle()` enforces StopGrabbing → CloseDevice → DestroyHandle everywhere, `reconnect()` stops before closing, `stop_grabbing()` is gated only on the handle, all `MVCC_*` result structs zero-initialised, `frame_size` returns 0 on failure. START checks connection first and reconnects.
+- [x] `ebuscam` streaming thread moved to `std::thread` + atomic flag with the same connection hooks.
+- [x] Start path reports SDK error codes in the message boxes; aborts with a message on a zero frame size; region dialog and resize guard against zero increments; `render_and_display` returns on a zero display size (the August crash).
+- [x] Logging: `qInstallMessageHandler` writes to `GLI_logs/` and chains to the console.
+- [ ] Carried: automatic disconnect handling and retry loop on the exception callback; the frame-buffer race behind the July dumps (SDK callback writing into a buffer the consumer still reads); SDK DLL (4.5.1.1 beside the exe) vs installed driver (4.8.0.3) mismatch on the deployment PC; heartbeat / packet-size tuning.
+
+### T17 - UI polish
+
+Status: DONE.
+
+- [x] Fonts: base pixel size raised by 1 px through the QSS (11 → 12, 10 → 11, 9/8 → 10), Monaco 12 / Consolas 13, `sans_heiti` picked from system CJK sans fallbacks (smileysans removed); numeric edits sized from font metrics.
+- [x] `INFO_CHECK` defaults on. Optional custom title label over the display (`ui.custom_title`).
+- [x] Console panel: `QTabWidget` replaced by the classic three-selector `MiscSelection` switcher ([consolepanel.h](src/widgets/panels/consolepanel.h)).
+- [x] TopBar: addon button (T6), colour-mode button, window controls grouped with state sync.
+- [x] PID aim: `point_ptz_to_target` uses the box centre.
+
+### T18 - Config and runtime additions
+
+Status: DONE.
+
+- [x] New sections: `video.default_urls` (URL dialog presets), `automatic.enabled` (actions run once per launch via `run_automatic_actions`), `debug.generate_dmp`, `panorama_optics` (sensor diagonal + zoom→FOV table), `pid_follow`, `gate_tracking`; `ui.theme` / `ui.color_mode` / `ui.custom_title`; `tcu.min_delay`; `device.ptz_zero_angle_h`.
+- [x] Per-display YOLO model selection dropped from config (`main/alt1/alt2_display_model`) per T3; `image_proc.model_idx` renamed `fishnet_model_idx`.
+- [x] Version 0.12.0 (`version.h`, `gist.rc`).
+
+---
+
+## Definition of Done for Sprint 25
+
+- [x] T1–T5 display routing, YOLO status, FfmpegSource, SETUP commit fix, RTSP latency
+- [x] T6 / T14 addon panel + runtime plugin loading; UDP709 and map/AIS as external projects
+- [x] T7 theme system and `tr()` sweep
+- [x] T8–T13 panorama, radar, follow, gate, tracking / classes, NAFNet
+- [x] T15 TCU flow control and delay floor
+- [x] T16 camera tier-one fixes
+- [x] T17 / T18 UI polish, config, version bump
+- [x] Main program rebuilt; both plugins loaded and exercised; UDP709 addon tests pass
+- [ ] `test_config` rebuilt against the September config changes (binary predates them)
+- [ ] Dark/light parity walkthrough (T7)
+- [ ] Feature test matrix rows for the sprint 25 features
+
+## Carried to Sprint 26+
+
+- T12: range formula integer division; range verification at high zoom.
+- T16: camera disconnect handler / retry, frame-buffer race, SDK DLL vs driver match, heartbeat / packet tuning.
+- T10: UDPPTZ held-operation arbiter between manual lens holds and follow.
+- T14 (addon project): target-report toggle; attitude handling when none is valid.
+- T13: post-build copy of the NAFNet model; enhance parity on the export path.
+- T3 C2 deferred: dead live-path branches in the export lambda of `load_video_file`.
+- T2 flagged: model combobox handlers do not call `update_processing_params()`.
+- T3 walkthrough #9/#10: source-death label not shown on STOP; HLS inter-segment stalls.
+- `curr_cam->start()` and the IP-address calls index the device list with `tcu.type` ([userpanel.cpp:3665](src/visual/userpanel.cpp#L3665), [userpanel.cpp:4120-4133](src/visual/userpanel.cpp#L4120-L4133)); BayerGB display path incomplete (`// TODO` at the pixel-type switch).
+- Keep PDBs with each release build so future dumps resolve.
+- Sprint 26: style unification across the refactored code.
