@@ -6,9 +6,8 @@ class TestScanParams : public QObject
     Q_OBJECT
 
 private slots:
-    // TC-SP-001: ScanParams default-constructed values match the documented
-    // defaults inherited from the legacy ScanConfig() constructor (Sprint 22).
-    void defaultValues()
+    // TC-SP-001: default-constructed ScanParams has the documented defaults.
+    void default_values()
     {
         ScanParams p;
 
@@ -64,7 +63,7 @@ private slots:
 
     // TC-SP-010: get_tcu_route produces frame_count delay values starting
     // from starting_delay with constant step_size_delay.
-    void tcuRouteBasic()
+    void tcu_route_basic()
     {
         ScanParams p;
         p.starting_delay = 100;
@@ -81,7 +80,7 @@ private slots:
     }
 
     // TC-SP-011: Single-frame degenerate case returns just starting_delay.
-    void tcuRouteSingleFrame()
+    void tcu_route_single_frame()
     {
         ScanParams p;  // defaults: starting_delay=0, frame_count=1
         auto route = get_tcu_route(p);
@@ -90,7 +89,7 @@ private slots:
     }
 
     // TC-SP-012: frame_count == 0 yields an empty route (loop never runs).
-    void tcuRouteZeroFrames()
+    void tcu_route_zero_frames()
     {
         ScanParams p;
         p.frame_count = 0;
@@ -100,7 +99,7 @@ private slots:
 
     // TC-SP-013: Fractional step preserved as float (starting_delay is int
     // but the result vector is float).
-    void tcuRouteFractionalStep()
+    void tcu_route_fractional_step()
     {
         ScanParams p;
         p.starting_delay = 0;
@@ -115,7 +114,7 @@ private slots:
         QCOMPARE(route[3], 7.5f);
     }
 
-    void gateWidthRouteBasic()
+    void gate_width_route_basic()
     {
         ScanParams p;
         p.starting_gw = 50;
@@ -130,9 +129,9 @@ private slots:
         QCOMPARE(route[3], 57.5f);
     }
 
-    // TC-SP-020: get_ptz_route with default ScanParams (1×1 grid) yields a
-    // single point at (starting_h, starting_v).
-    void ptzRouteDefaultSinglePoint()
+    // TC-SP-020: get_ptz_route with default ScanParams (a 1x1 grid) yields a single
+    // point at (starting_h, starting_v).
+    void ptz_route_default_single_point()
     {
         ScanParams p;  // count_h=1, count_v=1
         auto route = get_ptz_route(p);
@@ -141,9 +140,9 @@ private slots:
         QCOMPARE(route[0].second, 0.0f);
     }
 
-    // TC-SP-021: ptz_direction == 0 — outer loop H, inner loop V with
-    // serpentine V (V descends on odd-i columns from ending_v).
-    void ptzRouteDirectionZero()
+    // TC-SP-021: ptz_direction == 0: outer loop H, inner loop V, serpentine in V
+    // (V descends on odd columns from ending_v).
+    void ptz_route_direction_zero()
     {
         ScanParams p;
         p.ptz_direction = 0;
@@ -163,9 +162,9 @@ private slots:
         QCOMPARE(route[5], std::make_pair(10.0f,  0.0f));
     }
 
-    // TC-SP-022: ptz_direction != 0 — outer loop V, inner loop H with
-    // serpentine H (H descends on odd-j rows from ending_h).
-    void ptzRouteDirectionNonZero()
+    // TC-SP-022: ptz_direction != 0: outer loop V, inner loop H, serpentine in H
+    // (H descends on odd rows from ending_h).
+    void ptz_route_direction_non_zero()
     {
         ScanParams p;
         p.ptz_direction = 1;
@@ -186,7 +185,7 @@ private slots:
     }
 
     // TC-SP-023: count_h == 0 or count_v == 0 yields an empty route.
-    void ptzRouteZeroCount()
+    void ptz_route_zero_count()
     {
         ScanParams p;
         p.count_h = 0;
@@ -198,8 +197,8 @@ private slots:
         QCOMPARE(get_ptz_route(p).size(), (size_t)0);
     }
 
-    // TC-SP-024: Large grid size is correct (10x10 → 100 points).
-    void ptzRouteLargeGrid()
+    // TC-SP-024: a large grid has the right size (10x10 gives 100 points).
+    void ptz_route_large_grid()
     {
         ScanParams p;
         p.count_h = 10;
@@ -211,9 +210,9 @@ private slots:
         QCOMPARE(get_ptz_route(p).size(), (size_t)100);
     }
 
-    // TC-SP-025: Single-row strip (count_v=1) under both directions yields
-    // the same H sweep — V serpentine never engages.
-    void ptzRouteSingleRow()
+    // TC-SP-025: a single-row strip (count_v = 1) gives the same H sweep in both
+    // directions: the V serpentine never engages.
+    void ptz_route_single_row()
     {
         ScanParams p;
         p.starting_h = 0; p.ending_h = 20; p.step_h = 10; p.count_h = 3;
@@ -234,7 +233,7 @@ private slots:
         QCOMPARE(r1[2], std::make_pair(20.0f, 5.0f));
     }
 
-    void panoramaRouteDefault()
+    void panorama_route_default()
     {
         ScanParams p;
 
@@ -245,7 +244,7 @@ private slots:
         QCOMPARE(route[11], std::make_pair(330.0f, 0.0f));
     }
 
-    void panoramaRouteNoDuplicateEndpoint()
+    void panorama_route_no_duplicate_endpoint()
     {
         ScanParams p;
         p.panorama_start_h = 15.0f;
@@ -260,7 +259,7 @@ private slots:
         QCOMPARE(route[3], std::make_pair(285.0f, -5.0f));
     }
 
-    void panoramaRouteCounterClockwiseWrap()
+    void panorama_route_counter_clockwise_wrap()
     {
         ScanParams p;
         p.panorama_start_h = 10.0f;
@@ -275,7 +274,7 @@ private slots:
         QCOMPARE(route[3], std::make_pair(100.0f, 0.0f));
     }
 
-    void panoramaRouteStepFallback()
+    void panorama_route_step_fallback()
     {
         ScanParams p;
         p.panorama_count = 0;
@@ -287,7 +286,7 @@ private slots:
         QCOMPARE(route[7], std::make_pair(315.0f, 0.0f));
     }
 
-    void panoramaRouteEndingHorizontal()
+    void panorama_route_ending_horizontal()
     {
         ScanParams p;
         p.panorama_start_h = 350.0f;
@@ -303,7 +302,7 @@ private slots:
         QCOMPARE(route[3], std::make_pair(20.0f, 0.0f));
     }
 
-    void panoramaZoomFovInterpolation()
+    void panorama_zoom_fov_interpolation()
     {
         ScanParams p;
         p.panorama_zoom_level = 86.0f;

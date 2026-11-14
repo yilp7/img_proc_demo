@@ -7,8 +7,8 @@
 #include <algorithm>
 #include <string>
 
-Config::Config(QObject *parent)
-    : QObject(parent)
+Config::Config(QObject *parent) :
+    QObject(parent)
 {
     load_defaults();
 }
@@ -35,7 +35,7 @@ bool Config::load_from_file(const QString &filepath)
     nlohmann::json root;
     try {
         root = nlohmann::json::parse(bytes.constBegin(), bytes.constEnd());
-    } catch (const nlohmann::json::parse_error& e) {
+    } catch (const nlohmann::json::parse_error &e) {
         emit config_error(QString("JSON parse error: %1").arg(e.what()));
         return false;
     }
@@ -45,12 +45,10 @@ bool Config::load_from_file(const QString &filepath)
         return false;
     }
     
-    // Load version
     if (root.contains("version") && root["version"].is_string()) {
         m_data.version = QString::fromStdString(root["version"].get<std::string>());
     }
     
-    // Load COM settings
     if (root.contains("com_tcu") && root["com_tcu"].is_object()) {
         m_data.com_tcu = com_settings_from_json(root["com_tcu"]);
     }
@@ -67,21 +65,17 @@ bool Config::load_from_file(const QString &filepath)
         m_data.com_ptz = com_settings_from_json(root["com_ptz"]);
     }
     
-    // Load network settings
     if (root.contains("network") && root["network"].is_object()) {
         m_data.network = network_settings_from_json(root["network"]);
     }
-    // Load UI settings
     if (root.contains("ui") && root["ui"].is_object()) {
         m_data.ui = ui_settings_from_json(root["ui"]);
     }
     
-    // Load camera settings
     if (root.contains("camera") && root["camera"].is_object()) {
         m_data.camera = camera_settings_from_json(root["camera"]);
     }
 
-    // Load video URL presets
     if (root.contains("video") && root["video"].is_object()) {
         m_data.video = video_settings_from_json(root["video"]);
     }
@@ -92,27 +86,22 @@ bool Config::load_from_file(const QString &filepath)
         m_data.automatic = automatic_settings_from_json(root["automatic"]);
     }
 
-    // Load startup debug settings.
     if (root.contains("debug") && root["debug"].is_object()) {
         m_data.debug = debug_settings_from_json(root["debug"]);
     }
     
-    // Load TCU settings
     if (root.contains("tcu") && root["tcu"].is_object()) {
         m_data.tcu = tcu_settings_from_json(root["tcu"]);
     }
     
-    // Load device settings
     if (root.contains("device") && root["device"].is_object()) {
         m_data.device = device_settings_from_json(root["device"]);
     }
 
-    // Load save settings
     if (root.contains("save") && root["save"].is_object()) {
         m_data.save = save_settings_from_json(root["save"]);
     }
 
-    // Load panorama optics calibration
     if (root.contains("panorama_optics") && root["panorama_optics"].is_object()) {
         m_data.panorama_optics = panorama_optics_settings_from_json(root["panorama_optics"]);
     }
@@ -125,12 +114,10 @@ bool Config::load_from_file(const QString &filepath)
         m_data.gate_tracking = gate_tracking_settings_from_json(root["gate_tracking"]);
     }
 
-    // Load image processing settings
     if (root.contains("image_proc") && root["image_proc"].is_object()) {
         m_data.image_proc = image_proc_settings_from_json(root["image_proc"]);
     }
 
-    // Load YOLO settings
     if (root.contains("yolo") && root["yolo"].is_object()) {
         m_data.yolo = yolo_settings_from_json(root["yolo"]);
     }
@@ -143,50 +130,38 @@ bool Config::save_to_file(const QString &filepath) const
 {
     nlohmann::json root;
     
-    // Save version
     root["version"] = m_data.version.toStdString();
     
-    // Save COM settings
     root["com_tcu"] = com_settings_to_json(m_data.com_tcu);
     root["com_lens"] = com_settings_to_json(m_data.com_lens);
     root["com_laser"] = com_settings_to_json(m_data.com_laser);
     root["com_range"] = com_settings_to_json(m_data.com_range);
     root["com_ptz"] = com_settings_to_json(m_data.com_ptz);
     
-    // Save network settings
     root["network"] = network_settings_to_json(m_data.network);
     
-    // Save UI settings
     root["ui"] = ui_settings_to_json(m_data.ui);
     
-    // Save camera settings
     root["camera"] = camera_settings_to_json(m_data.camera);
 
-    // Save video URL presets and startup automation
     root["video"] = video_settings_to_json(m_data.video);
     root["automatic"] = automatic_settings_to_json(m_data.automatic);
     root["debug"] = debug_settings_to_json(m_data.debug);
     
-    // Save TCU settings
     root["tcu"] = tcu_settings_to_json(m_data.tcu);
     
-    // Save device settings
     root["device"] = device_settings_to_json(m_data.device);
 
-    // Save save settings
     root["save"] = save_settings_to_json(m_data.save);
 
-    // Save panorama optics calibration
     root["panorama_optics"] = panorama_optics_settings_to_json(m_data.panorama_optics);
 
     root["pid_follow"] = pid_follow_settings_to_json(m_data.pid_follow);
 
     root["gate_tracking"] = gate_tracking_settings_to_json(m_data.gate_tracking);
 
-    // Save image processing settings
     root["image_proc"] = image_proc_settings_to_json(m_data.image_proc);
 
-    // Save YOLO settings
     root["yolo"] = yolo_settings_to_json(m_data.yolo);
 
     QFile file(filepath);
@@ -255,8 +230,7 @@ Config::NetworkSettings Config::network_settings_from_json(const nlohmann::json 
     }
     if (obj.contains("udpptz_protocol") && obj["udpptz_protocol"].is_number()) {
         int v = obj["udpptz_protocol"].get<int>();
-        // Legacy migration: old default.json used 0/1; new encoding is the
-        // raw model number (500/530). Map old values forward on load.
+        // old default.json files store 0 / 1 here; map them to the model numbers 500 / 530
         if (v == 0) v = 500;
         else if (v == 1) v = 530;
         settings.udpptz_protocol = v;
@@ -357,7 +331,8 @@ Config::UISettings Config::ui_settings_from_json(const nlohmann::json &obj) cons
     }
     if (obj.contains("theme") && obj["theme"].is_string()) {
         settings.theme = QString::fromStdString(obj["theme"].get<std::string>()).trimmed();
-    } else if (obj.contains("theme_name") && obj["theme_name"].is_string()) {
+    }
+    else if (obj.contains("theme_name") && obj["theme_name"].is_string()) {
         settings.theme = QString::fromStdString(obj["theme_name"].get<std::string>()).trimmed();
     }
     if (settings.theme.isEmpty() || settings.theme == "default") {
@@ -366,9 +341,11 @@ Config::UISettings Config::ui_settings_from_json(const nlohmann::json &obj) cons
 
     if (obj.contains("color_mode") && obj["color_mode"].is_string()) {
         apply_color_mode(QString::fromStdString(obj["color_mode"].get<std::string>()));
-    } else if (obj.contains("theme_mode") && obj["theme_mode"].is_string()) {
+    }
+    else if (obj.contains("theme_mode") && obj["theme_mode"].is_string()) {
         apply_color_mode(QString::fromStdString(obj["theme_mode"].get<std::string>()));
-    } else if (obj.contains("dark_theme") && obj["dark_theme"].is_boolean()) {
+    }
+    else if (obj.contains("dark_theme") && obj["dark_theme"].is_boolean()) {
         apply_color_mode(obj["dark_theme"].get<bool>() ? "dark" : "light");
     }
     if (obj.contains("english") && obj["english"].is_boolean()) {
@@ -478,13 +455,13 @@ nlohmann::json Config::tcu_settings_to_json(const TCUSettings &settings) const
     obj["max_laser_width"] = static_cast<double>(settings.max_laser_width);
     obj["laser_width_offset"] = static_cast<double>(settings.laser_width_offset);
     
-    nlohmann::json psStepArray = nlohmann::json::array();
+    nlohmann::json ps_step_array = nlohmann::json::array();
     for (int i = 0; i < 4; ++i) {
-        psStepArray.push_back(static_cast<int>(settings.ps_step[i]));
+        ps_step_array.push_back(static_cast<int>(settings.ps_step[i]));
     }
-    obj["ps_step"] = psStepArray;
+    obj["ps_step"] = ps_step_array;
     
-    // laser_on is intentionally NOT saved — lasers must always be disabled on startup (safety)
+    // laser_on is not saved on purpose: lasers must be off at startup (safety)
     return obj;
 }
 
@@ -532,16 +509,15 @@ Config::TCUSettings Config::tcu_settings_from_json(const nlohmann::json &obj) co
     }
     
     if (obj.contains("ps_step") && obj["ps_step"].is_array()) {
-        auto psStepArray = obj["ps_step"];
-        for (int i = 0; i < 4 && i < psStepArray.size(); ++i) {
-            if (psStepArray[i].is_number()) {
-                settings.ps_step[i] = static_cast<uint>(psStepArray[i].get<int>());
+        auto ps_step_array = obj["ps_step"];
+        for (int i = 0; i < 4 && i < ps_step_array.size(); ++i) {
+            if (ps_step_array[i].is_number()) {
+                settings.ps_step[i] = static_cast<uint>(ps_step_array[i].get<int>());
             }
         }
     }
     
-    // laser_on is intentionally NOT loaded — lasers must always be disabled on startup (safety)
-    // settings.laser_on remains at default value 0
+    // laser_on is not loaded on purpose: lasers must be off at startup (safety)
     return settings;
 }
 
@@ -565,7 +541,8 @@ Config::DeviceSettings Config::device_settings_from_json(const nlohmann::json &o
     if (obj.contains("flip")) {
         if (obj["flip"].is_number()) {
             settings.flip = obj["flip"].get<int>();
-        } else if (obj["flip"].is_boolean()) {
+        }
+        else if (obj["flip"].is_boolean()) {
             settings.flip = obj["flip"].get<bool>() ? 1 : 0; // backward compat
         }
     }
@@ -633,16 +610,16 @@ nlohmann::json Config::panorama_optics_settings_to_json(const PanoramaOpticsSett
 {
     nlohmann::json obj;
     obj["sensor_diagonal_mm"] = settings.sensor_diagonal_mm;
-    nlohmann::json zoomFovArray = nlohmann::json::array();
+    nlohmann::json zoom_fov_array = nlohmann::json::array();
     for (const ZoomFovPoint &pt : settings.zoom_fov) {
         nlohmann::json item;
         item["zoom"] = static_cast<double>(pt.zoom);
         item["focal_length_mm"] = static_cast<double>(pt.focal_length_mm);
         item["fov_h"] = static_cast<double>(pt.fov_h);
         item["fov_v"] = static_cast<double>(pt.fov_v);
-        zoomFovArray.push_back(item);
+        zoom_fov_array.push_back(item);
     }
-    obj["zoom_fov"] = zoomFovArray;
+    obj["zoom_fov"] = zoom_fov_array;
     return obj;
 }
 
@@ -772,10 +749,11 @@ Config::ImageProcSettings Config::image_proc_settings_from_json(const nlohmann::
     if (obj.contains("custom_3d_gate_width") && obj["custom_3d_gate_width"].is_number()) {
         settings.custom_3d_gate_width = static_cast<float>(obj["custom_3d_gate_width"].get<double>());
     }
-    // model/fishnet — accept legacy "model_idx" key on load for backward compat
+    // model/fishnet: the old key "model_idx" is still accepted on load
     if (obj.contains("fishnet_model_idx") && obj["fishnet_model_idx"].is_number()) {
         settings.fishnet_model_idx = obj["fishnet_model_idx"].get<int>();
-    } else if (obj.contains("model_idx") && obj["model_idx"].is_number()) {
+    }
+    else if (obj.contains("model_idx") && obj["model_idx"].is_number()) {
         settings.fishnet_model_idx = obj["model_idx"].get<int>();
     }
     if (obj.contains("fishnet_recog") && obj["fishnet_recog"].is_boolean()) {
@@ -823,18 +801,14 @@ nlohmann::json Config::yolo_settings_to_json(const YoloSettings &settings) const
     nlohmann::json obj;
     obj["config_path"] = settings.config_path.toStdString();
 
-    // Note: Model selection for each display (main_display_model, alt1_display_model, alt2_display_model)
-    // are NOT saved to default.json - they are runtime-only settings
+    // the per-display model selection is runtime only and is not saved
 
-    // Visible light model
     obj["visible_model_path"] = settings.visible_model_path.toStdString();
     obj["visible_classes_file"] = settings.visible_classes_file.toStdString();
 
-    // Thermal model
     obj["thermal_model_path"] = settings.thermal_model_path.toStdString();
     obj["thermal_classes_file"] = settings.thermal_classes_file.toStdString();
 
-    // Gated imaging model
     obj["gated_model_path"] = settings.gated_model_path.toStdString();
     obj["gated_classes_file"] = settings.gated_classes_file.toStdString();
 
@@ -848,10 +822,8 @@ Config::YoloSettings Config::yolo_settings_from_json(const nlohmann::json &obj) 
         settings.config_path = QString::fromStdString(obj["config_path"].get<std::string>());
     }
 
-    // Note: Model selection fields (main_display_model, alt1_display_model, alt2_display_model)
-    // are NOT loaded from JSON - they always default to 0 (None) on startup
+    // the per-display model selection is not loaded: it starts at 0 (none)
 
-    // Visible light model
     if (obj.contains("visible_model_path") && obj["visible_model_path"].is_string()) {
         settings.visible_model_path = QString::fromStdString(obj["visible_model_path"].get<std::string>());
     }
@@ -859,7 +831,6 @@ Config::YoloSettings Config::yolo_settings_from_json(const nlohmann::json &obj) 
         settings.visible_classes_file = QString::fromStdString(obj["visible_classes_file"].get<std::string>());
     }
 
-    // Thermal model
     if (obj.contains("thermal_model_path") && obj["thermal_model_path"].is_string()) {
         settings.thermal_model_path = QString::fromStdString(obj["thermal_model_path"].get<std::string>());
     }
@@ -867,7 +838,6 @@ Config::YoloSettings Config::yolo_settings_from_json(const nlohmann::json &obj) 
         settings.thermal_classes_file = QString::fromStdString(obj["thermal_classes_file"].get<std::string>());
     }
 
-    // Gated imaging model
     if (obj.contains("gated_model_path") && obj["gated_model_path"].is_string()) {
         settings.gated_model_path = QString::fromStdString(obj["gated_model_path"].get<std::string>());
     }

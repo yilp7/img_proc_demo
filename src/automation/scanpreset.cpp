@@ -4,9 +4,9 @@
 #include <QDir>
 #include <cmath>
 
-ScanPreset::ScanPreset(QObject *parent)
-    : QObject(parent)
-    , m_is_valid(false)
+ScanPreset::ScanPreset(QObject *parent) :
+    QObject(parent),
+    m_is_valid(false)
 {
 }
 
@@ -14,7 +14,7 @@ ScanPreset::~ScanPreset()
 {
 }
 
-bool ScanPreset::load_from_file(const QString& filepath)
+bool ScanPreset::load_from_file(const QString &filepath)
 {
     clear_error();
 
@@ -35,15 +35,14 @@ bool ScanPreset::load_from_file(const QString& filepath)
     try {
         nlohmann::json json = nlohmann::json::parse(data.toStdString());
 
-        // Parse name
         if (json.contains("name") && json["name"].is_string()) {
             m_data.name = QString::fromStdString(json["name"]);
-        } else {
+        }
+        else {
             set_error("Missing or invalid 'name' field");
             return false;
         }
 
-        // Parse data section
         if (!json.contains("data") || !json["data"].is_object()) {
             set_error("Missing or invalid 'data' section");
             return false;
@@ -51,38 +50,33 @@ bool ScanPreset::load_from_file(const QString& filepath)
 
         nlohmann::json data_obj = json["data"];
 
-        // Parse camera parameters
         if (data_obj.contains("camera")) {
             m_data.camera = camera_params_from_json(data_obj["camera"]);
         }
 
-        // Parse TCU parameters
         if (data_obj.contains("tcu")) {
             m_data.tcu = tcu_params_from_json(data_obj["tcu"]);
         }
 
-        // Parse PTZ starting position
         if (data_obj.contains("ptz_starting_position")) {
             m_data.ptz_starting_position = ptz_position_from_json(data_obj["ptz_starting_position"]);
         }
 
-        // Parse scan parameters
         if (data_obj.contains("scan_parameters")) {
             m_data.scan_parameters = scan_params_from_json(data_obj["scan_parameters"]);
         }
 
-        // Data loaded successfully, set as valid and let caller handle validation
         m_is_valid = false; // Will be set to true after explicit validation
         qDebug() << "Successfully parsed scan preset data:" << m_data.name;
         return true;
 
-    } catch (const nlohmann::json::exception& e) {
+    } catch (const nlohmann::json::exception &e) {
         set_error(QString("JSON parsing error: %1").arg(e.what()));
         return false;
     }
 }
 
-bool ScanPreset::save_to_file(const QString& filepath) const
+bool ScanPreset::save_to_file(const QString &filepath) const
 {
     try {
         nlohmann::json json;
@@ -139,7 +133,7 @@ bool ScanPreset::validate_preset()
 
 bool ScanPreset::validate_camera_params() const
 {
-    const auto& cam = m_data.camera;
+    const auto &cam = m_data.camera;
 
     if (cam.frequency < 0.1 || cam.frequency > 100) {
         set_error("Camera frequency out of range (0.1-100)");
@@ -161,9 +155,9 @@ bool ScanPreset::validate_camera_params() const
 
 bool ScanPreset::validate_tcu_params() const
 {
-    const auto& tcu = m_data.tcu;
+    const auto &tcu = m_data.tcu;
 
-    if (tcu.PRF < 0.01f || tcu.PRF > 100.0f) {
+    if (tcu.prf < 0.01f || tcu.prf > 100.0f) {
         set_error("TCU PRF out of range (0.01-100)");
         return false;
     }
@@ -203,7 +197,7 @@ bool ScanPreset::validate_tcu_params() const
 
 bool ScanPreset::validate_ptz_params() const
 {
-    const auto& ptz = m_data.ptz_starting_position;
+    const auto &ptz = m_data.ptz_starting_position;
 
 //    if (ptz.starting_h < -180.0f || ptz.starting_h > 180.0f) {
 //        set_error("PTZ starting_h out of range (-180 to 180)");
@@ -225,10 +219,9 @@ bool ScanPreset::validate_ptz_params() const
 
 bool ScanPreset::validate_scan_parameters() const
 {
-    const auto& tcu_scan = m_data.scan_parameters.tcu_scan;
-    const auto& ptz_scan = m_data.scan_parameters.ptz_scan;
+    const auto &tcu_scan = m_data.scan_parameters.tcu_scan;
+    const auto &ptz_scan = m_data.scan_parameters.ptz_scan;
 
-    // Validate TCU scan parameters
     if (tcu_scan.starting_delay >= tcu_scan.ending_delay) {
         set_error("TCU starting_delay must be less than ending_delay");
         return false;
@@ -254,7 +247,6 @@ bool ScanPreset::validate_scan_parameters() const
         return false;
     }
 
-    // Validate PTZ scan parameters
     if (ptz_scan.starting_h >= ptz_scan.ending_h) {
         set_error("PTZ starting_h must be less than ending_h");
         return false;
@@ -292,13 +284,11 @@ bool ScanPreset::apply_preset()
         return false;
     }
 
-    // Preset data is validated and ready to be applied by the calling code
-    // The caller (AutoScan) will access the data via get_data() and emit appropriate signals
+    // nothing to apply here: AutoScan reads the data through get_data() and emits the signals
     return true;
 }
 
-// JSON conversion functions
-nlohmann::json ScanPreset::camera_params_to_json(const CameraParams& params) const
+nlohmann::json ScanPreset::camera_params_to_json(const CameraParams &params) const
 {
     nlohmann::json obj;
     obj["continuous_mode"] = params.continuous_mode;
@@ -308,7 +298,7 @@ nlohmann::json ScanPreset::camera_params_to_json(const CameraParams& params) con
     return obj;
 }
 
-ScanPreset::CameraParams ScanPreset::camera_params_from_json(const nlohmann::json& obj) const
+ScanPreset::CameraParams ScanPreset::camera_params_from_json(const nlohmann::json &obj) const
 {
     CameraParams params;
     if (obj.contains("continuous_mode")) params.continuous_mode = obj["continuous_mode"];
@@ -318,10 +308,10 @@ ScanPreset::CameraParams ScanPreset::camera_params_from_json(const nlohmann::jso
     return params;
 }
 
-nlohmann::json ScanPreset::tcu_params_to_json(const TCUParams& params) const
+nlohmann::json ScanPreset::tcu_params_to_json(const TCUParams &params) const
 {
     nlohmann::json obj;
-    obj["PRF"] = params.PRF;
+    obj["PRF"] = params.prf;
     obj["laser_width"] = params.laser_width;
     obj["delay_a"] = params.delay_a;
     obj["delay_b"] = params.delay_b;
@@ -332,10 +322,10 @@ nlohmann::json ScanPreset::tcu_params_to_json(const TCUParams& params) const
     return obj;
 }
 
-ScanPreset::TCUParams ScanPreset::tcu_params_from_json(const nlohmann::json& obj) const
+ScanPreset::TCUParams ScanPreset::tcu_params_from_json(const nlohmann::json &obj) const
 {
     TCUParams params;
-    if (obj.contains("PRF")) params.PRF = obj["PRF"];
+    if (obj.contains("PRF")) params.prf = obj["PRF"];
     if (obj.contains("laser_width")) params.laser_width = obj["laser_width"];
     if (obj.contains("delay_a")) params.delay_a = obj["delay_a"];
     if (obj.contains("delay_b")) params.delay_b = obj["delay_b"];
@@ -346,7 +336,7 @@ ScanPreset::TCUParams ScanPreset::tcu_params_from_json(const nlohmann::json& obj
     return params;
 }
 
-nlohmann::json ScanPreset::ptz_position_to_json(const PTZStartingPosition& pos) const
+nlohmann::json ScanPreset::ptz_position_to_json(const PTZStartingPosition &pos) const
 {
     nlohmann::json obj;
     obj["starting_h"] = pos.starting_h;
@@ -355,7 +345,7 @@ nlohmann::json ScanPreset::ptz_position_to_json(const PTZStartingPosition& pos) 
     return obj;
 }
 
-ScanPreset::PTZStartingPosition ScanPreset::ptz_position_from_json(const nlohmann::json& obj) const
+ScanPreset::PTZStartingPosition ScanPreset::ptz_position_from_json(const nlohmann::json &obj) const
 {
     PTZStartingPosition pos;
     if (obj.contains("starting_h")) pos.starting_h = obj["starting_h"];
@@ -364,11 +354,10 @@ ScanPreset::PTZStartingPosition ScanPreset::ptz_position_from_json(const nlohman
     return pos;
 }
 
-nlohmann::json ScanPreset::scan_params_to_json(const ScanParameters& params) const
+nlohmann::json ScanPreset::scan_params_to_json(const ScanParameters &params) const
 {
     nlohmann::json obj;
 
-    // TCU scan parameters
     nlohmann::json tcu_scan;
     tcu_scan["starting_delay"] = params.tcu_scan.starting_delay;
     tcu_scan["ending_delay"] = params.tcu_scan.ending_delay;
@@ -380,7 +369,6 @@ nlohmann::json ScanPreset::scan_params_to_json(const ScanParameters& params) con
     tcu_scan["rep_freq"] = params.tcu_scan.rep_freq;
     obj["tcu_scan"] = tcu_scan;
 
-    // PTZ scan parameters
     nlohmann::json ptz_scan;
     ptz_scan["starting_h"] = params.ptz_scan.starting_h;
     ptz_scan["ending_h"] = params.ptz_scan.ending_h;
@@ -395,7 +383,6 @@ nlohmann::json ScanPreset::scan_params_to_json(const ScanParameters& params) con
     ptz_scan["num_single_pos"] = params.ptz_scan.num_single_pos;
     obj["ptz_scan"] = ptz_scan;
 
-    // Capture options
     nlohmann::json capture_options;
     capture_options["capture_scan_ori"] = params.capture_options.capture_scan_ori;
     capture_options["capture_scan_res"] = params.capture_options.capture_scan_res;
@@ -406,13 +393,12 @@ nlohmann::json ScanPreset::scan_params_to_json(const ScanParameters& params) con
     return obj;
 }
 
-ScanPreset::ScanParameters ScanPreset::scan_params_from_json(const nlohmann::json& obj) const
+ScanPreset::ScanParameters ScanPreset::scan_params_from_json(const nlohmann::json &obj) const
 {
     ScanParameters params;
 
-    // TCU scan parameters
     if (obj.contains("tcu_scan")) {
-        const auto& tcu = obj["tcu_scan"];
+        const auto &tcu = obj["tcu_scan"];
         if (tcu.contains("starting_delay")) params.tcu_scan.starting_delay = tcu["starting_delay"];
         if (tcu.contains("ending_delay")) params.tcu_scan.ending_delay = tcu["ending_delay"];
         if (tcu.contains("starting_gw")) params.tcu_scan.starting_gw = tcu["starting_gw"];
@@ -423,9 +409,8 @@ ScanPreset::ScanParameters ScanPreset::scan_params_from_json(const nlohmann::jso
         if (tcu.contains("rep_freq")) params.tcu_scan.rep_freq = tcu["rep_freq"];
     }
 
-    // PTZ scan parameters
     if (obj.contains("ptz_scan")) {
-        const auto& ptz = obj["ptz_scan"];
+        const auto &ptz = obj["ptz_scan"];
         if (ptz.contains("starting_h")) params.ptz_scan.starting_h = ptz["starting_h"];
         if (ptz.contains("ending_h")) params.ptz_scan.ending_h = ptz["ending_h"];
         if (ptz.contains("starting_v")) params.ptz_scan.starting_v = ptz["starting_v"];
@@ -439,9 +424,8 @@ ScanPreset::ScanParameters ScanPreset::scan_params_from_json(const nlohmann::jso
         if (ptz.contains("num_single_pos")) params.ptz_scan.num_single_pos = ptz["num_single_pos"];
     }
 
-    // Capture options
     if (obj.contains("capture_options")) {
-        const auto& cap = obj["capture_options"];
+        const auto &cap = obj["capture_options"];
         if (cap.contains("capture_scan_ori")) params.capture_options.capture_scan_ori = cap["capture_scan_ori"];
         if (cap.contains("capture_scan_res")) params.capture_options.capture_scan_res = cap["capture_scan_res"];
         if (cap.contains("record_scan_ori")) params.capture_options.record_scan_ori = cap["record_scan_ori"];
@@ -451,7 +435,7 @@ ScanPreset::ScanParameters ScanPreset::scan_params_from_json(const nlohmann::jso
     return params;
 }
 
-void ScanPreset::set_error(const QString& error) const
+void ScanPreset::set_error(const QString &error) const
 {
     m_last_error = error;
     qWarning() << "ScanPreset error:" << error;

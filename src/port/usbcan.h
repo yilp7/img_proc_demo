@@ -9,7 +9,7 @@ class USBCAN : public QObject, public IPTZController
 {
     Q_OBJECT
 public:
-    enum OPERATION {
+    enum Operation {
         START      = 0x00,
         OFF        = 0x01,
         SELF_CHECK = 0x02,
@@ -29,7 +29,7 @@ public:
     explicit USBCAN();
     ~USBCAN();
 
-    bool is_connected() const { return connected; }
+    bool is_connected() const { return m_connected; }
     void update_timer_interval(uint interval = 0);
 
     // IPTZController interface
@@ -38,10 +38,10 @@ public:
     void ptz_set_angle(float h, float v) override;
     void ptz_set_angle_h(float h) override;
     void ptz_set_angle_v(float v) override;
-    float ptz_get_angle_h() const override { return position; }
-    float ptz_get_angle_v() const override { return pitch; }
-    bool ptz_is_connected() const override { return connected; }
-    QObject* ptz_qobject() override { return this; }
+    float ptz_get_angle_h() const override { return m_position; }
+    float ptz_get_angle_v() const override { return m_pitch; }
+    bool ptz_is_connected() const override { return m_connected; }
+    QObject *ptz_qobject() override { return this; }
     void communicate(QByteArray write, uint read_size = 0, uint read_timeout = 40, bool heartbeat = false);
 
 public slots:
@@ -58,33 +58,33 @@ signals:
     void disconnect_from();
     void transmit(qint32 param);
     void control(qint32 param, float val);
-    void angle_updated(float _h, float _v);
+    void angle_updated(float h, float v);
     void connection_status_changed(bool connected);
 
 private:
-    DWORD device_type;
-    DWORD device_index;
-    DWORD CAN_index;
+    DWORD m_device_type;
+    DWORD m_device_index;
+    DWORD m_can_index;
 
-    bool connected;
-    QMutex write_mutex;
-    QMutex read_mutex;
-    QMutex retrieve_mutex;
+    bool m_connected;
+    QMutex m_write_mutex;
+    QMutex m_read_mutex;
+    QMutex m_retrieve_mutex;
 
-    QTimer *timer_r5;
-    QTimer *timer_t20;
-    QTimer *timer_t200;
-    QTimer *timer_u100;
+    QTimer *m_timer_r5;
+    QTimer *m_timer_t20;
+    QTimer *m_timer_t200;
+    QTimer *m_timer_u100;
 
-    uchar power;
-    float zero_step = 0;
-    float pos_step;
-    float pit_step;
-    float position;
-    float pitch;
+    uchar m_power;
+    float m_zero_step = 0;
+    float m_pos_step;
+    float m_pit_step;
+    float m_position;
+    float m_pitch;
 
-    QByteArray received;
-    QByteArray last_read;
+    QByteArray m_received;
+    QByteArray m_last_read;
 };
 
 #endif // USBCAN_H

@@ -67,26 +67,26 @@ protected slots:
 #endif
 
 protected:
-    int idx;
+    int m_idx;
 
-    QMutex write_mutex;
-    QMutex read_mutex;
-    QMutex retrieve_mutex;
+    QMutex m_write_mutex;
+    QMutex m_read_mutex;
+    QMutex m_retrieve_mutex;
 
-    QTimer *timer;
-    uint   interval;
+    QTimer *m_timer;
+    uint   m_interval;
 
-    bool        use_tcp;
-    QSerialPort *serial_port;
-    QTcpSocket  *tcp_port;
-    ControlPort *shared_port;
+    bool        m_use_tcp;
+    QSerialPort *m_serial_port;
+    QTcpSocket  *m_tcp_port;
+    ControlPort *m_shared_port;
 
-    QByteArray received;
-    QByteArray last_read;
+    QByteArray m_received;
+    QByteArray m_last_read;
 
-    uint successive_count;
-    bool connected_to_serial;
-    bool connected_to_tcp;
+    uint m_successive_count;
+    bool m_connected_to_serial;
+    bool m_connected_to_tcp;
 
 };
 

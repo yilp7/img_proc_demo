@@ -8,12 +8,8 @@ class QToolButton;
 class QPushButton;
 class QLabel;
 
-// Right-stack save-options widget. Layout:
-//   row 1: file path edit + browse
-//   row 2: "Capture" label | ORI button | RES button
-//   row 3: "Record"  label | ORI button | RES button
-//
-// Re-parents the existing IMG_SAVE_STATIC widgets (no controller changes).
+// Save options of the right stack: a path row, then capture and record rows with
+// ORI and RES buttons. Re-parents the existing IMG_SAVE_STATIC widgets.
 class SaveOptionsWidget : public QFrame
 {
     Q_OBJECT

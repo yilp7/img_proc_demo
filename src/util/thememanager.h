@@ -15,24 +15,24 @@ public:
         QHash<QString, QString> tokens;
     };
 
-    static ThemeManager& instance();
+    static ThemeManager &instance();
 
-    QByteArray buildStyleSheet(const QString &theme_name, const QString &color_mode) const;
-    bool loadTheme(const QString &theme_name, const QString &color_mode, Theme *theme) const;
-    QStringList availableThemes() const;
+    QByteArray build_style_sheet(const QString &theme_name, const QString &color_mode) const;
+    bool load_theme(const QString &theme_name, const QString &color_mode, Theme *theme) const;
+    QStringList available_themes() const;
 
-    bool setCurrentTheme(const QString &theme_name, const QString &color_mode);
+    bool set_current_theme(const QString &theme_name, const QString &color_mode);
     QString token(const QString &name, const QString &fallback = QString()) const;
-    QString currentThemeName() const { return m_current.name; }
-    QString currentColorMode() const { return m_current.color_mode; }
+    QString get_current_theme_name() const { return m_current.name; }
+    QString get_current_color_mode() const { return m_current.color_mode; }
 
 private:
     ThemeManager() = default;
 
-    QByteArray readResource(const QString &path) const;
-    QByteArray applyTokens(QByteArray style, const Theme &theme) const;
-    QString normalizedColorMode(const QString &color_mode) const;
-    QString normalizedTokenName(const QString &name) const;
+    QByteArray read_resource(const QString &path) const;
+    QByteArray apply_tokens(QByteArray style, const Theme &theme) const;
+    QString normalized_color_mode(const QString &color_mode) const;
+    QString normalized_token_name(const QString &name) const;
 
     Theme m_current;
 };

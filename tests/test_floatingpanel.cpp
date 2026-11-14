@@ -10,28 +10,28 @@ class TestFloatingPanel : public QObject
     Q_OBJECT
 
 private slots:
-    // TC-FP-001: clampToParent keeps panel fully inside parent rect.
+    // TC-FP-001: clamp_to_parent keeps panel fully inside parent rect.
     void clamp_inside_parent()
     {
         const QSize parent(800, 600);
         const QSize panel(200, 150);
 
-        QCOMPARE(FloatingPanel::clampToParent(QPoint(100, 100), panel, parent), QPoint(100, 100));
-        QCOMPARE(FloatingPanel::clampToParent(QPoint(-50, 100), panel, parent), QPoint(0, 100));
-        QCOMPARE(FloatingPanel::clampToParent(QPoint(100, -50), panel, parent), QPoint(100, 0));
-        QCOMPARE(FloatingPanel::clampToParent(QPoint(9999, 100), panel, parent),
+        QCOMPARE(FloatingPanel::clamp_to_parent(QPoint(100, 100), panel, parent), QPoint(100, 100));
+        QCOMPARE(FloatingPanel::clamp_to_parent(QPoint(-50, 100), panel, parent), QPoint(0, 100));
+        QCOMPARE(FloatingPanel::clamp_to_parent(QPoint(100, -50), panel, parent), QPoint(100, 0));
+        QCOMPARE(FloatingPanel::clamp_to_parent(QPoint(9999, 100), panel, parent),
                  QPoint(parent.width() - panel.width(), 100));
-        QCOMPARE(FloatingPanel::clampToParent(QPoint(100, 9999), panel, parent),
+        QCOMPARE(FloatingPanel::clamp_to_parent(QPoint(100, 9999), panel, parent),
                  QPoint(100, parent.height() - panel.height()));
     }
 
-    // TC-FP-002: clampToParent handles degenerate parent (smaller than panel)
+    // TC-FP-002: clamp_to_parent handles degenerate parent (smaller than panel)
     // by pinning the panel to the origin on that axis.
     void clamp_parent_smaller_than_panel()
     {
         const QSize parent(100, 100);
         const QSize panel(200, 200);
-        QCOMPARE(FloatingPanel::clampToParent(QPoint(50, 50), panel, parent), QPoint(0, 0));
+        QCOMPARE(FloatingPanel::clamp_to_parent(QPoint(50, 50), panel, parent), QPoint(0, 0));
     }
 
     // TC-FP-003: drag moves panel by press-move-release and stays inside parent.
@@ -77,7 +77,7 @@ private slots:
         FloatingPanel *panel = new FloatingPanel(&parent);
         panel->resize(200, 150);
         panel->move(100, 100);
-        panel->setPinned(true);
+        panel->set_pinned(true);
         parent.show();
         QVERIFY(QTest::qWaitForWindowExposed(&parent));
 
@@ -94,7 +94,7 @@ private slots:
         QCOMPARE(panel->pos(), start);
     }
 
-    // TC-FP-005: hide button emits hideRequested() and hides the widget.
+    // TC-FP-005: hide button emits hide_requested() and hides the widget.
     void hide_emits_signal()
     {
         QWidget parent;
@@ -105,7 +105,7 @@ private slots:
         parent.show();
         QVERIFY(QTest::qWaitForWindowExposed(&parent));
 
-        QSignalSpy spy(panel, &FloatingPanel::hideRequested);
+        QSignalSpy spy(panel, &FloatingPanel::hide_requested);
 
         QPushButton *hide_btn = panel->findChild<QPushButton*>(QStringLiteral("FloatingPanelHide"));
         QVERIFY(hide_btn != nullptr);
@@ -115,22 +115,22 @@ private slots:
         QVERIFY(panel->isHidden());
     }
 
-    // TC-FP-006: pin button toggles pin state and emits pinToggled.
+    // TC-FP-006: pin button toggles pin state and emits pin_toggled.
     void pin_toggle_signal()
     {
         FloatingPanel panel;
-        QSignalSpy spy(&panel, &FloatingPanel::pinToggled);
+        QSignalSpy spy(&panel, &FloatingPanel::pin_toggled);
 
         QPushButton *pin_btn = panel.findChild<QPushButton*>(QStringLiteral("FloatingPanelPin"));
         QVERIFY(pin_btn != nullptr);
 
         QTest::mouseClick(pin_btn, Qt::LeftButton);
-        QCOMPARE(panel.isPinned(), true);
+        QCOMPARE(panel.is_pinned(), true);
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.at(0).at(0).toBool(), true);
 
         QTest::mouseClick(pin_btn, Qt::LeftButton);
-        QCOMPARE(panel.isPinned(), false);
+        QCOMPARE(panel.is_pinned(), false);
         QCOMPARE(spy.count(), 2);
         QCOMPARE(spy.at(1).at(0).toBool(), false);
     }

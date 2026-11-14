@@ -3,8 +3,8 @@
 #include <QLabel>
 #include <QVBoxLayout>
 
-MapboxWidget::MapboxWidget(QWidget *parent)
-    : QFrame(parent)
+MapboxWidget::MapboxWidget(QWidget *parent) :
+    QFrame(parent)
 {
     setObjectName("MAPBOX_WIDGET");
     auto *l = new QVBoxLayout(this);

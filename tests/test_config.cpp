@@ -11,7 +11,7 @@ class TestConfig : public QObject
 
 private slots:
     // TC-CF-001: Default values after construction
-    void defaultValuesAfterConstruction()
+    void default_values_after_construction()
     {
         Config config;
         const Config::ConfigData &d = config.get_data();
@@ -62,11 +62,11 @@ private slots:
     }
 
     // TC-CF-002: JSON round-trip
-    void jsonRoundTrip()
+    void json_round_trip()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString tmpFile = tmpDir.path() + "/config_rt.json";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString tmp_file = tmp_dir.path() + "/config_rt.json";
 
         // Save modified config
         Config config1;
@@ -89,11 +89,11 @@ private slots:
         config1.get_data().panorama_optics.zoom_fov.clear();
         config1.get_data().panorama_optics.zoom_fov.push_back(Config::ZoomFovPoint(1.0f, 12.0f, 40.0f, 24.0f));
         config1.get_data().panorama_optics.zoom_fov.push_back(Config::ZoomFovPoint(50.0f, 600.0f, 0.8f, 0.45f));
-        QVERIFY(config1.save_to_file(tmpFile));
+        QVERIFY(config1.save_to_file(tmp_file));
 
         // Load into a fresh config
         Config config2;
-        QVERIFY(config2.load_from_file(tmpFile));
+        QVERIFY(config2.load_from_file(tmp_file));
 
         const Config::ConfigData &d = config2.get_data();
         QCOMPARE(d.com_tcu.port, QString("COM3"));
@@ -121,21 +121,21 @@ private slots:
     }
 
     // TC-CF-003: Partial JSON - missing fields preserve defaults
-    void partialJsonPreservesDefaults()
+    void partial_json_preserves_defaults()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString tmpFile = tmpDir.path() + "/partial.json";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString tmp_file = tmp_dir.path() + "/partial.json";
 
         // Write minimal legacy JSON with only version and ui.dark_theme
-        QFile file(tmpFile);
+        QFile file(tmp_file);
         QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
         QTextStream out(&file);
         out << "{\"version\":\"1.0.0\",\"ui\":{\"dark_theme\":false}}";
         file.close();
 
         Config config;
-        QVERIFY(config.load_from_file(tmpFile));
+        QVERIFY(config.load_from_file(tmp_file));
 
         const Config::ConfigData &d = config.get_data();
 
@@ -167,45 +167,45 @@ private slots:
     }
 
     // TC-CF-004: Invalid JSON
-    void invalidJson()
+    void invalid_json()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString tmpFile = tmpDir.path() + "/invalid.json";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString tmp_file = tmp_dir.path() + "/invalid.json";
 
-        QFile file(tmpFile);
+        QFile file(tmp_file);
         QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
         QTextStream out(&file);
         out << "{invalid json";
         file.close();
 
         Config config;
-        QVERIFY(!config.load_from_file(tmpFile));
+        QVERIFY(!config.load_from_file(tmp_file));
     }
 
     // TC-CF-005: Non-existent file
-    void nonExistentFile()
+    void non_existent_file()
     {
         Config config;
         QVERIFY(!config.load_from_file("/nonexistent/path.json"));
     }
 
     // TC-CF-006: ps_step array round-trip
-    void psStepArrayRoundTrip()
+    void ps_step_array_round_trip()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString tmpFile = tmpDir.path() + "/ps_step.json";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString tmp_file = tmp_dir.path() + "/ps_step.json";
 
         Config config1;
         config1.get_data().tcu.ps_step[0] = 10;
         config1.get_data().tcu.ps_step[1] = 20;
         config1.get_data().tcu.ps_step[2] = 30;
         config1.get_data().tcu.ps_step[3] = 40;
-        QVERIFY(config1.save_to_file(tmpFile));
+        QVERIFY(config1.save_to_file(tmp_file));
 
         Config config2;
-        QVERIFY(config2.load_from_file(tmpFile));
+        QVERIFY(config2.load_from_file(tmp_file));
 
         QCOMPARE(config2.get_data().tcu.ps_step[0], 10u);
         QCOMPARE(config2.get_data().tcu.ps_step[1], 20u);
@@ -214,11 +214,11 @@ private slots:
     }
 
     // TC-CF-007: YOLO paths round-trip
-    void yoloPathsRoundTrip()
+    void yolo_paths_round_trip()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString tmpFile = tmpDir.path() + "/yolo.json";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString tmp_file = tmp_dir.path() + "/yolo.json";
 
         Config config1;
         config1.get_data().yolo.config_path = "custom/yolo.ini";
@@ -228,10 +228,10 @@ private slots:
         config1.get_data().yolo.thermal_classes_file = "custom/thermal.txt";
         config1.get_data().yolo.gated_model_path = "custom/gated.onnx";
         config1.get_data().yolo.gated_classes_file = "custom/gated.txt";
-        QVERIFY(config1.save_to_file(tmpFile));
+        QVERIFY(config1.save_to_file(tmp_file));
 
         Config config2;
-        QVERIFY(config2.load_from_file(tmpFile));
+        QVERIFY(config2.load_from_file(tmp_file));
 
         const Config::YoloSettings &y = config2.get_data().yolo;
         QCOMPARE(y.config_path, QString("custom/yolo.ini"));
@@ -244,7 +244,7 @@ private slots:
     }
 
     // TC-CF-008: load_defaults() reset
-    void loadDefaultsReset()
+    void load_defaults_reset()
     {
         Config config;
 
@@ -293,28 +293,28 @@ private slots:
     }
 
     // TC-CF-009: Version field persistence
-    void versionFieldPersistence()
+    void version_field_persistence()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString tmpFile = tmpDir.path() + "/version.json";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString tmp_file = tmp_dir.path() + "/version.json";
 
         Config config1;
-        QString originalVersion = config1.get_version();
-        QVERIFY(!originalVersion.isEmpty());
-        QVERIFY(config1.save_to_file(tmpFile));
+        QString original_version = config1.get_version();
+        QVERIFY(!original_version.isEmpty());
+        QVERIFY(config1.save_to_file(tmp_file));
 
         Config config2;
-        QVERIFY(config2.load_from_file(tmpFile));
-        QCOMPARE(config2.get_version(), originalVersion);
+        QVERIFY(config2.load_from_file(tmp_file));
+        QCOMPARE(config2.get_version(), original_version);
     }
 
     // TC-CF-010: ImageProcSettings round-trip
-    void imageProcSettingsRoundTrip()
+    void image_proc_settings_round_trip()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString tmpFile = tmpDir.path() + "/imgproc.json";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString tmp_file = tmp_dir.path() + "/imgproc.json";
 
         Config config1;
         auto &ip = config1.get_data().image_proc;
@@ -335,10 +335,10 @@ private slots:
         ip.ecc_levels = 3;
         ip.ecc_max_iter = 16;
         ip.ecc_eps = 0.0001;
-        QVERIFY(config1.save_to_file(tmpFile));
+        QVERIFY(config1.save_to_file(tmp_file));
 
         Config config2;
-        QVERIFY(config2.load_from_file(tmpFile));
+        QVERIFY(config2.load_from_file(tmp_file));
         const auto &ip2 = config2.get_data().image_proc;
         QCOMPARE(ip2.accu_base, 2.5f);
         QCOMPARE(ip2.gamma, 0.8f);
@@ -360,11 +360,11 @@ private slots:
     }
 
     // TC-CF-011: SaveSettings round-trip
-    void saveSettingsRoundTrip()
+    void save_settings_round_trip()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString tmpFile = tmpDir.path() + "/save.json";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString tmp_file = tmp_dir.path() + "/save.json";
 
         Config config1;
         auto &s = config1.get_data().save;
@@ -374,10 +374,10 @@ private slots:
         s.consecutive_capture = false;
         s.integrate_info = false;
         s.img_format = 2;
-        QVERIFY(config1.save_to_file(tmpFile));
+        QVERIFY(config1.save_to_file(tmp_file));
 
         Config config2;
-        QVERIFY(config2.load_from_file(tmpFile));
+        QVERIFY(config2.load_from_file(tmp_file));
         const auto &s2 = config2.get_data().save;
         QCOMPARE(s2.save_info, false);
         QCOMPARE(s2.custom_topleft_info, true);
@@ -388,21 +388,21 @@ private slots:
     }
 
     // TC-CF-012: DeviceSettings flip int round-trip (backward compat)
-    void deviceFlipIntRoundTrip()
+    void device_flip_int_round_trip()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString tmpFile = tmpDir.path() + "/device.json";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString tmp_file = tmp_dir.path() + "/device.json";
 
         Config config1;
         config1.get_data().device.flip = 2;
         config1.get_data().device.rotation = 90;
         config1.get_data().device.pixel_type = 1;
         config1.get_data().device.ptz_zero_angle_h = 315.25f;
-        QVERIFY(config1.save_to_file(tmpFile));
+        QVERIFY(config1.save_to_file(tmp_file));
 
         Config config2;
-        QVERIFY(config2.load_from_file(tmpFile));
+        QVERIFY(config2.load_from_file(tmp_file));
         QCOMPARE(config2.get_data().device.flip, 2);
         QCOMPARE(config2.get_data().device.rotation, 90);
         QCOMPARE(config2.get_data().device.pixel_type, 1);
@@ -410,21 +410,21 @@ private slots:
     }
 
     // TC-CF-013: ImageProcSettings defaults preserved on partial JSON
-    void imageProcDefaultsOnPartialJson()
+    void image_proc_defaults_on_partial_json()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString tmpFile = tmpDir.path() + "/partial_ip.json";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString tmp_file = tmp_dir.path() + "/partial_ip.json";
 
         // Write JSON with only image_proc.colormap set
-        QFile file(tmpFile);
+        QFile file(tmp_file);
         QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
         QTextStream out(&file);
         out << "{\"version\":\"1.0.0\",\"image_proc\":{\"colormap\":11}}";
         file.close();
 
         Config config;
-        QVERIFY(config.load_from_file(tmpFile));
+        QVERIFY(config.load_from_file(tmp_file));
         const auto &ip = config.get_data().image_proc;
 
         QCOMPARE(ip.colormap, 11);

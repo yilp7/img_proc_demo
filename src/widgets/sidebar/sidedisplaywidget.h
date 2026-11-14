@@ -8,11 +8,8 @@ class QLabel;
 class QPushButton;
 class QVBoxLayout;
 
-// Left-side widget that mirrors the ALT1 / ALT2 displays as live thumbnails.
-// Same pattern used by the SETUP / SCAN preview sidebars: a QLabel per
-// channel that listens to the corresponding Display::set_pixmap signal and
-// scales the pixmap to fit. When a channel isn't active no pixmap arrives
-// and the slot stays dark.
+// Left-side widget that mirrors the ALT1 / ALT2 displays as live thumbnails: a label
+// per channel follows Display::set_pixmap and scales the frame. An inactive channel stays dark.
 class SideDisplayWidget : public QFrame
 {
     Q_OBJECT
@@ -28,9 +25,8 @@ public:
     void apply_color_mode(bool light_mode);
 
 signals:
-    // Emitted when the user clicks the swap-with-main button next to an alt
-    // thumbnail. alt_idx is 1 for ALT 1, 2 for ALT 2 — the receiver should
-    // call swap_grab_thread_display(0, alt_idx).
+    // Emitted by the swap button next to an alt thumbnail. alt_idx is 1 or 2; the
+    // receiver calls swap_grab_thread_display(0, alt_idx).
     void swap_requested(int alt_idx);
 
 private:

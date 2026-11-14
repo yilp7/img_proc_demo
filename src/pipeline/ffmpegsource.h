@@ -10,20 +10,11 @@
 
 #include "pipeline/routing.h"  // StreamId
 
-// FfmpegSource — live network/local-file video reader driving one StreamSlot.
-//
-// Replaces the inline ~300-line lambda inside UserPanel::load_video_file's
-// else-branch (FFmpeg path). Constructor-only, then start()/stop():
-//   - start(target, url, format_gray) spawns a worker thread that runs the
-//     FFmpeg open + decode loop. Returns immediately; success/failure is
-//     reported via opened()/failed() signals.
-//   - stop() sets the interrupt flag and waits with bounded timeout for the
-//     worker to exit. Safe to call multiple times. Called from dtor.
-//
-// Signals are emitted from the worker thread. Lifecycle signals stay queued
-// to the GUI thread; frame_decoded() is connected directly so frames enter
-// BoundedQueue without building an unbounded GUI-event backlog.
-class FfmpegSource : public QObject {
+// Reads one network stream or local file with FFmpeg and feeds one StreamSlot.
+// start() spawns the worker and returns; opened() or failed() reports the result.
+// Signals come from the worker thread: frame_decoded() is connected directly, the rest queued.
+class FfmpegSource : public QObject
+{
     Q_OBJECT
 public:
     struct VideoInfo {
@@ -33,12 +24,11 @@ public:
         bool   is_color = true;  // false for format_gray=true
     };
 
-    explicit FfmpegSource(QObject* parent = nullptr);
+    explicit FfmpegSource(QObject *parent = nullptr);
     ~FfmpegSource() override;
 
-    // Kick off the worker. If a previous run is still alive, stops it first.
-    // url is the FFmpeg input (file path, rtsp://, http(s)://, dshow URL).
-    // format_gray converts decoded frames through a yuv→gray filtergraph.
+    // Starts the worker, stopping a previous run first. url is any FFmpeg input.
+    // format_gray routes decoded frames through a yuv to gray filter graph.
     void start(StreamId target, QString url, bool format_gray);
 
     // Signal the worker to stop and wait up to timeout_ms for it to exit.
@@ -51,15 +41,13 @@ public:
 
     bool is_running() const { return m_running.load(); }
     bool is_stopped() const { return m_stopped.load(); }
-    StreamId target() const { return m_target; }
-    QString current_url() const { return m_url; }
-    bool current_format_gray() const { return m_format_gray; }
-    // Monotonic session counter. Bumped on every start(); worker captures the
-    // value at thread launch and tags every emit. Receivers drop signals
-    // whose session != current_session(), so events from a stop()ped worker
-    // that are still queued in the GUI event loop don't bleed into the
-    // freshly started worker's stream.
-    int current_session() const { return m_session.load(); }
+    StreamId get_target() const { return m_target; }
+    QString get_current_url() const { return m_url; }
+    bool get_current_format_gray() const { return m_format_gray; }
+    // Bumped on every start(). The worker tags each signal with the value it started
+    // with, and receivers drop any other, so events still queued from a stopped
+    // worker cannot leak into the new stream.
+    int get_current_session() const { return m_session.load(); }
 
 signals:
     void opened(StreamId target, int session, FfmpegSource::VideoInfo info);
@@ -78,7 +66,7 @@ private:
     std::atomic<int>  m_session     {0};
     std::atomic<int>  m_ready_session {0};
     std::thread       m_thread;
-    StreamId          m_target = StreamId::None;
+    StreamId          m_target = StreamId::NONE;
     QString           m_url;
     bool              m_format_gray = false;
 };

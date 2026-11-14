@@ -2,7 +2,7 @@
 
 Laser::Laser(int index, uint laser_type) :
     ControlPort{index},
-    laser_type(laser_type)
+    m_laser_type(laser_type)
 {
 
 }
@@ -16,7 +16,7 @@ Laser::~Laser()
 nlohmann::json Laser::to_json()
 {
     return nlohmann::json{
-        {"type", laser_type},
+        {"type", m_laser_type},
         };
 }
 

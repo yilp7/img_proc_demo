@@ -6,56 +6,55 @@
 
 namespace TargetEstimator {
 
-double rangeMeters(double targetHeightMeters, const QRect &sourceBox,
-                   const QSize &sourceSize, const Optics &optics)
+double range_meters(double target_height_meters, const QRect &source_box,
+                    const QSize &source_size, const Optics &optics)
 {
-    if (targetHeightMeters <= 0.0) return 0.0;
-    if (sourceBox.height() <= 0) return 0.0;
-    if (optics.focalLengthMm <= 0.0 || optics.sensorDiagonalMm <= 0.0) return 0.0;
+    if (target_height_meters <= 0.0) return 0.0;
+    if (source_box.height() <= 0) return 0.0;
+    if (optics.focal_length_mm <= 0.0 || optics.sensor_diagonal_mm <= 0.0) return 0.0;
 
-    // Port of estimate_distance_m / sensor_pixel_size_mm in
-    // others/distance_estimate:
+    // Same as estimate_distance_m in others/distance_estimate:
     //   pitch = sensor_diagonal / frame_diagonal
     //   range = focal * height / (box_px * pitch)
-    const double diagonal_px = std::hypot(static_cast<double>(sourceSize.width()),
-                                          static_cast<double>(sourceSize.height()));
+    const double diagonal_px = std::hypot(static_cast<double>(source_size.width()),
+                                          static_cast<double>(source_size.height()));
     if (diagonal_px <= 0.0) return 0.0;
 
-    const double pixel_size_mm = optics.sensorDiagonalMm / diagonal_px;
+    const double pixel_size_mm = optics.sensor_diagonal_mm / diagonal_px;
     if (pixel_size_mm <= 0.0) return 0.0;
 
-    return optics.focalLengthMm * targetHeightMeters / (sourceBox.height() * pixel_size_mm);
+    return optics.focal_length_mm * target_height_meters / (source_box.height() * pixel_size_mm);
 }
 
-void offsetFromCentreDeg(const QRect &sourceBox, const QSize &sourceSize,
-                         const Optics &optics, double *horizontalDeg, double *verticalDeg)
+void offset_from_centre_deg(const QRect &source_box, const QSize &source_size,
+                            const Optics &optics, double *horizontal_deg, double *vertical_deg)
 {
-    if (horizontalDeg) *horizontalDeg = 0.0;
-    if (verticalDeg) *verticalDeg = 0.0;
-    if (sourceSize.width() <= 0 || sourceSize.height() <= 0) return;
-    if (optics.fovHorizontalDeg <= 0.0 || optics.fovVerticalDeg <= 0.0) return;
+    if (horizontal_deg) *horizontal_deg = 0.0;
+    if (vertical_deg) *vertical_deg = 0.0;
+    if (source_size.width() <= 0 || source_size.height() <= 0) return;
+    if (optics.fov_horizontal_deg <= 0.0 || optics.fov_vertical_deg <= 0.0) return;
 
-    const double half_w = sourceSize.width() / 2.0;
-    const double half_h = sourceSize.height() / 2.0;
-    const double focal_x = half_w / std::tan(qDegreesToRadians(optics.fovHorizontalDeg) / 2.0);
-    const double focal_y = half_h / std::tan(qDegreesToRadians(optics.fovVerticalDeg) / 2.0);
+    const double half_w = source_size.width() / 2.0;
+    const double half_h = source_size.height() / 2.0;
+    const double focal_x = half_w / std::tan(qDegreesToRadians(optics.fov_horizontal_deg) / 2.0);
+    const double focal_y = half_h / std::tan(qDegreesToRadians(optics.fov_vertical_deg) / 2.0);
     if (focal_x <= 0.0 || focal_y <= 0.0) return;
 
-    const double cx = sourceBox.x() + sourceBox.width() / 2.0;
-    const double cy = sourceBox.y() + sourceBox.height() / 2.0;
+    const double cx = source_box.x() + source_box.width() / 2.0;
+    const double cy = source_box.y() + source_box.height() / 2.0;
 
-    if (horizontalDeg) *horizontalDeg = qRadiansToDegrees(std::atan((cx - half_w) / focal_x));
+    if (horizontal_deg) *horizontal_deg = qRadiansToDegrees(std::atan((cx - half_w) / focal_x));
     // Image y grows downward; elevation grows upward.
-    if (verticalDeg) *verticalDeg = qRadiansToDegrees(std::atan((half_h - cy) / focal_y));
+    if (vertical_deg) *vertical_deg = qRadiansToDegrees(std::atan((half_h - cy) / focal_y));
 }
 
-Bearing hullToGeographic(double hullAzimuthDeg, double hullElevationDeg,
-                         double headingDeg, double pitchDeg, double rollDeg)
+Bearing hull_to_geographic(double hull_azimuth_deg, double hull_elevation_deg,
+                           double heading_deg, double pitch_deg, double roll_deg)
 {
-    const double az = qDegreesToRadians(hullAzimuthDeg);
-    const double el = qDegreesToRadians(hullElevationDeg);
-    const double p = qDegreesToRadians(pitchDeg);
-    const double r = qDegreesToRadians(rollDeg);
+    const double az = qDegreesToRadians(hull_azimuth_deg);
+    const double el = qDegreesToRadians(hull_elevation_deg);
+    const double p = qDegreesToRadians(pitch_deg);
+    const double r = qDegreesToRadians(roll_deg);
 
     double x = std::cos(el) * std::cos(az);
     double y = std::cos(el) * std::sin(az);
@@ -74,11 +73,11 @@ Bearing hullToGeographic(double hullAzimuthDeg, double hullElevationDeg,
     z = zp;
 
     Bearing out;
-    double azimuth = qRadiansToDegrees(std::atan2(y, x)) + headingDeg;
+    double azimuth = qRadiansToDegrees(std::atan2(y, x)) + heading_deg;
     azimuth = std::fmod(azimuth, 360.0);
     if (azimuth < 0.0) azimuth += 360.0;
-    out.azimuthDeg = azimuth;
-    out.elevationDeg = qRadiansToDegrees(std::asin(qBound(-1.0, z, 1.0)));
+    out.azimuth_deg = azimuth;
+    out.elevation_deg = qRadiansToDegrees(std::asin(qBound(-1.0, z, 1.0)));
     return out;
 }
 

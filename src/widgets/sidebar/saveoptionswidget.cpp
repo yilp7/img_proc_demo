@@ -10,8 +10,8 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
-SaveOptionsWidget::SaveOptionsWidget(QWidget *parent)
-    : QFrame(parent)
+SaveOptionsWidget::SaveOptionsWidget(QWidget *parent) :
+    QFrame(parent)
 {
     setObjectName("SAVE_OPTIONS_WIDGET");
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);

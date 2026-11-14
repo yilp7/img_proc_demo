@@ -1,12 +1,12 @@
 #include "rangefinder.h"
 
-RangeFinder::RangeFinder(int index) : ControlPort(index), rf_type(0), freq(0), baudrate(0) {}
+RangeFinder::RangeFinder(int index) : ControlPort(index), m_rf_type(0), m_freq(0), m_baudrate(0) {}
 
 RangeFinder::~RangeFinder() {}
 
-uint RangeFinder::type() { return rf_type.load(); }
+uint RangeFinder::get_type() { return m_rf_type.load(); }
 
-void RangeFinder::set_type(uint type) { rf_type.store(type); }
+void RangeFinder::set_type(uint type) { m_rf_type.store(type); }
 
 #if ENABLE_PORT_JSON
 nlohmann::json RangeFinder::to_json() { return nlohmann::json(); }
@@ -31,13 +31,13 @@ void RangeFinder::try_communicate()
 
     communicate(QByteArray(), 20, 100, false);
     QByteArray read;
-    retrieve_mutex.lock();
-    read = last_read;
-    retrieve_mutex.unlock();
+    m_retrieve_mutex.lock();
+    read = m_last_read;
+    m_retrieve_mutex.unlock();
 
     read_distance(read.mid(read.indexOf(0x5C), 4));
-//    if (read.size() != 1 || read[0] != char(0x15)) successive_count = 0;
-//    else                                           successive_count++;
+//    if (read.size() != 1 || read[0] != char(0x15)) m_successive_count = 0;
+//    else                                           m_successive_count++;
 }
 
 inline void check_sum(QByteArray command)
@@ -50,7 +50,7 @@ inline void check_sum(QByteArray command)
 int RangeFinder::rf_control(qint32 rf_param, uint val)
 {
     QByteArray command;
-    switch (rf_type.load()) {
+    switch (m_rf_type.load()) {
     case 0:
         switch (rf_param) {
         case SERIAL:
@@ -61,8 +61,8 @@ int RangeFinder::rf_control(qint32 rf_param, uint val)
         }
         case FREQ_SET:
         {
-            freq = val;
-            uint param = 1e6 / freq - 1;
+            m_freq = val;
+            uint param = 1e6 / m_freq - 1;
             uchar buf[] = {0x5A, 0x0B, 0x02, uchar(param & 0xFF), uchar((param >> 8) & 0xFF), 0x00};
             command = QByteArray((char*)buf, 6);
             goto send;
@@ -75,7 +75,7 @@ int RangeFinder::rf_control(qint32 rf_param, uint val)
         }
         case BAUDRATE:
         {
-            baudrate = val;
+            m_baudrate = val;
             uint param = val / 100;
             uchar buf[] = {0x5A, 0x06, 0x02, uchar(param & 0xFF), uchar((param >> 8) & 0xFF), 0x00};
             command = QByteArray((char*)buf, 6);
@@ -95,9 +95,9 @@ send:
 
 read:
     QByteArray read;
-    retrieve_mutex.lock();
-    read = last_read;
-    retrieve_mutex.unlock();
+    m_retrieve_mutex.lock();
+    read = m_last_read;
+    m_retrieve_mutex.unlock();
 
     return 0;
 }

@@ -10,26 +10,17 @@ class QPushButton;
 class QLineEdit;
 class QLabel;
 
-// Image-processing controls for the right-side stack. Two tabs:
-//   MODELS  — per-display model selectors (MAIN / ALT1 / ALT2). The
-//             dropdown items are detection models (currently VL / Thermal /
-//             Gated; future builds add fishnet etc. discovered from the
-//             local models/ folder).
-//   GENERAL — image-processing toggles: enhance, frame-avg, pseudocolor, 3D.
-//
-// Re-parents existing widgets out of YOLO_PAGE (model lists) and
-// IMG_PROC_STATIC (processing toggles). Widget identity preserved, all
-// existing controller / Config wiring still works.
+// Image processing controls of the right stack, in two tabs: MODELS (a model
+// selector per display) and GENERAL (enhance, frame average, pseudocolor, 3D).
+// It re-parents existing widgets, so their controller and Config wiring is unchanged.
 class ImgProcWidget : public QFrame
 {
     Q_OBJECT
 public:
     explicit ImgProcWidget(QWidget *parent = nullptr);
 
-    // MODELS inputs: 3 model selectors + labels (from YOLO_PAGE / YOLO_GRP).
-    // GENERAL inputs: a display picker combobox at row 0 (created by
-    // UserPanel and passed in so UserPanel keeps the signal connection)
-    // and the per-display processing controls underneath.
+    // MODELS takes three model selectors with their labels. GENERAL takes the display
+    // picker, created by UserPanel so it keeps the connection, and the per-display controls.
     void setup(QComboBox  *main_model,     QComboBox  *alt1_model,
                QComboBox  *alt2_model,
                QLabel     *main_label,     QLabel     *alt1_label,
@@ -44,7 +35,7 @@ public:
     // display_idx: 0=MAIN, 1=ALT1, 2=ALT2.
     // state: 0=none (gray), 1=loaded (green), 2=failed (red).
     void set_model_status(int display_idx, int state);
-    bool auto_follow_enabled() const;
+    bool is_auto_follow_enabled() const;
 
 signals:
     void auto_follow_changed(bool enabled);

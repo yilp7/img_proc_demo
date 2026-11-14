@@ -14,10 +14,8 @@ struct PanoramaZoomFovPoint {
         : zoom(z), focal_length_mm(focal), fov_h(h), fov_v(v) {}
 };
 
-// Plain-data scan configuration. Replaces the data members that used to
-// live on the legacy ScanConfig QDialog (S22). Owned by ScanController;
-// borrowed by the pipeline worker thread via ProcessingParams::SharedState.
-// Same defaults the old ScanConfig() constructor used.
+// Plain-data scan configuration, owned by ScanController and read by the pipeline
+// thread through PipelineGlobals::scan_params.
 struct ScanParams {
     enum PtzScanMode {
         PTZ_SCAN_GRID = 0,
@@ -90,8 +88,7 @@ struct ScanParams {
     };
 };
 
-// Derived routes. Free functions so they're testable without constructing
-// a controller. Logic copied verbatim from ScanConfig::get_*_route().
+// Derived routes. Free functions so they can be tested without a controller.
 std::vector<std::pair<float, float>> get_ptz_route(const ScanParams &p);
 std::vector<std::pair<float, float>> get_panorama_route(const ScanParams &p);
 std::vector<float>                   get_tcu_route(const ScanParams &p);
@@ -100,6 +97,6 @@ std::pair<float, float>              get_panorama_fov(float zoom, const std::vec
 void                                 update_panorama_fov_from_zoom(ScanParams &p);
 float                                get_panorama_sweep_degrees(const ScanParams &p);
 int                                  get_panorama_stop_count(const ScanParams &p);
-const char*                          get_panorama_fusion_name(int mode);
+const char                          *get_panorama_fusion_name(int mode);
 
 #endif // SCANPARAMS_H

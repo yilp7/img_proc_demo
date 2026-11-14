@@ -5,25 +5,16 @@
 
 #include <vector>
 
-// Operator-designated region tracker, for closed-loop follow when no detector
-// is running. Two exclusive methods, chosen in the setup panel:
-//
-//   OpticalFlow  Lucas-Kanade on corner features inside the gate. Smooth and
-//                cheap, but needs texture: a target on flat water or open sky
-//                may not yield enough corners to seed at all.
-//   Template     Normalized cross-correlation of the designated patch over a
-//                search window. Indifferent to texture and yields an absolute
-//                match score, so loss is detected directly rather than inferred
-//                from surviving feature count.
-//
-// Both estimate scale, so the gate follows a target that grows or shrinks.
+// Tracker of an operator-designated region, for closed-loop follow without a
+// detector. OPTICAL_FLOW follows corner features and needs texture; TEMPLATE
+// correlates the designated patch and reports a match score. Both estimate scale.
 class GateTracker
 {
 public:
-    enum class Mode { OpticalFlow, Template };
+    enum class Mode { OPTICAL_FLOW, TEMPLATE };
 
     struct Settings {
-        Mode mode = Mode::OpticalFlow;
+        Mode mode = Mode::OPTICAL_FLOW;
         // Optical flow: validates each point by tracking it back to the previous
         // frame and rejecting those that do not return to their origin. Roughly
         // doubles the flow cost.
@@ -33,31 +24,31 @@ public:
         bool multi_scale = true;
     };
 
-    void setSettings(const Settings &settings);
-    const Settings& settings() const { return m_settings; }
+    void set_settings(const Settings &settings);
+    const Settings &get_settings() const { return m_settings; }
 
     void seed(const cv::Mat &gray, const cv::Rect &gate);
-    // Returns false once the gate can no longer be trusted; box() is then
+    // Returns false once the gate can no longer be trusted; get_box() is then
     // meaningless and the caller should disengage.
     bool update(const cv::Mat &gray);
     void clear();
 
-    bool active() const { return m_active; }
-    cv::Rect box() const { return m_box; }
-    int featureCount() const { return static_cast<int>(m_points.size()); }
+    bool is_active() const { return m_active; }
+    cv::Rect get_box() const { return m_box; }
+    int get_feature_count() const { return static_cast<int>(m_points.size()); }
     // Last correlation peak in template mode, 0 in optical-flow mode.
-    double matchScore() const { return m_score; }
+    double get_match_score() const { return m_score; }
 
-    void setMinFeatures(int value) { m_min_features = value; }
-    void setMaxFeatures(int value) { m_max_features = value; }
+    void set_min_features(int value) { m_min_features = value; }
+    void set_max_features(int value) { m_max_features = value; }
 
 private:
-    bool detectFeatures(const cv::Mat &gray, bool core_only);
-    bool updateOpticalFlow(const cv::Mat &gray);
-    bool updateTemplate(const cv::Mat &gray);
+    bool detect_features(const cv::Mat &gray, bool core_only);
+    bool update_optical_flow(const cv::Mat &gray);
+    bool update_template(const cv::Mat &gray);
     // Applies a translation and a scale about the gate centre, and reports
     // whether the result is still usable.
-    bool moveBox(float dx, float dy, float scale, const cv::Size &frame);
+    bool move_box(float dx, float dy, float scale, const cv::Size &frame);
 
     Settings m_settings;
 

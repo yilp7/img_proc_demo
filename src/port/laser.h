@@ -26,7 +26,7 @@ protected slots:
 #endif
 
 private:
-    uint laser_type;
+    uint m_laser_type;
 };
 
 #endif // LASER_H

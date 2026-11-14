@@ -4,21 +4,21 @@
 #include <QSaveFile>
 #include <QTextStream>
 
-const QString TargetClassTable::VisibleLight = QStringLiteral("VL");
-const QString TargetClassTable::Thermal = QStringLiteral("THERMAL");
-const QString TargetClassTable::Gated = QStringLiteral("GATED");
+const QString TargetClassTable::VISIBLE_LIGHT = QStringLiteral("VL");
+const QString TargetClassTable::THERMAL = QStringLiteral("THERMAL");
+const QString TargetClassTable::GATED = QStringLiteral("GATED");
 
 QStringList TargetClassTable::models()
 {
-    return {VisibleLight, Thermal, Gated};
+    return {VISIBLE_LIGHT, THERMAL, GATED};
 }
 
-QString TargetClassTable::modelForIndex(int model_idx)
+QString TargetClassTable::model_for_index(int model_idx)
 {
     switch (model_idx) {
-    case 1: return VisibleLight;
-    case 2: return Thermal;
-    case 3: return Gated;
+    case 1: return VISIBLE_LIGHT;
+    case 2: return THERMAL;
+    case 3: return GATED;
     default: return QString();
     }
 }
@@ -58,9 +58,9 @@ bool TargetClassTable::load(const QString &filepath, QString *error)
         if (entry.name.isEmpty()) continue;
 
         const QStringList values = line.mid(split + 1).split(QLatin1Char(','));
-        if (!values.isEmpty()) entry.heightMeters = values.at(0).trimmed().toDouble();
-        if (values.size() > 1) entry.targetType = values.at(1).trimmed().toInt();
-        if (values.size() > 2) entry.targetCategory = values.at(2).trimmed().toInt();
+        if (!values.isEmpty()) entry.height_meters = values.at(0).trimmed().toDouble();
+        if (values.size() > 1) entry.target_type = values.at(1).trimmed().toInt();
+        if (values.size() > 2) entry.target_category = values.at(2).trimmed().toInt();
         parsed[section].push_back(entry);
     }
 
@@ -87,8 +87,8 @@ bool TargetClassTable::save(const QString &filepath, QString *error) const
         out << "\n[" << model << "]\n";
         const QVector<TargetClassEntry> list = m_entries.value(model);
         for (const TargetClassEntry &entry : list) {
-            out << entry.name << " = " << QString::number(entry.heightMeters, 'f', 2)
-                << ", " << entry.targetType << ", " << entry.targetCategory << "\n";
+            out << entry.name << " = " << QString::number(entry.height_meters, 'f', 2)
+                << ", " << entry.target_type << ", " << entry.target_category << "\n";
         }
     }
 
@@ -99,23 +99,23 @@ bool TargetClassTable::save(const QString &filepath, QString *error) const
     return true;
 }
 
-QVector<TargetClassEntry> TargetClassTable::entries(const QString &model) const
+QVector<TargetClassEntry> TargetClassTable::get_entries(const QString &model) const
 {
     return m_entries.value(model.toUpper());
 }
 
-void TargetClassTable::setEntries(const QString &model, const QVector<TargetClassEntry> &entries)
+void TargetClassTable::set_entries(const QString &model, const QVector<TargetClassEntry> &entries)
 {
     m_entries.insert(model.toUpper(), entries);
 }
 
-bool TargetClassTable::lookup(const QString &model, const QString &className,
+bool TargetClassTable::lookup(const QString &model, const QString &class_name,
                               TargetClassEntry *out) const
 {
     if (!out) return false;
     const QVector<TargetClassEntry> list = m_entries.value(model.toUpper());
     for (const TargetClassEntry &entry : list) {
-        if (entry.name.compare(className, Qt::CaseInsensitive) == 0) {
+        if (entry.name.compare(class_name, Qt::CaseInsensitive) == 0) {
             *out = entry;
             return true;
         }
@@ -123,7 +123,7 @@ bool TargetClassTable::lookup(const QString &model, const QString &className,
     return false;
 }
 
-void TargetClassTable::mergeClassNames(const QString &model, const QStringList &names)
+void TargetClassTable::merge_class_names(const QString &model, const QStringList &names)
 {
     const QString key = model.toUpper();
     QVector<TargetClassEntry> merged;

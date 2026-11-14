@@ -15,11 +15,11 @@ class AddonPanel : public FloatingPanel
 public:
     explicit AddonPanel(QWidget *parent = nullptr);
 
-    QWidget *pluginHost() const { return m_host; }
-    void fitPluginChildren();
+    QWidget *get_plugin_host() const { return m_host; }
+    void fit_plugin_children();
 
 signals:
-    void resizedByUser();
+    void resized_by_user();
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;

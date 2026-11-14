@@ -10,10 +10,12 @@
 #include <QTabWidget>
 #include <QVBoxLayout>
 
-ImgProcWidget::ImgProcWidget(QWidget *parent)
-    : QFrame(parent), m_tabs(nullptr),
-      m_models_page(nullptr), m_general_page(nullptr),
-      m_auto_follow_check(nullptr)
+ImgProcWidget::ImgProcWidget(QWidget *parent) :
+    QFrame(parent),
+    m_tabs(nullptr),
+    m_models_page(nullptr),
+    m_general_page(nullptr),
+    m_auto_follow_check(nullptr)
 {
     setObjectName("IMG_PROC_WIDGET");
 
@@ -48,10 +50,8 @@ void ImgProcWidget::setup(QComboBox  *main_model,     QComboBox  *alt1_model,
         w->show();
     };
 
-    // MODELS tab: 3 rows, "label + model selector" per display
-    // (MAIN / ALT1 / ALT2). Dropdown items are detection models — currently
-    // VL / Thermal / Gated from YOLO_PAGE; future builds discover models
-    // dynamically from the local models/ folder (fishnet included).
+    // MODELS tab: one row per display with a label and a model selector. The items
+    // are the detection models (visible light, thermal, gated).
     auto *ml = new QGridLayout(m_models_page);
     ml->setContentsMargins(6, 6, 6, 6);
     ml->setHorizontalSpacing(6);
@@ -101,9 +101,8 @@ void ImgProcWidget::setup(QComboBox  *main_model,     QComboBox  *alt1_model,
     ml->setRowStretch(row, 1);
     ml->setColumnStretch(1, 1);
 
-    // GENERAL tab: image-processing toggles (enhance / frame-avg / pseudocolor / 3D).
-    // Row 0 is the display picker — selects which display's pcfg the controls
-    // below it read from and write to.
+    // GENERAL tab: the image processing toggles. Row 0 is the display picker, which
+    // selects the display whose pcfg the controls below read and write.
     auto *gl = new QGridLayout(m_general_page);
     gl->setContentsMargins(6, 6, 6, 6);
     gl->setHorizontalSpacing(6);
@@ -139,9 +138,8 @@ void ImgProcWidget::setup(QComboBox  *main_model,     QComboBox  *alt1_model,
         ++grow;
     }
     if (img_3d_chk) {
-        // Single-row 3D layout, faithful to pre-sprint-15 user_panel.ui:
-        //   [☐ 3D]   [threshold edit]   [16×16 icon-only RESET_3D_BTN]
-        // Reset button is square, no text — icon set by UserPanel via theme.
+        // One row for 3D: checkbox, threshold edit and a square icon-only reset button
+        // whose icon UserPanel sets per theme.
         reparent_into(img_3d_chk, m_general_page);
         auto *row3d = new QHBoxLayout();
         row3d->setContentsMargins(0, 0, 0, 0);
@@ -164,7 +162,7 @@ void ImgProcWidget::setup(QComboBox  *main_model,     QComboBox  *alt1_model,
     gl->setColumnStretch(1, 1);
 }
 
-bool ImgProcWidget::auto_follow_enabled() const
+bool ImgProcWidget::is_auto_follow_enabled() const
 {
     return m_auto_follow_check && m_auto_follow_check->isChecked();
 }

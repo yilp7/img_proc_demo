@@ -13,7 +13,7 @@
 #include <cmath>
 
 namespace {
-bool updateColor(QColor &slot, const QColor &color)
+bool update_color(QColor &slot, const QColor &color)
 {
     if (slot == color) return false;
     slot = color;
@@ -23,21 +23,21 @@ bool updateColor(QColor &slot, const QColor &color)
 // A heading source that has gone quiet must not keep correcting the dial
 // with its last value. Well above the one-second cadence of the feeds that
 // exist, so a live source never expires between updates.
-constexpr int HeadingReferenceTimeoutMs = 5000;
+constexpr int HEADING_REFERENCE_TIMEOUT_MS = 5000;
 }
 
-PtzRadarWidget::PtzRadarWidget(QWidget *parent)
-    : QFrame(parent),
-      m_angle_h(0.0f),
-      m_angle_v(0.0f),
-      m_zero_angle_h(0.0f),
-      m_bg_color(0x04, 0x03, 0x03),
-      m_border_color(0x24, 0x1E, 0x1A),
-      m_grid_color(0x38, 0x2D, 0x25),
-      m_grid_soft_color(0x24, 0x1E, 0x1A),
-      m_text_color(0xC8, 0xB8, 0xA8),
-      m_muted_color(0x8A, 0x74, 0x61),
-      m_accent_color(0xE0, 0x92, 0x4A)
+PtzRadarWidget::PtzRadarWidget(QWidget *parent) :
+    QFrame(parent),
+    m_angle_h(0.0f),
+    m_angle_v(0.0f),
+    m_zero_angle_h(0.0f),
+    m_bg_color(0x04, 0x03, 0x03),
+    m_border_color(0x24, 0x1E, 0x1A),
+    m_grid_color(0x38, 0x2D, 0x25),
+    m_grid_soft_color(0x24, 0x1E, 0x1A),
+    m_text_color(0xC8, 0xB8, 0xA8),
+    m_muted_color(0x8A, 0x74, 0x61),
+    m_accent_color(0xE0, 0x92, 0x4A)
 {
     setObjectName("PTZ_RADAR_WIDGET");
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
@@ -51,50 +51,50 @@ PtzRadarWidget::PtzRadarWidget(QWidget *parent)
     m_north_button->setCursor(Qt::PointingHandCursor);
     connect(m_north_button, &QPushButton::toggled, this, [this](bool enabled) {
         update();
-        emit northReferenceChanged(enabled);
+        emit north_reference_changed(enabled);
     });
 
     m_heading_timeout = new QTimer(this);
     m_heading_timeout->setSingleShot(true);
-    m_heading_timeout->setInterval(HeadingReferenceTimeoutMs);
+    m_heading_timeout->setInterval(HEADING_REFERENCE_TIMEOUT_MS);
     connect(m_heading_timeout, &QTimer::timeout, this, [this]() {
         if (!m_heading_valid) return;
         m_heading_valid = false;
-        if (isNorthReferenced()) update();
+        if (is_north_referenced()) update();
     });
 }
 
-bool PtzRadarWidget::isNorthReferenced() const
+bool PtzRadarWidget::is_north_referenced() const
 {
     return m_north_button && m_north_button->isChecked();
 }
 
-void PtzRadarWidget::setNorthReferenced(bool enabled)
+void PtzRadarWidget::set_north_referenced(bool enabled)
 {
     if (m_north_button) m_north_button->setChecked(enabled);
 }
 
-void PtzRadarWidget::setHeading(float heading_deg, bool valid)
+void PtzRadarWidget::set_heading(float heading_deg, bool valid)
 {
     // Every valid update re-arms the expiry, so a source repeating the same
     // heading stays current.
     if (valid) m_heading_timeout->start();
     else m_heading_timeout->stop();
 
-    const float normalized = normalizeAngle(heading_deg);
+    const float normalized = normalize_angle(heading_deg);
     if (qFuzzyCompare(m_heading, normalized) && m_heading_valid == valid) return;
     m_heading = normalized;
     m_heading_valid = valid;
-    if (isNorthReferenced()) update();
+    if (is_north_referenced()) update();
 }
 
 // ptz_zero_angle_h is applied first and is unaffected by the north reference;
 // the heading is added on top of the already zero-corrected bearing.
-float PtzRadarWidget::displayedAngle() const
+float PtzRadarWidget::displayed_angle() const
 {
-    const float rel = normalizeAngle(m_angle_h - m_zero_angle_h);
-    if (!isNorthReferenced() || !m_heading_valid) return rel;
-    return normalizeAngle(rel + m_heading);
+    const float rel = normalize_angle(m_angle_h - m_zero_angle_h);
+    if (!is_north_referenced() || !m_heading_valid) return rel;
+    return normalize_angle(rel + m_heading);
 }
 
 void PtzRadarWidget::resizeEvent(QResizeEvent *event)
@@ -113,51 +113,51 @@ QSize PtzRadarWidget::minimumSizeHint() const
     return QSize(180, 180);
 }
 
-void PtzRadarWidget::setRadarBackgroundColor(const QColor &color)
+void PtzRadarWidget::set_radar_background_color(const QColor &color)
 {
-    if (updateColor(m_bg_color, color)) update();
+    if (update_color(m_bg_color, color)) update();
 }
 
-void PtzRadarWidget::setRadarBorderColor(const QColor &color)
+void PtzRadarWidget::set_radar_border_color(const QColor &color)
 {
-    if (updateColor(m_border_color, color)) update();
+    if (update_color(m_border_color, color)) update();
 }
 
-void PtzRadarWidget::setRadarGridColor(const QColor &color)
+void PtzRadarWidget::set_radar_grid_color(const QColor &color)
 {
-    if (updateColor(m_grid_color, color)) update();
+    if (update_color(m_grid_color, color)) update();
 }
 
-void PtzRadarWidget::setRadarGridSoftColor(const QColor &color)
+void PtzRadarWidget::set_radar_grid_soft_color(const QColor &color)
 {
-    if (updateColor(m_grid_soft_color, color)) update();
+    if (update_color(m_grid_soft_color, color)) update();
 }
 
-void PtzRadarWidget::setRadarTextColor(const QColor &color)
+void PtzRadarWidget::set_radar_text_color(const QColor &color)
 {
-    if (updateColor(m_text_color, color)) update();
+    if (update_color(m_text_color, color)) update();
 }
 
-void PtzRadarWidget::setRadarMutedColor(const QColor &color)
+void PtzRadarWidget::set_radar_muted_color(const QColor &color)
 {
-    if (updateColor(m_muted_color, color)) update();
+    if (update_color(m_muted_color, color)) update();
 }
 
-void PtzRadarWidget::setRadarAccentColor(const QColor &color)
+void PtzRadarWidget::set_radar_accent_color(const QColor &color)
 {
-    if (updateColor(m_accent_color, color)) update();
+    if (update_color(m_accent_color, color)) update();
 }
 
-void PtzRadarWidget::setAngle(float h, float v)
+void PtzRadarWidget::set_angle(float h, float v)
 {
-    m_angle_h = normalizeAngle(h);
+    m_angle_h = normalize_angle(h);
     m_angle_v = v;
     update();
 }
 
-void PtzRadarWidget::setZeroAngle(float h)
+void PtzRadarWidget::set_zero_angle(float h)
 {
-    m_zero_angle_h = normalizeAngle(h);
+    m_zero_angle_h = normalize_angle(h);
     update();
 }
 
@@ -185,12 +185,11 @@ void PtzRadarWidget::paintEvent(QPaintEvent *event)
     QFont value_font = font();
     value_font.setPixelSize(10);
     p.setFont(value_font);
-    const float rel = displayedAngle();
-    // The suffix is the only signal that the zero has moved, and "N?" says the
-    // reference is requested but no heading is current, because none arrived
-    // or the last one expired. Without it a hull-referenced bearing would read
-    // as a north bearing.
-    const QString reference = !isNorthReferenced() ? QString()
+    const float rel = displayed_angle();
+    // The suffix is the only sign that the zero has moved. "N?" means the reference is
+    // requested but no heading is current; without it a hull bearing would read as a
+    // north bearing.
+    const QString reference = !is_north_referenced() ? QString()
                             : (m_heading_valid ? QStringLiteral(" N") : QStringLiteral(" N?"));
     const QString value = QString("H %1%2  V %3")
         .arg(QString::asprintf("%06.2f", rel))
@@ -255,7 +254,7 @@ void PtzRadarWidget::paintEvent(QPaintEvent *event)
     Q_UNUSED(event);
 }
 
-float PtzRadarWidget::normalizeAngle(float angle)
+float PtzRadarWidget::normalize_angle(float angle)
 {
     float normalized = std::fmod(angle, 360.0f);
     if (normalized < 0.0f) normalized += 360.0f;

@@ -20,24 +20,24 @@ namespace {
 
 // Fixed width so the form's fields line up in a column instead of each
 // stretching to the dialog width.
-constexpr int FieldWidth = 96;
+constexpr int FIELD_WIDTH = 96;
 
-QDoubleSpinBox *makeSpin(double min, double max, double step, int decimals)
+QDoubleSpinBox *make_spin(double min, double max, double step, int decimals)
 {
     auto *spin = new QDoubleSpinBox();
     spin->setRange(min, max);
     spin->setSingleStep(step);
     spin->setDecimals(decimals);
-    spin->setFixedWidth(FieldWidth);
+    spin->setFixedWidth(FIELD_WIDTH);
     return spin;
 }
 
 } // namespace
 
-PidTuningWindow::PidTuningWindow(Config *config, PtzFollowController *controller, QWidget *parent)
-    : QDialog(parent),
-      m_config(config),
-      m_controller(controller)
+PidTuningWindow::PidTuningWindow(Config *config, PtzFollowController *controller, QWidget *parent) :
+    QDialog(parent),
+    m_config(config),
+    m_controller(controller)
 {
     setObjectName(QStringLiteral("PID_TUNING_WINDOW"));
     setModal(false);
@@ -45,17 +45,17 @@ PidTuningWindow::PidTuningWindow(Config *config, PtzFollowController *controller
     setWindowFlag(Qt::WindowContextHelpButtonHint, false);
     resize(460, 560);
 
-    setupUi();
-    retranslateUi();
-    reloadFromConfig();
+    setup_ui();
+    retranslate_ui();
+    reload_from_config();
 
     if (m_controller) {
         connect(m_controller, &PtzFollowController::telemetry,
-                this, &PidTuningWindow::showTelemetry);
+                this, &PidTuningWindow::show_telemetry);
     }
 }
 
-void PidTuningWindow::setupUi()
+void PidTuningWindow::setup_ui()
 {
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(12, 12, 12, 12);
@@ -65,12 +65,12 @@ void PidTuningWindow::setupUi()
     auto *gains = m_gains_group;
     auto *gains_form = new QFormLayout(gains);
     gains_form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
-    m_kp_h = makeSpin(0.0, 20.0, 0.05, 3);
-    m_ki_h = makeSpin(0.0, 20.0, 0.01, 3);
-    m_kd_h = makeSpin(0.0, 20.0, 0.01, 3);
-    m_kp_v = makeSpin(0.0, 20.0, 0.05, 3);
-    m_ki_v = makeSpin(0.0, 20.0, 0.01, 3);
-    m_kd_v = makeSpin(0.0, 20.0, 0.01, 3);
+    m_kp_h = make_spin(0.0, 20.0, 0.05, 3);
+    m_ki_h = make_spin(0.0, 20.0, 0.01, 3);
+    m_kd_h = make_spin(0.0, 20.0, 0.01, 3);
+    m_kp_v = make_spin(0.0, 20.0, 0.05, 3);
+    m_ki_v = make_spin(0.0, 20.0, 0.01, 3);
+    m_kd_v = make_spin(0.0, 20.0, 0.01, 3);
     gains_form->addRow(tr("Kp horizontal"), m_kp_h);
     gains_form->addRow(tr("Ki horizontal"), m_ki_h);
     gains_form->addRow(tr("Kd horizontal"), m_kd_h);
@@ -83,15 +83,15 @@ void PidTuningWindow::setupUi()
     auto *limits = m_limits_group;
     auto *limits_form = new QFormLayout(limits);
     limits_form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
-    m_deadband = makeSpin(0.0, 5.0, 0.05, 3);
+    m_deadband = make_spin(0.0, 5.0, 0.05, 3);
     // 60 deg/s is the protocol's manual-search ceiling.
-    m_max_velocity = makeSpin(0.1, 60.0, 1.0, 2);
-    m_integral_limit = makeSpin(0.0, 60.0, 0.5, 2);
-    m_derivative_filter = makeSpin(0.0, 1.0, 0.05, 2);
+    m_max_velocity = make_spin(0.1, 60.0, 1.0, 2);
+    m_integral_limit = make_spin(0.0, 60.0, 0.5, 2);
+    m_derivative_filter = make_spin(0.0, 1.0, 0.05, 2);
     m_coast_ms = new QSpinBox();
     m_coast_ms->setRange(0, 5000);
     m_coast_ms->setSingleStep(50);
-    m_coast_ms->setFixedWidth(FieldWidth);
+    m_coast_ms->setFixedWidth(FIELD_WIDTH);
     m_compensate = new QCheckBox();
     limits_form->addRow(tr("Deadband (deg)"), m_deadband);
     limits_form->addRow(tr("Max velocity (deg/s)"), m_max_velocity);
@@ -124,9 +124,9 @@ void PidTuningWindow::setupUi()
     buttons->addWidget(m_save_button);
     root->addLayout(buttons);
 
-    connect(m_reload_button, &QPushButton::clicked, this, &PidTuningWindow::reloadFromConfig);
-    connect(m_apply_button, &QPushButton::clicked, this, &PidTuningWindow::applyToController);
-    connect(m_save_button, &QPushButton::clicked, this, &PidTuningWindow::saveToConfig);
+    connect(m_reload_button, &QPushButton::clicked, this, &PidTuningWindow::reload_from_config);
+    connect(m_apply_button, &QPushButton::clicked, this, &PidTuningWindow::apply_to_controller);
+    connect(m_save_button, &QPushButton::clicked, this, &PidTuningWindow::save_to_config);
 
     // Live apply: tuning means watching the response change as a value moves,
     // and a mandatory Apply click between every nudge makes that unusable.
@@ -135,14 +135,14 @@ void PidTuningWindow::setupUi()
                                           m_derivative_filter};
     for (QDoubleSpinBox *spin : spins) {
         connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-                this, [this](double) { applyToController(); });
+                this, [this](double) { apply_to_controller(); });
     }
     connect(m_coast_ms, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, [this](int) { applyToController(); });
-    connect(m_compensate, &QCheckBox::toggled, this, [this](bool) { applyToController(); });
+            this, [this](int) { apply_to_controller(); });
+    connect(m_compensate, &QCheckBox::toggled, this, [this](bool) { apply_to_controller(); });
 }
 
-void PidTuningWindow::retranslateUi()
+void PidTuningWindow::retranslate_ui()
 {
     setWindowTitle(tr("PTZ Follow Tuning"));
     if (m_gains_group) m_gains_group->setTitle(tr("Gains"));
@@ -160,23 +160,23 @@ void PidTuningWindow::retranslateUi()
 
 void PidTuningWindow::changeEvent(QEvent *event)
 {
-    if (event->type() == QEvent::LanguageChange) retranslateUi();
+    if (event->type() == QEvent::LanguageChange) retranslate_ui();
     QDialog::changeEvent(event);
 }
 
-void PidTuningWindow::toggleVisible()
+void PidTuningWindow::toggle_visible()
 {
     if (isVisible()) {
         hide();
         return;
     }
-    reloadFromConfig();
+    reload_from_config();
     show();
     raise();
     activateWindow();
 }
 
-Config::PidFollowSettings PidTuningWindow::settingsFromUi() const
+Config::PidFollowSettings PidTuningWindow::settings_from_ui() const
 {
     Config::PidFollowSettings settings;
     settings.kp_h = m_kp_h->value();
@@ -194,20 +194,20 @@ Config::PidFollowSettings PidTuningWindow::settingsFromUi() const
     return settings;
 }
 
-void PidTuningWindow::applyToController()
+void PidTuningWindow::apply_to_controller()
 {
-    if (m_controller) m_controller->setSettings(settingsFromUi());
+    if (m_controller) m_controller->set_settings(settings_from_ui());
 }
 
-void PidTuningWindow::saveToConfig()
+void PidTuningWindow::save_to_config()
 {
     if (!m_config) return;
-    m_config->get_data().pid_follow = settingsFromUi();
+    m_config->get_data().pid_follow = settings_from_ui();
     m_config->auto_save();
-    applyToController();
+    apply_to_controller();
 }
 
-void PidTuningWindow::reloadFromConfig()
+void PidTuningWindow::reload_from_config()
 {
     if (!m_config) return;
     const Config::PidFollowSettings &settings = m_config->get_data().pid_follow;
@@ -233,15 +233,15 @@ void PidTuningWindow::reloadFromConfig()
     m_compensate->setChecked(settings.compensate_turret_motion);
 
     for (QWidget *w : widgets) w->blockSignals(false);
-    applyToController();
+    apply_to_controller();
 }
 
-void PidTuningWindow::showTelemetry(double errorH, double errorV,
-                                    double outputH, double outputV, bool active)
+void PidTuningWindow::show_telemetry(double error_h, double error_v,
+                                     double output_h, double output_v, bool active)
 {
     if (m_state_label) m_state_label->setText(active ? tr("following") : tr("idle"));
     if (m_error_label) m_error_label->setText(QStringLiteral("H %1    V %2")
-                                              .arg(errorH, 0, 'f', 3).arg(errorV, 0, 'f', 3));
+                                              .arg(error_h, 0, 'f', 3).arg(error_v, 0, 'f', 3));
     if (m_output_label) m_output_label->setText(QStringLiteral("H %1    V %2")
-                                                .arg(outputH, 0, 'f', 2).arg(outputV, 0, 'f', 2));
+                                                .arg(output_h, 0, 'f', 2).arg(output_v, 0, 'f', 2));
 }

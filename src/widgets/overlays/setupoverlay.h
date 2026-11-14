@@ -21,13 +21,9 @@ class Config;
 
 namespace Ui { class Preferences; }
 
-// Full-window SETUP-mode overlay. Owns the widgets that used to live in the
-// legacy Preferences dialog (instantiated here via Ui::Preferences::setupUi
-// on a hidden form root, then re-parented into 3 horizontal rows of cards),
-// plus a fixed preview sidebar on the right.
-//
-// The overlay is hidden by default. UserPanel toggles it on TopBar mode
-// changes (Setup -> show, Monitor/Scan -> hide).
+// Full-window overlay of the setup mode. Owns the widgets of the Preferences form
+// (Ui::Preferences::setupUi on a hidden root, re-parented into three rows of cards)
+// and a fixed preview sidebar. Hidden by default.
 class SetupOverlay : public QFrame
 {
     Q_OBJECT
@@ -46,20 +42,18 @@ public:
     void bind();
 
     void set_config(Config *config) { m_config = config; }
-    Config *config() const { return m_config; }
+    Config *get_config() const { return m_config; }
 
-    // Direct access to the generated widget struct so UserPanel can attach
-    // additional behavior (icon, theming, custom signal hooks) to specific
-    // widgets. Replaces the legacy `pref->ui->X` pattern.
-    Ui::Preferences *w() const { return m_ui; }
+    // Direct access to the generated widgets, so UserPanel can attach icons, theming
+    // or extra signal hooks to specific ones.
+    Ui::Preferences *get_w() const { return m_ui; }
 
     // Access the row containers / preview sidebar for cards we still inject
     // from UserPanel (PARAMS_STATIC, IMG_GRAB_STATIC, preview thumbnails).
-    QWidget *contentRow(int idx) const;
-    QHBoxLayout *rowLayout(int idx) const;
-    QVBoxLayout *previewSidebarLayout() const { return m_preview_layout; }
+    QWidget *get_content_row(int idx) const;
+    QHBoxLayout *get_row_layout(int idx) const;
+    QVBoxLayout *get_preview_sidebar_layout() const { return m_preview_layout; }
 
-    // Ported from Preferences --
     void data_exchange(bool read);
     void config_ip(bool read, int ip = 0, int gateway = 0, int nic_address = 0);
     void enable_ip_editing(bool enable);
@@ -69,16 +63,15 @@ public:
     void switch_language(bool en, QTranslator *trans);
     void set_ptz_type_enabled(bool enabled);
 
-    // State that used to live on Preferences --
-    bool  split() const         { return m_split; }
-    bool  cameralink() const    { return m_cameralink; }
-    float dist_ns() const       { return m_dist_ns; }
-    void  set_dist_ns(float v)  { m_dist_ns = v; }
+    bool  get_split() const       { return m_split; }
+    bool  get_cameralink() const  { return m_cameralink; }
+    float get_dist_ns() const     { return m_dist_ns; }
+    void  set_dist_ns(float v)    { m_dist_ns = v; }
 
 public slots:
-    // Mirrors Preferences::update_device_list -- DeviceManager signals into this.
+    // DeviceManager signals into this
     void update_device_list(int cmd, QStringList dev_list = QStringList());
-    // Mirrors Preferences::toggle_laser (laser_grp buttonToggled).
+    // connected to laser_grp's buttonToggled
     void toggle_laser(int id, bool on);
 
 signals:
@@ -99,9 +92,9 @@ signals:
 
     // tcu config
     void tcu_type_changed(int idx);
-    void set_auto_rep_freq(bool _auto);
-    void set_auto_mcp(bool _auto);
-    void set_ab_lock(bool _auto);
+    void set_auto_rep_freq(bool is_auto);
+    void set_auto_mcp(bool is_auto);
+    void set_ab_lock(bool is_auto);
     void rep_freq_unit_changed(int idx);
     void base_unit_changed(int idx);
     void max_dist_changed(float dist);
@@ -138,7 +131,6 @@ private:
     Config           *m_config;
     QButtonGroup     *m_laser_grp;
 
-    // Runtime state previously held on Preferences
     bool   m_split;
     bool   m_cameralink;
     float  m_dist_ns;

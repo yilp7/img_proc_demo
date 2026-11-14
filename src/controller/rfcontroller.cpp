@@ -1,7 +1,7 @@
 #include "controller/rfcontroller.h"
 
-RFController::RFController(QObject *parent)
-    : QObject(parent)
+RFController::RFController(QObject *parent) :
+    QObject(parent)
 {
 }
 

@@ -16,7 +16,7 @@ public:
     ~DeveloperOptions();
 
 private:
-    Ui::DeveloperOptions *ui;
+    Ui::DeveloperOptions *m_ui;
 };
 
 #endif // DEVELOPEROPTIONS_H

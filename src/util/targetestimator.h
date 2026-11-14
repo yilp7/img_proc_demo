@@ -7,44 +7,39 @@
 namespace TargetEstimator {
 
 struct Optics {
-    // Range inputs: focal length at the current zoom, and the sensor diagonal
-    // used to derive pixel pitch. Both are zero by default so an Optics that
-    // was never filled from config yields no range rather than a plausible
-    // wrong one — panorama_optics in default.json is the only source.
-    double focalLengthMm = 0.0;
-    double sensorDiagonalMm = 0.0;
+    // Range inputs: focal length at the current zoom and the sensor diagonal, which
+    // gives the pixel pitch. Both default to zero so an Optics never filled from the
+    // config yields no range instead of a plausible wrong one.
+    double focal_length_mm = 0.0;
+    double sensor_diagonal_mm = 0.0;
     // Bearing inputs: full-frame FOV at the current zoom, interpolated from
     // the panorama_optics.zoom_fov calibration.
-    double fovHorizontalDeg = 38.4;
-    double fovVerticalDeg = 22.5;
+    double fov_horizontal_deg = 38.4;
+    double fov_vertical_deg = 22.5;
 };
 
 struct Bearing {
-    double azimuthDeg = 0.0;    // clockwise from true north
-    double elevationDeg = 0.0;  // positive above the horizontal plane
+    double azimuth_deg = 0.0;    // clockwise from true north
+    double elevation_deg = 0.0;  // positive above the horizontal plane
 };
 
-// Range from a known physical height and the box's pixel height:
-//   range = height * focal_px / box_px,  focal_px = frame_h / (2 tan(vfov/2))
-// Returns 0 when the inputs cannot support an estimate (unknown class height,
-// degenerate box or frame). Accuracy is linear in the FOV, so it is only as
-// good as the zoom value behind `optics`.
-double rangeMeters(double targetHeightMeters, const QRect &sourceBox,
-                   const QSize &sourceSize, const Optics &optics);
+// Range from a known physical height and the box's pixel height. Returns 0 when
+// the inputs cannot support an estimate (unknown class height, degenerate box or
+// frame). Accuracy is linear in the FOV, so it is only as good as the zoom value.
+double range_meters(double target_height_meters, const QRect &source_box,
+                    const QSize &source_size, const Optics &optics);
 
 // Angular offset of the box centre from the frame centre, in degrees.
 // Rectilinear (tangent) projection rather than a linear pixels-to-degrees
 // ratio; the two diverge noticeably at the wide end of this lens.
-void offsetFromCentreDeg(const QRect &sourceBox, const QSize &sourceSize,
-                         const Optics &optics, double *horizontalDeg, double *verticalDeg);
+void offset_from_centre_deg(const QRect &source_box, const QSize &source_size,
+                            const Optics &optics, double *horizontal_deg, double *vertical_deg);
 
-// Hull-frame direction (turret angles plus the in-frame offset above) rotated
-// out to true north / horizontal, using the platform attitude. This is the
-// inverse of the G1 geographic-to-hull rotation; with a zero attitude it is
-// the identity. Same assumptions apply: turret not gyro-stabilised, positive
-// roll starboard-down.
-Bearing hullToGeographic(double hullAzimuthDeg, double hullElevationDeg,
-                         double headingDeg, double pitchDeg, double rollDeg);
+// Hull-frame direction (turret angles plus the in-frame offset) rotated to true
+// north and the horizontal plane with the platform attitude: the inverse of the G1
+// rotation. Assumes the turret is not gyro-stabilised and positive roll is starboard-down.
+Bearing hull_to_geographic(double hull_azimuth_deg, double hull_elevation_deg,
+                           double heading_deg, double pitch_deg, double roll_deg);
 
 } // namespace TargetEstimator
 

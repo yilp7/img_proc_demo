@@ -3,19 +3,19 @@
 
 PTZ::PTZ(int index, uchar address, uint speed) :
     ControlPort{index},
-    address(address),
-    angle_h(0),
-    angle_v(0),
-    ptz_speed(speed),
-    pan_speed(speed),
-    tilt_speed(speed)
+    m_address(address),
+    m_angle_h(0),
+    m_angle_v(0),
+    m_ptz_speed(speed),
+    m_pan_speed(speed),
+    m_tilt_speed(speed)
 {
     uchar q0[] = {SYNC_BYTE, address, 0x00, PTZ_QUERY_H, 0x00, 0x00, 0x00};
-    query[0] = QByteArray((char*)q0, 7);
-    query[0][6] = checksum(query[0]);
+    m_query[0] = QByteArray((char*)q0, 7);
+    m_query[0][6] = checksum(m_query[0]);
     uchar q1[] = {SYNC_BYTE, address, 0x00, PTZ_QUERY_V, 0x00, 0x00, 0x00};
-    query[1] = QByteArray((char*)q1, 7);
-    query[1][6] = checksum(query[1]);
+    m_query[1] = QByteArray((char*)q1, 7);
+    m_query[1][6] = checksum(m_query[1]);
 }
 
 PTZ::~PTZ()
@@ -23,12 +23,10 @@ PTZ::~PTZ()
 
 }
 
-// IPTZController interface
-
 void PTZ::ptz_move(int direction, int speed)
 {
-    ptz_speed = std::min(std::max((uchar)speed, uchar(MIN_SPEED)), uchar(MAX_SPEED));
-    // Direction enum values map directly to PARAMS enum (direction + 1 for Pelco-D)
+    m_ptz_speed = std::min(std::max((uchar)speed, uchar(MIN_SPEED)), uchar(MAX_SPEED));
+    // IPTZController directions map onto Params: direction + 1
     ptz_control(direction + 1);
 }
 
@@ -46,8 +44,8 @@ void PTZ::ptz_set_angle(float h, float v)
 void PTZ::ptz_set_angle_h(float h) { ptz_control(SET_H, h); }
 void PTZ::ptz_set_angle_v(float v) { ptz_control(SET_V, v); }
 
-float PTZ::ptz_get_angle_h() const { return (float)angle_h; }
-float PTZ::ptz_get_angle_v() const { return (float)angle_v; }
+float PTZ::ptz_get_angle_h() const { return (float)m_angle_h; }
+float PTZ::ptz_get_angle_v() const { return (float)m_angle_v; }
 
 bool PTZ::ptz_is_connected() const
 {
@@ -56,23 +54,22 @@ bool PTZ::ptz_is_connected() const
 
 double PTZ::get(qint32 ptz_param)
 {
-    switch (ptz_param)
-    {
-        case ANGLE_H: return angle_h;
-        case ANGLE_V: return angle_v;
-        case SPEED:   return ptz_speed;
-        default: return 0;
-        }
+    switch (ptz_param) {
+    case ANGLE_H: return m_angle_h;
+    case ANGLE_V: return m_angle_v;
+    case SPEED:   return m_ptz_speed;
+    default: return 0;
+    }
 }
 
 #if ENABLE_PORT_JSON
 nlohmann::json PTZ::to_json()
 {
     return nlohmann::json{
-        {"address", address},
-        {"angle_h", angle_h},
-        {"angle_v", angle_v},
-        {"speed", ptz_speed},
+        {"address", m_address},
+        {"angle_h", m_angle_h},
+        {"angle_v", m_angle_v},
+        {"speed", m_ptz_speed},
     };
 }
 #endif
@@ -109,40 +106,37 @@ void PTZ::try_communicate()
 
     static int write_idx = 0;
 
-    communicate(query[write_idx], 7, READ_TIMEOUT_MS, true);
+    communicate(m_query[write_idx], 7, READ_TIMEOUT_MS, true);
     QByteArray read;
-    retrieve_mutex.lock();
-    read = last_read;
-    retrieve_mutex.unlock();
+    m_retrieve_mutex.lock();
+    read = m_last_read;
+    m_retrieve_mutex.unlock();
 
-    if (read.size() != 7) successive_count = 0;
+    if (read.size() != 7) m_successive_count = 0;
     int angle_fb = (uchar(read[4]) << 8) + uchar(read[5]);
-    switch (write_idx)
-    {
-        case 0:
-            if (read[3] == char(PTZ_REPLY_H)) {
-                successive_count++;
-                angle_fb %= FULL_ROTATION;
-                double temp_angle = angle_fb / (double)ANGLE_SCALE;
-                // Ensure horizontal angle is always positive (0 to 360)
-                temp_angle = temp_angle < 0 ? temp_angle + 360.0 : temp_angle;
-                emit ptz_param_updated(PTZ::ANGLE_H, angle_h = temp_angle);
-                emit angle_updated((float)angle_h, (float)angle_v);
-            }
-            else successive_count = 0;
-            break;
-        case 1:
-            if (read[3] == char(PTZ_REPLY_V))
-            {
-                successive_count++;
-                angle_fb = (angle_fb + VERTICAL_LIMIT) % FULL_ROTATION - VERTICAL_LIMIT;
-                angle_fb = std::min(std::max(angle_fb, -VERTICAL_LIMIT), VERTICAL_LIMIT);
-                emit ptz_param_updated(PTZ::ANGLE_V, angle_v = angle_fb / (double)ANGLE_SCALE);
-                emit angle_updated((float)angle_h, (float)angle_v);
-            }
-            else successive_count = 0;
-            break;
-        default: break;
+    switch (write_idx) {
+    case 0:
+        if (read[3] == char(PTZ_REPLY_H)) {
+            m_successive_count++;
+            angle_fb %= FULL_ROTATION;
+            double temp_angle = angle_fb / (double)ANGLE_SCALE;
+            temp_angle = temp_angle < 0 ? temp_angle + 360.0 : temp_angle;
+            emit ptz_param_updated(PTZ::ANGLE_H, m_angle_h = temp_angle);
+            emit angle_updated((float)m_angle_h, (float)m_angle_v);
+        }
+        else m_successive_count = 0;
+        break;
+    case 1:
+        if (read[3] == char(PTZ_REPLY_V)) {
+            m_successive_count++;
+            angle_fb = (angle_fb + VERTICAL_LIMIT) % FULL_ROTATION - VERTICAL_LIMIT;
+            angle_fb = std::min(std::max(angle_fb, -VERTICAL_LIMIT), VERTICAL_LIMIT);
+            emit ptz_param_updated(PTZ::ANGLE_V, m_angle_v = angle_fb / (double)ANGLE_SCALE);
+            emit angle_updated((float)m_angle_h, (float)m_angle_v);
+        }
+        else m_successive_count = 0;
+        break;
+    default: break;
     }
 
     write_idx = (write_idx + 1) % 2;
@@ -151,103 +145,99 @@ void PTZ::try_communicate()
 int PTZ::ptz_control(qint32 ptz_param, double val)
 {
     QByteArray command;
-    switch(ptz_param)
+    switch(ptz_param) {
+    case STOP:       { uchar buf[] = {SYNC_BYTE, m_address, 0x00, PTZ_DIR_STOP,       0x00,                    0x00,                    0x00}; command = QByteArray((char*)buf, 7); break; }
+    case UP_LEFT:    { uchar buf[] = {SYNC_BYTE, m_address, 0x00, PTZ_DIR_UP_LEFT,    m_pan_speed,             m_tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
+    case UP:         { uchar buf[] = {SYNC_BYTE, m_address, 0x00, PTZ_DIR_UP,         0x00,                    m_tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
+    case UP_RIGHT:   { uchar buf[] = {SYNC_BYTE, m_address, 0x00, PTZ_DIR_UP_RIGHT,   m_pan_speed,             m_tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
+    case LEFT:       { uchar buf[] = {SYNC_BYTE, m_address, 0x00, PTZ_DIR_LEFT,       m_pan_speed,             0x00,                    0x00}; command = QByteArray((char*)buf, 7); break; }
+    case SELF_CHECK: { uchar buf[] = {SYNC_BYTE, m_address, 0x00, PTZ_DIR_SELF_CHECK, 0x00,                    PTZ_SELF_CHECK_DATA, 0x00}; command = QByteArray((char*)buf, 7); break; }
+    case RIGHT:      { uchar buf[] = {SYNC_BYTE, m_address, 0x00, PTZ_DIR_RIGHT,      m_pan_speed,             0x00,                    0x00}; command = QByteArray((char*)buf, 7); break; }
+    case DOWN_LEFT:  { uchar buf[] = {SYNC_BYTE, m_address, 0x00, PTZ_DIR_DOWN_LEFT,  m_pan_speed,             m_tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
+    case DOWN:       { uchar buf[] = {SYNC_BYTE, m_address, 0x00, PTZ_DIR_DOWN,       0x00,                    m_tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
+    case DOWN_RIGHT: { uchar buf[] = {SYNC_BYTE, m_address, 0x00, PTZ_DIR_DOWN_RIGHT, m_pan_speed,             m_tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
+    case ANGLE_H:
+    case ANGLE_V:
     {
-        case STOP:       { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_STOP,       0x00,                  0x00,                  0x00}; command = QByteArray((char*)buf, 7); break; }
-        case UP_LEFT:    { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_UP_LEFT,    pan_speed,             tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
-        case UP:         { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_UP,         0x00,                  tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
-        case UP_RIGHT:   { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_UP_RIGHT,   pan_speed,             tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
-        case LEFT:       { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_LEFT,       pan_speed,             0x00,                  0x00}; command = QByteArray((char*)buf, 7); break; }
-        case SELF_CHECK: { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_SELF_CHECK, 0x00,                  PTZ_SELF_CHECK_DATA, 0x00}; command = QByteArray((char*)buf, 7); break; }
-        case RIGHT:      { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_RIGHT,      pan_speed,             0x00,                  0x00}; command = QByteArray((char*)buf, 7); break; }
-        case DOWN_LEFT:  { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_DOWN_LEFT,  pan_speed,             tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
-        case DOWN:       { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_DOWN,       0x00,                  tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
-        case DOWN_RIGHT: { uchar buf[] = {SYNC_BYTE, address, 0x00, PTZ_DIR_DOWN_RIGHT, pan_speed,             tilt_speed,            0x00}; command = QByteArray((char*)buf, 7); break; }
-        case ANGLE_H:
-        case ANGLE_V:
-        {
-            uchar buffer_out[7] = {0};
-            buffer_out[0] = SYNC_BYTE;
-            buffer_out[1] = address;
-            buffer_out[2] = 0x00;
-            buffer_out[3] = ptz_param == ANGLE_H ? PTZ_QUERY_H : PTZ_QUERY_V;
-            buffer_out[4] = 0x00;
-            buffer_out[5] = 0x00;
-            buffer_out[6] = ptz_param == ANGLE_H ? 0x52 : 0x54;
-            command = QByteArray((char*)buffer_out, 7);
-            break;
-        }
-        case SET_H:
-        {
-            int angle = (int((angle_h = val) * ANGLE_SCALE) % FULL_ROTATION + FULL_ROTATION) % FULL_ROTATION;
-            uchar buffer_out[7] = {0};
-            buffer_out[0] = SYNC_BYTE;
-            buffer_out[1] = address;
-            buffer_out[2] = 0x00;
-            buffer_out[3] = PTZ_SET_H;
-            buffer_out[4] = (angle >> 8) & 0xFF;
-            buffer_out[5] = angle & 0xFF;
-            buffer_out[6] = 0x00;
-            command = QByteArray((char*)buffer_out, 7);
-            break;
-        }
-        case SET_V:
-        {
-            int angle = (int(std::min(std::max(angle_v = val, -VERTICAL_DEG), VERTICAL_DEG) * ANGLE_SCALE) % FULL_ROTATION + FULL_ROTATION) % FULL_ROTATION;
-            uchar buffer_out[7] = {0};
-            buffer_out[0] = SYNC_BYTE;
-            buffer_out[1] = address;
-            buffer_out[2] = 0x00;
-            buffer_out[3] = PTZ_SET_V;
-            buffer_out[4] = (angle >> 8) & 0xFF;
-            buffer_out[5] = angle & 0xFF;
-            buffer_out[6] = 0x00;
-            command = QByteArray((char*)buffer_out, 7);
-            break;
-        }
-        case SPEED:   ptz_speed = pan_speed = tilt_speed = std::min(std::max((uchar)val, uchar(MIN_SPEED)), uchar(MAX_SPEED)); return 0;
-        case SPEED_H: pan_speed  = std::min(std::max((uchar)val, uchar(MIN_SPEED)), uchar(MAX_SPEED)); return 0;
-        case SPEED_V: tilt_speed = std::min(std::max((uchar)val, uchar(MIN_SPEED)), uchar(MAX_SPEED)); return 0;
-        case ADDRESS: address = val; return 0;
-        default: return -11111;
+        uchar buffer_out[7] = {0};
+        buffer_out[0] = SYNC_BYTE;
+        buffer_out[1] = m_address;
+        buffer_out[2] = 0x00;
+        buffer_out[3] = ptz_param == ANGLE_H ? PTZ_QUERY_H : PTZ_QUERY_V;
+        buffer_out[4] = 0x00;
+        buffer_out[5] = 0x00;
+        buffer_out[6] = ptz_param == ANGLE_H ? 0x52 : 0x54;
+        command = QByteArray((char*)buffer_out, 7);
+        break;
+    }
+    case SET_H:
+    {
+        int angle = (int((m_angle_h = val) * ANGLE_SCALE) % FULL_ROTATION + FULL_ROTATION) % FULL_ROTATION;
+        uchar buffer_out[7] = {0};
+        buffer_out[0] = SYNC_BYTE;
+        buffer_out[1] = m_address;
+        buffer_out[2] = 0x00;
+        buffer_out[3] = PTZ_SET_H;
+        buffer_out[4] = (angle >> 8) & 0xFF;
+        buffer_out[5] = angle & 0xFF;
+        buffer_out[6] = 0x00;
+        command = QByteArray((char*)buffer_out, 7);
+        break;
+    }
+    case SET_V:
+    {
+        int angle = (int(std::min(std::max(m_angle_v = val, -VERTICAL_DEG), VERTICAL_DEG) * ANGLE_SCALE) % FULL_ROTATION + FULL_ROTATION) % FULL_ROTATION;
+        uchar buffer_out[7] = {0};
+        buffer_out[0] = SYNC_BYTE;
+        buffer_out[1] = m_address;
+        buffer_out[2] = 0x00;
+        buffer_out[3] = PTZ_SET_V;
+        buffer_out[4] = (angle >> 8) & 0xFF;
+        buffer_out[5] = angle & 0xFF;
+        buffer_out[6] = 0x00;
+        command = QByteArray((char*)buffer_out, 7);
+        break;
+    }
+    case SPEED:   m_ptz_speed = m_pan_speed = m_tilt_speed = std::min(std::max((uchar)val, uchar(MIN_SPEED)), uchar(MAX_SPEED)); return 0;
+    case SPEED_H: m_pan_speed  = std::min(std::max((uchar)val, uchar(MIN_SPEED)), uchar(MAX_SPEED)); return 0;
+    case SPEED_V: m_tilt_speed = std::min(std::max((uchar)val, uchar(MIN_SPEED)), uchar(MAX_SPEED)); return 0;
+    case ADDRESS: m_address = val; return 0;
+    default: return -11111;
     }
     command[6] = checksum(command);
-    switch (ptz_param)
+    switch (ptz_param) {
+    case ANGLE_H:
+    case ANGLE_V:
     {
-        case ANGLE_H:
-        case ANGLE_V:
-        {
-            communicate(command, 7, READ_TIMEOUT_MS);
-            QByteArray read;
-            retrieve_mutex.lock();
-            read = last_read;
-            retrieve_mutex.unlock();
+        communicate(command, 7, READ_TIMEOUT_MS);
+        QByteArray read;
+        m_retrieve_mutex.lock();
+        read = m_last_read;
+        m_retrieve_mutex.unlock();
 
-            int angle = (uchar(read[4]) << 8) + uchar(read[5]);
-            switch (ptz_param)
+        int angle = (uchar(read[4]) << 8) + uchar(read[5]);
+        switch (ptz_param) {
+        case ANGLE_H:
+            angle %= FULL_ROTATION;
             {
-                case ANGLE_H:
-                    angle %= FULL_ROTATION;
-                    {
-                        double temp_angle = angle / (double)ANGLE_SCALE;
-                        // Ensure horizontal angle is always positive (0 to 360)
-                        temp_angle = temp_angle < 0 ? temp_angle + 360.0 : temp_angle;
-                        emit ptz_param_updated(ptz_param, angle_h = temp_angle);
-                        emit angle_updated((float)angle_h, (float)angle_v);
-                    }
-                    break;
-                case ANGLE_V:
-                    angle = (angle + VERTICAL_LIMIT) % FULL_ROTATION - VERTICAL_LIMIT;
-                    angle = std::min(std::max(angle, -VERTICAL_LIMIT), VERTICAL_LIMIT);
-                    emit ptz_param_updated(ptz_param, angle_v = angle / (double)ANGLE_SCALE);
-                    emit angle_updated((float)angle_h, (float)angle_v);
-                    break;
+                double temp_angle = angle / (double)ANGLE_SCALE;
+                temp_angle = temp_angle < 0 ? temp_angle + 360.0 : temp_angle;
+                emit ptz_param_updated(ptz_param, m_angle_h = temp_angle);
+                emit angle_updated((float)m_angle_h, (float)m_angle_v);
             }
             break;
-        }
-        default:
-            communicate(command, 0, READ_TIMEOUT_MS);
+        case ANGLE_V:
+            angle = (angle + VERTICAL_LIMIT) % FULL_ROTATION - VERTICAL_LIMIT;
+            angle = std::min(std::max(angle, -VERTICAL_LIMIT), VERTICAL_LIMIT);
+            emit ptz_param_updated(ptz_param, m_angle_v = angle / (double)ANGLE_SCALE);
+            emit angle_updated((float)m_angle_h, (float)m_angle_v);
             break;
+        }
+        break;
+    }
+    default:
+        communicate(command, 0, READ_TIMEOUT_MS);
+        break;
     }
         return 0;
 }
@@ -270,7 +260,7 @@ void PTZ::load_from_json(const nlohmann::json &j)
         if (j.contains("angle_v") && j["angle_v"].is_number())
             ptz_control(SET_V, j["angle_v"].get<double>());
     }
-    catch (const nlohmann::json::exception& e) {
+    catch (const nlohmann::json::exception &e) {
         qWarning("JSON parsing error in PTZ configuration: %s", e.what());
     }
 
@@ -285,8 +275,8 @@ void PTZ::send_ctrl_cmd(uchar dir)
     command[1] = 0x01;
     command[2] = 0x00;
     command[3] = dir;
-    command[4] = dir < 5 ? ptz_speed : 0x00;
-    command[5] = dir > 5 ? ptz_speed : 0x00;
+    command[4] = dir < 5 ? m_ptz_speed : 0x00;
+    command[5] = dir > 5 ? m_ptz_speed : 0x00;
     command[6] = checksum(command);
 
     communicate(command, 0, 0);

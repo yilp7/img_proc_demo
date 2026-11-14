@@ -19,15 +19,13 @@ Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
 #pragma comment(lib, "user32.lib")
 #endif
 
-int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
+int generate_mini_dump(PEXCEPTION_POINTERS exception_pointers)
 {
-    // check if dmp folder exists
     const QString native_dump_directory = QDir::toNativeSeparators(g_dump_directory);
-    DWORD dwStatus = GetFileAttributesW(
+    DWORD status = GetFileAttributesW(
         reinterpret_cast<LPCWSTR>(native_dump_directory.utf16()));
-    if ((dwStatus == INVALID_FILE_ATTRIBUTES) || !(dwStatus & FILE_ATTRIBUTE_DIRECTORY)) return EXCEPTION_EXECUTE_HANDLER;
+    if ((status == INVALID_FILE_ATTRIBUTES) || !(status & FILE_ATTRIBUTE_DIRECTORY)) return EXCEPTION_EXECUTE_HANDLER;
 
-    // define function ptr
     typedef BOOL(WINAPI * MiniDumpWriteDumpT)(
         HANDLE,
         DWORD,
@@ -37,52 +35,45 @@ int GenerateMiniDump(PEXCEPTION_POINTERS pExceptionPointers)
         PMINIDUMP_USER_STREAM_INFORMATION,
         PMINIDUMP_CALLBACK_INFORMATION
         );
-    // load function MiniDumpWriteDump from DbgHelp.dll
-    MiniDumpWriteDumpT pfnMiniDumpWriteDump = NULL;
-    HMODULE hDbgHelp = LoadLibraryW(L"DbgHelp.dll");
-    if (NULL == hDbgHelp)
-    {
+    MiniDumpWriteDumpT write_dump = nullptr;
+    HMODULE dbg_help = LoadLibraryW(L"DbgHelp.dll");
+    if (nullptr == dbg_help) {
         return EXCEPTION_CONTINUE_EXECUTION;
     }
-    pfnMiniDumpWriteDump = (MiniDumpWriteDumpT)GetProcAddress(hDbgHelp, "MiniDumpWriteDump");
+    write_dump = (MiniDumpWriteDumpT)GetProcAddress(dbg_help, "MiniDumpWriteDump");
 
-    if (NULL == pfnMiniDumpWriteDump)
-    {
-        FreeLibrary(hDbgHelp);
+    if (nullptr == write_dump) {
+        FreeLibrary(dbg_help);
         return EXCEPTION_CONTINUE_EXECUTION;
     }
-    // create dump file
     const QString dump_file_path = QDir::toNativeSeparators(
         QDir(g_dump_directory).filePath(
             "DumpFile" + QDateTime::currentDateTime().toString("-yyyyMMdd-hhmmss") + ".dmp"));
-    HANDLE hDumpFile = CreateFileW(reinterpret_cast<LPCWSTR>(dump_file_path.utf16()),
+    HANDLE dump_file = CreateFileW(reinterpret_cast<LPCWSTR>(dump_file_path.utf16()),
                                    GENERIC_READ | GENERIC_WRITE,
                                    FILE_SHARE_WRITE | FILE_SHARE_READ,
                                    0, CREATE_ALWAYS, 0, 0);
-    if (INVALID_HANDLE_VALUE == hDumpFile)
-    {
-        FreeLibrary(hDbgHelp);
+    if (INVALID_HANDLE_VALUE == dump_file) {
+        FreeLibrary(dbg_help);
         return EXCEPTION_CONTINUE_EXECUTION;
     }
-    // write dump file
-    MINIDUMP_EXCEPTION_INFORMATION expParam;
-    expParam.ThreadId = GetCurrentThreadId();
-    expParam.ExceptionPointers = pExceptionPointers;
-    expParam.ClientPointers = FALSE;
-    pfnMiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(),
-        hDumpFile, MiniDumpWithDataSegs, (pExceptionPointers ? &expParam : NULL), NULL, NULL);
-    // release file handle
-    CloseHandle(hDumpFile);
-    FreeLibrary(hDbgHelp);
+    MINIDUMP_EXCEPTION_INFORMATION exp_param;
+    exp_param.ThreadId = GetCurrentThreadId();
+    exp_param.ExceptionPointers = exception_pointers;
+    exp_param.ClientPointers = FALSE;
+    write_dump(GetCurrentProcess(), GetCurrentProcessId(),
+        dump_file, MiniDumpWithDataSegs, (exception_pointers ? &exp_param : nullptr), nullptr, nullptr);
+    CloseHandle(dump_file);
+    FreeLibrary(dbg_help);
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
-LONG WINAPI ExceptionFilter(LPEXCEPTION_POINTERS lpExceptionInfo)
+LONG WINAPI exception_filter(LPEXCEPTION_POINTERS exception_info)
 {
     if (IsDebuggerPresent()) {
         return EXCEPTION_CONTINUE_SEARCH;
     }
-    return GenerateMiniDump(lpExceptionInfo);
+    return generate_mini_dump(exception_info);
 }
 #endif
 
@@ -94,8 +85,7 @@ void log_message(QtMsgType type, const QMessageLogContext &context, const QStrin
     static QMutex mutex;
     mutex.lock();
     QString text = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz ");
-    switch(type)
-    {
+    switch(type) {
     case QtDebugMsg:
         text += QString("[Debug] ");
         break;
@@ -139,8 +129,9 @@ int main(int argc, char *argv[])
     if (startup_config.get_data().debug.generate_dmp) {
         g_dump_directory = QDir(QCoreApplication::applicationDirPath()).filePath("dmp");
         if (QDir().mkpath(g_dump_directory)) {
-            SetUnhandledExceptionFilter(ExceptionFilter);
-        } else {
+            SetUnhandledExceptionFilter(exception_filter);
+        }
+        else {
             qWarning() << "Cannot create dump directory:" << g_dump_directory;
         }
     }
@@ -201,9 +192,9 @@ int main(int argc, char *argv[])
 
     a.setFont(monaco);
 
-    stylesheet_dark = ThemeManager::instance().buildStyleSheet("gruvbox", "dark");
-    stylesheet_light = ThemeManager::instance().buildStyleSheet("gruvbox", "light");
-    ThemeManager::instance().setCurrentTheme("gruvbox", "dark");
+    stylesheet_dark = ThemeManager::instance().build_style_sheet("gruvbox", "dark");
+    stylesheet_light = ThemeManager::instance().build_style_sheet("gruvbox", "light");
+    ThemeManager::instance().set_current_theme("gruvbox", "dark");
 
     app_color_mode = 0;
 

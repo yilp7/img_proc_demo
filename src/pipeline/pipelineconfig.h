@@ -47,12 +47,9 @@ struct PipelineConfig {
     bool integrate_info = true;
     int img_format = 0;
 
-    // Per-display GENERAL-tab toggles. Session-only — never persisted to
-    // config file (see [[feedback-per-display-toggles-not-persisted]]).
-    // image_3d / pseudocolor are read in display-routing paths (layout +
-    // pixel-format selection), enable_3d / pseudocolor_enabled in the
-    // pipeline's 3D + colormap stages. Same checkbox drives both halves of
-    // each pair — duplication preserved from the old ProcessingParams shape.
+    // Per-display toggles of the GENERAL tab. Session only, never saved to the config.
+    // image_3d / pseudocolor steer display routing; enable_3d / pseudocolor_enabled
+    // steer the pipeline stages. One checkbox drives both halves of each pair.
     bool frame_avg_enabled = false;
     int  frame_avg_mode    = 0;
     bool enable_3d         = false;
@@ -64,7 +61,7 @@ struct PipelineConfig {
 
     // from YoloSettings
     QString config_path;
-    int model_idx = 0;  // YOLO model index for this display (per-display since T3 C1a)
+    int model_idx = 0;  // YOLO model index for this display
     QString visible_model_path;
     QString visible_classes_file;
     QString thermal_model_path;

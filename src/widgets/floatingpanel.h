@@ -10,39 +10,34 @@ class QVBoxLayout;
 class QHBoxLayout;
 class QMouseEvent;
 
-// Base class for draggable / pinnable / hideable panels that float inside a
-// parent widget (OpticsPanel, TCUPanel, ConsolePanel subclass this).
-//
-// Transparency: enabled via QSS `background-color: rgba(...)` on the
-// FloatingPanel class. Avoids Qt::WA_TranslucentBackground so behavior is the
-// same across platforms. If transparency proves unreliable at integration
-// time, callers can paint an opaque background via QSS without changing this
-// class — transparency is a nice-to-have, not a contract.
+// Base class of the draggable, pinnable, hideable panels that float inside a parent
+// widget. Transparency comes from the stylesheet (rgba background), not from
+// Qt::WA_TranslucentBackground, so it behaves the same on every platform.
 class FloatingPanel : public QWidget
 {
     Q_OBJECT
 public:
     explicit FloatingPanel(QWidget *parent = nullptr);
 
-    void setTitle(const QString &title);
-    QString title() const;
+    void set_title(const QString &title);
+    QString get_title() const;
 
-    void setPinned(bool pinned);
-    bool isPinned() const { return m_pinned; }
+    void set_pinned(bool pinned);
+    bool is_pinned() const { return m_pinned; }
 
     // Subclasses add child widgets into this layout; the header is never
     // inside it, so subclasses cannot accidentally break the drag surface.
-    QVBoxLayout* contentLayout() const { return m_content_layout; }
+    QVBoxLayout *get_content_layout() const { return m_content_layout; }
 
     // Clamp helper exposed for unit testing the drag math in isolation.
-    static QPoint clampToParent(const QPoint &desiredTopLeft,
-                                const QSize &panelSize,
-                                const QSize &parentSize);
+    static QPoint clamp_to_parent(const QPoint &desired_top_left,
+                                  const QSize &panel_size,
+                                  const QSize &parent_size);
 
 signals:
-    void pinToggled(bool pinned);
-    void hideRequested();
-    void dragged(QPoint newTopLeft);
+    void pin_toggled(bool pinned);
+    void hide_requested();
+    void dragged(QPoint new_top_left);
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
@@ -50,8 +45,8 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override;
 
 private slots:
-    void onPinClicked();
-    void onHideClicked();
+    void on_pin_clicked();
+    void on_hide_clicked();
 
 private:
     QWidget      *m_header;

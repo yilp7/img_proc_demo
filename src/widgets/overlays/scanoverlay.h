@@ -14,16 +14,9 @@ class QRadioButton;
 class QLabel;
 class ScanController;
 
-// Full-window SCAN-mode overlay. A single horizontal row of config group cards
-// inside a QScrollArea (left) plus a fixed preview sidebar (right, ~220 px).
-//
-// Owns the widget→params sync that used to live on ScanConfig (S22):
-// `bind()` plugs in pointers to the re-parented widgets + the ScanController;
-// `setup_hz` / `setup_unit` swap the μs↔ns↔m display modes; the
-// `update_scan_tcu` / `update_scan_ptz` slots run derivation rules on edit;
-// `loadFromParams` pushes m_params back into the widgets after a preset load.
-//
-// Hidden by default; UserPanel toggles on TopBar::modeChanged(Scan).
+// Full-window overlay of the scan mode: a scrollable row of setting cards and a
+// fixed preview sidebar. Keeps the widgets in sync with ScanController::get_params():
+// bind() connects them, load_from_params() pushes the values back after a preset load.
 class ScanOverlay : public QFrame
 {
     Q_OBJECT
@@ -31,19 +24,16 @@ public:
     explicit ScanOverlay(QWidget *parent = nullptr);
 
     // The QWidget whose layout holds the cards row (pass as parent_w to addWidget).
-    QWidget     *contentWidget()  const { return m_cards_container; }
+    QWidget     *get_content_widget()  const { return m_cards_container; }
 
-    // QHBoxLayout of the cards row — callers addWidget() cards here, then
-    // addStretch(1) once all cards are inserted.
-    QHBoxLayout *cardsLayout()    const { return m_cards_layout; }
+    // the row's QHBoxLayout: callers add their cards, then one stretch
+    QHBoxLayout *get_cards_layout()    const { return m_cards_layout; }
 
-    // QVBoxLayout of the right preview sidebar (task 19.5).
-    QVBoxLayout *previewLayout()  const { return m_preview_layout; }
+    // QVBoxLayout of the right preview sidebar
+    QVBoxLayout *get_preview_layout()  const { return m_preview_layout; }
 
-    // ── S22: ScanConfig replacement ─────────────────────────────────────────
-    // Widget pointers UserPanel hands over after re-parenting them into the
-    // SCAN overlay cards. All optional — leave fields null for widgets that
-    // don't exist in a given layout (none currently).
+    // Widget pointers UserPanel hands over. All are optional: a null field means the
+    // widget does not exist in the layout.
     struct Widgets {
         QLineEdit  *start_delay_u   = nullptr;
         QLineEdit  *start_delay_n   = nullptr;
@@ -119,26 +109,22 @@ public:
         QWidget    *unit_ns_4       = nullptr;
     };
 
-    // Plug in the controller + widget references and wire all signal/slot
-    // connections that used to be set up in ScanConfig's constructor.
-    // After this returns, widget edits propagate into ScanController::params().
+    // Stores the controller and the widgets and makes the connections. After it
+    // returns, widget edits go into ScanController::get_params().
     void bind(ScanController *ctrl, const Widgets &w);
 
-    // Push ScanController::params() values back to the widgets. Used after
-    // preset LOAD (replaces ScanConfig::data_exchange(false)).
-    void loadFromParams();
+    // Pushes ScanController::get_params() back into the widgets, after a preset load.
+    void load_from_params();
 
-    // Switch frequency display unit (kHz / Hz). Stores hz_unit in params,
-    // updates rep_freq edit + label. Replaces ScanConfig::setup_hz.
+    // Switches the frequency unit (kHz / Hz): stores hz_unit and updates the rep_freq edit and label.
     void setup_hz(int idx);
 
-    // Switch base unit (0 ns, 1 μs, 2 m). Shows/hides μs/ns vs m widget
-    // groups, updates step-unit labels, rewrites step edits.
-    // Replaces ScanConfig::setup_unit.
+    // Switches the base unit (0 ns, 1 μs, 2 m): shows the matching widget group and
+    // rewrites the step labels and edits.
     void setup_unit(int idx);
 
 private slots:
-    // Widget edits → ScanController::params() (with derivation rules).
+    // widget edits to ScanController::get_params(), with the derivation rules
     void on_tcu_edit();
     void on_ptz_edit();
     void on_capture_ori(int s);

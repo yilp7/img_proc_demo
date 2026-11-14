@@ -2,8 +2,9 @@
 
 #include <QVBoxLayout>
 
-RightStackContainer::RightStackContainer(QWidget *parent)
-    : QFrame(parent), m_layout(nullptr)
+RightStackContainer::RightStackContainer(QWidget *parent) :
+    QFrame(parent),
+    m_layout(nullptr)
 {
     setObjectName("RIGHT_STACK");
     m_layout = new QVBoxLayout(this);
@@ -11,7 +12,7 @@ RightStackContainer::RightStackContainer(QWidget *parent)
     m_layout->setSpacing(6);
 }
 
-void RightStackContainer::addSection(QWidget *w, int stretch)
+void RightStackContainer::add_section(QWidget *w, int stretch)
 {
     if (!w) return;
     w->setParent(this);

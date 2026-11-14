@@ -7,7 +7,7 @@ class HuanYu : public ControlPort
 {
     Q_OBJECT
 public:
-    enum PARAMS {
+    enum Params {
         ZOOM_STOP  = 0x01,
         ZOOM_IN    = 0x02,
         ZOOM_OUT   = 0x03,
@@ -35,7 +35,7 @@ protected slots:
     int cam_control(qint32 cam_param, uint val = 0);
 
 private:
-    std::map<int, QByteArray> commands = {
+    std::map<int, QByteArray> m_commands = {
         {ZOOM_STOP, QByteArray("\x81\x01\x04\x07\x00\xFF", 6)},
         {ZOOM_IN,   QByteArray("\x81\x01\x04\x07\x20\xFF", 6)},
         {ZOOM_OUT,  QByteArray("\x81\x01\x04\x07\x30\xFF", 6)},
@@ -55,7 +55,7 @@ private:
         {OSD_OFF, QByteArray("\x81\x01\x04\x74\x3F\xFF", 6)},
     };
 
-    uchar speed;
+    uchar m_speed;
 };
 
 #endif // HUANYU_H

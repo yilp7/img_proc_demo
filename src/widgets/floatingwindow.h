@@ -9,7 +9,7 @@ class FloatingWindow : public QWidget
 public:
     explicit FloatingWindow();
 
-    Display* get_display_widget();
+    Display *get_display_widget();
     void resize_display(int width, int height);
 
 protected:
@@ -21,15 +21,15 @@ protected:
 
 public:
     // ui-control
-    bool            pressed;
-    QPoint          prev_pos;
-    QElapsedTimer   timer_mouse;
+    bool            m_pressed;
+    QPoint          m_prev_pos;
+    QElapsedTimer   m_timer_mouse;
 
 private:
-    Display* disp;
-    QFrame*  frame;
+    Display *m_disp;
+    QFrame  *m_frame;
 
-    int      w, h;
+    int      m_w, m_h;
 };
 
 #endif // FLOATINGWINDOW_H

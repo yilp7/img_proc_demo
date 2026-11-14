@@ -5,14 +5,9 @@
 #include <QString>
 #include <opencv2/core.hpp>
 
-// Thread-safe parameter snapshot for grab_thread_process().
-// GUI thread writes via update_processing_params() under m_params_mutex;
-// worker thread copies at loop start.
-//
-// Per-display GENERAL-tab toggles (frame_avg / enable_3d / image_3d /
-// enhance / enhance_option / pseudocolor / pseudocolor_enabled / 3D
-// threshold) moved to PipelineConfig (DisplaySlot::pcfg) — they're per
-// display now, driven by the display picker on the GENERAL tab.
+// Snapshot of UI state for the pipeline thread. The GUI thread writes it through
+// update_processing_params() under m_params_mutex; the worker copies it at loop start.
+// Per-display toggles live in PipelineConfig.
 struct ProcessingParams {
     // global UI sliders / toggles (single value applies to whichever
     // display the pipeline is producing for).
@@ -36,7 +31,7 @@ struct ProcessingParams {
     int       display_width = 0;
     int       display_height = 0;
 
-    // from Preferences
+    // from the setup overlay
     bool    split              = false;
     QString custom_info_text;
 };

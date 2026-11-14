@@ -19,9 +19,9 @@ protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
 
 private:
-    Ui::SerialServer *ui;
+    Ui::SerialServer *m_ui;
 
-    QComboBox *port_type_lists[4];
+    QComboBox *m_port_type_lists[4];
 };
 
 #endif // SERIALSERVER_H

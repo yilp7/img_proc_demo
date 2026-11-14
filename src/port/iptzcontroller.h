@@ -3,7 +3,8 @@
 
 #include <QObject>
 
-class IPTZController {
+class IPTZController
+{
 public:
     virtual ~IPTZController() = default;
 
@@ -24,11 +25,10 @@ public:
     };
 
     virtual void ptz_move(int direction, int speed) = 0;
-    // Joystick path: independent pan/tilt speeds. Backends that natively
-    // support two-axis speeds (UDPPTZ, Pelco-D) should override. The
-    // default falls back to single-speed move using the larger axis so
-    // older backends keep working.
-    virtual void ptz_move_2d(int direction, int h_speed, int v_speed) {
+    // Joystick path with independent pan and tilt speeds. Backends with two-axis speed
+    // (UDPPTZ, Pelco-D) override it; the default moves at the larger of the two.
+    virtual void ptz_move_2d(int direction, int h_speed, int v_speed)
+    {
         ptz_move(direction, (h_speed > v_speed) ? h_speed : v_speed);
     }
     virtual void ptz_stop() = 0;
@@ -41,7 +41,7 @@ public:
 
     // All implementors must define signal: angle_updated(float h, float v)
     // Returns the QObject pointer for connect()
-    virtual QObject* ptz_qobject() = 0;
+    virtual QObject *ptz_qobject() = 0;
 };
 
 #endif // IPTZCONTROLLER_H

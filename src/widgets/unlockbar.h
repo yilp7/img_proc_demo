@@ -8,49 +8,48 @@ class QMouseEvent;
 class QPaintEvent;
 class QTimer;
 
-// Striped safety slider. User must drag the thumb across most of the width
-// to unlock. Gates the laser-ON transition only — turning the laser OFF is
-// the caller's responsibility and bypasses this widget.
+// Striped safety slider: the thumb has to be dragged across most of the width to
+// unlock. It gates switching the laser on only; switching off bypasses it.
 class UnlockBar : public QWidget
 {
     Q_OBJECT
-    Q_PROPERTY(QColor trackBackgroundColor READ trackBackgroundColor WRITE setTrackBackgroundColor)
-    Q_PROPERTY(QColor stripeColor READ stripeColor WRITE setStripeColor)
-    Q_PROPERTY(QColor trackEdgeColor READ trackEdgeColor WRITE setTrackEdgeColor)
-    Q_PROPERTY(QColor thumbLockedColor READ thumbLockedColor WRITE setThumbLockedColor)
-    Q_PROPERTY(QColor thumbUnlockedColor READ thumbUnlockedColor WRITE setThumbUnlockedColor)
-    Q_PROPERTY(QColor thumbEdgeArmedColor READ thumbEdgeArmedColor WRITE setThumbEdgeArmedColor)
-    Q_PROPERTY(QColor thumbEdgePassColor READ thumbEdgePassColor WRITE setThumbEdgePassColor)
+    Q_PROPERTY(QColor trackBackgroundColor READ get_track_background_color WRITE set_track_background_color)
+    Q_PROPERTY(QColor stripeColor READ get_stripe_color WRITE set_stripe_color)
+    Q_PROPERTY(QColor trackEdgeColor READ get_track_edge_color WRITE set_track_edge_color)
+    Q_PROPERTY(QColor thumbLockedColor READ get_thumb_locked_color WRITE set_thumb_locked_color)
+    Q_PROPERTY(QColor thumbUnlockedColor READ get_thumb_unlocked_color WRITE set_thumb_unlocked_color)
+    Q_PROPERTY(QColor thumbEdgeArmedColor READ get_thumb_edge_armed_color WRITE set_thumb_edge_armed_color)
+    Q_PROPERTY(QColor thumbEdgePassColor READ get_thumb_edge_pass_color WRITE set_thumb_edge_pass_color)
 public:
     explicit UnlockBar(QWidget *parent = nullptr);
 
     // Unlock threshold as a fraction of the track width. Default 0.9.
     // Clamped to (0, 1].
-    void   setUnlockThreshold(double fraction);
-    double unlockThreshold() const { return m_threshold; }
+    void   set_unlock_threshold(double fraction);
+    double get_unlock_threshold() const { return m_threshold; }
 
     // Auto-relock timeout in ms. Default 3000. Set to 0 to disable auto-
     // relock (in which case the caller is responsible for calling relock()).
-    void setRelockMs(int ms);
-    int  relockMs() const { return m_relock_ms; }
+    void set_relock_ms(int ms);
+    int  get_relock_ms() const { return m_relock_ms; }
 
-    bool isUnlocked() const { return m_unlocked; }
+    bool is_unlocked() const { return m_unlocked; }
 
-    QColor trackBackgroundColor() const { return m_track_bg_color; }
-    QColor stripeColor() const { return m_stripe_color; }
-    QColor trackEdgeColor() const { return m_track_edge_color; }
-    QColor thumbLockedColor() const { return m_thumb_locked_color; }
-    QColor thumbUnlockedColor() const { return m_thumb_unlocked_color; }
-    QColor thumbEdgeArmedColor() const { return m_thumb_edge_armed_color; }
-    QColor thumbEdgePassColor() const { return m_thumb_edge_pass_color; }
+    QColor get_track_background_color() const { return m_track_bg_color; }
+    QColor get_stripe_color() const { return m_stripe_color; }
+    QColor get_track_edge_color() const { return m_track_edge_color; }
+    QColor get_thumb_locked_color() const { return m_thumb_locked_color; }
+    QColor get_thumb_unlocked_color() const { return m_thumb_unlocked_color; }
+    QColor get_thumb_edge_armed_color() const { return m_thumb_edge_armed_color; }
+    QColor get_thumb_edge_pass_color() const { return m_thumb_edge_pass_color; }
 
-    void setTrackBackgroundColor(const QColor &color);
-    void setStripeColor(const QColor &color);
-    void setTrackEdgeColor(const QColor &color);
-    void setThumbLockedColor(const QColor &color);
-    void setThumbUnlockedColor(const QColor &color);
-    void setThumbEdgeArmedColor(const QColor &color);
-    void setThumbEdgePassColor(const QColor &color);
+    void set_track_background_color(const QColor &color);
+    void set_stripe_color(const QColor &color);
+    void set_track_edge_color(const QColor &color);
+    void set_thumb_locked_color(const QColor &color);
+    void set_thumb_unlocked_color(const QColor &color);
+    void set_thumb_edge_armed_color(const QColor &color);
+    void set_thumb_edge_pass_color(const QColor &color);
 
 public slots:
     // Force the bar back to the locked state. Safe to call when already
@@ -68,16 +67,16 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override;
 
 private slots:
-    void onRelockTimeout();
+    void on_relock_timeout();
 
 private:
-    int  trackLeft()   const;
-    int  trackRight()  const;
-    int  trackWidth()  const;
-    int  thumbWidth()  const;
+    int  track_left()    const;
+    int  track_right()   const;
+    int  track_width()   const;
+    int  thumb_width()   const;
 
-    void setThumbX(int x);
-    void springBack();
+    void set_thumb_x(int x);
+    void spring_back();
 
     double  m_threshold;
     int     m_relock_ms;

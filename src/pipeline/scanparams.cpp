@@ -5,8 +5,8 @@
 
 namespace {
 
-const int kMaxPanoramaStops = 2000;
-const double kPi = 3.14159265358979323846;
+const int MAX_PANORAMA_STOPS = 2000;
+const double PI = 3.14159265358979323846;
 
 struct PanoramaCalibrationPoint {
     double zoom;
@@ -26,7 +26,7 @@ float normalize_angle(float value)
 int clamp_count(int count)
 {
     if (count < 1) return 1;
-    if (count > kMaxPanoramaStops) return kMaxPanoramaStops;
+    if (count > MAX_PANORAMA_STOPS) return MAX_PANORAMA_STOPS;
     return count;
 }
 
@@ -46,12 +46,12 @@ int panorama_count_from_params(const ScanParams &p)
 
 double degrees_to_radians(double value)
 {
-    return value * kPi / 180.0;
+    return value * PI / 180.0;
 }
 
 float radians_to_degrees(double value)
 {
-    return static_cast<float>(value * 180.0 / kPi);
+    return static_cast<float>(value * 180.0 / PI);
 }
 
 double sensor_size_from_fov(double focal_length_mm, double fov_degrees)
@@ -103,10 +103,12 @@ double interpolate_calibration_value(const std::vector<PanoramaCalibrationPoint>
     if (zoom <= points.front().zoom) {
         lo_idx = 0;
         hi_idx = 1;
-    } else if (zoom >= points.back().zoom) {
+    }
+    else if (zoom >= points.back().zoom) {
         lo_idx = points.size() - 2;
         hi_idx = points.size() - 1;
-    } else {
+    }
+    else {
         for (size_t i = 1; i < points.size(); ++i) {
             if (zoom <= points[i].zoom) {
                 lo_idx = i - 1;
@@ -261,7 +263,7 @@ int get_panorama_stop_count(const ScanParams &p)
     return clamp_count(count);
 }
 
-const char* get_panorama_fusion_name(int mode)
+const char *get_panorama_fusion_name(int mode)
 {
     switch (mode) {
     case ScanParams::PANORAMA_FUSION_NONE: return "none";

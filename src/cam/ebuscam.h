@@ -20,26 +20,27 @@
 #include <atomic>
 #include <thread>
 
-class EbusCam : public Cam {
+class EbusCam : public Cam
+{
 private:
-    PvDevice           *dev_handle;
-    PvStream           *stream_handle;
-    PvDeviceAdapter    *dev_adapter;
-    PvDeviceSerialPort *dev_serial_port;
+    PvDevice           *m_dev_handle;
+    PvStream           *m_stream_handle;
+    PvDeviceAdapter    *m_dev_adapter;
+    PvDeviceSerialPort *m_dev_serial_port;
 
-    uchar buffer_out[7];
-    uchar buffer_in[7];
+    uchar m_buffer_out[7];
+    uchar m_buffer_in[7];
 
-    std::list<PvBuffer*> buffer_list;
-    StreamFrameSink*     ptr_user;
-    std::atomic_bool     is_streaming;
-    std::thread          streaming_thread;
+    std::list<PvBuffer*> m_buffer_list;
+    StreamFrameSink     *m_ptr_user;
+    std::atomic_bool     m_is_streaming;
+    std::thread          m_streaming_thread;
 
     void clear_device_list();
 
 public:
-    std::vector<PvDeviceInfoGEV*> gige_dev_list;
-    std::vector<PvDeviceInfoU3V*> usb3_dev_list;
+    std::vector<PvDeviceInfoGEV*> m_gige_dev_list;
+    std::vector<PvDeviceInfoU3V*> m_usb3_dev_list;
 
 public:
     EbusCam();
@@ -58,15 +59,15 @@ public:
     int stop_grabbing();
 
     void get_max_frame_size(int *w, int *h);
-    void frame_size(bool read, int *w, int *h, int *inc_w = NULL, int *inc_h = NULL);
-    void frame_offset(bool read, int *x, int *y, int *inc_x = NULL, int *inc_y = NULL);
+    void frame_size(bool read, int *w, int *h, int *inc_w = nullptr, int *inc_h = nullptr);
+    void frame_offset(bool read, int *x, int *y, int *inc_x = nullptr, int *inc_y = nullptr);
     void time_exposure(bool read, float *val);
     void frame_rate(bool read, float *val);
     void gain_analog(bool read, float *val);
     void trigger_mode(bool read, bool *val);
     void trigger_source(bool read, bool *val);
     int ip_config(bool read, int *val);
-    int ip_address(bool read, int idx, int *ip, int *gateway, int *nic_address = NULL);
+    int ip_address(bool read, int idx, int *ip, int *gateway, int *nic_address = nullptr);
     int pixel_type(bool read, int *val);
     void trigger_once();
 

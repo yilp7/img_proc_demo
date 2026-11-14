@@ -8,36 +8,36 @@
 #include <QWidget>
 
 namespace {
-const int kResizeHandleSize = 18;
+const int RESIZE_HANDLE_SIZE = 18;
 }
 
-AddonPanel::AddonPanel(QWidget *parent)
-    : FloatingPanel(parent),
-      m_host(nullptr),
-      m_resize_handle(nullptr),
-      m_resizing(false),
-      m_resize_press_global(),
-      m_resize_press_geometry()
+AddonPanel::AddonPanel(QWidget *parent) :
+    FloatingPanel(parent),
+    m_host(nullptr),
+    m_resize_handle(nullptr),
+    m_resizing(false),
+    m_resize_press_global(),
+    m_resize_press_geometry()
 {
-    setTitle(tr("Addon"));
+    set_title(tr("Addon"));
     setMinimumSize(220, 160);
 
     m_host = new QWidget(this);
     m_host->setObjectName("ADDON_PLUGIN_HOST");
     m_host->setAttribute(Qt::WA_StyledBackground, true);
     m_host->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    contentLayout()->addWidget(m_host, 1);
+    get_content_layout()->addWidget(m_host, 1);
 
     m_resize_handle = new QWidget(this);
     m_resize_handle->setObjectName("ADDON_RESIZE_HANDLE");
     m_resize_handle->setAttribute(Qt::WA_StyledBackground, true);
-    m_resize_handle->setFixedSize(kResizeHandleSize, kResizeHandleSize);
+    m_resize_handle->setFixedSize(RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE);
     m_resize_handle->setCursor(Qt::SizeFDiagCursor);
     m_resize_handle->installEventFilter(this);
     m_resize_handle->raise();
 }
 
-void AddonPanel::fitPluginChildren()
+void AddonPanel::fit_plugin_children()
 {
     if (!m_host) return;
     const QList<QWidget*> children =
@@ -60,7 +60,7 @@ bool AddonPanel::eventFilter(QObject *obj, QEvent *event)
             m_resize_press_global = mouse->globalPos();
             m_resize_press_geometry = geometry();
             if (m_resize_handle) m_resize_handle->grabMouse();
-            emit resizedByUser();
+            emit resized_by_user();
             return true;
         }
     }
@@ -85,7 +85,7 @@ bool AddonPanel::eventFilter(QObject *obj, QEvent *event)
                                   m_resize_press_geometry.height() + delta.y(), max_h);
         if (size() != QSize(next_w, next_h)) {
             resize(next_w, next_h);
-            emit resizedByUser();
+            emit resized_by_user();
         }
         return true;
     }
@@ -95,7 +95,7 @@ bool AddonPanel::eventFilter(QObject *obj, QEvent *event)
         if (m_resizing && mouse->button() == Qt::LeftButton) {
             m_resizing = false;
             if (m_resize_handle) m_resize_handle->releaseMouse();
-            emit resizedByUser();
+            emit resized_by_user();
             return true;
         }
     }
@@ -107,9 +107,9 @@ void AddonPanel::resizeEvent(QResizeEvent *event)
 {
     FloatingPanel::resizeEvent(event);
     if (m_resize_handle) {
-        m_resize_handle->move(qMax(0, width() - kResizeHandleSize),
-                              qMax(0, height() - kResizeHandleSize));
+        m_resize_handle->move(qMax(0, width() - RESIZE_HANDLE_SIZE),
+                              qMax(0, height() - RESIZE_HANDLE_SIZE));
         m_resize_handle->raise();
     }
-    fitPluginChildren();
+    fit_plugin_children();
 }

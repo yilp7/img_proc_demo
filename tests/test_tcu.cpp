@@ -3,38 +3,32 @@
 #include "port/tcu_protocol.h"
 #include "util/constants.h"
 
-// ---------------------------------------------------------------------------
-// Test subclass: intercepts communicate() so no real serial/TCP I/O happens.
-// The `using` declaration exposes the protected set_user_param overloads.
-// ---------------------------------------------------------------------------
+// Test subclass: intercepts communicate() so no real serial or TCP I/O happens.
+// The using declaration exposes the protected set_user_param overloads.
 class TestTCU : public TCU
 {
     Q_OBJECT
 public:
     explicit TestTCU(int type = 0) : TCU(-1, type) {}
 
-    QList<QByteArray> frames;
+    QList<QByteArray> m_frames;
 
-    void communicate(QByteArray write, uint, uint, bool) override {
-        frames.append(write);
+    void communicate(QByteArray write, uint, uint, bool) override
+    {
+        m_frames.append(write);
     }
 
     using TCU::set_user_param;   // make both overloads callable from tests
 };
 
-// ---------------------------------------------------------------------------
-// QtTest test class
-// ---------------------------------------------------------------------------
 class TestTCUSuite : public QObject
 {
     Q_OBJECT
 
 private slots:
 
-    // ------------------------------------------------------------------
-    // TC-T-001: Default values after construction
-    // ------------------------------------------------------------------
-    void defaultValues()
+    // TC-T-001: default values after construction
+    void default_values()
     {
         TestTCU tcu(0);
 
@@ -46,19 +40,15 @@ private slots:
         QCOMPARE(tcu.get(TCU::CCD_FREQ),      10.0);
     }
 
-    // ------------------------------------------------------------------
-    // TC-T-002: Type 0 get(GATE_WIDTH_A) returns gate_width_a
-    // ------------------------------------------------------------------
-    void type0GateWidthA()
+    // TC-T-002: type 0 get(GATE_WIDTH_A) returns gate_width_a
+    void type0_gate_width_a()
     {
         TestTCU tcu(0);
         QCOMPARE(tcu.get(TCU::GATE_WIDTH_A), 40.0);
     }
 
-    // ------------------------------------------------------------------
-    // TC-T-003: Type 2 get(GATE_WIDTH_A) returns gate_width_b
-    // ------------------------------------------------------------------
-    void type2GateWidthAReturnsB()
+    // TC-T-003: type 2 get(GATE_WIDTH_A) returns gate_width_b
+    void type2_gate_width_a_returns_b()
     {
         TestTCU tcu(2);
 
@@ -69,20 +59,16 @@ private slots:
         QCOMPARE(tcu.get(TCU::GATE_WIDTH_A), 99.0);
     }
 
-    // ------------------------------------------------------------------
-    // TC-T-004: Type 2 get(LASER_WIDTH) returns gate_width_a
-    // ------------------------------------------------------------------
-    void type2LaserWidthReturnsGateWidthA()
+    // TC-T-004: type 2 get(LASER_WIDTH) returns gate_width_a
+    void type2_laser_width_returns_gate_width_a()
     {
         TestTCU tcu(2);
         // Default gate_width_a = 40
         QCOMPARE(tcu.get(TCU::LASER_WIDTH), 40.0);
     }
 
-    // ------------------------------------------------------------------
-    // TC-T-005: Type 2 get(DELAY_A) returns delay_b
-    // ------------------------------------------------------------------
-    void type2DelayAReturnsDelayB()
+    // TC-T-005: type 2 get(DELAY_A) returns delay_b
+    void type2_delay_a_returns_delay_b()
     {
         TestTCU tcu(2);
 
@@ -91,20 +77,17 @@ private slots:
         QCOMPARE(tcu.get(TCU::DELAY_A), 200.0);
     }
 
-    // ------------------------------------------------------------------
-    // TC-T-006: Type 0 REPEATED_FREQ protocol frame
-    //   set_user_param(REPEATED_FREQ, 20.0)
-    //   -> set_tcu_param(REPEATED_FREQ, (1e6 / 8) / 20 = 6250)
-    //   -> frame: [0x88, 0x00, 0x00, 0x00, 0x18, 0x6A, 0x99]
-    // ------------------------------------------------------------------
-    void type0RepFreqFrame()
+    // TC-T-006: type 0 REPEATED_FREQ frame
+    // set_user_param(REPEATED_FREQ, 20.0) sends (1e6 / 8) / 20 = 6250 = 0x186A:
+    // [0x88, 0x00, 0x00, 0x00, 0x18, 0x6A, 0x99]
+    void type0_rep_freq_frame()
     {
         TestTCU tcu(0);
         tcu.set_user_param(TCU::REPEATED_FREQ, 20.0);
 
-        QVERIFY(!tcu.frames.isEmpty());
+        QVERIFY(!tcu.m_frames.isEmpty());
 
-        QByteArray frame = tcu.frames.last();
+        QByteArray frame = tcu.m_frames.last();
         QCOMPARE(frame.size(), 7);
 
         // 6250 = 0x0000186A
@@ -120,20 +103,16 @@ private slots:
         QCOMPARE(frame, expected);
     }
 
-    // ------------------------------------------------------------------
-    // TC-T-007: Type 0 DELAY_A frame
-    //   set_user_param(DELAY_A, 200.0)
-    //   -> round(200) = 200 = 0xC8
-    //   -> frame: [0x88, 0x02, 0x00, 0x00, 0x00, 0xC8, 0x99]
-    // ------------------------------------------------------------------
-    void type0DelayAFrame()
+    // TC-T-007: type 0 DELAY_A frame
+    // set_user_param(DELAY_A, 200.0) sends 200 = 0xC8: [0x88, 0x02, 0x00, 0x00, 0x00, 0xC8, 0x99]
+    void type0_delay_a_frame()
     {
         TestTCU tcu(0);
         tcu.set_user_param(TCU::DELAY_A, 200.0);
 
-        QVERIFY(!tcu.frames.isEmpty());
+        QVERIFY(!tcu.m_frames.isEmpty());
 
-        QByteArray frame = tcu.frames.last();
+        QByteArray frame = tcu.m_frames.last();
         QCOMPARE(frame.size(), 7);
 
         QByteArray expected;
@@ -148,21 +127,16 @@ private slots:
         QCOMPARE(frame, expected);
     }
 
-    // ------------------------------------------------------------------
-    // TC-T-008: Type 1 DELAY_A emits two frames (integer + ps)
-    //   set_user_param(DELAY_A, 100.0)
-    //   -> integer_part = int(100.001)/4 = 25 = 0x19
-    //   -> decimal_part = round(0.025) = 0
-    //   Frame 1: [0x88, 0x02, 0,0,0,0x19, 0x99]   cmd=DELAY_A
-    //   Frame 2: [0x88, 0x29, 0,0,0,0x00, 0x99]   cmd=DELAY_A_PS
-    // ------------------------------------------------------------------
-    void type1DelayATwoFrames()
+    // TC-T-008: type 1 DELAY_A sends two frames, integer and ps
+    // For 100.0: integer part int(100.001) / 4 = 25 = 0x19, ps part 0.
+    // [0x88, 0x02, 0,0,0, 0x19, 0x99] then [0x88, 0x29, 0,0,0, 0x00, 0x99] (DELAY_A_PS)
+    void type1_delay_a_two_frames()
     {
         TestTCU tcu(1);
-        QVERIFY(tcu.frames.isEmpty());   // constructor sends nothing
+        QVERIFY(tcu.m_frames.isEmpty());   // constructor sends nothing
 
         tcu.set_user_param(TCU::DELAY_A, 100.0);
-        QCOMPARE(tcu.frames.size(), 2);
+        QCOMPARE(tcu.m_frames.size(), 2);
 
         // Frame 1: integer part
         QByteArray f1;
@@ -173,7 +147,7 @@ private slots:
         f1.append(char(0x00));
         f1.append(char(0x19));   // 25
         f1.append(char(0x99));
-        QCOMPARE(tcu.frames[0], f1);
+        QCOMPARE(tcu.m_frames[0], f1);
 
         // Frame 2: picosecond part
         QByteArray f2;
@@ -184,53 +158,42 @@ private slots:
         f2.append(char(0x00));
         f2.append(char(0x00));   // 0
         f2.append(char(0x99));
-        QCOMPARE(tcu.frames[1], f2);
+        QCOMPARE(tcu.m_frames[1], f2);
     }
 
-    // ------------------------------------------------------------------
-    // TC-T-009: Type 2 DELAY_A cmd byte remapped to DELAY_B (0x04)
-    //   set_user_param(DELAY_A, 100.0)
-    //   -> in set_tcu_param type 2, DELAY_A is remapped to DELAY_B
-    //   -> first frame cmd byte must be 0x04, NOT 0x02
-    // ------------------------------------------------------------------
-    void type2DelayARemappedToDelayB()
+    // TC-T-009: type 2 remaps DELAY_A to DELAY_B
+    // the first frame's command byte must be 0x04, not 0x02
+    void type2_delay_a_remapped_to_delay_b()
     {
         TestTCU tcu(2);
         tcu.set_user_param(TCU::DELAY_A, 100.0);
 
-        QVERIFY(tcu.frames.size() >= 1);
+        QVERIFY(tcu.m_frames.size() >= 1);
 
-        QByteArray frame = tcu.frames[0];
+        QByteArray frame = tcu.m_frames[0];
         QCOMPARE(frame.size(), 7);
 
         // cmd byte at index 1 should be DELAY_B (0x04), not DELAY_A (0x02)
         QCOMPARE(quint8(frame[1]), quint8(0x04));
     }
 
-    // ------------------------------------------------------------------
-    // TC-T-010: Frame structure — header 0x88, trailer 0x99, length 7
-    // ------------------------------------------------------------------
-    void frameStructure()
+    // TC-T-010: frame structure: header 0x88, trailer 0x99, length 7
+    void frame_structure()
     {
         TestTCU tcu(0);
         tcu.set_user_param(TCU::MCP, uint(10));
 
-        QVERIFY(!tcu.frames.isEmpty());
+        QVERIFY(!tcu.m_frames.isEmpty());
 
-        QByteArray frame = tcu.frames.last();
+        QByteArray frame = tcu.m_frames.last();
         QCOMPARE(frame.size(), 7);
         QCOMPARE(quint8(frame[0]), quint8(TCU_HEAD));
         QCOMPARE(quint8(frame[6]), quint8(TCU_TAIL));
     }
 
-    // ------------------------------------------------------------------
-    // TC-T-011: EST_DIST -> delay_a calculation
-    //   set_user_param(EST_DIST, 1500.0)
-    //   delay_a = 1500 / 0.15 = 10000
-    //   get(DELAY_A) == 10000
-    //   get(EST_DIST) == 1500
-    // ------------------------------------------------------------------
-    void estDistDelayCalculation()
+    // TC-T-011: EST_DIST sets delay_a
+    // set_user_param(EST_DIST, 1500.0) gives delay_a = 1500 / 0.15 = 10000
+    void est_dist_delay_calculation()
     {
         TestTCU tcu(0);
         tcu.set_user_param(TCU::EST_DIST, 1500.0);
@@ -239,12 +202,9 @@ private slots:
         QCOMPARE(tcu.get(TCU::EST_DIST),  1500.0);
     }
 
-    // ------------------------------------------------------------------
-    // TC-T-012: AB_LOCK off -> independent A/B
-    //   Disable ab_lock, then set EST_DIST.
-    //   delay_a should update; delay_b should remain at default 100.
-    // ------------------------------------------------------------------
-    void abLockOffIndependent()
+    // TC-T-012: with AB_LOCK off, A and B are independent
+    // setting EST_DIST updates delay_a; delay_b stays at its default 100
+    void ab_lock_off_independent()
     {
         TestTCU tcu(0);
 
@@ -254,26 +214,16 @@ private slots:
         tcu.set_user_param(TCU::EST_DIST, 1500.0);
 
         QCOMPARE(tcu.get(TCU::DELAY_A), 10000.0);
-        // delay_b not updated because ab_lock is off — stays at default
+        // delay_b is not updated because ab_lock is off
         QCOMPARE(tcu.get(TCU::DELAY_B),   100.0);
     }
 
-    // ------------------------------------------------------------------
-    // TC-T-013: Auto PRF — clamped and unclamped
-    //
-    // Part A: dist=3000 -> PRF ~47.5 -> clamped to 30
-    //   delay_a = 3000/0.15 = 20000
-    //   depth_of_view = 40*0.15 = 6.0
-    //   rep_freq = 1e6 / (20000 + 6/0.15 + 1000) = 1e6/21040 ~= 47.53
-    //   Clamped to TCU_MAX_PRF_KHZ = 30
-    //
-    // Part B: dist=15000 -> PRF < 30 -> not clamped
-    //   delay_a = 15000/0.15 = 100000
-    //   rep_freq = 1e6 / (100000 + 40 + 1000) = 1e6/101040 ~= 9.897
-    // ------------------------------------------------------------------
-    void autoPrfClamp()
+    // TC-T-013: auto PRF, clamped and unclamped
+    // A: dist 3000 gives 1e6 / 21040 = 47.5 kHz, clamped to TCU_MAX_PRF_KHZ = 30.
+    // B: dist 15000 gives 1e6 / 101040 = 9.9 kHz, not clamped.
+    void auto_prf_clamp()
     {
-        // --- Part A: clamped ---
+        // part A: clamped
         {
             TestTCU tcu(0);
             tcu.set_user_param(TCU::AUTO_PRF, uint(1));
@@ -282,7 +232,7 @@ private slots:
             QCOMPARE(tcu.get(TCU::REPEATED_FREQ), TCU_MAX_PRF_KHZ);
         }
 
-        // --- Part B: not clamped ---
+        // part B: not clamped
         {
             TestTCU tcu(0);
             tcu.set_user_param(TCU::AUTO_PRF, uint(1));

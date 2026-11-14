@@ -12,14 +12,14 @@
 namespace {
 
 // The graph downsamples three times, so both dimensions must be multiples of 8.
-constexpr int DownsampleFactor = 8;
+constexpr int DOWNSAMPLE_FACTOR = 8;
 
-const char *InputNames[] = {"image"};
-const char *OutputNames[] = {"enhanced"};
+const char *INPUT_NAMES[] = {"image"};
+const char *OUTPUT_NAMES[] = {"enhanced"};
 
 int round_up(int size)
 {
-    return ((size + DownsampleFactor - 1) / DownsampleFactor) * DownsampleFactor;
+    return ((size + DOWNSAMPLE_FACTOR - 1) / DOWNSAMPLE_FACTOR) * DOWNSAMPLE_FACTOR;
 }
 
 } // namespace
@@ -114,7 +114,7 @@ bool NafNetEnhancer::run_plane(const cv::Mat &plane, cv::Mat &out)
                 static_cast<size_t>(padded_w) * static_cast<size_t>(padded_h),
                 shape.data(), shape.size());
 
-    auto outputs = m_session->Run(Ort::RunOptions{nullptr}, InputNames, &input, 1, OutputNames, 1);
+    auto outputs = m_session->Run(Ort::RunOptions{nullptr}, INPUT_NAMES, &input, 1, OUTPUT_NAMES, 1);
 
     // The result is wrapped without a copy, so a graph that did not return the
     // padded input size would be read out of bounds.

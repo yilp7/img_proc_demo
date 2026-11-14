@@ -14,36 +14,35 @@
 #include <QWidget>
 
 namespace {
-const int kOptionNone = 0;
-const int kOptionData = 1;
-const int kOptionHist = 2;
-const int kOptionAlt  = 4;
-const int kOptionVid  = 6;
+const int OPTION_NONE = 0;
+const int OPTION_DATA = 1;
+const int OPTION_HIST = 2;
+const int OPTION_ALT  = 4;
+const int OPTION_VID  = 6;
 
-struct OptionSpec
-{
+struct OptionSpec {
     int option;
 };
 
-const OptionSpec kSelectorOptions[] = {
-    { kOptionData },
-    { kOptionHist },
-    { kOptionAlt  },
-    { kOptionVid  },
-    { kOptionNone },
+const OptionSpec SELECTOR_OPTIONS[] = {
+    { OPTION_DATA },
+    { OPTION_HIST },
+    { OPTION_ALT  },
+    { OPTION_VID  },
+    { OPTION_NONE },
 };
 }
 
-ConsolePanel::ConsolePanel(QWidget *parent)
-    : FloatingPanel(parent),
-      m_selector_group(nullptr),
-      m_stack(nullptr),
-      m_selectors{nullptr, nullptr, nullptr},
-      m_radios{nullptr, nullptr, nullptr},
-      m_page_index_by_option(),
-      m_updating(false)
+ConsolePanel::ConsolePanel(QWidget *parent) :
+    FloatingPanel(parent),
+    m_selector_group(nullptr),
+    m_stack(nullptr),
+    m_selectors{nullptr, nullptr, nullptr},
+    m_radios{nullptr, nullptr, nullptr},
+    m_page_index_by_option(),
+    m_updating(false)
 {
-    setTitle(tr("Console"));
+    set_title(tr("Console"));
 
     auto *selector_bar = new QFrame(this);
     selector_bar->setObjectName("CONSOLE_SELECTOR_BAR");
@@ -69,41 +68,41 @@ ConsolePanel::ConsolePanel(QWidget *parent)
         selector_layout->addWidget(m_selectors[i]);
 
         connect(m_selectors[i], &MiscSelection::selected, this, [this, i]() {
-            activateSelector(i);
+            activate_selector(i);
         });
         connect(m_selectors[i], QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this, [this, i](int) {
-            activateSelector(i);
+            activate_selector(i);
         });
     }
     selector_layout->addStretch(1);
 
     connect(m_selector_group, QOverload<int>::of(&QButtonGroup::buttonClicked),
             this, [this](int id) {
-        activateSelector(id);
+        activate_selector(id);
     });
 
     m_stack = new QStackedWidget(this);
     m_stack->setObjectName("CONSOLE_STACK");
 
-    contentLayout()->addWidget(selector_bar);
-    contentLayout()->addWidget(m_stack, 1);
+    get_content_layout()->addWidget(selector_bar);
+    get_content_layout()->addWidget(m_stack, 1);
 }
 
 void ConsolePanel::setup(QStackedWidget *misc_display)
 {
-    struct PageSpec { int option; const char *pageName; };
+    struct PageSpec { int option; const char *page_name; };
     static const PageSpec specs[] = {
-        { kOptionData, "DATA_PAGE"     },
-        { kOptionHist, "HIST_PAGE"     },
-        { kOptionAlt,  "ALT_CTRL_PAGE" },
-        { kOptionVid,  "VID_PAGE"      },
+        { OPTION_DATA, "DATA_PAGE"     },
+        { OPTION_HIST, "HIST_PAGE"     },
+        { OPTION_ALT,  "ALT_CTRL_PAGE" },
+        { OPTION_VID,  "VID_PAGE"      },
     };
 
     m_page_index_by_option.clear();
     for (const auto &s : specs) {
         QWidget *page = misc_display->findChild<QWidget*>(
-            QString::fromLatin1(s.pageName), Qt::FindDirectChildrenOnly);
+            QString::fromLatin1(s.page_name), Qt::FindDirectChildrenOnly);
         if (!page) continue;
         misc_display->removeWidget(page);
         page->show();
@@ -114,59 +113,59 @@ void ConsolePanel::setup(QStackedWidget *misc_display)
     auto *placeholder = new QLabel(tr("3D point cloud - placeholder"), m_stack);
     placeholder->setObjectName("CONSOLE_PLACEHOLDER");
     placeholder->setAlignment(Qt::AlignCenter);
-    m_page_index_by_option.insert(kOptionNone, m_stack->addWidget(placeholder));
+    m_page_index_by_option.insert(OPTION_NONE, m_stack->addWidget(placeholder));
 
     m_updating = true;
-    populateSelector(m_selectors[0], kOptionHist);
-    populateSelector(m_selectors[1], kOptionAlt);
-    populateSelector(m_selectors[2], kOptionVid);
+    populate_selector(m_selectors[0], OPTION_HIST);
+    populate_selector(m_selectors[1], OPTION_ALT);
+    populate_selector(m_selectors[2], OPTION_VID);
     m_updating = false;
 
     m_radios[2]->setChecked(true);
-    activateSelector(2);
+    activate_selector(2);
 }
 
-int ConsolePanel::currentOption() const
+int ConsolePanel::get_current_option() const
 {
     const int id = m_selector_group ? m_selector_group->checkedId() : 0;
-    return selectorOption(id < 0 ? 0 : id);
+    return get_selector_option(id < 0 ? 0 : id);
 }
 
-void ConsolePanel::populateSelector(MiscSelection *selector, int defaultOption)
+void ConsolePanel::populate_selector(MiscSelection *selector, int default_option)
 {
     if (!selector) return;
     selector->clear();
-    for (const auto &s : kSelectorOptions) {
+    for (const auto &s : SELECTOR_OPTIONS) {
         QString label;
         switch (s.option) {
-        case kOptionData: label = tr("DATA"); break;
-        case kOptionHist: label = tr("HIST"); break;
-        case kOptionAlt:  label = tr("ALT");  break;
-        case kOptionVid:  label = tr("VID");  break;
+        case OPTION_DATA: label = tr("DATA"); break;
+        case OPTION_HIST: label = tr("HIST"); break;
+        case OPTION_ALT:  label = tr("ALT");  break;
+        case OPTION_VID:  label = tr("VID");  break;
         default:          label = tr("3D");   break;
         }
         selector->addItem(label, s.option);
     }
-    const int idx = selector->findData(defaultOption);
+    const int idx = selector->findData(default_option);
     if (idx >= 0) selector->setCurrentIndex(idx);
 }
 
-void ConsolePanel::activateSelector(int selectorIndex)
+void ConsolePanel::activate_selector(int selector_index)
 {
-    if (m_updating || selectorIndex < 0 || selectorIndex >= 3) return;
-    if (m_radios[selectorIndex]) m_radios[selectorIndex]->setChecked(true);
-    activateOption(selectorOption(selectorIndex));
+    if (m_updating || selector_index < 0 || selector_index >= 3) return;
+    if (m_radios[selector_index]) m_radios[selector_index]->setChecked(true);
+    activate_option(get_selector_option(selector_index));
 }
 
-void ConsolePanel::activateOption(int optionId)
+void ConsolePanel::activate_option(int option_id)
 {
-    const int stack_index = m_page_index_by_option.value(optionId, -1);
+    const int stack_index = m_page_index_by_option.value(option_id, -1);
     if (stack_index >= 0 && m_stack) m_stack->setCurrentIndex(stack_index);
-    emit optionSelected(optionId);
+    emit option_selected(option_id);
 }
 
-int ConsolePanel::selectorOption(int selectorIndex) const
+int ConsolePanel::get_selector_option(int selector_index) const
 {
-    if (selectorIndex < 0 || selectorIndex >= 3 || !m_selectors[selectorIndex]) return kOptionNone;
-    return m_selectors[selectorIndex]->currentData().toInt();
+    if (selector_index < 0 || selector_index >= 3 || !m_selectors[selector_index]) return OPTION_NONE;
+    return m_selectors[selector_index]->currentData().toInt();
 }

@@ -48,13 +48,13 @@ constexpr unsigned char LENS_REPLY_ZOOM   = 0x5D;
 constexpr unsigned char LENS_REPLY_FOCUS  = 0x5E;
 constexpr unsigned char LENS_REPLY_RADIUS = 0x70;
 
-// Lens direction commands — Command 2 (byte 3)
+// Lens direction commands, command 2 (byte 3)
 constexpr unsigned char LENS_CMD_STOP      = 0x00;
 constexpr unsigned char LENS_CMD_ZOOM_IN   = 0x20;
 constexpr unsigned char LENS_CMD_ZOOM_OUT  = 0x40;
 constexpr unsigned char LENS_CMD_FOCUS_FAR = 0x80;
 
-// Lens direction commands — Command 1 (byte 2)
+// Lens direction commands, command 1 (byte 2)
 constexpr unsigned char LENS_CMD_FOCUS_NEAR  = 0x01;
 constexpr unsigned char LENS_CMD_RADIUS_UP   = 0x02;
 constexpr unsigned char LENS_CMD_RADIUS_DOWN = 0x04;

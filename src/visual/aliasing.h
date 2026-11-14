@@ -8,7 +8,8 @@ struct AliasingData {
     float distance;
     int num_period;
 
-    friend QDebug& operator << (QDebug& qd, const AliasingData& ad) {
+    friend QDebug &operator << (QDebug &qd, const AliasingData &ad)
+    {
         qd << "PRF: " << ad.rep_freq << ", distance: " << ad.distance << ", # period: " << ad.num_period;
         return qd;
     }
@@ -31,18 +32,18 @@ signals:
     void delay_set_selected(int selection_id);
 
 public:
-    float original_distance;
-    int   current_selection;
+    float m_original_distance;
+    int   m_current_selection;
 
-    QMap<int, struct AliasingData> recommended_parameters; // key: #period, value: recommand parameters
+    QMap<int, struct AliasingData> m_recommended_parameters; // key: #period, value: recommand parameters
 
 protected:
     void closeEvent(QCloseEvent *event);
 
 private:
-    QTableView         *inference;
-    QStandardItemModel *inference_model;
-    QButtonGroup       *apply_btn_grp;
+    QTableView         *m_inference;
+    QStandardItemModel *m_inference_model;
+    QButtonGroup       *m_apply_btn_grp;
 };
 
 #endif // ALIASING_H

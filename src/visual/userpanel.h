@@ -86,10 +86,10 @@ class UserPanel;
 class DisplayRouter;
 struct DisplaySlot;
 
-// Consumer-side worker. Reads frames from whatever StreamSlot is currently
-// routed to its DisplaySlot via the DisplayRouter. Was named GrabThread, but
-// it's been the consumer all along — name updated to match.
-class ConsumerThread : public QThread {
+// Consumer-side worker: reads frames from whichever StreamSlot the router has
+// bound to its DisplaySlot.
+class ConsumerThread : public QThread
+{
     Q_OBJECT
 public:
     ConsumerThread(PipelineProcessor *pipeline, DisplayRouter *router, DisplaySlot *display);
@@ -115,7 +115,7 @@ class UserPanel : public QMainWindow
 
 // enumerations only
 public:
-     enum PREF_TYPE {
+     enum PrefType {
          WIN_PREF   = 0,
          TCU_PARAMS = 1,
          SCAN       = 2,
@@ -156,7 +156,7 @@ public slots:
     // signaled in preferences ui
     void search_for_devices();
     void rotate(int angle);
-    // TCU-related slots delegated to TCUController
+    // TCU-related slots
     void update_light_speed(bool uw) { m_tcu_ctrl->update_light_speed(uw); }
     void setup_hz(int hz_unit) { m_tcu_ctrl->setup_hz(hz_unit); }
     void setup_stepping(int base_unit) { m_tcu_ctrl->setup_stepping(base_unit); }
@@ -166,7 +166,6 @@ public slots:
     void update_gate_width_offset(float dov_offset) { m_tcu_ctrl->update_gate_width_offset(dov_offset); }
     void update_laser_offset(float laser_offset) { m_tcu_ctrl->update_laser_offset(laser_offset); }
     void setup_laser(int laser_on) { m_tcu_ctrl->setup_laser(laser_on); }
-    // Delegated to DeviceManager
     void set_baudrate(int idx, int baudrate) { m_device_mgr->set_baudrate(idx, baudrate); }
     void set_tcp_status_on_port(int idx, bool use_tcp) { m_device_mgr->set_tcp_status_on_port(idx, use_tcp); }
     void set_tcu_as_shared_port(bool share) { m_device_mgr->set_tcu_as_shared_port(share); }
@@ -187,19 +186,18 @@ public slots:
     void joystick_button_released(int btn);
     void joystick_direction_changed(int direction);
 
-    // signaled by ControlPort (port_status, ptz delegated to DeviceManager)
+    // signaled by ControlPort
     void append_data(QString str);
-    // Lens params delegated to LensController
     void update_lens_params(qint32 lens_param, uint val) { m_lens_ctrl->update_lens_params(lens_param, val); }
     void update_distance(double distance) { m_rf_ctrl->update_distance(distance); }
 
-    // signaled by Aliasing - delegated to TCUController
+    // signaled by Aliasing
     void set_distance_set(int id) { m_tcu_ctrl->set_distance_set(id); }
 
     // ui switching
     void switch_ui();
 
-    // VID_PAGE camera control - delegated to DeviceManager
+    // VID_PAGE camera control
 
 private slots:
     // on clicking enum btn: enumerate devices
@@ -246,7 +244,7 @@ private slots:
     void on_IMG_3D_CHECK_stateChanged(int arg1);
     void on_FRAME_AVG_CHECK_stateChanged(int arg1);
 
-    // lens control functions - delegated to LensController
+    // lens control
     void on_ZOOM_IN_BTN_pressed() { m_lens_ctrl->on_ZOOM_IN_BTN_pressed(); }
     void on_ZOOM_IN_BTN_released() { m_lens_ctrl->on_ZOOM_IN_BTN_released(); }
     void on_ZOOM_OUT_BTN_pressed() { m_lens_ctrl->on_ZOOM_OUT_BTN_pressed(); }
@@ -269,35 +267,34 @@ private slots:
     void on_IRIS_CLOSE_BTN_released() { m_lens_ctrl->on_IRIS_CLOSE_BTN_released(); }
     void laser_preset_reached() { m_laser_ctrl->laser_preset_reached(); }
 
-    // slider-controlled slots (TCU-related delegated to TCUController)
+    // slider-controlled slots
     void change_mcp(int val) { m_tcu_ctrl->change_mcp(val); }
     void change_gain(int val);
     void change_delay(int val) { m_tcu_ctrl->change_delay(val); }
     void change_gatewidth(int val) { m_tcu_ctrl->change_gatewidth(val); }
     void change_focus_speed(int val) { m_lens_ctrl->change_focus_speed(val); }
 
-    // Scan control - delegated to ScanController
+    // scan control
     void on_SCAN_BUTTON_clicked() { m_scan_ctrl->on_SCAN_BUTTON_clicked(); }
     void on_CONTINUE_SCAN_BUTTON_clicked() { m_scan_ctrl->on_CONTINUE_SCAN_BUTTON_clicked(); }
     void on_RESTART_SCAN_BUTTON_clicked() { m_scan_ctrl->on_RESTART_SCAN_BUTTON_clicked(); }
     void on_SCAN_CONFIG_BTN_clicked() { m_scan_ctrl->on_SCAN_CONFIG_BTN_clicked(); }
     void enable_scan_options(bool show) { m_scan_ctrl->enable_scan_options(show); }
 
-    // update delay, rep_freq, gate width, laser_width and their widgets - delegated to TCUController
+    // update delay, rep_freq, gate width, laser_width and their widgets
     void update_laser_width() { m_tcu_ctrl->update_laser_width(); }
     void update_delay() { m_tcu_ctrl->update_delay(); }
     void update_gate_width() { m_tcu_ctrl->update_gate_width(); }
     void update_tcu_params(qint32 tcu_param) { m_tcu_ctrl->update_tcu_params(tcu_param); }
 
     // start laser & initialize laser stat
-    // Laser control delegated to LaserController
     void on_LASER_BTN_clicked() { m_laser_ctrl->on_LASER_BTN_clicked(); }
     void start_laser() { m_laser_ctrl->start_laser(); }
     void init_laser() { m_laser_ctrl->init_laser(); }
 
     // hide left parameter bar
     void on_HIDE_BTN_clicked();
-    // Alt display panel - delegated to AuxPanelManager
+    // alt display panel
     void on_MISC_RADIO_1_clicked();
     void on_MISC_RADIO_2_clicked();
     void on_MISC_RADIO_3_clicked();
@@ -323,7 +320,7 @@ private slots:
     // config optical gatewidth by file (serial number)
     void config_gatewidth(QString filename);
 
-    // PTZ button handlers - delegated to DeviceManager
+    // PTZ button handlers
 
     void alt_display_control(int cmd);
 
@@ -390,8 +387,7 @@ protected:
 private:
     void data_exchange(bool read);
 
-    // dir = +1 enter ps mode (relabels U/N to ",/." and inserts P),
-    //       -1 leave. Restored from pre-Sprint-9 helper.
+    // dir = +1 enters ps mode (relabels U/N to ",/." and inserts P), -1 leaves it.
     void update_tcu_param_pos(int dir, QLabel *u_unit, QLineEdit *n_input,
                               QLabel *n_unit, QLineEdit *p_input);
 
@@ -400,8 +396,6 @@ private:
 
     // update activated / deactivated buttons
     void enable_controls(bool cam_rdy);
-
-    // Port init/setup delegated to DeviceManager
 
     void position_display_overlays(DisplayId did);
     void set_source_dead_overlay(DisplayId did, bool dead);
@@ -420,8 +414,8 @@ private:
     void engage_pid_follow(int track_id);
     void disengage_pid_follow();
     int track_id_at(const QPoint &display_pos) const;
-    // Single source of the optics used by every estimate — range on labels,
-    // G6 reports and the follow loop all go through here.
+    // Single source of the optics for every estimate: range on labels, G6 reports
+    // and the follow loop all go through here.
     TargetEstimator::Optics current_optics() const;
     // Snapshots the label settings into the pipeline, which cannot reach the
     // class table or the zoom field itself.
@@ -429,11 +423,11 @@ private:
     // Same for the gate tracker's method and options.
     void push_gate_tracking_settings();
     void request_follow_gate(const QRect &display_gate);
-    void update_follow_gate(QRect displayBox, QRect sourceBox, QSize sourceSize, bool active);
+    void update_follow_gate(QRect display_box, QRect source_box, QSize source_size, bool active);
     // Runs the loop against whichever source is holding the target.
-    void drive_pid_follow(const QRect &sourceBox, const QSize &sourceSize, bool have_target);
+    void drive_pid_follow(const QRect &source_box, const QSize &source_size, bool have_target);
 
-    // Lens operations delegated to LensController
+    // lens operations
     void lens_stop() { m_lens_ctrl->lens_stop(); }
     void set_zoom();
     void set_focus();
@@ -441,23 +435,21 @@ private:
     void focus_far() { m_lens_ctrl->focus_far(); }
     void focus_near() { m_lens_ctrl->focus_near(); }
 
-    // Laser preset delegated to LaserController
     void goto_laser_preset(char target) { m_laser_ctrl->goto_laser_preset(target); }
 
     // save img in buffer to file; or save imgs while scanning (declarations moved to pipeline section)
 
-    // convert data to be sent to HEX buffer - delegated to TCUController
+    // convert data to be sent to HEX buffer
     QByteArray convert_to_send_tcu(uchar num, unsigned int send) { return m_tcu_ctrl->convert_to_send_tcu(num, send); }
 
     // update data to data-display; fb: whether reading feedback from com
     QByteArray generate_ba(uchar *data, int len);
     QByteArray communicate_display(int id, QByteArray write, int write_size, int read_size, bool fb);
 
-    // filter_scan stays (uses img_mem[0])
     void filter_scan();
     void auto_scan_for_target() { m_scan_ctrl->auto_scan_for_target(); }
 
-    // change current in laser - delegated to TCUController
+    // change current in laser
     void update_current();
 
     // write/read params to config file
@@ -468,11 +460,9 @@ private:
     void read_gatewidth_lookup_table(QFile *fp);
 
     // config sync functions
-    void syncConfigToPreferences();
-    void syncPreferencesToConfig();
+    void sync_config_to_preferences();
+    void sync_preferences_to_config();
     void run_automatic_actions();
-
-    // TCP server connection delegated to DeviceManager
 
     // send ptz control cmd
     void send_ctrl_cmd(uchar dir);
@@ -480,143 +470,143 @@ private:
     // static image display (drag & drop)
     void start_static_display(int width, int height, bool is_color, int display_idx = 0, int pixel_depth = 8, int device_type = -1);
     bool load_image_file(QString filename, bool init);
-    int load_video_file(QString filename, bool format_gray = false, void (*process_frame)(cv::Mat &frame, void *ptr) = NULL,
-                        void *ptr = NULL, int display_idx = 0, bool display = true);
+    int load_video_file(QString filename, bool format_gray = false, void (*process_frame)(cv::Mat &frame, void *ptr) = nullptr,
+                        void *ptr = nullptr, int display_idx = 0, bool display = true);
 
     // status display
     void update_pixel_depth(int depth, int display_idx = 0);
 
 public:
-    bool                  mouse_pressed;
+    bool                  m_mouse_pressed;
     QMutex                m_roi_mutex;                 // protects list_roi + user_mask
-    std::vector<cv::Rect> list_roi;                   // user-selected roi
+    std::vector<cv::Rect> m_list_roi;                   // user-selected roi
 
 private:
-    Ui::UserPanel*  ui;
-    QFrame*         m_center_toolbar;  // inline center toolbar: SEL/ZOOM/PTZ + INFO
-    QFrame*         m_pbar;           // panel toggle bar: 3 checkable buttons top-right
-    OpticsPanel*    m_optics_panel;
-    TCUPanel*       m_tcu_panel;
-    ConsolePanel*   m_console_panel;
-    AddonPanel*     m_addon_panel;
+    Ui::UserPanel  *m_ui;
+    QFrame         *m_center_toolbar;  // inline center toolbar: SEL/ZOOM/PTZ + INFO
+    QFrame         *m_pbar;           // panel toggle bar: 3 checkable buttons top-right
+    OpticsPanel    *m_optics_panel;
+    TCUPanel       *m_tcu_panel;
+    ConsolePanel   *m_console_panel;
+    AddonPanel     *m_addon_panel;
     bool            m_addon_panel_requested;
-    PanoramaPanel*  m_panorama_panel;
+    PanoramaPanel  *m_panorama_panel;
     // Addons. The panel implements AddonHost once, through the adapter, and
     // hands it to every addon; after start() it never calls one.
     class AddonHostAdapter;
-    AddonHostAdapter* m_addon_host;
+    AddonHostAdapter *m_addon_host;
     QVector<PluginInterface*> m_addons;
-    QPushButton*    m_scan_panorama_toggle;
-    QLabel*         m_theme_label;
-    QComboBox*      m_theme_combo;
-    QLabel*         m_custom_title_label;
+    QPushButton    *m_scan_panorama_toggle;
+    QLabel         *m_theme_label;
+    QComboBox      *m_theme_combo;
+    QLabel         *m_custom_title_label;
     bool            m_panorama_panel_user_placed;
     bool            m_panorama_scan_active;
-    RightStackContainer* m_right_stack;
-    ImgProcWidget*       m_img_proc;
-    PtzRadarWidget*      m_ptz_radar;
-    SaveOptionsWidget*   m_save_options;
-    VisionWidget*        m_vision;
-    SideDisplayWidget*   m_side_display;
-    MapboxWidget*        m_mapbox;
-    SetupOverlay*        m_setup_overlay;
-    ScanOverlay*         m_scan_overlay;
+    RightStackContainer *m_right_stack;
+    ImgProcWidget       *m_img_proc;
+    PtzRadarWidget      *m_ptz_radar;
+    SaveOptionsWidget   *m_save_options;
+    VisionWidget        *m_vision;
+    SideDisplayWidget   *m_side_display;
+    MapboxWidget        *m_mapbox;
+    SetupOverlay        *m_setup_overlay;
+    ScanOverlay         *m_scan_overlay;
     ScanOverlay::Widgets m_scan_overlay_widgets;  // cached until m_scan_ctrl is alive
-    QLabel*              m_setup_thumb[3];   // SETUP preview thumbnails (MAIN/ALT1/ALT2)
-    QLabel*              m_scan_thumb[3];    // SCAN preview thumbnails (MAIN/ALT1/ALT2)
-    DeviceManager*  m_device_mgr;
-    TCUController*  m_tcu_ctrl;
-    LensController* m_lens_ctrl;
-    LaserController* m_laser_ctrl;
-    RFController*    m_rf_ctrl;
-    ScanController*  m_scan_ctrl;
-    AuxPanelManager* m_aux_panel;
-    LaserControl*   laser_settings;
-    Config*         config;
+    QLabel              *m_setup_thumb[3];   // SETUP preview thumbnails (MAIN/ALT1/ALT2)
+    QLabel              *m_scan_thumb[3];    // SCAN preview thumbnails (MAIN/ALT1/ALT2)
+    DeviceManager  *m_device_mgr;
+    TCUController  *m_tcu_ctrl;
+    LensController *m_lens_ctrl;
+    LaserController *m_laser_ctrl;
+    RFController    *m_rf_ctrl;
+    ScanController  *m_scan_ctrl;
+    AuxPanelManager *m_aux_panel;
+    LaserControl   *m_laser_settings;
+    Config         *m_config;
 #ifdef DISTANCE_3D_VIEW
-    Distance3DView* view_3d;
+    Distance3DView *m_view_3d;
 #endif //DISTANCE_3D_VIEW
-    Aliasing*       aliasing;
-    PresetPanel*    preset;
-    FloatingWindow* fw_display[2];
-    FloatingWindow* secondary_display;
+    Aliasing       *m_aliasing;
+    PresetPanel    *m_preset;
+    FloatingWindow *m_fw_display[2];
+    FloatingWindow *m_secondary_display;
 
-    bool simple_ui;
+    bool m_simple_ui;
 
-    int             calc_avg_option;            // a: 4 frames; b: 8 frames
-    bool            trigger_by_software;        // whether the device gets trigger signal from sw
-    QMutex          port_mutex;                 // port handle lock
-    Cam*            curr_cam;                   // current camera
-    float           time_exposure_edit;
-    float           gain_analog_edit;
-    QString         save_location;              // where to save the image
-    QString         TEMP_SAVE_LOCATION;         // temp location to save the image
-    cv::VideoWriter vid_out_proc;               // video writer for export (separate from per-display recorders)
-    QString         current_video_filename;     // name of the imported video file (if not a stream)
-    QString         output_filename;            // target output name when exporting video
-    QString         temp_output_filename;       // temp save location of target output file
+    int             m_calc_avg_option;            // a: 4 frames; b: 8 frames
+    bool            m_trigger_by_software;        // whether the device gets trigger signal from sw
+    QMutex          m_port_mutex;                 // port handle lock
+    Cam            *m_curr_cam;                   // current camera
+    float           m_time_exposure_edit;
+    float           m_gain_analog_edit;
+    QString         m_save_location;              // where to save the image
+    QString         m_temp_save_location;         // temp location to save the image
+    cv::VideoWriter m_vid_out_proc;               // video writer for export (separate from per-display recorders)
+    QString         m_current_video_filename;     // name of the imported video file (if not a stream)
+    QString         m_output_filename;            // target output name when exporting video
+    QString         m_temp_output_filename;       // temp save location of target output file
 
     // Per-stream and per-display state lives in m_router (see pipeline/routing.h).
-    // m_cam_sink is a stable address fed to curr_cam->set_user_pointer so the
-    // cam SDK callbacks push frames through the StreamSlot::frames queue.
+    // m_cam_sink is the stable address given to the camera SDK, whose callbacks push
+    // frames into StreamSlot::frames through it.
     DisplayRouter    m_router;
     PipelineGlobals  m_globals;
     StreamFrameSink  m_cam_sink;
 
-    int  device_type;        // 1/2/3: industrial cam; -1: local file; -2: network stream
-    bool device_on;          // whether curr device is on
-    bool trigger_mode_on;    // whether img grabbing is on trigger mode
-    bool start_grabbing;     // whether the device is rdy to grab imgs
-    int  trigger_source;     // where the device gets the trigger signal
+    int  m_device_type;        // 1/2/3: industrial cam; -1: local file; -2: network stream
+    bool m_device_on;          // whether curr device is on
+    bool m_trigger_mode_on;    // whether img grabbing is on trigger mode
+    bool m_start_grabbing;     // whether the device is rdy to grab imgs
+    int  m_trigger_source;     // where the device gets the trigger signal
 
-    // SETUP-overlay-driven dimensions for the main cam. Per-display dimensions
-    // live on each StreamSlot::meta — these are the cam-control widgets' view.
-    int  main_pixel_format;
-    int  main_pixel_depth;
+    // Dimensions of the main camera as the setup overlay's camera widgets see them.
+    // Per-display dimensions live in each StreamSlot::meta.
+    int  m_main_pixel_format;
+    int  m_main_pixel_depth;
 
-    bool            video_thread_state;         // whether video reading thread is on
-    JoystickThread* h_joystick_thread;          // process joystick input
+    bool            m_video_thread_state;         // whether video reading thread is on
+    JoystickThread *m_h_joystick_thread;          // process joystick input
 
-    bool                    hide_left;                  // whether left bar is hidden
-    int                     resize_place;               // mouse position when resizing or at border
-    QPoint                  prev_pos;                   // previous window position
+    bool                    m_hide_left;                  // whether left bar is hidden
+    int                     m_resize_place;               // mouse position when resizing or at border
+    QPoint                  m_prev_pos;                   // previous window position
 
-    bool                    joybtn_A;                   // joystick button states
-    bool                    joybtn_B;
-    bool                    joybtn_X;
-    bool                    joybtn_Y;
-    bool                    joybtn_L1;
-    bool                    joybtn_L2;
-    bool                    joybtn_R1;
-    bool                    joybtn_R2;
-    bool                    ptz_adjust_ongoing;
+    bool                    m_joybtn_a;                   // joystick button states
+    bool                    m_joybtn_b;
+    bool                    m_joybtn_x;
+    bool                    m_joybtn_y;
+    bool                    m_joybtn_l1;
+    bool                    m_joybtn_l2;
+    bool                    m_joybtn_r1;
+    bool                    m_joybtn_r2;
+    bool                    m_ptz_adjust_ongoing;
 
-    uchar                   lang;                       // 0: en_us, 1: zh_cn
-    QTranslator             trans;
+    uchar                   m_lang;                       // 0: en_us, 1: zh_cn
+    QTranslator             m_trans;
 
-    ThreadPool              tp;
+    ThreadPool              m_tp;
 
-    QButtonGroup*           alt_ctrl_grp;               // alt display control button group
+    QButtonGroup           *m_alt_ctrl_grp;               // alt display control button group
 
 //    QMediaPlayer*           video_input;
 //    VideoSurface*           video_surface;
 
     // TEMP ONLY
     // TODO move to addons
-    PluginInterface*        pluginInterface;            // the panel addon, once instantiated
-    QPluginLoader*          m_addon_plugin_loader;      // the panel addon's loader, found at startup
+    PluginInterface        *m_plugin_interface;         // the panel addon, once instantiated
+    QPluginLoader          *m_addon_plugin_loader;      // the panel addon's loader, found at startup
     QList<QPluginLoader*>   m_addon_loaders;            // window addons, loaded at startup
 
-    // YOLO Detection — detectors live per DisplaySlot now. Init-mutex stays
-    // singleton since it only protects detector construction.
+    // YOLO detectors live in each DisplaySlot. The init mutex stays here because it
+    // only protects detector construction.
     QMutex                  m_yolo_init_mutex;
     QVector<QRect>          m_main_detection_boxes;
     bool                    m_detection_auto_follow_active = false;
     // Track currently being followed. Auto-follow aims once per acquisition,
     // so this is what distinguishes "still the same target" from "a new one".
     int                     m_auto_follow_track_id = -1;
-    PtzFollowController*    m_pid_follow;
-    PidTuningWindow*        m_pid_tuning_window;
+    PtzFollowController    *m_pid_follow;
+    PidTuningWindow        *m_pid_tuning_window;
     // Latest tracked targets, kept so a click can be resolved to a track id.
     QVector<DetectedTarget> m_main_targets;
     // Follow gate state mirrored from the pipeline. Track id -1 with an active
@@ -625,22 +615,18 @@ private:
     QSize                   m_follow_gate_frame;
     bool                    m_follow_gate_active = false;
     // Follow gate track id, distinct from any YOLO id.
-    static constexpr int    GateTrackId = -2;
+    static constexpr int    GATE_TRACK_ID = -2;
 
-    TargetClassWindow*      m_target_class_window;
+    TargetClassWindow      *m_target_class_window;
 
     // Thread-safe snapshots of UI widget state and Config for the consumers.
     QMutex                  m_params_mutex;
     ProcessingParams        m_processing_params;
-    // GENERAL-tab display picker selection. The GENERAL controls
-    // (enhance / frame-avg / pseudocolor / 3D / threshold / RESET_3D_BTN
-    // — except RESET_3D_BTN which is global TCU state) read from and
-    // write to m_router.display(m_picked_display).pcfg.
-    DisplayId               m_picked_display = DisplayId::Main;
-    // m_pipeline_config is the "global view" of pipeline settings. On
-    // update_processing_params() it is copied into every DisplaySlot's pcfg
-    // (apply-to-all default). The picker UX in C1b will swap this view to
-    // mirror the currently-selected display.
+    // Display picked on the GENERAL tab. Its controls read and write
+    // m_router.get_display(m_picked_display).pcfg, except RESET_3D_BTN, which is TCU state.
+    DisplayId               m_picked_display = DisplayId::MAIN;
+    // The global view of the pipeline settings. update_processing_params() copies it
+    // into every DisplaySlot's pcfg.
     PipelineConfig          m_pipeline_config;
     void update_processing_params();
     // Write the GENERAL-tab widget values into the picked display's pcfg.
@@ -651,33 +637,27 @@ private:
     // switching to. Invoked when m_picked_display changes.
     void repopulate_general_widgets_from_picked();
 
-    // Pipeline processor (owns all pipeline methods, run by GrabThread)
-    PipelineProcessor*      m_pipeline;
+    // Pipeline processor, run by the ConsumerThreads
+    PipelineProcessor      *m_pipeline;
 
-    // FFmpeg readers — one per stream. Drives the live-network/local-file
-    // playback path; cv:// + industrial cam push directly into StreamFrameSink
-    // instead.
-    FfmpegSource*           m_ffmpeg[kStreamCount] = { nullptr, nullptr, nullptr };
-    // Per-slot cv:// thread lifecycle. Each cv:// dispatch captures the
-    // shared_ptr; setting *m_cv_run[i] = false makes the cv:// loop exit
-    // independently of DisplaySlot::consumer_run (which start_static_display
-    // toggles back to true and would otherwise resurrect a stale cv://).
-    std::shared_ptr<std::atomic<bool>> m_cv_run[kStreamCount];
-    // Per-stream signal handlers (free functions on UserPanel for legibility).
-    // Each slot drops the signal if its `session` doesn't match the source's
-    // current_session() — stale events queued in the GUI loop from a worker
-    // that has been stop()ed must NOT bleed into the newly started worker.
+    // FFmpeg readers, one per stream, for network and local-file playback.
+    // cv:// and the industrial cameras push straight into a StreamFrameSink.
+    FfmpegSource           *m_ffmpeg[STREAM_COUNT] = { nullptr, nullptr, nullptr };
+    // Run flag of each slot's cv:// thread. Clearing it ends that loop independently of
+    // DisplaySlot::consumer_run, which start_static_display sets back to true and
+    // which would otherwise revive a stale cv:// thread.
+    std::shared_ptr<std::atomic<bool>> m_cv_run[STREAM_COUNT];
+    // Per-stream signal handlers. Each drops a signal whose session is not the
+    // source's get_current_session(): events still queued from a stopped worker must not
+    // reach the new one.
     void on_ffmpeg_opened(StreamId target, int session, FfmpegSource::VideoInfo info);
     void on_ffmpeg_frame(StreamId target, int session, cv::Mat frame);
     void on_ffmpeg_failed(StreamId target, int session, QString reason);
     void on_ffmpeg_finished(StreamId target, int session);
 
-    // Stop every active producer on the given slot before a new source
-    // takes over. All source types (FFmpeg, cv://, industrial cam, …) push
-    // to the same StreamSlot::frames queue, so any prior producer that's
-    // still alive will interleave with the new one. Call from each
-    // source-load entry point's top so the new source has the queue to
-    // itself.
+    // Stops every producer on the slot before a new source takes over. All source
+    // types push into the same StreamSlot::frames queue, so a producer left alive
+    // would interleave with the new one.
     void stop_all_sources_on_slot(int display_idx);
 
 public:

@@ -1,76 +1,76 @@
 #include "aliasing.h"
 #include "userpanel.h"
 
-Aliasing::Aliasing(QWidget *parent)
-    : QWidget{parent}
+Aliasing::Aliasing(QWidget *parent) :
+    QWidget{parent}
 {
-    inference = new QTableView();
-    inference_model = new QStandardItemModel();
-    inference_model->setHorizontalHeaderLabels({"PRF\n(kHz)", "T\n(μs)", "result dist\n(m)", "result delay\n(μs)", "# T\n(1)", ""});
+    m_inference = new QTableView();
+    m_inference_model = new QStandardItemModel();
+    m_inference_model->setHorizontalHeaderLabels({"PRF\n(kHz)", "T\n(μs)", "result dist\n(m)", "result delay\n(μs)", "# T\n(1)", ""});
 
-    apply_btn_grp = new QButtonGroup(this);
+    m_apply_btn_grp = new QButtonGroup(this);
     for (int i = 0; i < 31; i++) {
         QPushButton *btn = new QPushButton("APPLY");
-        apply_btn_grp->addButton(btn, i);
+        m_apply_btn_grp->addButton(btn, i);
     }
-    connect(apply_btn_grp, static_cast<void (QButtonGroup::*)(int id)>(&QButtonGroup::buttonClicked), this,
-            [this](int id){ emit delay_set_selected(current_selection = id); });
+    connect(m_apply_btn_grp, static_cast<void (QButtonGroup::*)(int id)>(&QButtonGroup::buttonClicked), this,
+            [this](int id){ emit delay_set_selected(m_current_selection = id); });
 
-    inference->setWindowTitle("Aliasing");
-    inference->resize(600, 800);
-    inference->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    inference->horizontalHeader()->setHighlightSections(false);
-    inference->verticalHeader()->setHighlightSections(false);
-    inference->setModel(inference_model);
-    inference->setAlternatingRowColors(true);
+    m_inference->setWindowTitle("Aliasing");
+    m_inference->resize(600, 800);
+    m_inference->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_inference->horizontalHeader()->setHighlightSections(false);
+    m_inference->verticalHeader()->setHighlightSections(false);
+    m_inference->setModel(m_inference_model);
+    m_inference->setAlternatingRowColors(true);
 
     for (int i = 0 ; i < 30; i++) {
         QStandardItem *prf_item = new QStandardItem(QString::asprintf("%02d", i + 1));
         prf_item->setData(i + 1);
         prf_item->setEditable(false);
         prf_item->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);
-        inference_model->setItem(i, 0, prf_item);
+        m_inference_model->setItem(i, 0, prf_item);
 
         QStandardItem *period_item = new QStandardItem(QString::asprintf("%.3f", 0));
         period_item->setData(0);
         period_item->setEditable(false);
         period_item->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);
-        inference_model->setItem(i, 1, period_item);
+        m_inference_model->setItem(i, 1, period_item);
 
         QStandardItem *num_period_item = new QStandardItem(QString::asprintf("%d", 0));
         num_period_item->setData(0);
         num_period_item->setEditable(false);
         num_period_item->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);
-        inference_model->setItem(i, 4, num_period_item);
+        m_inference_model->setItem(i, 4, num_period_item);
 
         QStandardItem *result_dist_item = new QStandardItem(QString::asprintf("%.3f", 0));
         result_dist_item->setData(0);
         result_dist_item->setEditable(false);
         result_dist_item->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);
-        inference_model->setItem(i, 2, result_dist_item);
+        m_inference_model->setItem(i, 2, result_dist_item);
 
         QStandardItem *result_delay_item = new QStandardItem(QString::asprintf("%.3f", 0));
         result_delay_item->setData(0);
         result_delay_item->setEditable(false);
         result_delay_item->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);
-        inference_model->setItem(i, 3, result_delay_item);
+        m_inference_model->setItem(i, 3, result_delay_item);
 
-        inference->setIndexWidget(inference_model->index(i, 5), apply_btn_grp->button(i));
+        m_inference->setIndexWidget(m_inference_model->index(i, 5), m_apply_btn_grp->button(i));
     }
 
 }
 
 Aliasing::~Aliasing()
 {
-    delete inference_model;
-    delete inference;
+    delete m_inference_model;
+    delete m_inference;
 }
 
 void Aliasing::update_distance(float distance)
 {
-//    inference_model->clear();
-    original_distance = distance;
-    recommended_parameters.clear();
+//    m_inference_model->clear();
+    m_original_distance = distance;
+    m_recommended_parameters.clear();
 
     float period, result_dist, result_delay, num_period;
     int current_num_period = 0, current_result_index = 0;
@@ -82,92 +82,92 @@ void Aliasing::update_distance(float distance)
         prf_item->setData(i + 1);
         prf_item->setEditable(false);
         prf_item->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);
-        inference_model->setItem(i, 0, prf_item);
+        m_inference_model->setItem(i, 0, prf_item);
 
         period = 1000. / (i + 1);
         QStandardItem *period_item = new QStandardItem(QString::asprintf("%.3f", period));
         period_item->setData(period);
         period_item->setEditable(false);
         period_item->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);
-        inference_model->setItem(i, 1, period_item);
+        m_inference_model->setItem(i, 1, period_item);
 
         num_period = std::floor(distance / (150 * period));
         QStandardItem *num_period_item = new QStandardItem(QString::asprintf("%d", (int)num_period));
         num_period_item->setData(num_period);
         num_period_item->setEditable(false);
         num_period_item->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);
-        inference_model->setItem(i, 4, num_period_item);
+        m_inference_model->setItem(i, 4, num_period_item);
 
         result_dist = distance - num_period * 150 * period;
         QStandardItem *result_dist_item = new QStandardItem(QString::asprintf("%.3f", result_dist));
         result_dist_item->setData(result_dist);
         result_dist_item->setEditable(false);
         result_dist_item->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);
-        inference_model->setItem(i, 2, result_dist_item);
+        m_inference_model->setItem(i, 2, result_dist_item);
 
         result_delay = result_dist / 150;
         QStandardItem *result_delay_item = new QStandardItem(QString::asprintf("%.3f", result_delay));
         result_delay_item->setData(result_delay);
         result_delay_item->setEditable(false);
         result_delay_item->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);
-        inference_model->setItem(i, 3, result_delay_item);
+        m_inference_model->setItem(i, 3, result_delay_item);
 
-        inference->setIndexWidget(inference_model->index(i, 5), apply_btn_grp->button(i));
+        m_inference->setIndexWidget(m_inference_model->index(i, 5), m_apply_btn_grp->button(i));
 #endif
-        QStandardItem *prf_item = inference_model->item(i, 0);
+        QStandardItem *prf_item = m_inference_model->item(i, 0);
         prf_item->setText(QString::asprintf("%02d", i + 1));
         prf_item->setData(i + 1);
 
         period = 1000. / (i + 1);
-        QStandardItem *period_item = inference_model->item(i, 1);
+        QStandardItem *period_item = m_inference_model->item(i, 1);
         period_item->setText(QString::asprintf("%.3f", period));
         period_item->setData(period);
 
         num_period = std::floor(distance / (150 * period));
-        QStandardItem *num_period_item = inference_model->item(i, 4);
+        QStandardItem *num_period_item = m_inference_model->item(i, 4);
         num_period_item->setText(QString::asprintf("%d", (int)num_period));
         num_period_item->setData(num_period);
 
         result_dist = distance - num_period * 150 * period;
-        QStandardItem *result_dist_item = inference_model->item(i, 2);
+        QStandardItem *result_dist_item = m_inference_model->item(i, 2);
         result_dist_item->setText(QString::asprintf("%.3f", result_dist));
         result_dist_item->setData(result_dist);
 
         result_delay = result_dist / 150;
-        QStandardItem *result_delay_item = inference_model->item(i, 3);
+        QStandardItem *result_delay_item = m_inference_model->item(i, 3);
         result_delay_item->setText(QString::asprintf("%.3f", result_delay));
         result_delay_item->setData(result_delay);
 
         if (result_delay > 5 && abs(result_delay - 10) <= abs(current_result_delay - 10)) current_result_delay = result_delay, current_result_index = i;
 
         if (num_period > current_num_period) {
-            if (current_result_delay < 200) recommended_parameters[current_num_period] = AliasingData{inference_model->item(current_result_index, 0)->data().toFloat(),
-                                                                                                      inference_model->item(current_result_index, 2)->data().toFloat(),
-                                                                                                      inference_model->item(current_result_index, 4)->data().toInt()};
+            if (current_result_delay < 200) m_recommended_parameters[current_num_period] = AliasingData{m_inference_model->item(current_result_index, 0)->data().toFloat(),
+                                                                                                        m_inference_model->item(current_result_index, 2)->data().toFloat(),
+                                                                                                        m_inference_model->item(current_result_index, 4)->data().toInt()};
             current_num_period = num_period;
             current_result_delay = 1000;
         }
     }
-    if (current_result_delay < 200) recommended_parameters[current_num_period] = AliasingData{inference_model->item(current_result_index, 0)->data().toFloat(),
-                                                                                              inference_model->item(current_result_index, 2)->data().toFloat(),
-                                                                                              inference_model->item(current_result_index, 4)->data().toInt()};
-    qDebug() << recommended_parameters;
+    if (current_result_delay < 200) m_recommended_parameters[current_num_period] = AliasingData{m_inference_model->item(current_result_index, 0)->data().toFloat(),
+                                                                                                m_inference_model->item(current_result_index, 2)->data().toFloat(),
+                                                                                                m_inference_model->item(current_result_index, 4)->data().toInt()};
+    qDebug() << m_recommended_parameters;
 }
 
 void Aliasing::show_ui()
 {
-    inference->show();
-    inference->raise();
+    m_inference->show();
+    m_inference->raise();
 }
 
 AliasingData Aliasing::retrieve_data(int id)
 {
-    return AliasingData {inference_model->item(id, 0)->data().toFloat(),
-                         inference_model->item(id, 2)->data().toFloat(),
-                        inference_model->item(id, 4)->data().toInt()};
+    return AliasingData {m_inference_model->item(id, 0)->data().toFloat(),
+                         m_inference_model->item(id, 2)->data().toFloat(),
+                        m_inference_model->item(id, 4)->data().toInt()};
 }
 
 void Aliasing::closeEvent(QCloseEvent *event)
 {
-    inference->close();
+    m_inference->close();
 }

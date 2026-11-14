@@ -17,7 +17,7 @@ public:
     JoystickThread(UserPanel *panel);
     ~JoystickThread();
 
-    enum BUTTON {
+    enum Button {
         NONE     = 0x0000,
         A        = 0x0001,
         X        = 0x0002,
@@ -35,7 +35,7 @@ public:
         SELECT   = 0x2000,
     };
 
-    enum DIRECTION {
+    enum Direction {
         UP        = 0,
         UPRIGHT   = 1,
         RIGHT     = 2,
@@ -62,18 +62,18 @@ signals:
 
 private:
     UserPanel     *m_panel;
-    QTimer        *t;
+    QTimer        *m_t;
 #ifdef WIN32
-    JOYINFOEX     *joy;
-    MMRESULT      joy_return;
+    JOYINFOEX     *m_joy;
+    MMRESULT      m_joy_return;
 #endif
 
-    ulong         curr_btn;
-    ulong         prev_btn;
-    int           curr_direction;
-    int           prev_direction;
-    int           x, y, u, r;
-    bool          pressed[14];
+    ulong         m_curr_btn;
+    ulong         m_prev_btn;
+    int           m_curr_direction;
+    int           m_prev_direction;
+    int           m_x, m_y, m_u, m_r;
+    bool          m_pressed[14];
 };
 
 #endif // JOYSTICKTHREAD_H

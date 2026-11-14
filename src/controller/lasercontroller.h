@@ -15,11 +15,9 @@ public:
     explicit LaserController(DeviceManager *device_mgr, LensController *lens_ctrl,
                              TCUController *tcu_ctrl, QObject *parent = nullptr);
 
-    // Getters
-    char get_curr_laser_idx() const { return curr_laser_idx; }
+    char get_curr_laser_idx() const { return m_curr_laser_idx; }
 
-    // Setters
-    void set_curr_laser_idx(char v) { curr_laser_idx = v; }
+    void set_curr_laser_idx(char v) { m_curr_laser_idx = v; }
 
 public slots:
     void on_LASER_BTN_clicked();
@@ -45,13 +43,13 @@ signals:
 private:
     void set_laser_preset_target(int *pos);
 
-    DeviceManager*  m_device_mgr;
-    LensController* m_lens_ctrl;
-    TCUController*  m_tcu_ctrl;
+    DeviceManager  *m_device_mgr;
+    LensController *m_lens_ctrl;
+    TCUController  *m_tcu_ctrl;
 
-    bool            laser_on;   // true when laser is active (button shows "OFF")
-    bool            firing;     // true when laser is firing (button shows "STOP")
-    char            curr_laser_idx;
+    bool            m_laser_on;   // true when laser is active (button shows "OFF")
+    bool            m_firing;     // true when laser is firing (button shows "STOP")
+    char            m_curr_laser_idx;
 };
 
 #endif // LASERCONTROLLER_H

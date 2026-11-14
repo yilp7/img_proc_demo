@@ -22,20 +22,20 @@ private:
     void load_data();
 
 private:
-    Ui::Distance3DView    *ui;
-    QWidget               *signal_sender;
-    std::vector<cv::Rect> *list_roi;
+    Ui::Distance3DView    *m_ui;
+    QWidget               *m_signal_sender;
+    std::vector<cv::Rect> *m_list_roi;
 
-    QtDataVisualization::Q3DScatter *scatter_graph;
+    QtDataVisualization::Q3DScatter *m_scatter_graph;
 
-    uint    downsample;
+    uint    m_downsample;
 
-    QMutex  mat_mutex;
-    cv::Mat dist_mat;
-    double  dist_min;
-    double  dist_max;
-    bool    consecutive;
-    bool    get_single_frame;
+    QMutex  m_mat_mutex;
+    cv::Mat m_dist_mat;
+    double  m_dist_min;
+    double  m_dist_max;
+    bool    m_consecutive;
+    bool    m_get_single_frame;
 };
 
 #endif // DISTANCE3DVIEW_H

@@ -20,27 +20,27 @@ float median(std::vector<float> &values)
 // Per-frame scale is clamped hard: a target's apparent size cannot change much
 // between frames, and an unclamped estimate from a noisy point set collapses
 // the gate to nothing in a few frames.
-constexpr float MaxScaleStep = 0.05f;
+constexpr float MAX_SCALE_STEP = 0.05f;
 // Cumulative bounds relative to the designated size, so a slow drift in the
 // scale estimate cannot walk the gate away over a long track.
-constexpr float MinCumulativeScale = 0.25f;
-constexpr float MaxCumulativeScale = 4.0f;
+constexpr float MIN_CUMULATIVE_SCALE = 0.25f;
+constexpr float MAX_CUMULATIVE_SCALE = 4.0f;
 
 // Correlation floor for accepting a template match, and the higher bar the
 // frozen anchor has to clear to take a drifted track back.
-constexpr double MatchAcceptScore = 0.45;
-constexpr double AnchorRecoverScore = 0.55;
+constexpr double MATCH_ACCEPT_SCORE = 0.45;
+constexpr double ANCHOR_RECOVER_SCORE = 0.55;
 // Only a confident match is allowed to teach the adaptive template, and then
 // only slightly; this is the difference between tracking appearance change and
 // dissolving into the background.
-constexpr double TemplateLearnScore = 0.70;
-constexpr double TemplateLearnRate = 0.08;
+constexpr double TEMPLATE_LEARN_SCORE = 0.70;
+constexpr double TEMPLATE_LEARN_RATE = 0.08;
 // Frames the gate may coast on a failed match before the track is abandoned.
-constexpr int MaxTemplateMisses = 10;
+constexpr int MAX_TEMPLATE_MISSES = 10;
 
 } // namespace
 
-void GateTracker::setSettings(const Settings &settings)
+void GateTracker::set_settings(const Settings &settings)
 {
     // The two methods keep entirely different state, so a live track cannot
     // survive the switch.
@@ -62,7 +62,7 @@ void GateTracker::clear()
     m_misses = 0;
 }
 
-bool GateTracker::detectFeatures(const cv::Mat &gray, bool core_only)
+bool GateTracker::detect_features(const cv::Mat &gray, bool core_only)
 {
     cv::Rect region = m_box;
     if (core_only) {
@@ -106,12 +106,13 @@ void GateTracker::seed(const cv::Mat &gray, const cv::Rect &gate)
 
     m_frame_size = gray.size();
 
-    if (m_settings.mode == Mode::Template) {
+    if (m_settings.mode == Mode::TEMPLATE) {
         gray(bounded).copyTo(m_template);
         m_template.copyTo(m_anchor);
         m_score = 1.0;
-    } else {
-        if (!detectFeatures(gray, false)) {
+    }
+    else {
+        if (!detect_features(gray, false)) {
             // A gate over flat water or sky has nothing to lock onto. Failing
             // here is better than reporting a track that will immediately
             // wander.
@@ -124,20 +125,20 @@ void GateTracker::seed(const cv::Mat &gray, const cv::Rect &gate)
     m_active = true;
 }
 
-bool GateTracker::moveBox(float dx, float dy, float scale, const cv::Size &frame)
+bool GateTracker::move_box(float dx, float dy, float scale, const cv::Size &frame)
 {
     const float cx = m_box.x + m_box.width * 0.5f + dx;
     const float cy = m_box.y + m_box.height * 0.5f + dy;
 
-    scale = std::min(std::max(scale, 1.0f - MaxScaleStep), 1.0f + MaxScaleStep);
+    scale = std::min(std::max(scale, 1.0f - MAX_SCALE_STEP), 1.0f + MAX_SCALE_STEP);
     float width = m_box.width * scale;
     float height = m_box.height * scale;
 
     if (m_seed_size.width > 0 && m_seed_size.height > 0) {
-        width = std::min(std::max(width, MinCumulativeScale * m_seed_size.width),
-                         MaxCumulativeScale * m_seed_size.width);
-        height = std::min(std::max(height, MinCumulativeScale * m_seed_size.height),
-                          MaxCumulativeScale * m_seed_size.height);
+        width = std::min(std::max(width, MIN_CUMULATIVE_SCALE * m_seed_size.width),
+                         MAX_CUMULATIVE_SCALE * m_seed_size.width);
+        height = std::min(std::max(height, MIN_CUMULATIVE_SCALE * m_seed_size.height),
+                          MAX_CUMULATIVE_SCALE * m_seed_size.height);
     }
 
     m_box = cv::Rect(static_cast<int>(std::lround(cx - width * 0.5f)),
@@ -158,10 +159,10 @@ bool GateTracker::update(const cv::Mat &gray)
         return false;
     }
 
-    return m_settings.mode == Mode::Template ? updateTemplate(gray) : updateOpticalFlow(gray);
+    return m_settings.mode == Mode::TEMPLATE ? update_template(gray) : update_optical_flow(gray);
 }
 
-bool GateTracker::updateOpticalFlow(const cv::Mat &gray)
+bool GateTracker::update_optical_flow(const cv::Mat &gray)
 {
     if (m_previous.empty() || m_points.empty()) return false;
 
@@ -171,10 +172,9 @@ bool GateTracker::updateOpticalFlow(const cv::Mat &gray)
     cv::calcOpticalFlowPyrLK(m_previous, gray, m_points, next, status, err,
                              cv::Size(21, 21), 3);
 
-    // Forward-backward validation. Tracking the results back to the previous
-    // frame and demanding they land where they started rejects bad points
-    // individually, which the median-agreement filter below cannot do once the
-    // majority has already drifted.
+    // Forward-backward validation: points are tracked back to the previous frame and
+    // must land where they started. This rejects bad points one by one, which the
+    // median filter below cannot once most of them have drifted.
     std::vector<float> fb_error;
     float fb_tolerance = 0.0f;
     if (m_settings.forward_backward_check) {
@@ -214,11 +214,11 @@ bool GateTracker::updateOpticalFlow(const cv::Mat &gray)
     }
 
     if (static_cast<int>(kept_next.size()) < m_min_features) {
-        // Too few survivors to trust a median. One re-seed attempt on the
-        // current frame before giving up — a brief occlusion or a glint can
-        // kill the old features while the target is still there.
+        // Too few survivors to trust a median. One re-seed on the current frame before
+        // giving up: an occlusion or a glint can kill the features while the target is
+        // still there.
         gray.copyTo(m_previous);
-        if (!detectFeatures(gray, true)) {
+        if (!detect_features(gray, true)) {
             clear();
             return false;
         }
@@ -248,10 +248,9 @@ bool GateTracker::updateOpticalFlow(const cv::Mat &gray)
         filtered = kept_next;
     }
 
-    // Scale from the median ratio of pairwise point separations. Translation
-    // cancels out, so this measures the target growing or shrinking rather than
-    // moving — without it the gate keeps its designated size and eventually
-    // contains as much background as target.
+    // Scale from the median ratio of pairwise point separations: translation cancels
+    // out, so it measures growing or shrinking. Without it the gate keeps its size
+    // and ends up holding as much background as target.
     float scale = 1.0f;
     if (filtered.size() >= 2) {
         std::vector<float> ratios;
@@ -268,7 +267,7 @@ bool GateTracker::updateOpticalFlow(const cv::Mat &gray)
     }
 
     m_points = filtered;
-    if (!moveBox(median_dx, median_dy, scale, gray.size())) {
+    if (!move_box(median_dx, median_dy, scale, gray.size())) {
         clear();
         return false;
     }
@@ -277,11 +276,11 @@ bool GateTracker::updateOpticalFlow(const cv::Mat &gray)
 
     // Feature count decays as points fail; top back up before it reaches the
     // floor, so a long track does not slowly starve itself.
-    if (static_cast<int>(m_points.size()) < m_max_features / 3) detectFeatures(gray, true);
+    if (static_cast<int>(m_points.size()) < m_max_features / 3) detect_features(gray, true);
     return true;
 }
 
-bool GateTracker::updateTemplate(const cv::Mat &gray)
+bool GateTracker::update_template(const cv::Mat &gray)
 {
     if (m_template.empty()) {
         clear();
@@ -304,8 +303,8 @@ bool GateTracker::updateTemplate(const cv::Mat &gray)
 
     std::vector<float> scales{1.0f};
     if (m_settings.multi_scale) {
-        scales.push_back(1.0f - MaxScaleStep);
-        scales.push_back(1.0f + MaxScaleStep);
+        scales.push_back(1.0f - MAX_SCALE_STEP);
+        scales.push_back(1.0f + MAX_SCALE_STEP);
     }
 
     const auto correlate = [&](const cv::Mat &tmpl, float scale,
@@ -350,7 +349,7 @@ bool GateTracker::updateTemplate(const cv::Mat &gray)
     // left that is guaranteed not to have drifted, so try to recover with it
     // before writing the track off.
     bool recovered = false;
-    if (best_score < MatchAcceptScore && !m_anchor.empty()) {
+    if (best_score < MATCH_ACCEPT_SCORE && !m_anchor.empty()) {
         cv::Mat anchor = m_anchor;
         if (anchor.cols != m_box.width || anchor.rows != m_box.height) {
             const cv::Size target(std::max(8, m_box.width), std::max(8, m_box.height));
@@ -360,7 +359,7 @@ bool GateTracker::updateTemplate(const cv::Mat &gray)
         double score = 0.0;
         cv::Point location;
         cv::Size size;
-        if (correlate(anchor, 1.0f, &score, &location, &size) && score >= AnchorRecoverScore) {
+        if (correlate(anchor, 1.0f, &score, &location, &size) && score >= ANCHOR_RECOVER_SCORE) {
             best_score = score;
             best_location = location;
             best_size = size;
@@ -370,10 +369,10 @@ bool GateTracker::updateTemplate(const cv::Mat &gray)
 
     m_score = best_score;
 
-    if (best_score < MatchAcceptScore && !recovered) {
+    if (best_score < MATCH_ACCEPT_SCORE && !recovered) {
         // Coast on the last position: a target crossing behind a mast should
         // not cost the operator their designation.
-        if (++m_misses > MaxTemplateMisses) {
+        if (++m_misses > MAX_TEMPLATE_MISSES) {
             clear();
             return false;
         }
@@ -388,7 +387,7 @@ bool GateTracker::updateTemplate(const cv::Mat &gray)
     const float dy = (matched.y + matched.height * 0.5f) - (m_box.y + m_box.height * 0.5f);
     const float scale = m_box.width > 0 ? static_cast<float>(best_size.width) / m_box.width : 1.0f;
 
-    if (!moveBox(dx, dy, scale, gray.size())) {
+    if (!move_box(dx, dy, scale, gray.size())) {
         clear();
         return false;
     }
@@ -402,13 +401,13 @@ bool GateTracker::updateTemplate(const cv::Mat &gray)
         // needs matching dimensions.
         if (recovered || m_box.size() != m_template.size())
             gray(m_box).copyTo(m_template);
-        else if (best_score >= TemplateLearnScore)
-            cv::addWeighted(m_template, 1.0 - TemplateLearnRate,
-                            gray(m_box), TemplateLearnRate, 0.0, m_template);
+        else if (best_score >= TEMPLATE_LEARN_SCORE)
+            cv::addWeighted(m_template, 1.0 - TEMPLATE_LEARN_RATE,
+                            gray(m_box), TEMPLATE_LEARN_RATE, 0.0, m_template);
     }
 
     // The scale ratio above reads the template size against the box size, so
-    // the two must stay equal. They diverge only when moveBox clamps or the
+    // the two must stay equal. They diverge only when move_box clamps or the
     // patch could not be taken, which is rare enough to pay a resample for.
     if (m_box.size() != m_template.size() && m_box.width >= 8 && m_box.height >= 8)
         cv::resize(m_template, m_template, m_box.size(), 0, 0, cv::INTER_LINEAR);

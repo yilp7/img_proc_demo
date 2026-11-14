@@ -50,10 +50,10 @@ public:
         int fusion_method = 2);
 
     // 3D
-    static void gated3D(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw, double *range, double range_thresh);
-    static void gated3D_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw,
-                           int colormap = cv::COLORMAP_PARULA, double lower_thresh = 0, double upper_thresh = 0.981,
-                           bool trim = false, cv::Mat *dist_mat = nullptr, double *d_min = nullptr, double *d_max = nullptr);
+    static void gated_3d(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw, double *range, double range_thresh);
+    static void gated_3d_v2(cv::Mat &src1, cv::Mat &src2, cv::Mat &res, double delay, double gw,
+                            int colormap = cv::COLORMAP_PARULA, double lower_thresh = 0, double upper_thresh = 0.981,
+                            bool trim = false, cv::Mat *dist_mat = nullptr, double *d_min = nullptr, double *d_max = nullptr);
     // TODO rewrite 3d painting function
     static void paint_3d(cv::Mat &src, cv::Mat &res, double range_thresh, double min, double max, int colormap = cv::COLORMAP_PARULA);
 
@@ -69,10 +69,10 @@ private:
     static void dark_channel(cv::Mat &src, cv::Mat &dark, cv::Mat &inter, int r);
 
 private:
-    int height;
-    int width;
-    int depth;
-    int channels;
+    int m_height;
+    int m_width;
+    int m_depth;
+    int m_channels;
 };
 
 #endif // IMAGEPROC_H

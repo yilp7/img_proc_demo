@@ -18,26 +18,26 @@
 #include <QWheelEvent>
 
 namespace {
-const int kResizeHandleSize = 18;
+const int RESIZE_HANDLE_SIZE = 18;
 }
 
-PanoramaPanel::PanoramaPanel(QWidget *parent)
-    : FloatingPanel(parent),
-      m_scroll(nullptr),
-      m_preview(nullptr),
-      m_status(nullptr),
-      m_reset_button(nullptr),
-      m_resize_handle(nullptr),
-      m_interactive(false),
-      m_panning(false),
-      m_resizing(false),
-      m_zoom(1.0),
-      m_pan(),
-      m_last_pan_pos(),
-      m_resize_press_global(),
-      m_resize_press_geometry()
+PanoramaPanel::PanoramaPanel(QWidget *parent) :
+    FloatingPanel(parent),
+    m_scroll(nullptr),
+    m_preview(nullptr),
+    m_status(nullptr),
+    m_reset_button(nullptr),
+    m_resize_handle(nullptr),
+    m_interactive(false),
+    m_panning(false),
+    m_resizing(false),
+    m_zoom(1.0),
+    m_pan(),
+    m_last_pan_pos(),
+    m_resize_press_global(),
+    m_resize_press_geometry()
 {
-    setTitle(tr("Panorama"));
+    set_title(tr("Panorama"));
     setMinimumSize(360, 130);
 
     QWidget *header = findChild<QWidget*>("FloatingPanelHeader");
@@ -53,7 +53,7 @@ PanoramaPanel::PanoramaPanel(QWidget *parent)
     m_reset_button->setFixedSize(40, 20);
     m_reset_button->setFocusPolicy(Qt::NoFocus);
     connect(m_reset_button, &QPushButton::clicked,
-            this, &PanoramaPanel::resetRequested);
+            this, &PanoramaPanel::reset_requested);
 
     if (header_layout) {
         if (QLabel *title_label = header->findChild<QLabel*>("FloatingPanelTitle")) {
@@ -64,9 +64,10 @@ PanoramaPanel::PanoramaPanel(QWidget *parent)
         header_layout->insertStretch(2, 1);
         header_layout->insertWidget(qMax(0, header_layout->count() - 2),
                                     m_reset_button, 0, Qt::AlignVCenter);
-    } else {
-        contentLayout()->addWidget(m_status);
-        contentLayout()->addWidget(m_reset_button);
+    }
+    else {
+        get_content_layout()->addWidget(m_status);
+        get_content_layout()->addWidget(m_reset_button);
     }
 
     m_scroll = new QScrollArea(this);
@@ -87,22 +88,22 @@ PanoramaPanel::PanoramaPanel(QWidget *parent)
     m_scroll->viewport()->installEventFilter(this);
     m_preview->installEventFilter(this);
 
-    contentLayout()->addWidget(m_scroll, 1);
+    get_content_layout()->addWidget(m_scroll, 1);
 
     m_resize_handle = new QWidget(this);
     m_resize_handle->setObjectName("PANORAMA_RESIZE_HANDLE");
     m_resize_handle->setAttribute(Qt::WA_StyledBackground, true);
-    m_resize_handle->setFixedSize(kResizeHandleSize, kResizeHandleSize);
+    m_resize_handle->setFixedSize(RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE);
     m_resize_handle->setCursor(Qt::SizeFDiagCursor);
     m_resize_handle->installEventFilter(this);
     m_resize_handle->raise();
 
-    clearPreview();
+    clear_preview();
 }
 
-void PanoramaPanel::clearPreview()
+void PanoramaPanel::clear_preview()
 {
-    resetView();
+    reset_view();
     m_source_pixmap = QPixmap();
     if (m_preview) {
         m_preview->clear();
@@ -110,39 +111,39 @@ void PanoramaPanel::clearPreview()
     }
 }
 
-void PanoramaPanel::setPreviewPixmap(const QPixmap &pixmap)
+void PanoramaPanel::set_preview_pixmap(const QPixmap &pixmap)
 {
     if (pixmap.isNull()) return;
     m_source_pixmap = pixmap;
-    updatePreviewPixmap();
+    update_preview_pixmap();
 }
 
-void PanoramaPanel::setGenerating()
+void PanoramaPanel::set_generating()
 {
     m_interactive = false;
     m_panning = false;
-    resetView();
+    reset_view();
     if (m_status) {
         m_status->setText(tr("panorama generating"));
         m_status->setVisible(true);
     }
     if (m_preview) m_preview->setCursor(Qt::ArrowCursor);
     if (m_scroll && m_scroll->viewport()) m_scroll->viewport()->setCursor(Qt::ArrowCursor);
-    updatePreviewPixmap();
+    update_preview_pixmap();
 }
 
-void PanoramaPanel::setGenerated()
+void PanoramaPanel::set_generated()
 {
     m_interactive = true;
     m_panning = false;
-    resetView();
+    reset_view();
     if (m_status) {
         m_status->setText(tr("panorama generated"));
         m_status->setVisible(true);
     }
     if (m_preview) m_preview->setCursor(Qt::OpenHandCursor);
     if (m_scroll && m_scroll->viewport()) m_scroll->viewport()->setCursor(Qt::OpenHandCursor);
-    updatePreviewPixmap();
+    update_preview_pixmap();
 }
 
 bool PanoramaPanel::eventFilter(QObject *obj, QEvent *event)
@@ -155,8 +156,8 @@ bool PanoramaPanel::eventFilter(QObject *obj, QEvent *event)
                 m_resizing = true;
                 m_resize_press_global = mouse->globalPos();
                 m_resize_press_geometry = geometry();
-                if (m_resize_handle) m_resize_handle->grabMouse();
-                emit resizedByUser();
+                if (m_resize_handle) m_resize_handle->grabMouse(); // keep receiving moves when the cursor leaves the handle
+                emit resized_by_user();
                 return true;
             }
         }
@@ -165,6 +166,7 @@ bool PanoramaPanel::eventFilter(QObject *obj, QEvent *event)
             auto *mouse = static_cast<QMouseEvent*>(event);
             const QPoint delta = mouse->globalPos() - m_resize_press_global;
             const QSize min_size = minimumSize();
+            // upper bound: the parent's right and bottom edges; without a parent, the requested size itself
             int max_w = qMax(min_size.width(), m_resize_press_geometry.width() + delta.x());
             int max_h = qMax(min_size.height(), m_resize_press_geometry.height() + delta.y());
 
@@ -181,7 +183,7 @@ bool PanoramaPanel::eventFilter(QObject *obj, QEvent *event)
                                       m_resize_press_geometry.height() + delta.y(), max_h);
             if (size() != QSize(next_w, next_h)) {
                 resize(next_w, next_h);
-                emit resizedByUser();
+                emit resized_by_user();
             }
             return true;
         }
@@ -191,7 +193,7 @@ bool PanoramaPanel::eventFilter(QObject *obj, QEvent *event)
             if (m_resizing && mouse->button() == Qt::LeftButton) {
                 m_resizing = false;
                 if (m_resize_handle) m_resize_handle->releaseMouse();
-                emit resizedByUser();
+                emit resized_by_user();
                 return true;
             }
         }
@@ -211,20 +213,22 @@ bool PanoramaPanel::eventFilter(QObject *obj, QEvent *event)
         if (delta == 0) return true;
 
         const double old_zoom = m_zoom;
+        // 15% per wheel step, between 1x and 8x
         const double factor = delta > 0 ? 1.15 : (1.0 / 1.15);
         m_zoom = qBound(1.0, m_zoom * factor, 8.0);
         if (qFuzzyCompare(old_zoom, m_zoom)) return true;
 
         const QSize target = m_scroll ? m_scroll->viewport()->size() : QSize();
         if (target.width() > 0 && target.height() > 0) {
-            const QPoint cursor = eventPointInViewport(obj, wheel->pos());
+            // keep the image point under the cursor fixed: scale its offset from the view centre by the zoom ratio
+            const QPoint cursor = event_point_in_viewport(obj, wheel->pos());
             const QPointF center(target.width() / 2.0, target.height() / 2.0);
             const QPointF relative = QPointF(cursor) - center - QPointF(m_pan);
             const QPointF adjusted = QPointF(cursor) - center - relative * (m_zoom / old_zoom);
             m_pan = QPoint(qRound(adjusted.x()), qRound(adjusted.y()));
         }
 
-        updatePreviewPixmap();
+        update_preview_pixmap();
         return true;
     }
 
@@ -232,7 +236,7 @@ bool PanoramaPanel::eventFilter(QObject *obj, QEvent *event)
         auto *mouse = static_cast<QMouseEvent*>(event);
         if (mouse->button() == Qt::LeftButton) {
             m_panning = true;
-            m_last_pan_pos = eventPointInViewport(obj, mouse->pos());
+            m_last_pan_pos = event_point_in_viewport(obj, mouse->pos());
             if (m_preview) {
                 m_preview->setCursor(Qt::ClosedHandCursor);
                 m_preview->grabMouse();
@@ -245,10 +249,10 @@ bool PanoramaPanel::eventFilter(QObject *obj, QEvent *event)
     if (event->type() == QEvent::MouseMove) {
         auto *mouse = static_cast<QMouseEvent*>(event);
         if (m_panning) {
-            const QPoint pos = eventPointInViewport(obj, mouse->pos());
+            const QPoint pos = event_point_in_viewport(obj, mouse->pos());
             m_pan += pos - m_last_pan_pos;
             m_last_pan_pos = pos;
-            updatePreviewPixmap();
+            update_preview_pixmap();
             return true;
         }
     }
@@ -273,14 +277,14 @@ void PanoramaPanel::resizeEvent(QResizeEvent *event)
 {
     FloatingPanel::resizeEvent(event);
     if (m_resize_handle) {
-        m_resize_handle->move(qMax(0, width() - kResizeHandleSize),
-                              qMax(0, height() - kResizeHandleSize));
+        m_resize_handle->move(qMax(0, width() - RESIZE_HANDLE_SIZE),
+                              qMax(0, height() - RESIZE_HANDLE_SIZE));
         m_resize_handle->raise();
     }
-    updatePreviewPixmap();
+    update_preview_pixmap();
 }
 
-QPoint PanoramaPanel::eventPointInViewport(QObject *obj, const QPoint &pos) const
+QPoint PanoramaPanel::event_point_in_viewport(QObject *obj, const QPoint &pos) const
 {
     if (obj == m_preview && m_scroll) {
         return m_preview->mapTo(m_scroll->viewport(), pos);
@@ -288,14 +292,14 @@ QPoint PanoramaPanel::eventPointInViewport(QObject *obj, const QPoint &pos) cons
     return pos;
 }
 
-void PanoramaPanel::resetView()
+void PanoramaPanel::reset_view()
 {
     m_zoom = 1.0;
     m_pan = QPoint(0, 0);
     m_last_pan_pos = QPoint();
 }
 
-void PanoramaPanel::updatePreviewPixmap()
+void PanoramaPanel::update_preview_pixmap()
 {
     if (!m_preview || m_source_pixmap.isNull()) return;
 
@@ -318,7 +322,8 @@ void PanoramaPanel::updatePreviewPixmap()
         };
         m_pan.setX(clamp_axis(m_pan.x(), target.width(), scaled_size.width()));
         m_pan.setY(clamp_axis(m_pan.y(), target.height(), scaled_size.height()));
-    } else {
+    }
+    else {
         m_pan = QPoint(0, 0);
     }
 

@@ -2,31 +2,29 @@
 
 ControlPort::ControlPort(int index) :
     QObject{nullptr},
-    idx(index),
-    timer(nullptr),
-    interval(1000),
-    use_tcp(false),
-    serial_port(nullptr),
-    tcp_port(nullptr),
-    shared_port(nullptr),
-    successive_count(0),
-    connected_to_serial(false),
-    connected_to_tcp(false)
+    m_idx(index),
+    m_timer(nullptr),
+    m_interval(1000),
+    m_use_tcp(false),
+    m_serial_port(nullptr),
+    m_tcp_port(nullptr),
+    m_shared_port(nullptr),
+    m_successive_count(0),
+    m_connected_to_serial(false),
+    m_connected_to_tcp(false)
 {
-    serial_port = new QSerialPort(this);
-    tcp_port = new QTcpSocket(this);
-    // Bypass system-level proxy. On machines where Windows reports an HTTP
-    // proxy (corporate network, stale PAC, "auto-detect settings"), Qt
-    // refuses raw TCP with "The proxy type is invalid for this operation"
-    // and never sends a packet. Skip the system proxy lookup entirely.
-    tcp_port->setProxy(QNetworkProxy::NoProxy);
-    timer = new QTimer(this);
-    timer->setTimerType(Qt::PreciseTimer);
-    timer->setInterval(interval);
+    m_serial_port = new QSerialPort(this);
+    m_tcp_port = new QTcpSocket(this);
+    // Bypass the system proxy: when Windows reports an HTTP proxy, Qt refuses raw TCP
+    // with "The proxy type is invalid for this operation" and sends nothing.
+    m_tcp_port->setProxy(QNetworkProxy::NoProxy);
+    m_timer = new QTimer(this);
+    m_timer->setTimerType(Qt::PreciseTimer);
+    m_timer->setInterval(m_interval);
 
-    connect(serial_port, &QSerialPort::readyRead, this, &ControlPort::handle_received);
-    connect(tcp_port, &QTcpSocket::readyRead, this, &ControlPort::handle_received);
-    connect(timer, &QTimer::timeout, this, &ControlPort::try_communicate);
+    connect(m_serial_port, &QSerialPort::readyRead, this, &ControlPort::handle_received);
+    connect(m_tcp_port, &QTcpSocket::readyRead, this, &ControlPort::handle_received);
+    connect(m_timer, &QTimer::timeout, this, &ControlPort::try_communicate);
     connect(this, &ControlPort::connect_to_serial, this, &ControlPort::connect_to_serial_port);
     connect(this, &ControlPort::connect_to_tcp, this, &ControlPort::connect_to_tcp_port);
     connect(this, &ControlPort::disconnect_from, this, &ControlPort::disconnect_from_port);
@@ -39,42 +37,42 @@ ControlPort::ControlPort(int index) :
 
 ControlPort::~ControlPort()
 {
-    if (serial_port->isOpen()) serial_port->close();
-    serial_port->deleteLater();
+    if (m_serial_port->isOpen()) m_serial_port->close();
+    m_serial_port->deleteLater();
 
-    timer->stop();
-    timer->deleteLater();
+    m_timer->stop();
+    m_timer->deleteLater();
 }
 
 qint32 ControlPort::get_baudrate()
 {
-    return serial_port->isOpen() ? serial_port->baudRate() : 0;
+    return m_serial_port->isOpen() ? m_serial_port->baudRate() : 0;
 }
 
 void ControlPort::set_baudrate(qint32 baudrate)
 {
-    if (serial_port->isOpen()) serial_port->setBaudRate(baudrate);
+    if (m_serial_port->isOpen()) m_serial_port->setBaudRate(baudrate);
 }
 
 bool ControlPort::get_use_tcp()
 {
-    return tcp_port->isOpen() ? use_tcp : false;
+    return m_tcp_port->isOpen() ? m_use_tcp : false;
 }
 
 void ControlPort::set_use_tcp(bool use_tcp)
 {
-    this->use_tcp = use_tcp;
+    this->m_use_tcp = use_tcp;
 }
 
 int ControlPort::get_port_status() const
 {
-    return (connected_to_tcp ? PortStatus::TCP_CONNECTED : PortStatus::NOT_CONNECTED) |
-           (connected_to_serial ? PortStatus::SERIAL_CONNECTED : PortStatus::NOT_CONNECTED);
+    return (m_connected_to_tcp ? PortStatus::TCP_CONNECTED : PortStatus::NOT_CONNECTED) |
+           (m_connected_to_serial ? PortStatus::SERIAL_CONNECTED : PortStatus::NOT_CONNECTED);
 }
 
 void ControlPort::share_port_from(ControlPort *port)
 {
-    shared_port = port;
+    m_shared_port = port;
 }
 
 QByteArray ControlPort::generate_ba(uchar *data, int len)
@@ -86,65 +84,65 @@ QByteArray ControlPort::generate_ba(uchar *data, int len)
 
 bool ControlPort::connect_to_serial_port(QString port_num, qint32 baudrate)
 {
-    if (serial_port->isOpen()) serial_port->close();
+    if (m_serial_port->isOpen()) m_serial_port->close();
 
     QString port_name;
 #if WIN32
     port_name = "COM" + port_num;
 #else
 #endif
-    serial_port->setPortName(port_name);
-    serial_port->setBaudRate(baudrate); // default: QSerialPort::Baud9600
-    serial_port->setDataBits(QSerialPort::Data8);
-    serial_port->setParity(QSerialPort::NoParity);
-    serial_port->setStopBits(QSerialPort::OneStop);
-    serial_port->setFlowControl(QSerialPort::NoFlowControl);
+    m_serial_port->setPortName(port_name);
+    m_serial_port->setBaudRate(baudrate); // default: QSerialPort::Baud9600
+    m_serial_port->setDataBits(QSerialPort::Data8);
+    m_serial_port->setParity(QSerialPort::NoParity);
+    m_serial_port->setStopBits(QSerialPort::OneStop);
+    m_serial_port->setFlowControl(QSerialPort::NoFlowControl);
 
 //    qDebug() << "open port in" << QThread::currentThread();
-    timer->stop();
-    if (serial_port->open(QIODevice::ReadWrite)) {
-        timer->start();
-        serial_port->clear();
+    m_timer->stop();
+    if (m_serial_port->open(QIODevice::ReadWrite)) {
+        m_timer->start();
+        m_serial_port->clear();
         qDebug("%s connected", qPrintable(port_name));
-        connected_to_serial = true;
-//        emit serial_port_status_updated(connected_to_serial = true);
-        successive_count = 0;
+        m_connected_to_serial = true;
+//        emit serial_port_status_updated(m_connected_to_serial = true);
+        m_successive_count = 0;
     }
     else {
-        timer->stop();
-        connected_to_serial = false;
-//        emit serial_port_status_updated(connected_to_serial = false);
+        m_timer->stop();
+        m_connected_to_serial = false;
+//        emit serial_port_status_updated(m_connected_to_serial = false);
     }
     emit port_status_updated();
 
     // COM port saving will be handled by UserPanel through config
-    return connected_to_serial;
+    return m_connected_to_serial;
 }
 
 bool ControlPort::connect_to_tcp_port(QString ip, ushort port)
 {
-    if (tcp_port->isOpen()) tcp_port->close();
+    if (m_tcp_port->isOpen()) m_tcp_port->close();
 
-    qDebug() << "[ControlPort" << idx << "] connecting to" << ip << ":" << port;
-    tcp_port->connectToHost(ip, port);
-    use_tcp = connected_to_tcp = tcp_port->waitForConnected(1000);
-    qDebug() << "[ControlPort" << idx << "] connected=" << connected_to_tcp
-             << "state=" << tcp_port->state()
-             << "local=" << tcp_port->localAddress().toString() << ":" << tcp_port->localPort()
-             << "peer="  << tcp_port->peerAddress().toString()  << ":" << tcp_port->peerPort()
-             << "err="   << tcp_port->errorString();
-    if (connected_to_tcp) timer->start();
-    else                  timer->stop(), tcp_port->close();
-//    emit tcp_port_status_updated(use_tcp = connected_to_tcp = tcp_port->waitForConnected(1000));
+    qDebug() << "[ControlPort" << m_idx << "] connecting to" << ip << ":" << port;
+    m_tcp_port->connectToHost(ip, port);
+    m_use_tcp = m_connected_to_tcp = m_tcp_port->waitForConnected(1000);
+    qDebug() << "[ControlPort" << m_idx << "] connected=" << m_connected_to_tcp
+             << "state=" << m_tcp_port->state()
+             << "local=" << m_tcp_port->localAddress().toString() << ":" << m_tcp_port->localPort()
+             << "peer="  << m_tcp_port->peerAddress().toString()  << ":" << m_tcp_port->peerPort()
+             << "err="   << m_tcp_port->errorString();
+    if (m_connected_to_tcp) m_timer->start();
+    else                    m_timer->stop(), m_tcp_port->close();
+//    emit tcp_port_status_updated(m_use_tcp = m_connected_to_tcp = m_tcp_port->waitForConnected(1000));
     emit port_status_updated();
-    return use_tcp;
+    return m_use_tcp;
 }
 
 void ControlPort::disconnect_from_port(bool tcp)
 {
-    if (tcp) tcp_port->close(), use_tcp = connected_to_tcp = false;
-    else     serial_port->close(), connected_to_serial = false;
-    timer->stop();
+    if (tcp) m_tcp_port->close(), m_use_tcp = m_connected_to_tcp = false;
+    else     m_serial_port->close(), m_connected_to_serial = false;
+    m_timer->stop();
     emit port_status_updated();
 }
 
@@ -156,15 +154,15 @@ void ControlPort::try_communicate()
 
 void ControlPort::update_timer_interval(uint interval)
 {
-    timer->stop();
+    m_timer->stop();
     if (!interval) return;
-    timer->setInterval(interval);
-    timer->start();
+    m_timer->setInterval(interval);
+    m_timer->start();
 }
 
 void ControlPort::communicate(QByteArray write, uint read_size, uint read_timeout, bool heartbeat)
 {
-    if (shared_port) return shared_port->emit send_data(write, read_size, read_timeout, heartbeat);
+    if (m_shared_port) return m_shared_port->emit send_data(write, read_size, read_timeout, heartbeat);
 
 //    qDebug() << "port communication in" << QThread::currentThread();
     QByteArray read;
@@ -173,46 +171,46 @@ void ControlPort::communicate(QByteArray write, uint read_size, uint read_timeou
     for (int i = 0; i < write.size(); i++) str_s += QString::asprintf(" %02X", (uchar)write[i]);
     if (!heartbeat) emit port_io_log(str_s);
 
-    read_mutex.lock();
-    received.clear();
-    read_mutex.unlock();
+    m_read_mutex.lock();
+    m_received.clear();
+    m_read_mutex.unlock();
 
-    write_mutex.lock();
-    QIODevice *port = use_tcp ? (QIODevice*)tcp_port : (QIODevice*)serial_port;
+    m_write_mutex.lock();
+    QIODevice *port = m_use_tcp ? (QIODevice*)m_tcp_port : (QIODevice*)m_serial_port;
 
     if (!port->isOpen()) {
-        write_mutex.unlock();
+        m_write_mutex.unlock();
         return;
     }
 //    qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "sent    " << write.toHex(' ').toUpper();
 
     port->write(write.constData(), write.size());
 //    while (port->waitForBytesWritten(10)) ;
-    write_mutex.unlock();
+    m_write_mutex.unlock();
 
     static QElapsedTimer read_timer;
     if (read_timer.elapsed()) read_timer.restart();
     else                      read_timer.start();
-    while ((read_size == 0 || received.length() < read_size) && read_timer.elapsed() < read_timeout) port->waitForReadyRead(5);
+    while ((read_size == 0 || m_received.length() < read_size) && read_timer.elapsed() < read_timeout) port->waitForReadyRead(5);
 
-    read_mutex.lock();
+    m_read_mutex.lock();
     if (read_size) {
-        read = received.left(read_size);
+        read = m_received.left(read_size);
 //        qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "received" << read.toHex(' ').toUpper();
-//        qDebug() << received.toHex(' ').toUpper();
-        received = received.right(received.length() - read.size());
-//        qDebug() << received.toHex(' ').toUpper();
+//        qDebug() << m_received.toHex(' ').toUpper();
+        m_received = m_received.right(m_received.length() - read.size());
+//        qDebug() << m_received.toHex(' ').toUpper();
     }
     else {
-        read = received;
+        read = m_received;
 //        qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "received" << read.toHex(' ').toUpper();
-        received.clear();
+        m_received.clear();
     }
-    read_mutex.unlock();
+    m_read_mutex.unlock();
 
-    retrieve_mutex.lock();
-    last_read = read;
-    retrieve_mutex.unlock();
+    m_retrieve_mutex.lock();
+    m_last_read = read;
+    m_retrieve_mutex.unlock();
     for (int i = 0; i < read.size(); i++) str_r += QString::asprintf(" %02X", (uchar)read[i]);
     if (!heartbeat) emit port_io_log(str_r);
 
@@ -224,11 +222,11 @@ void ControlPort::communicate(QByteArray write, uint read_size, uint read_timeou
 void ControlPort::handle_received()
 {
     QByteArray read;
-    read_mutex.lock();
-    if (use_tcp) read = tcp_port->readAll();
-    else         read = serial_port->readAll();
-    read_mutex.unlock();
+    m_read_mutex.lock();
+    if (m_use_tcp) read = m_tcp_port->readAll();
+    else           read = m_serial_port->readAll();
+    m_read_mutex.unlock();
     //    qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "received" << read.toHex(' ').toUpper();
-    received += read;
+    m_received += read;
     //    qDebug() << "received in" << QThread::currentThread();
 }

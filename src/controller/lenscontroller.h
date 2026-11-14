@@ -15,27 +15,25 @@ public:
     enum LensButton { BTN_ZOOM_IN, BTN_ZOOM_OUT, BTN_FOCUS_FAR, BTN_FOCUS_NEAR,
                       BTN_RADIUS_INC, BTN_RADIUS_DEC, BTN_IRIS_OPEN, BTN_IRIS_CLOSE };
 
-    // Modern PTZ arc-slider axes — speed/joystick mode where drag distance
-    // from midpoint maps to a signed speed, separated from classic stepping.
-    enum ModernAxis { Zoom, Focus, Iris, ModernAxisCount };
+    // Axes of the modern arc sliders: drag distance from the midpoint maps to a
+    // signed speed, separate from classic stepping.
+    enum ModernAxis { ZOOM, FOCUS, IRIS, MODERN_AXIS_COUNT };
 
     explicit LensController(DeviceManager *device_mgr, QObject *parent = nullptr);
 
     void init(bool *simple_ui, uchar *lang);
 
-    // Getters
-    uint get_zoom() const           { return zoom; }
-    uint get_focus() const          { return focus; }
-    int  get_focus_direction() const{ return focus_direction; }
-    int  get_clarity(int i) const   { return clarity[i]; }
-    uint get_lens_adjust_ongoing() const { return lens_adjust_ongoing; }
+    uint get_zoom() const           { return m_zoom; }
+    uint get_focus() const          { return m_focus; }
+    int  get_focus_direction() const{ return m_focus_direction; }
+    int  get_clarity(int i) const   { return m_clarity[i]; }
+    uint get_lens_adjust_ongoing() const { return m_lens_adjust_ongoing; }
 
-    // Setters
-    void set_zoom(uint v)           { zoom = v; }
-    void set_focus(uint v)          { focus = v; }
-    void set_focus_direction(int v) { focus_direction = v; }
-    void set_clarity(int i, int v)  { clarity[i] = v; }
-    void set_lens_adjust_ongoing(uint v) { lens_adjust_ongoing = v; }
+    void set_zoom(uint v)           { m_zoom = v; }
+    void set_focus(uint v)          { m_focus = v; }
+    void set_focus_direction(int v) { m_focus_direction = v; }
+    void set_clarity(int i, int v)  { m_clarity[i] = v; }
+    void set_lens_adjust_ongoing(uint v) { m_lens_adjust_ongoing = v; }
 
 public slots:
     // Button pressed/released handlers
@@ -67,8 +65,8 @@ public slots:
     void update_lens_params(qint32 lens_param, uint val);
     void lens_stop();
 
-    // Set zoom/focus/iris from value (previously read from UI). "Iris" maps
-    // to Lens::SET_RADIUS — same protocol path as the IRIS_*/RADIUS_* buttons.
+    // Set zoom / focus / iris from a value. Iris maps to Lens::SET_RADIUS, the same
+    // protocol path as the IRIS and RADIUS buttons.
     void set_zoom_value(uint val);
     void set_focus_value(uint val);
     void set_iris_value(uint val);
@@ -95,16 +93,16 @@ signals:
     void focus_speed_display_changed(int slider_val, QString edit_text);
 
 private:
-    DeviceManager*  m_device_mgr;
-    bool*           m_simple_ui;
-    uchar*          m_lang;
+    DeviceManager  *m_device_mgr;
+    bool           *m_simple_ui;
+    uchar          *m_lang;
 
-    uint            zoom;
-    uint            focus;
-    int             focus_direction;
-    int             clarity[3];
-    uint            lens_adjust_ongoing;
-    int             m_modern_last_speed[ModernAxisCount] = {0, 0, 0};
+    uint            m_zoom;
+    uint            m_focus;
+    int             m_focus_direction;
+    int             m_clarity[3];
+    uint            m_lens_adjust_ongoing;
+    int             m_modern_last_speed[MODERN_AXIS_COUNT] = {0, 0, 0};
 };
 
 #endif // LENSCONTROLLER_H

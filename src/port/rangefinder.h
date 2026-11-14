@@ -7,7 +7,7 @@ class RangeFinder : public ControlPort
 {
     Q_OBJECT
 public:
-    enum PARAMS {
+    enum Params {
         SERIAL    = 0x00,
         FREQ_SET  = 0x01,
         FREQ_GET  = 0x02,
@@ -19,7 +19,7 @@ public:
     explicit RangeFinder(int index = -1);
     ~RangeFinder();
 
-    uint type();
+    uint get_type();
     void set_type(uint type);
 
 #if ENABLE_PORT_JSON
@@ -39,10 +39,10 @@ protected slots:
     int read_distance(QByteArray data);
 
 private:
-    std::atomic<uint> rf_type;
+    std::atomic<uint> m_rf_type;
 
-    uint freq;
-    uint baudrate;
+    uint m_freq;
+    uint m_baudrate;
 };
 
 #endif // RANGEFINDER_H

@@ -24,8 +24,8 @@ public:
         int udp_target_port = 30000;
         QString udp_listen_ip = "192.168.1.100";
         int udp_listen_port = 30001;
-        // UDPPTZ::Protocol value — 500 (PROTOCOL_500, scan_range in bytes
-        // 8-9) or 530 (PROTOCOL_530, 0x7F7F in bytes 8-9, 10 ms cadence).
+        // UDPPTZ::Protocol value: 500 (scan_range in bytes 8-9) or 530 (0x7F7F in bytes
+        // 8-9, 10 ms cadence).
         int udpptz_protocol = 530;
     };
 
@@ -73,8 +73,8 @@ public:
         // it must not move when the light speed (dist_ns) changes.
         float min_delay = 1000.0f;
         float delay_offset = 0.0f;
-        // Stored in meters (matches max_dist pattern). UI displays in ns via /m_dist_ns.
-        // 750 m == 5000 ns gate width at dist_ns = c·1e-9/2 = 0.15 m/ns.
+        // Stored in metres like max_dist; the UI shows ns by dividing by dist_ns.
+        // 750 m is a 5000 ns gate width at dist_ns = 0.15 m/ns.
         float max_dov = 750.0f;
         float gate_width_offset = 0.0f;
         float max_laser_width = 2500.0f;
@@ -239,7 +239,8 @@ public:
         ImageProcSettings image_proc;
         YoloSettings yolo;
 
-        ConfigData() {
+        ConfigData()
+        {
             version = QString("%1.%2.%3.%4")
                       .arg(VER_MAJOR)
                       .arg(VER_MINOR)
@@ -259,8 +260,8 @@ public:
 
     void auto_save();
 
-    const ConfigData& get_data() const { return m_data; }
-    ConfigData& get_data() { return m_data; }
+    const ConfigData &get_data() const { return m_data; }
+    ConfigData &get_data() { return m_data; }
 
     QString get_version() const { return m_data.version; }
     void set_version(const QString &version) { m_data.version = version; }

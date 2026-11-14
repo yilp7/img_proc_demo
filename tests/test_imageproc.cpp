@@ -8,7 +8,7 @@ class TestImageProc : public QObject
 
 private slots:
     // TC-IP-001: hist_equalization grayscale
-    void histEqualizationGrayscale()
+    void hist_equalization_grayscale()
     {
         cv::Mat src(100, 100, CV_8U, cv::Scalar(50));
         cv::Mat res;
@@ -20,20 +20,20 @@ private slots:
 
         // For a uniform image, equalizeHist maps all pixels to the same
         // output value. Verify output is valid and produced a result.
-        cv::Scalar srcMean, srcStddev, resMean, resStddev;
-        cv::meanStdDev(src, srcMean, srcStddev);
-        cv::meanStdDev(res, resMean, resStddev);
+        cv::Scalar src_mean, src_stddev, res_mean, res_stddev;
+        cv::meanStdDev(src, src_mean, src_stddev);
+        cv::meanStdDev(res, res_mean, res_stddev);
 
         // At minimum the output should differ from the input
         // (equalizeHist on a constant image maps all pixels to a single
         // CDF-derived value which differs from the input constant).
-        bool differs = (resMean[0] != srcMean[0]) || (resStddev[0] != srcStddev[0]);
-        QVERIFY2(differs || resStddev[0] >= srcStddev[0],
+        bool differs = (res_mean[0] != src_mean[0]) || (res_stddev[0] != src_stddev[0]);
+        QVERIFY2(differs || res_stddev[0] >= src_stddev[0],
                  "Output should differ from input or have >= stddev");
     }
 
     // TC-IP-002: hist_equalization color
-    void histEqualizationColor()
+    void hist_equalization_color()
     {
         cv::Mat src(100, 100, CV_8UC3, cv::Scalar(50, 50, 50));
         cv::Mat res;
@@ -45,7 +45,7 @@ private slots:
     }
 
     // TC-IP-003: laplace_transform default kernel
-    void laplaceTransformDefaultKernel()
+    void laplace_transform_default_kernel()
     {
         cv::Mat src(100, 100, CV_8U, cv::Scalar(0));
         // Bottom half = 128 to create a horizontal edge at rows 49-50
@@ -57,29 +57,25 @@ private slots:
 
         QCOMPARE(res.size(), src.size());
 
-        // Default kernel (0,-1,0, 0,5,0, 0,-1,0) is a sharpening filter.
-        // Flat regions: output = 5*val - 2*val = 3*val (clamped to [0,255]).
-        // Edge region has mixed neighbors, so edge mean differs from both
-        // flat regions.
-        double edgeVal = cv::mean(res(cv::Rect(0, 49, 100, 2)))[0];
-        double flatTopVal = cv::mean(res(cv::Rect(0, 10, 100, 10)))[0];
-        double flatBotVal = cv::mean(res(cv::Rect(0, 70, 100, 10)))[0];
+        // The default kernel (0,-1,0, 0,5,0, 0,-1,0) sharpens: flat regions give 3 * val,
+        // clamped to [0, 255]. The edge rows have mixed neighbours, so their mean differs.
+        double edge_val = cv::mean(res(cv::Rect(0, 49, 100, 2)))[0];
+        double flat_top_val = cv::mean(res(cv::Rect(0, 10, 100, 10)))[0];
+        double flat_bot_val = cv::mean(res(cv::Rect(0, 70, 100, 10)))[0];
 
-        // Flat top (0): 3*0 = 0. Flat bottom (128): 3*128 = 384 → 255.
-        // Edge row 49 (val=0, neighbor below=128): 5*0 - 128 → clamp 0.
-        // Edge row 50 (val=128, neighbor above=0): 5*128 - 0 - 128 = 512 → 255.
-        // Edge mean ≈ (0+255)/2 = 127.5. Verify edge exceeds flat top (0).
-        QVERIFY2(edgeVal > flatTopVal,
+        // Flat top (0) stays 0; flat bottom (128) gives 384, clamped to 255. Edge row 49
+        // clamps to 0 and row 50 to 255, so the edge mean is about 127.5, above the flat top.
+        QVERIFY2(edge_val > flat_top_val,
                  qPrintable(QString("Edge mean (%1) should exceed flat top mean (%2)")
-                            .arg(edgeVal).arg(flatTopVal)));
+                            .arg(edge_val).arg(flat_top_val)));
         // Verify flat bottom is sharpened (3*128=384 saturates to 255)
-        QVERIFY2(flatBotVal > 200,
+        QVERIFY2(flat_bot_val > 200,
                  qPrintable(QString("Flat bottom mean (%1) should be >200 after sharpening")
-                            .arg(flatBotVal)));
+                            .arg(flat_bot_val)));
     }
 
     // TC-IP-004: laplace_transform identity kernel
-    void laplaceTransformIdentityKernel()
+    void laplace_transform_identity_kernel()
     {
         cv::Mat src(100, 100, CV_8U, cv::Scalar(0));
         src(cv::Rect(0, 50, 100, 50)).setTo(255);
@@ -108,7 +104,7 @@ private slots:
     }
 
     // TC-IP-005: plateau_equl_hist methods 0-6
-    void plateauEqulHistAllMethods()
+    void plateau_equl_hist_all_methods()
     {
         // 256x256 gradient: row i has value i
         cv::Mat src(256, 256, CV_8U);
@@ -125,16 +121,16 @@ private slots:
 
             // Verify output is within valid [0, 255] range (guaranteed
             // by CV_8U type, but verify no corruption)
-            double minVal, maxVal;
-            cv::minMaxLoc(res, &minVal, &maxVal);
-            QVERIFY2(minVal >= 0 && maxVal <= 255,
+            double min_val, max_val;
+            cv::minMaxLoc(res, &min_val, &max_val);
+            QVERIFY2(min_val >= 0 && max_val <= 255,
                      qPrintable(QString("Method %1: values out of range [%2, %3]")
-                                .arg(method).arg(minVal).arg(maxVal)));
+                                .arg(method).arg(min_val).arg(max_val)));
         }
     }
 
     // TC-IP-006: brightness_and_contrast
-    void brightnessAndContrast()
+    void brightness_and_contrast()
     {
         cv::Mat src(100, 100, CV_8U, cv::Scalar(128));
         cv::Mat res = src.clone();  // pre-allocate since function uses res.data
@@ -143,25 +139,23 @@ private slots:
         // Expected: saturate_cast<uchar>(1.5 * 128 + 10) = 202
         ImageProc::brightness_and_contrast(src, res, alpha, beta);
 
-        // Check that most pixels are approximately 202
-        // The implementation: res = src * alpha + beta, then zeros out
-        // pixels where ptr2[idx] == beta. For value 128: 1.5*128+10=202,
-        // which != 10(beta), so no zeroing.
-        int correctCount = 0;
+        // Most pixels should be about 202: res = src * alpha + beta, and the function zeroes
+        // pixels equal to beta, which 202 is not.
+        int correct_count = 0;
         for (int i = 0; i < res.rows; i++) {
             for (int j = 0; j < res.cols; j++) {
                 int val = res.at<uchar>(i, j);
-                if (std::abs(val - 202) <= 2) correctCount++;
+                if (std::abs(val - 202) <= 2) correct_count++;
             }
         }
-        double pctCorrect = (double)correctCount / (res.rows * res.cols) * 100.0;
-        QVERIFY2(pctCorrect > 95.0,
+        double pct_correct = (double)correct_count / (res.rows * res.cols) * 100.0;
+        QVERIFY2(pct_correct > 95.0,
                  qPrintable(QString("Expected ~202, but only %1% of pixels within +/-2")
-                            .arg(pctCorrect)));
+                            .arg(pct_correct)));
     }
 
     // TC-IP-007: split_img
-    void splitImg()
+    void split_img()
     {
         cv::Mat src(200, 200, CV_8U, cv::Scalar(0));
         // Four quadrants: TL=10, TR=20, BL=30, BR=40
@@ -181,27 +175,27 @@ private slots:
         int half_h = 100, half_w = 100;
 
         // Spot-check a few pixels by computing the expected mapping
-        auto expectedVal = [&](int i, int j) -> uchar {
+        auto expected_val = [&](int i, int j) -> uchar {
             int src_i = 2 * (i % half_h) + i / half_h;
             int src_j = 2 * (j % half_w) + j / half_w;
             return src.at<uchar>(src_i, src_j);
         };
 
         // Check corners and center points
-        QCOMPARE(res.at<uchar>(0, 0),     expectedVal(0, 0));
-        QCOMPARE(res.at<uchar>(0, 99),    expectedVal(0, 99));
-        QCOMPARE(res.at<uchar>(0, 100),   expectedVal(0, 100));
-        QCOMPARE(res.at<uchar>(99, 0),    expectedVal(99, 0));
-        QCOMPARE(res.at<uchar>(99, 99),   expectedVal(99, 99));
-        QCOMPARE(res.at<uchar>(100, 0),   expectedVal(100, 0));
-        QCOMPARE(res.at<uchar>(100, 100), expectedVal(100, 100));
-        QCOMPARE(res.at<uchar>(199, 199), expectedVal(199, 199));
-        QCOMPARE(res.at<uchar>(50, 50),   expectedVal(50, 50));
-        QCOMPARE(res.at<uchar>(150, 150), expectedVal(150, 150));
+        QCOMPARE(res.at<uchar>(0, 0),     expected_val(0, 0));
+        QCOMPARE(res.at<uchar>(0, 99),    expected_val(0, 99));
+        QCOMPARE(res.at<uchar>(0, 100),   expected_val(0, 100));
+        QCOMPARE(res.at<uchar>(99, 0),    expected_val(99, 0));
+        QCOMPARE(res.at<uchar>(99, 99),   expected_val(99, 99));
+        QCOMPARE(res.at<uchar>(100, 0),   expected_val(100, 0));
+        QCOMPARE(res.at<uchar>(100, 100), expected_val(100, 100));
+        QCOMPARE(res.at<uchar>(199, 199), expected_val(199, 199));
+        QCOMPARE(res.at<uchar>(50, 50),   expected_val(50, 50));
+        QCOMPARE(res.at<uchar>(150, 150), expected_val(150, 150));
     }
 
-    // TC-IP-008: gated3D
-    void gated3DBasic()
+    // TC-IP-008: gated_3d
+    void gated_3d_basic()
     {
         cv::Mat src1(100, 100, CV_8U, cv::Scalar(200));
         cv::Mat src2(100, 100, CV_8U, cv::Scalar(50));
@@ -211,7 +205,7 @@ private slots:
         // range array must be pre-allocated: size = width * height
         std::vector<double> range(100 * 100, 0.0);
 
-        ImageProc::gated3D(src1, src2, res, delay, gw, range.data(), range_thresh);
+        ImageProc::gated_3d(src1, src2, res, delay, gw, range.data(), range_thresh);
 
         // Output includes a color bar (BARWIDTH=104), so width = 100 + 104
         QCOMPARE(res.rows, src1.rows);
@@ -221,16 +215,16 @@ private slots:
         QCOMPARE(res.channels(), 3);  // output is CV_8UC3
     }
 
-    // TC-IP-009: gated3D_v2
-    void gated3DV2Basic()
+    // TC-IP-009: gated_3d_v2
+    void gated_3d_v2_basic()
     {
         cv::Mat src1(100, 100, CV_8U, cv::Scalar(200));
         cv::Mat src2(100, 100, CV_8U, cv::Scalar(50));
         cv::Mat res = cv::Mat::zeros(100, 100 + 104, CV_8U);
 
-        ImageProc::gated3D_v2(src1, src2, res, 100.0, 40.0);
+        ImageProc::gated_3d_v2(src1, src2, res, 100.0, 40.0);
 
-        // gated3D_v2 appends a bar, so result width = 100 + 104
+        // gated_3d_v2 appends a bar, so result width = 100 + 104
         QCOMPARE(res.rows, src1.rows);
         QVERIFY2(res.cols >= src1.cols,
                  qPrintable(QString("Result cols (%1) should be >= source cols (%2)")
@@ -241,7 +235,7 @@ private slots:
     }
 
     // TC-IP-010: accumulative_enhance
-    void accumulativeEnhance()
+    void accumulative_enhance()
     {
         // Gradient image: column j has value j (0-99)
         cv::Mat src(100, 100, CV_8U);
@@ -258,26 +252,23 @@ private slots:
         QCOMPARE(res.size(), src.size());
         QCOMPARE(res.type(), CV_8U);
 
-        // Dark pixels (low j) should be enhanced more than bright pixels.
-        // For p < 0.250 * 256 = 64: output = saturate(p * 2.4 * 2.4) = saturate(p * 5.76)
-        // For p >= 64: multiplier decreases progressively.
-        // Check that a dark pixel (j=10) has a higher enhancement ratio
-        // than a brighter pixel (j=80).
-        double darkSrcMean = cv::mean(src.col(10))[0];
-        double darkResMean = cv::mean(res.col(10))[0];
-        double brightSrcMean = cv::mean(src.col(80))[0];
-        double brightResMean = cv::mean(res.col(80))[0];
+        // Dark pixels are enhanced more than bright ones: below 64 the output is p * 5.76,
+        // and the multiplier falls above that. So j = 10 must gain more than j = 80.
+        double dark_src_mean = cv::mean(src.col(10))[0];
+        double dark_res_mean = cv::mean(res.col(10))[0];
+        double bright_src_mean = cv::mean(src.col(80))[0];
+        double bright_res_mean = cv::mean(res.col(80))[0];
 
-        double darkRatio = darkResMean / std::max(darkSrcMean, 1.0);
-        double brightRatio = brightResMean / std::max(brightSrcMean, 1.0);
+        double dark_ratio = dark_res_mean / std::max(dark_src_mean, 1.0);
+        double bright_ratio = bright_res_mean / std::max(bright_src_mean, 1.0);
 
-        QVERIFY2(darkRatio > brightRatio,
+        QVERIFY2(dark_ratio > bright_ratio,
                  qPrintable(QString("Dark enhancement ratio (%1) should exceed bright ratio (%2)")
-                            .arg(darkRatio).arg(brightRatio)));
+                            .arg(dark_ratio).arg(bright_ratio)));
     }
 
     // TC-IP-011: adaptive_enhance
-    void adaptiveEnhance()
+    void adaptive_enhance()
     {
         cv::Mat src(100, 100, CV_8U, cv::Scalar(128));
         cv::Mat res;
@@ -290,18 +281,18 @@ private slots:
         // Output should differ from input (gamma != 1.0)
         cv::Mat diff;
         cv::absdiff(src, res, diff);
-        int numDiff = cv::countNonZero(diff);
-        QVERIFY2(numDiff > 0, "Output should differ from input with gamma=1.2");
+        int num_diff = cv::countNonZero(diff);
+        QVERIFY2(num_diff > 0, "Output should differ from input with gamma=1.2");
 
         // All values should be in [0, 255] (guaranteed by CV_8U, but verify
         // no corruption)
-        double minVal, maxVal;
-        cv::minMaxLoc(res, &minVal, &maxVal);
-        QVERIFY(minVal >= 0 && maxVal <= 255);
+        double min_val, max_val;
+        cv::minMaxLoc(res, &min_val, &max_val);
+        QVERIFY(min_val >= 0 && max_val <= 255);
     }
 
     // TC-IP-012: haze_removal
-    void hazeRemoval()
+    void haze_removal()
     {
         // Use a non-uniform image: bright haze with darker scene content.
         // A uniform image produces identical output because (px - A)/t + A = A
@@ -324,10 +315,10 @@ private slots:
         // Output should differ from non-uniform input after haze removal
         cv::Mat diff;
         cv::absdiff(src, res, diff);
-        cv::Mat diffGray;
-        cv::cvtColor(diff, diffGray, cv::COLOR_BGR2GRAY);
-        int numDiff = cv::countNonZero(diffGray);
-        QVERIFY2(numDiff > 0 || cv::mean(diff)[0] > 0,
+        cv::Mat diff_gray;
+        cv::cvtColor(diff, diff_gray, cv::COLOR_BGR2GRAY);
+        int num_diff = cv::countNonZero(diff_gray);
+        QVERIFY2(num_diff > 0 || cv::mean(diff)[0] > 0,
                  "Haze removal output should differ from hazy input");
     }
 };

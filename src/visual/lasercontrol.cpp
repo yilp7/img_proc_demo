@@ -3,71 +3,71 @@
 
 LaserControl::LaserControl(QWidget *parent, Lens *p_lens) :
     QDialog(parent),
-    ui(new Ui::LaserControl),
-    pressed(false),
-    p_lens(p_lens),
-    laser_control(nullptr),
-    speed{32, 32, 32, 32}
+    m_ui(new Ui::LaserControl),
+    m_pressed(false),
+    m_p_lens(p_lens),
+    m_laser_control(nullptr),
+    m_speed{32, 32, 32, 32}
 {
-    ui->setupUi(this);
+    m_ui->setupUi(this);
 
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint);
 
     apply_color_mode();
 
-    laser_control = new QButtonGroup(this);
-    laser_control->addButton(ui->BTN_CONTROL_A_1, 0);
-    laser_control->addButton(ui->BTN_CONTROL_A_2, 1);
-    laser_control->addButton(ui->BTN_CONTROL_B_1, 2);
-    laser_control->addButton(ui->BTN_CONTROL_B_2, 3);
-    laser_control->addButton(ui->BTN_CONTROL_C_1, 4);
-    laser_control->addButton(ui->BTN_CONTROL_C_2, 5);
-    laser_control->addButton(ui->BTN_CONTROL_D_1, 6);
-    laser_control->addButton(ui->BTN_CONTROL_D_2, 7);
-    connect(laser_control, SIGNAL(buttonPressed(int)), this, SLOT(btn_control_pressed(int)));
-    connect(laser_control, SIGNAL(buttonReleased(int)), this, SLOT(btn_control_released(int)));
+    m_laser_control = new QButtonGroup(this);
+    m_laser_control->addButton(m_ui->BTN_CONTROL_A_1, 0);
+    m_laser_control->addButton(m_ui->BTN_CONTROL_A_2, 1);
+    m_laser_control->addButton(m_ui->BTN_CONTROL_B_1, 2);
+    m_laser_control->addButton(m_ui->BTN_CONTROL_B_2, 3);
+    m_laser_control->addButton(m_ui->BTN_CONTROL_C_1, 4);
+    m_laser_control->addButton(m_ui->BTN_CONTROL_C_2, 5);
+    m_laser_control->addButton(m_ui->BTN_CONTROL_D_1, 6);
+    m_laser_control->addButton(m_ui->BTN_CONTROL_D_2, 7);
+    connect(m_laser_control, SIGNAL(buttonPressed(int)), this, SLOT(btn_control_pressed(int)));
+    connect(m_laser_control, SIGNAL(buttonReleased(int)), this, SLOT(btn_control_released(int)));
 
-    ui->SLIDER_SPEED_1->setRange(1, 64);
-    ui->SLIDER_SPEED_2->setRange(1, 64);
-    ui->SLIDER_SPEED_3->setRange(1, 64);
-    ui->SLIDER_SPEED_4->setRange(1, 64);
-    connect(ui->SLIDER_SPEED_1, &QSlider::valueChanged, this, [this](int val) { ui->EDT_SPEED_1->setText(QString::number(speed[0] = val)); });
-    connect(ui->SLIDER_SPEED_2, &QSlider::valueChanged, this, [this](int val) { ui->EDT_SPEED_2->setText(QString::number(speed[1] = val)); });
-    connect(ui->SLIDER_SPEED_3, &QSlider::valueChanged, this, [this](int val) { ui->EDT_SPEED_3->setText(QString::number(speed[2] = val)); });
-    connect(ui->SLIDER_SPEED_4, &QSlider::valueChanged, this, [this](int val) { ui->EDT_SPEED_4->setText(QString::number(speed[3] = val)); });
-    ui->SLIDER_SPEED_1->setValue(32);
-    ui->SLIDER_SPEED_2->setValue(32);
-    ui->SLIDER_SPEED_3->setValue(32);
-    ui->SLIDER_SPEED_4->setValue(32);
-    connect(ui->EDT_SPEED_1, &QLineEdit::editingFinished, this,
+    m_ui->SLIDER_SPEED_1->setRange(1, 64);
+    m_ui->SLIDER_SPEED_2->setRange(1, 64);
+    m_ui->SLIDER_SPEED_3->setRange(1, 64);
+    m_ui->SLIDER_SPEED_4->setRange(1, 64);
+    connect(m_ui->SLIDER_SPEED_1, &QSlider::valueChanged, this, [this](int val) { m_ui->EDT_SPEED_1->setText(QString::number(m_speed[0] = val)); });
+    connect(m_ui->SLIDER_SPEED_2, &QSlider::valueChanged, this, [this](int val) { m_ui->EDT_SPEED_2->setText(QString::number(m_speed[1] = val)); });
+    connect(m_ui->SLIDER_SPEED_3, &QSlider::valueChanged, this, [this](int val) { m_ui->EDT_SPEED_3->setText(QString::number(m_speed[2] = val)); });
+    connect(m_ui->SLIDER_SPEED_4, &QSlider::valueChanged, this, [this](int val) { m_ui->EDT_SPEED_4->setText(QString::number(m_speed[3] = val)); });
+    m_ui->SLIDER_SPEED_1->setValue(32);
+    m_ui->SLIDER_SPEED_2->setValue(32);
+    m_ui->SLIDER_SPEED_3->setValue(32);
+    m_ui->SLIDER_SPEED_4->setValue(32);
+    connect(m_ui->EDT_SPEED_1, &QLineEdit::editingFinished, this,
             [this]() {
-                speed[0] = std::min(std::max(ui->EDT_SPEED_1->text().toInt(), 1), 64);
-                ui->SLIDER_SPEED_1->setValue(speed[0]);
-                ui->EDT_SPEED_1->setText(QString::number(speed[0]));
+                m_speed[0] = std::min(std::max(m_ui->EDT_SPEED_1->text().toInt(), 1), 64);
+                m_ui->SLIDER_SPEED_1->setValue(m_speed[0]);
+                m_ui->EDT_SPEED_1->setText(QString::number(m_speed[0]));
                 if(!this->focusWidget()) return;
                 this->focusWidget()->clearFocus();
             });
-    connect(ui->EDT_SPEED_2, &QLineEdit::editingFinished, this,
+    connect(m_ui->EDT_SPEED_2, &QLineEdit::editingFinished, this,
             [this]() {
-                speed[1] = std::min(std::max(ui->EDT_SPEED_2->text().toInt(), 1), 64);
-                ui->SLIDER_SPEED_2->setValue(speed[1]);
-                ui->EDT_SPEED_3->setText(QString::number(speed[1]));
+                m_speed[1] = std::min(std::max(m_ui->EDT_SPEED_2->text().toInt(), 1), 64);
+                m_ui->SLIDER_SPEED_2->setValue(m_speed[1]);
+                m_ui->EDT_SPEED_3->setText(QString::number(m_speed[1]));
                 if(!this->focusWidget()) return;
                 this->focusWidget()->clearFocus();
             });
-    connect(ui->EDT_SPEED_3, &QLineEdit::editingFinished, this,
+    connect(m_ui->EDT_SPEED_3, &QLineEdit::editingFinished, this,
             [this]() {
-                speed[2] = std::min(std::max(ui->EDT_SPEED_3->text().toInt(), 1), 64);
-                ui->SLIDER_SPEED_3->setValue(speed[2]);
-                ui->EDT_SPEED_3->setText(QString::number(speed[2]));
+                m_speed[2] = std::min(std::max(m_ui->EDT_SPEED_3->text().toInt(), 1), 64);
+                m_ui->SLIDER_SPEED_3->setValue(m_speed[2]);
+                m_ui->EDT_SPEED_3->setText(QString::number(m_speed[2]));
                 if(!this->focusWidget()) return;
                 this->focusWidget()->clearFocus();
             });
-    connect(ui->EDT_SPEED_4, &QLineEdit::editingFinished, this,
+    connect(m_ui->EDT_SPEED_4, &QLineEdit::editingFinished, this,
             [this]() {
-                speed[3] = std::min(std::max(ui->EDT_SPEED_4->text().toInt(), 1), 64);
-                ui->SLIDER_SPEED_4->setValue(speed[3]);
-                ui->EDT_SPEED_4->setText(QString::number(speed[3]));
+                m_speed[3] = std::min(std::max(m_ui->EDT_SPEED_4->text().toInt(), 1), 64);
+                m_ui->SLIDER_SPEED_4->setValue(m_speed[3]);
+                m_ui->EDT_SPEED_4->setText(QString::number(m_speed[3]));
                 if(!this->focusWidget()) return;
                 this->focusWidget()->clearFocus();
             });
@@ -77,37 +77,37 @@ LaserControl::LaserControl(QWidget *parent, Lens *p_lens) :
 
 LaserControl::~LaserControl()
 {
-    delete ui;
+    delete m_ui;
 }
 
 void LaserControl::apply_color_mode()
 {
     const QString mode_dir = app_color_mode ? "light" : "dark";
-    ui->BTN_CONTROL_A_1->setIcon(QIcon(":/lens/" + mode_dir + "/iris_1"));
-    ui->BTN_CONTROL_A_2->setIcon(QIcon(":/lens/" + mode_dir + "/iris_2"));
-    ui->BTN_CONTROL_B_1->setIcon(QIcon(":/lens/" + mode_dir + "/iris_1"));
-    ui->BTN_CONTROL_B_2->setIcon(QIcon(":/lens/" + mode_dir + "/iris_2"));
-    ui->BTN_CONTROL_C_1->setIcon(QIcon(":/lens/" + mode_dir + "/iris_1"));
-    ui->BTN_CONTROL_C_2->setIcon(QIcon(":/lens/" + mode_dir + "/iris_2"));
-    ui->BTN_CONTROL_D_1->setIcon(QIcon(":/lens/" + mode_dir + "/iris_1"));
-    ui->BTN_CONTROL_D_2->setIcon(QIcon(":/lens/" + mode_dir + "/iris_2"));
+    m_ui->BTN_CONTROL_A_1->setIcon(QIcon(":/lens/" + mode_dir + "/iris_1"));
+    m_ui->BTN_CONTROL_A_2->setIcon(QIcon(":/lens/" + mode_dir + "/iris_2"));
+    m_ui->BTN_CONTROL_B_1->setIcon(QIcon(":/lens/" + mode_dir + "/iris_1"));
+    m_ui->BTN_CONTROL_B_2->setIcon(QIcon(":/lens/" + mode_dir + "/iris_2"));
+    m_ui->BTN_CONTROL_C_1->setIcon(QIcon(":/lens/" + mode_dir + "/iris_1"));
+    m_ui->BTN_CONTROL_C_2->setIcon(QIcon(":/lens/" + mode_dir + "/iris_2"));
+    m_ui->BTN_CONTROL_D_1->setIcon(QIcon(":/lens/" + mode_dir + "/iris_1"));
+    m_ui->BTN_CONTROL_D_2->setIcon(QIcon(":/lens/" + mode_dir + "/iris_2"));
 }
 
 void LaserControl::mousePressEvent(QMouseEvent *event)
 {
     if(event->button() != Qt::LeftButton) return;
-    pressed = true;
-    prev_pos = event->globalPos();
+    m_pressed = true;
+    m_prev_pos = event->globalPos();
 
     QDialog::mousePressEvent(event);
 }
 
 void LaserControl::mouseMoveEvent(QMouseEvent *event)
 {
-    if (pressed) {
+    if (m_pressed) {
         // use globalPos instead of pos to prevent window shaking
-        window()->move(window()->pos() + event->globalPos() - prev_pos);
-        prev_pos = event->globalPos();
+        window()->move(window()->pos() + event->globalPos() - m_prev_pos);
+        m_prev_pos = event->globalPos();
     }
     else {
         setCursor(cursor_curr_pointer);
@@ -118,7 +118,7 @@ void LaserControl::mouseMoveEvent(QMouseEvent *event)
 void LaserControl::mouseReleaseEvent(QMouseEvent *event)
 {
     if(event->button() != Qt::LeftButton) return;
-    pressed = false;
+    m_pressed = false;
 
     QDialog::mouseReleaseEvent(event);
 }
@@ -138,10 +138,10 @@ void LaserControl::btn_control_pressed(int id)
     default: control_command = Lens::STOP;        break;
     }
 
-    emit send_lens_msg_addr(control_command, id > 1 ? 0x02: 0x01, speed[id / 2] - 1);
+    emit send_lens_msg_addr(control_command, id > 1 ? 0x02: 0x01, m_speed[id / 2] - 1);
 }
 
 void LaserControl::btn_control_released(int id)
 {
-    emit send_lens_msg_addr(Lens::STOP, id > 1 ? 0x02: 0x01, speed[id / 2] - 1);
+    emit send_lens_msg_addr(Lens::STOP, id > 1 ? 0x02: 0x01, m_speed[id / 2] - 1);
 }

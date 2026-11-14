@@ -7,18 +7,17 @@
 #include <QFile>
 #include <QCoreApplication>
 
-AutoScan::AutoScan(QObject *parent)
-    : QObject(parent)
-    , m_state(IDLE)
-    , m_scan_preset(nullptr)
-    , m_startup_timer(nullptr)
-    , m_config_manager(nullptr)
+AutoScan::AutoScan(QObject *parent) :
+    QObject(parent),
+    m_state(IDLE),
+    m_scan_preset(nullptr),
+    m_startup_timer(nullptr),
+    m_config_manager(nullptr)
 {
     m_scan_preset = new ScanPreset(this);
     m_startup_timer = new QTimer(this);
     m_startup_timer->setSingleShot(true);
 
-    // Connect signals
     connect(m_scan_preset, &ScanPreset::scan_preset_loaded,
             this, &AutoScan::on_preset_loaded);
     connect(m_scan_preset, &ScanPreset::scan_preset_validation_failed,
@@ -31,21 +30,21 @@ AutoScan::~AutoScan()
 {
 }
 
-bool AutoScan::is_auto_scan_enabled(const QStringList& args) const
+bool AutoScan::is_auto_scan_enabled(const QStringList &args) const
 {
     return args.contains("--auto-scan");
 }
 
-QString AutoScan::get_preset_path(const QStringList& args) const
+QString AutoScan::get_preset_path(const QStringList &args) const
 {
-    int presetIndex = args.indexOf("--scan-preset");
-    if (presetIndex >= 0 && presetIndex + 1 < args.size()) {
-        return args.at(presetIndex + 1);  // Custom path provided
+    int preset_index = args.indexOf("--scan-preset");
+    if (preset_index >= 0 && preset_index + 1 < args.size()) {
+        return args.at(preset_index + 1);
     }
-    return QCoreApplication::applicationDirPath() + "/scan_preset.json";  // Default path
+    return QCoreApplication::applicationDirPath() + "/scan_preset.json";
 }
 
-bool AutoScan::start_auto_scan_sequence(const QString& preset_path)
+bool AutoScan::start_auto_scan_sequence(const QString &preset_path)
 {
     clear_error();
 
@@ -56,25 +55,23 @@ bool AutoScan::start_auto_scan_sequence(const QString& preset_path)
 
     m_current_preset_path = preset_path;
 
-    // Check if preset file exists
     if (!QFile::exists(preset_path)) {
         set_error(QString("Preset file not found: %1").arg(preset_path));
         return false;
     }
 
-    // Verify prerequisites
     if (!verify_prerequisites()) {
         return false;
     }
 
     qDebug() << "Starting auto-scan sequence with preset:" << preset_path;
 
-    // Start with optional delay
     if (m_config.startup_delay > 0) {
         qDebug() << "Applying startup delay:" << m_config.startup_delay << "ms";
         set_state(LOADING_PRESET);
         m_startup_timer->start(m_config.startup_delay);
-    } else {
+    }
+    else {
         on_startup_delay_timeout();
     }
 
@@ -97,15 +94,15 @@ void AutoScan::stop_auto_scan()
 QString AutoScan::get_state_string() const
 {
     switch (m_state) {
-        case IDLE: return "Idle";
-        case INITIALIZING_CAMERA: return "Initializing Camera";
-        case LOADING_PRESET: return "Loading Preset";
-        case CONFIGURING_DEVICES: return "Configuring Devices";
-        case STARTING_SCAN: return "Starting Scan";
-        case SCANNING: return "Scanning";
-        case COMPLETED: return "Completed";
-        case SCAN_ERROR: return "Error";
-        default: return "Unknown";
+    case IDLE: return "Idle";
+    case INITIALIZING_CAMERA: return "Initializing Camera";
+    case LOADING_PRESET: return "Loading Preset";
+    case CONFIGURING_DEVICES: return "Configuring Devices";
+    case STARTING_SCAN: return "Starting Scan";
+    case SCANNING: return "Scanning";
+    case COMPLETED: return "Completed";
+    case SCAN_ERROR: return "Error";
+    default: return "Unknown";
     }
 }
 
@@ -123,12 +120,11 @@ void AutoScan::on_startup_delay_timeout()
     }
 }
 
-void AutoScan::on_preset_loaded(const QString& name)
+void AutoScan::on_preset_loaded(const QString &name)
 {
     qDebug() << "Preset loaded successfully:" << name;
     emit auto_scan_started(name);
 
-    // Move to camera initialization
     set_state(INITIALIZING_CAMERA);
 
     if (!auto_initialize_camera()) {
@@ -137,7 +133,6 @@ void AutoScan::on_preset_loaded(const QString& name)
         return;
     }
 
-    // Move to device configuration
     set_state(CONFIGURING_DEVICES);
 
     if (!auto_configure_devices()) {
@@ -147,7 +142,7 @@ void AutoScan::on_preset_loaded(const QString& name)
     }
 }
 
-void AutoScan::on_preset_validation_failed(const QString& error)
+void AutoScan::on_preset_validation_failed(const QString &error)
 {
     set_error(QString("Preset validation failed: %1").arg(error));
     set_state(SCAN_ERROR);
@@ -156,31 +151,28 @@ void AutoScan::on_preset_validation_failed(const QString& error)
 
 void AutoScan::on_initialization_complete()
 {
-    // Check if auto-scan is enabled via command line
     if (is_auto_scan_enabled(m_command_line_args)) {
-        QString presetPath = get_preset_path(m_command_line_args);
-        qDebug() << "Auto-scan enabled with preset:" << presetPath;
+        QString preset_path = get_preset_path(m_command_line_args);
+        qDebug() << "Auto-scan enabled with preset:" << preset_path;
 
-        // Configure auto-scan
         AutoScanConfig config;
         config.enabled = true;
         config.startup_delay = 2000;  // 2 second delay after UI initialization
         config.verify_devices = true;
         config.create_timestamped_folders = true;
 
-        // Check for custom output directory
-        int outputIndex = m_command_line_args.indexOf("--output-dir");
-        if (outputIndex >= 0 && outputIndex + 1 < m_command_line_args.size()) {
-            config.output_directory = m_command_line_args.at(outputIndex + 1);
+        int output_index = m_command_line_args.indexOf("--output-dir");
+        if (output_index >= 0 && output_index + 1 < m_command_line_args.size()) {
+            config.output_directory = m_command_line_args.at(output_index + 1);
         }
 
         set_config(config);
 
-        // Start auto-scan sequence
-        if (!start_auto_scan_sequence(presetPath)) {
+        if (!start_auto_scan_sequence(preset_path)) {
             qWarning() << "Failed to start auto-scan:" << get_last_error();
         }
-    } else {
+    }
+    else {
         qDebug() << "Auto-scan not enabled - starting normal operation";
     }
 }
@@ -209,17 +201,16 @@ bool AutoScan::auto_initialize_camera()
     return true;
 }
 
-bool AutoScan::auto_load_scan_preset(const QString& preset_path)
+bool AutoScan::auto_load_scan_preset(const QString &preset_path)
 {
     qDebug() << "Auto-loading scan preset:" << preset_path;
 
-    // Load the raw data from file
     if (!m_scan_preset->load_from_file(preset_path)) {
         set_error(QString("Failed to load preset: %1").arg(m_scan_preset->get_last_error()));
         return false;
     }
 
-    // Trigger validation - this will emit scan_preset_loaded or scan_preset_validation_failed
+    // validation emits scan_preset_loaded or scan_preset_validation_failed
     if (!m_scan_preset->validate_preset()) {
         set_error(QString("Preset validation failed: %1").arg(m_scan_preset->get_last_error()));
         return false;
@@ -237,13 +228,12 @@ bool AutoScan::auto_configure_devices()
 
     qDebug() << "Auto-configuring devices...";
 
-    // Verify preset is ready for application
     if (!m_scan_preset->apply_preset()) {
         set_error(QString("Failed to prepare preset: %1").arg(m_scan_preset->get_last_error()));
         return false;
     }
 
-    // Emit signal to UserPanel to actually apply the preset data to devices
+    // UserPanel applies the preset to the devices
     qDebug() << "Emitting signal to apply preset data to devices";
     emit apply_scan_preset_to_devices(m_scan_preset->get_data());
 
@@ -254,7 +244,6 @@ bool AutoScan::auto_start_scan()
 {
     qDebug() << "Auto-starting scan...";
 
-    // Create output directory if needed
     if (m_config.create_timestamped_folders) {
         QString output_dir = create_output_directory();
         if (output_dir.isEmpty()) {
@@ -275,10 +264,8 @@ bool AutoScan::auto_start_scan()
 
 bool AutoScan::verify_prerequisites() const
 {
-    // TODO: Add prerequisite checks if needed:
-    // - Disk space
-    // - Permissions
-    // Other checks will be handled by the receiving components via signals
+    // TODO: check disk space and permissions here.
+    // The receivers of the signals do the other checks.
 
     return true;
 }
@@ -292,7 +279,7 @@ QString AutoScan::create_output_directory() const
 
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
     QString preset_name = m_scan_preset->get_data().name;
-    preset_name.replace(" ", "_");  // Replace spaces with underscores
+    preset_name.replace(" ", "_");
 
     QString full_dir = QString("%1/%2_%3").arg(base_dir, timestamp, preset_name);
 
@@ -314,7 +301,7 @@ void AutoScan::set_state(AutoScanState state)
     }
 }
 
-void AutoScan::set_error(const QString& error)
+void AutoScan::set_error(const QString &error)
 {
     m_last_error = error;
     qWarning() << "AutoScan error:" << error;

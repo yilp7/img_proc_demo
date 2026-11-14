@@ -6,55 +6,55 @@
 #include <QTimer>
 
 LaserController::LaserController(DeviceManager *device_mgr, LensController *lens_ctrl,
-                                 TCUController *tcu_ctrl, QObject *parent)
-    : QObject(parent),
-      m_device_mgr(device_mgr),
-      m_lens_ctrl(lens_ctrl),
-      m_tcu_ctrl(tcu_ctrl),
-      laser_on(false),
-      firing(false),
-      curr_laser_idx(-1)
+                                 TCUController *tcu_ctrl, QObject *parent) :
+    QObject(parent),
+    m_device_mgr(device_mgr),
+    m_lens_ctrl(lens_ctrl),
+    m_tcu_ctrl(tcu_ctrl),
+    m_laser_on(false),
+    m_firing(false),
+    m_curr_laser_idx(-1)
 {
 }
 
 void LaserController::on_LASER_BTN_clicked()
 {
 #ifdef LVTONG
-    if (!laser_on) {
+    if (!m_laser_on) {
         emit laser_btn_update(false, "");
         uchar buf_laser_on[] = {0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99};
-        m_device_mgr->tcu()->emit send_data(QByteArray((char*)buf_laser_on, 7), 0, 0);
+        m_device_mgr->get_tcu()->emit send_data(QByteArray((char*)buf_laser_on, 7), 0, 0);
         QTimer::singleShot(4000, this, SLOT(start_laser()));
     }
     else {
-        if (firing) on_FIRE_LASER_BTN_clicked();
+        if (m_firing) on_FIRE_LASER_BTN_clicked();
         uchar buf_laser_off[] = {0x88, 0x08, 0x00, 0x00, 0x00, 0x02, 0x99};
-        m_device_mgr->tcu()->send_data(QByteArray((char*)buf_laser_off, 7), 0, 0);
+        m_device_mgr->get_tcu()->send_data(QByteArray((char*)buf_laser_off, 7), 0, 0);
 
-        laser_on = false;
+        m_laser_on = false;
         emit laser_btn_update(true, tr("ON"));
         emit current_edit_enabled(false);
         emit fire_btn_update(false, "");
         emit simple_laser_chk_update(false, -1);
     }
 #else
-    emit laser_enable_requested(!laser_on);
-    laser_on = !laser_on;
-    emit laser_btn_update(true, laser_on ? tr("OFF") : tr("ON"));
+    emit laser_enable_requested(!m_laser_on);
+    m_laser_on = !m_laser_on;
+    emit laser_btn_update(true, m_laser_on ? tr("OFF") : tr("ON"));
 #endif
 }
 
 void LaserController::start_laser()
 {
     uchar buf_laser_on[] = {0x88, 0x08, 0x00, 0x00, 0x00, 0x01, 0x99};
-    m_device_mgr->tcu()->emit send_data(QByteArray((char*)buf_laser_on, 7), 0, 0);
+    m_device_mgr->get_tcu()->emit send_data(QByteArray((char*)buf_laser_on, 7), 0, 0);
 
     QTimer::singleShot(1000, this, SLOT(init_laser()));
 }
 
 void LaserController::init_laser()
 {
-    laser_on = true;
+    m_laser_on = true;
     emit laser_btn_update(true, tr("OFF"));
     emit current_edit_enabled(true);
 
@@ -75,22 +75,23 @@ void LaserController::init_laser()
 
 void LaserController::on_FIRE_LASER_BTN_clicked()
 {
-    if (!firing) {
+    if (!m_firing) {
         emit send_laser_msg("ON\r");
         qDebug() << QString("ON\r");
 
         emit laser_enable_requested(true);
 
-        firing = true;
+        m_firing = true;
         emit fire_btn_update(true, tr("STOP"));
         emit simple_laser_chk_update(true, 1); // 1 = checked
-    } else {
+    }
+    else {
         emit send_laser_msg("OFF\r");
         qDebug() << QString("OFF\r");
 
         emit laser_enable_requested(false);
 
-        firing = false;
+        m_firing = false;
         emit fire_btn_update(true, tr("FIRE"));
         emit simple_laser_chk_update(true, 0); // 0 = unchecked
     }
@@ -99,7 +100,7 @@ void LaserController::on_FIRE_LASER_BTN_clicked()
 void LaserController::laser_preset_reached()
 {
     m_lens_ctrl->lens_stop();
-    curr_laser_idx = -curr_laser_idx;
+    m_curr_laser_idx = -m_curr_laser_idx;
 }
 
 inline void LaserController::set_laser_preset_target(int *pos)
@@ -110,14 +111,14 @@ inline void LaserController::set_laser_preset_target(int *pos)
 void LaserController::goto_laser_preset(char target)
 {
     // check sum = sum(byte1 to byte5) & 0xFF
-    if (curr_laser_idx < 0) {
+    if (m_curr_laser_idx < 0) {
         m_lens_ctrl->lens_stop();
         set_laser_preset_target(new int[4]{0});
         target = 1;
         goto quick_break;
     }
-    if (target > curr_laser_idx) {
-        switch(curr_laser_idx | target) {
+    if (target > m_curr_laser_idx) {
+        switch(m_curr_laser_idx | target) {
         case 0x3:
             set_laser_preset_target(new int[4]{1008, 1008, 1008, 1008});
             goto quick_break;
@@ -140,7 +141,7 @@ void LaserController::goto_laser_preset(char target)
         }
     }
     else {
-        switch(curr_laser_idx | target) {
+        switch(m_curr_laser_idx | target) {
         case 0x3:
             set_laser_preset_target(new int[4]{0000, 0000, 0000, 0000});
             goto quick_break;
@@ -163,6 +164,6 @@ void LaserController::goto_laser_preset(char target)
         }
     }
 quick_break:
-    curr_laser_idx = -target;
+    m_curr_laser_idx = -target;
     QTimer::singleShot(3000, this, SLOT(laser_preset_reached()));
 }

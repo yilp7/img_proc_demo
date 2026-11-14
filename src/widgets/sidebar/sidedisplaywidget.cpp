@@ -8,21 +8,20 @@
 #include <QVBoxLayout>
 
 namespace {
-QLabel* make_section_label(const QString &text, QWidget *parent)
+QLabel *make_section_label(const QString &text, QWidget *parent)
 {
     auto *lbl = new QLabel(text, parent);
     lbl->setObjectName("SIDE_DISPLAY_SECTION_LBL");
     return lbl;
 }
 
-QPushButton* make_swap_button(QWidget *parent)
+QPushButton *make_swap_button(QWidget *parent)
 {
     auto *btn = new QPushButton(parent);
     btn->setObjectName("SIDE_DISPLAY_SWAP_BTN");
     btn->setFixedSize(20, 18);
-// Use the same icon as ui->SWITCH_TCU_UI_BTN (set in UserPanel::toggle_color_mode
-    // and the init path). Dark theme is the boot default; UserPanel re-applies
-    // the correct variant on theme switch.
+// Same icon as SWITCH_TCU_UI_BTN. Dark is the boot default; UserPanel re-applies
+// the right variant on a theme switch.
     btn->setIcon(QIcon(":/tools/dark/switch"));
     btn->setIconSize(QSize(14, 14));
     btn->setCursor(Qt::PointingHandCursor);
@@ -30,7 +29,7 @@ QPushButton* make_swap_button(QWidget *parent)
     return btn;
 }
 
-QLabel* make_thumb(QWidget *parent)
+QLabel *make_thumb(QWidget *parent)
 {
     auto *thumb = new QLabel(parent);
     thumb->setObjectName("SIDE_DISPLAY_THUMB");
@@ -40,7 +39,7 @@ QLabel* make_thumb(QWidget *parent)
     return thumb;
 }
 
-QWidget* make_header_row(QLabel *label, QPushButton *swap, QWidget *parent)
+QWidget *make_header_row(QLabel *label, QPushButton *swap, QWidget *parent)
 {
     auto *row = new QWidget(parent);
     auto *l = new QHBoxLayout(row);
@@ -53,11 +52,15 @@ QWidget* make_header_row(QLabel *label, QPushButton *swap, QWidget *parent)
 }
 } // namespace
 
-SideDisplayWidget::SideDisplayWidget(QWidget *parent)
-    : QFrame(parent),
-      m_layout(nullptr),
-      m_alt1_label(nullptr), m_alt1_swap(nullptr), m_alt1_thumb(nullptr),
-      m_alt2_label(nullptr), m_alt2_swap(nullptr), m_alt2_thumb(nullptr)
+SideDisplayWidget::SideDisplayWidget(QWidget *parent) :
+    QFrame(parent),
+    m_layout(nullptr),
+    m_alt1_label(nullptr),
+    m_alt1_swap(nullptr),
+    m_alt1_thumb(nullptr),
+    m_alt2_label(nullptr),
+    m_alt2_swap(nullptr),
+    m_alt2_thumb(nullptr)
 {
     setObjectName("SIDE_DISPLAY_WIDGET");
     m_layout = new QVBoxLayout(this);
@@ -90,6 +93,7 @@ void SideDisplayWidget::setup(Display *alt1, Display *alt2)
             thumb->setPixmap(pm.scaled(thumb->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
         };
     };
+    // queued: set_pixmap comes from the consumer thread, the scaling runs on the GUI thread
     if (alt1 && m_alt1_thumb)
         connect(alt1, &Display::set_pixmap, m_alt1_thumb, scaler(m_alt1_thumb), Qt::QueuedConnection);
     if (alt2 && m_alt2_thumb)

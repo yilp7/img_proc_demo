@@ -9,15 +9,9 @@
 
 #include "onnxruntime_cxx_api.h"
 
-// LightNAFNetGray (others/jiaofu) wrapped as a frame-average / denoise option.
-//
-// The model is single-channel by construction — its graph takes [1, 1, H, W] —
-// so a colour frame is enhanced one channel at a time and merged back, at three
-// inferences per frame.
-//
-// Preprocessing follows others/jiaofu/MODEL_CONTRACT.md, in full-frame mode so
-// the output matches the input size. The delivery's own centre mode returns an
-// 800x800 crop, which cannot stand in for the frame being displayed.
+// LightNAFNetGray wrapped as a frame-average / denoise option. The model is
+// single-channel, so a colour frame takes one inference per channel. Preprocessing
+// follows others/jiaofu/MODEL_CONTRACT.md in full-frame mode, so output size equals input.
 class NafNetEnhancer
 {
 public:
@@ -34,8 +28,8 @@ public:
     // Loads on first call. Failure is sticky: this sits on the per-frame path
     // and must not retry a missing model or an absent CUDA stack every frame.
     bool ensure_loaded(const QString &model_path);
-    bool available() const { return m_session != nullptr; }
-    QString last_error() const { return m_error; }
+    bool is_available() const { return m_session != nullptr; }
+    QString get_last_error() const { return m_error; }
 
     // In place on CV_8UC1 or CV_8UC3. Returns false and leaves the image
     // untouched when the model is unavailable or the format is unsupported.

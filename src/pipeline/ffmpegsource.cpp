@@ -16,38 +16,40 @@ namespace {
 // Interrupt callback context: a pointer to FfmpegSource's stop flag. Returns
 // 1 to abort the blocking FFmpeg call; FFmpeg polls this between IO chunks.
 struct InterruptCtx {
-    std::atomic<bool>* should_stop;
+    std::atomic<bool> *should_stop;
     time_t             last_activity;
 };
 
-int ffmpeg_interrupt(void* opaque) {
-    InterruptCtx* ctx = static_cast<InterruptCtx*>(opaque);
+int ffmpeg_interrupt(void *opaque)
+{
+    InterruptCtx *ctx = static_cast<InterruptCtx*>(opaque);
     if (!ctx) return 0;
     if (ctx->should_stop && ctx->should_stop->load()) return 1;
-    // Hard 30 s ceiling on blocked IO — matches the legacy guard. Networks
-    // sometimes wedge a connect() for minutes without ever erroring; the
-    // stop flag alone doesn't bound that, since the user hasn't asked to
-    // stop.
-    if (ctx->last_activity > 0 && time(NULL) - ctx->last_activity > 30) return 1;
+    // Hard 30 s ceiling on blocked IO: a network can wedge connect() for minutes
+    // without an error, and the stop flag does not bound that.
+    if (ctx->last_activity > 0 && time(nullptr) - ctx->last_activity > 30) return 1;
     return 0;
 }
 
-bool is_transient_read_error(int err) {
+bool is_transient_read_error(int err)
+{
     return err == AVERROR(EAGAIN);
 }
 
-bool is_connection_reset_error(int err) {
+bool is_connection_reset_error(int err)
+{
     return err == -10054 || err == AVERROR(ECONNRESET);
 }
 
-void init_filter_graph(AVFormatContext* format_context, int video_stream_idx,
-                       AVFilterGraph* filter_graph, AVCodecContext* codec_context,
-                       AVFilterContext** buffersink_ctx, AVFilterContext** buffersrc_ctx) {
+void init_filter_graph(AVFormatContext *format_context, int video_stream_idx,
+                       AVFilterGraph *filter_graph, AVCodecContext *codec_context,
+                       AVFilterContext **buffersink_ctx, AVFilterContext **buffersrc_ctx)
+{
     char args[512];
-    const AVFilter* buffersrc  = avfilter_get_by_name("buffer");
-    const AVFilter* buffersink = avfilter_get_by_name("buffersink");
-    AVFilterInOut*  outputs    = avfilter_inout_alloc();
-    AVFilterInOut*  inputs     = avfilter_inout_alloc();
+    const AVFilter *buffersrc  = avfilter_get_by_name("buffer");
+    const AVFilter *buffersink = avfilter_get_by_name("buffersink");
+    AVFilterInOut  *outputs    = avfilter_inout_alloc();
+    AVFilterInOut  *inputs     = avfilter_inout_alloc();
     // Guards cover every early-return path below. avfilter_inout_free is a
     // no-op on NULL, so safe if avfilter_graph_parse_ptr already consumed
     // the lists.
@@ -65,38 +67,41 @@ void init_filter_graph(AVFormatContext* format_context, int video_stream_idx,
              time_base.num, time_base.den,
              codec_context->sample_aspect_ratio.num, codec_context->sample_aspect_ratio.den);
 
-    if (avfilter_graph_create_filter(buffersrc_ctx, buffersrc, "in", args, NULL, filter_graph) < 0) return;
-    if (avfilter_graph_create_filter(buffersink_ctx, buffersink, "out", NULL, NULL, filter_graph) < 0) return;
+    if (avfilter_graph_create_filter(buffersrc_ctx, buffersrc, "in", args, nullptr, filter_graph) < 0) return;
+    if (avfilter_graph_create_filter(buffersink_ctx, buffersink, "out", nullptr, nullptr, filter_graph) < 0) return;
     if (av_opt_set_int_list(*buffersink_ctx, "pix_fmts", pix_fmts, AV_PIX_FMT_NONE, AV_OPT_SEARCH_CHILDREN) < 0) return;
 
     outputs->name       = av_strdup("in");
     outputs->filter_ctx = *buffersrc_ctx;
     outputs->pad_idx    = 0;
-    outputs->next       = NULL;
+    outputs->next       = nullptr;
 
     inputs->name       = av_strdup("out");
     inputs->filter_ctx = *buffersink_ctx;
     inputs->pad_idx    = 0;
-    inputs->next       = NULL;
+    inputs->next       = nullptr;
 
-    if (avfilter_graph_parse_ptr(filter_graph, "format=gray", &inputs, &outputs, NULL) < 0) return;
-    if (avfilter_graph_config(filter_graph, NULL) < 0) return;
+    if (avfilter_graph_parse_ptr(filter_graph, "format=gray", &inputs, &outputs, nullptr) < 0) return;
+    if (avfilter_graph_config(filter_graph, nullptr) < 0) return;
 }
 
 } // namespace
 
-FfmpegSource::FfmpegSource(QObject* parent)
-    : QObject(parent) {
+FfmpegSource::FfmpegSource(QObject *parent) :
+    QObject(parent)
+{
     qRegisterMetaType<FfmpegSource::VideoInfo>("FfmpegSource::VideoInfo");
     qRegisterMetaType<StreamId>("StreamId");
     qRegisterMetaType<cv::Mat>("cv::Mat");
 }
 
-FfmpegSource::~FfmpegSource() {
+FfmpegSource::~FfmpegSource()
+{
     stop();
 }
 
-void FfmpegSource::start(StreamId target, QString url, bool format_gray) {
+void FfmpegSource::start(StreamId target, QString url, bool format_gray)
+{
     stop();
     const int session = m_session.fetch_add(1) + 1;
     m_should_stop.store(false);
@@ -111,21 +116,21 @@ void FfmpegSource::start(StreamId target, QString url, bool format_gray) {
     m_thread = std::thread(&FfmpegSource::run_thread, this, target, session, url, format_gray);
 }
 
-void FfmpegSource::mark_display_ready(int session) {
+void FfmpegSource::mark_display_ready(int session)
+{
     m_ready_session.store(session);
 }
 
-void FfmpegSource::stop(int timeout_ms) {
+void FfmpegSource::stop(int timeout_ms)
+{
     const bool was_joinable = m_thread.joinable();
     if (was_joinable) qDebug() << "[FfmpegSource] stop: joining previous worker";
     m_should_stop = true;
     m_stopped = true;
     if (m_thread.joinable()) {
-        // The worker checks m_should_stop after each av_read_frame and at
-        // every decoded frame, and the interrupt callback aborts blocking
-        // IO. Joining without a hard timeout is intentional — std::thread
-        // has no portable timed join. The interrupt callback's 30 s ceiling
-        // bounds the worst case if FFmpeg ignores the stop flag.
+        // The worker checks m_should_stop after every read and decoded frame, and the
+        // interrupt callback aborts blocking IO. The join has no timeout (std::thread has
+        // none); the callback's 30 s ceiling bounds the worst case.
         (void)timeout_ms;
         m_thread.join();
     }
@@ -133,42 +138,43 @@ void FfmpegSource::stop(int timeout_ms) {
     m_running = false;
 }
 
-void FfmpegSource::run_thread(StreamId target, int session, QString url, bool format_gray) {
+void FfmpegSource::run_thread(StreamId target, int session, QString url, bool format_gray)
+{
     bool is_rtsp_stream = url.contains("rtsp://");
     bool is_http_stream = url.contains("http://") || url.contains("https://");
     bool is_local_file  = !is_rtsp_stream && !is_http_stream;
 
-    AVFormatContext* format_context = avformat_alloc_context();
+    AVFormatContext *format_context = avformat_alloc_context();
     std::shared_ptr<AVFormatContext*> closer_format_context(&format_context, avformat_close_input);
-    AVCodecParameters* codec_param = NULL;
-    const AVCodec* codec = NULL;
-    AVCodecContext* codec_context = avcodec_alloc_context3(NULL);
+    AVCodecParameters *codec_param = nullptr;
+    const AVCodec *codec = nullptr;
+    AVCodecContext *codec_context = avcodec_alloc_context3(nullptr);
     std::shared_ptr<AVCodecContext*> closer_codec_context(&codec_context, avcodec_free_context);
-    AVFrame* frame = av_frame_alloc();
+    AVFrame *frame = av_frame_alloc();
     std::shared_ptr<AVFrame*> deleter_frame(&frame, av_frame_free);
-    AVFrame* frame_sw = av_frame_alloc();
+    AVFrame *frame_sw = av_frame_alloc();
     std::shared_ptr<AVFrame*> deleter_frame_sw(&frame_sw, av_frame_free);
-    AVFrame* frame_result = av_frame_alloc();
+    AVFrame *frame_result = av_frame_alloc();
     std::shared_ptr<AVFrame*> deleter_frame_result(&frame_result, av_frame_free);
-    AVFrame* frame_filter = av_frame_alloc();
+    AVFrame *frame_filter = av_frame_alloc();
     std::shared_ptr<AVFrame*> deleter_frame_filter(&frame_filter, av_frame_free);
-    uint8_t* buffer = NULL;
+    uint8_t *buffer = nullptr;
     // Address-of pattern: deleter reads the current value at scope exit. The
     // value form (buffer, av_free) would capture the NULL we have now and
     // leak the later av_malloc.
-    std::shared_ptr<uint8_t*> deleter_buffer(&buffer, [](uint8_t** p) { av_free(*p); });
-    SwsContext* sws_context = NULL;
-    std::shared_ptr<SwsContext*> deleter_sws_context(&sws_context, [](SwsContext** p) { sws_freeContext(*p); });
-    AVFilterContext* buffersink_ctx = nullptr;
-    AVFilterContext* buffersrc_ctx = nullptr;
-    AVFilterGraph* filter_graph = avfilter_graph_alloc();
+    std::shared_ptr<uint8_t*> deleter_buffer(&buffer, [](uint8_t **p) { av_free(*p); });
+    SwsContext *sws_context = nullptr;
+    std::shared_ptr<SwsContext*> deleter_sws_context(&sws_context, [](SwsContext **p) { sws_freeContext(*p); });
+    AVFilterContext *buffersink_ctx = nullptr;
+    AVFilterContext *buffersrc_ctx = nullptr;
+    AVFilterGraph *filter_graph = avfilter_graph_alloc();
     std::shared_ptr<AVFilterGraph*> deleter_filter_graph(&filter_graph, avfilter_graph_free);
 
     InterruptCtx interrupt_ctx{ &m_should_stop, 0 };
     format_context->interrupt_callback.callback = ffmpeg_interrupt;
     format_context->interrupt_callback.opaque   = &interrupt_ctx;
 
-    auto finish = [&](bool ok, const char* reason) {
+    auto finish = [&](bool ok, const char *reason) {
         m_running = false;
         qDebug() << "[FfmpegSource] worker exiting: target=" << static_cast<int>(target)
                  << "session=" << session << "ok=" << ok << "reason=" << reason;
@@ -176,11 +182,11 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
         else    emit failed(target, session, QString::fromLatin1(reason));
     };
 
-    AVInputFormat* input_format = nullptr;
+    AVInputFormat *input_format = nullptr;
     if (url.contains("video=") || url.contains("audio="))
         input_format = (AVInputFormat*)av_find_input_format("dshow");
 
-    AVDictionary* format_opts = nullptr;
+    AVDictionary *format_opts = nullptr;
     if (is_rtsp_stream) {
         av_dict_set(&format_opts, "rtsp_transport", "tcp",     0);
         av_dict_set(&format_opts, "buffer_size",    "262144",  0);
@@ -195,7 +201,7 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
         av_dict_set(&format_opts, "seg_max_retry",   "3", 0);
     }
 
-    interrupt_ctx.last_activity = time(NULL);
+    interrupt_ctx.last_activity = time(nullptr);
     if (avformat_open_input(&format_context, url.toUtf8().constData(), input_format, &format_opts) != 0) {
         av_dict_free(&format_opts);
         finish(false, "open_failed");
@@ -203,7 +209,7 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
     }
     av_dict_free(&format_opts);
 
-    if (avformat_find_stream_info(format_context, NULL) < 0) { finish(false, "stream_info_failed"); return; }
+    if (avformat_find_stream_info(format_context, nullptr) < 0) { finish(false, "stream_info_failed"); return; }
 
     int video_stream_idx = -1;
     int max_res_w = 0;
@@ -236,19 +242,20 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
     }
 
     codec = avcodec_find_decoder(codec_param->codec_id);
-    if (codec == NULL) { finish(false, "codec_unsupported"); return; }
+    if (codec == nullptr) { finish(false, "codec_unsupported"); return; }
     if (avcodec_parameters_to_context(codec_context, codec_param) < 0) { finish(false, "codec_param_failed"); return; }
 
-    // HW decode for local files only — streams skip HW because the GPU→CPU
-    // readback bottleneck causes burst-then-stall ("PowerPoint" effect).
-    AVBufferRef* hw_device_ctx = nullptr;
+    // HW decode for local files only: on streams the GPU to CPU readback makes the
+    // picture burst and stall.
+    AVBufferRef *hw_device_ctx = nullptr;
     bool hw_decoding = false;
     if (is_local_file &&
         av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_D3D11VA, nullptr, nullptr, 0) == 0) {
         codec_context->hw_device_ctx = av_buffer_ref(hw_device_ctx);
         hw_decoding = true;
         qDebug() << "[FfmpegSource] using D3D11VA hardware decoding (local file)";
-    } else {
+    }
+    else {
         qDebug() << "[FfmpegSource] using SW decoding ("
                  << (is_local_file ? "HW unavailable" : "stream") << ")";
     }
@@ -257,7 +264,8 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
     if (is_rtsp_stream) {
         codec_context->thread_count = 1;
         codec_context->thread_type  = FF_THREAD_SLICE;
-    } else {
+    }
+    else {
         codec_context->thread_count = 0;
         codec_context->thread_type  = FF_THREAD_FRAME | FF_THREAD_SLICE;
     }
@@ -266,17 +274,18 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
         codec_context->flags2 |= AV_CODEC_FLAG2_FAST;
     }
 
-    if (avcodec_open2(codec_context, codec, NULL) < 0) {
+    if (avcodec_open2(codec_context, codec, nullptr) < 0) {
         if (hw_decoding) {
             qDebug() << "[FfmpegSource] HW codec open failed, retrying with software decoding";
             hw_decoding = false;
             avcodec_free_context(&codec_context);
-            codec_context = avcodec_alloc_context3(NULL);
+            codec_context = avcodec_alloc_context3(nullptr);
             if (avcodec_parameters_to_context(codec_context, codec_param) < 0) { finish(false, "codec_param_failed"); return; }
             if (is_rtsp_stream) {
                 codec_context->thread_count = 1;
                 codec_context->thread_type  = FF_THREAD_SLICE;
-            } else {
+            }
+            else {
                 codec_context->thread_count = 0;
                 codec_context->thread_type  = FF_THREAD_FRAME | FF_THREAD_SLICE;
             }
@@ -284,8 +293,9 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
                 codec_context->flags  |= AV_CODEC_FLAG_LOW_DELAY;
                 codec_context->flags2 |= AV_CODEC_FLAG2_FAST;
             }
-            if (avcodec_open2(codec_context, codec, NULL) < 0) { finish(false, "decoder_open_failed"); return; }
-        } else {
+            if (avcodec_open2(codec_context, codec, nullptr) < 0) { finish(false, "decoder_open_failed"); return; }
+        }
+        else {
             finish(false, "decoder_open_failed"); return;
         }
     }
@@ -331,11 +341,11 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
     const bool is_network_stream = is_rtsp_stream || is_http_stream;
 
     while (!m_should_stop.load()) {
-        interrupt_ctx.last_activity = time(NULL);
+        interrupt_ctx.last_activity = time(nullptr);
         if ((result = av_read_frame(format_context, &packet)) < 0) {
             if (result == AVERROR_EOF) break;
             if (is_transient_read_error(result)) {
-                QThread::msleep(2);
+                QThread::msleep(2); // transient error: pause briefly instead of spinning
                 continue;
             }
             if (is_network_stream) {
@@ -352,7 +362,7 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
                     finish(false, "read_failed");
                     return;
                 }
-                QThread::msleep(10);
+                QThread::msleep(10); // let the network recover before the next read
                 continue;
             }
             continue;
@@ -368,7 +378,7 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
             // receive leaves frames queued and accumulates latency.
             bool stream_done = false;
             while (avcodec_receive_frame(codec_context, frame) == 0) {
-                AVFrame* sw_frame = frame;
+                AVFrame *sw_frame = frame;
                 if (hw_decoding && frame->format != AV_PIX_FMT_NONE && frame->hw_frames_ctx) {
                     av_frame_unref(frame_sw);
                     if (av_hwframe_transfer_data(frame_sw, frame, 0) < 0) {
@@ -385,12 +395,9 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
                     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) { stream_done = true; break; }
                 }
                 else {
-                    // Use frame->pts (decoder output) not sw_frame->pts:
-                    // av_hwframe_transfer_data does not copy metadata, so
-                    // sw_frame->pts is unset (0) under HW decoding, making
-                    // the throttle a no-op.
-                    // RTSP is already network-paced; sleeping on PTS keeps
-                    // any demuxer/camera backlog alive instead of catching up.
+                    // Use frame->pts, not sw_frame->pts: av_hwframe_transfer_data copies no metadata,
+                    // so the latter is 0 under HW decoding and the throttle would do nothing.
+                    // RTSP is network-paced already; sleeping on PTS there would keep a backlog alive.
                     if (!is_rtsp_stream && frame->pts != AV_NOPTS_VALUE) {
                         if (last_pts != AV_NOPTS_VALUE) {
                             delay = av_rescale_q(frame->pts - last_pts, time_base, time_base_q) - elapsed_timer.nsecsElapsed() / 1000;
@@ -404,17 +411,15 @@ void FfmpegSource::run_thread(StreamId target, int session, QString url, bool fo
                         sws_src_fmt = (AVPixelFormat)sw_frame->format;
                         sws_context = sws_getContext(codec_context->width, codec_context->height, sws_src_fmt,
                                                      codec_context->width, codec_context->height, pixel_fmt,
-                                                     SWS_BILINEAR, NULL, NULL, NULL);
+                                                     SWS_BILINEAR, nullptr, nullptr, nullptr);
                     }
                     sws_scale(sws_context, sw_frame->data, sw_frame->linesize, 0, codec_context->height,
                               frame_result->data, frame_result->linesize);
                 }
 
                 cv_frame.data = (format_gray ? frame_filter : frame_result)->data[0];
-                // Emit a clone — the cv::Mat data lives on stack buffers
-                // owned by av_image_fill_arrays; the consumer holds the
-                // frame past this iteration and the next pass overwrites
-                // the buffer.
+                // Emit a clone: the Mat data sits in buffers av_image_fill_arrays owns, which the
+                // next pass overwrites while the consumer still holds the frame.
                 emit frame_decoded(target, session, cv_frame.clone());
                 av_frame_unref(frame);
 

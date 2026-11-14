@@ -5,92 +5,92 @@ cv::Mat bayer_temp;
 
 MvCam::MvCam()
 {
-    device_type = 1;
-    dev_handle = NULL;
-    reconnect_required = false;
-    curr_idx = 0;
+    m_device_type = 1;
+    m_dev_handle = nullptr;
+    m_reconnect_required = false;
+    m_curr_idx = 0;
 }
 MvCam::~MvCam() { release_handle(); }
 
-// Stop, close, destroy, in the order the SDK expects. Stop is issued even when
-// the link is down: after a disconnect the handle still has an acquisition
-// armed, and reopening or destroying it in that state is where the restart
-// crash starts. On a dead link the stop times out inside the SDK, which costs
-// a moment and nothing else.
+// Stop, close, destroy, in the order the SDK expects. Stop is sent even when the
+// link is down: after a disconnect the handle still has an acquisition armed, and
+// reusing it in that state is where the restart crash starts.
 int MvCam::release_handle()
 {
-    if (!dev_handle) return MV_E_HANDLE;
-    MV_CC_StopGrabbing(dev_handle);
-    const int ret = MV_CC_CloseDevice(dev_handle);
-    MV_CC_DestroyHandle(dev_handle);
-    dev_handle = NULL;
+    if (!m_dev_handle) return MV_E_HANDLE;
+    MV_CC_StopGrabbing(m_dev_handle);
+    const int ret = MV_CC_CloseDevice(m_dev_handle);
+    MV_CC_DestroyHandle(m_dev_handle);
+    m_dev_handle = nullptr;
     return ret;
 }
 
 void MvCam::configure_device()
 {
-    if (!dev_handle) return;
+    if (!m_dev_handle) return;
 
-    MV_CC_RegisterExceptionCallBack(dev_handle, exception_cb, this);
-    reconnect_required = false;
+    MV_CC_RegisterExceptionCallBack(m_dev_handle, exception_cb, this);
+    m_reconnect_required = false;
 
-    int size = MV_CC_GetOptimalPacketSize(dev_handle);
-    if (size >= MV_OK) MV_CC_SetIntValueEx(dev_handle, "GevSCPSPacketSize", size);
+    int size = MV_CC_GetOptimalPacketSize(m_dev_handle);
+    if (size >= MV_OK) MV_CC_SetIntValueEx(m_dev_handle, "GevSCPSPacketSize", size);
 
     // Keep the acquisition engine armed for repeated frames. TriggerMode can
     // still be enabled separately; this only prevents one-shot acquisition.
-    MV_CC_SetEnumValueByString(dev_handle, "AcquisitionMode", "Continuous");
-    MV_CC_SetPixelFormat(dev_handle, PixelType_Gvsp_Mono8);
-    MV_CC_SetEnumValue(dev_handle, "ExposureMode", MV_EXPOSURE_MODE_TIMED);
-    MV_CC_SetEnumValue(dev_handle, "ExposureAuto", MV_EXPOSURE_AUTO_MODE_OFF);
-    MV_CC_SetEnumValue(dev_handle, "GainAuto", 0);
-    MV_CC_SetBoolValue(dev_handle, "AcquisitionFrameRateEnable", true);
-    MV_CC_SetEnumValue(dev_handle, "BinningHorizontal", 1);
-    MV_CC_SetEnumValue(dev_handle, "BinningVertical", 1);
+    MV_CC_SetEnumValueByString(m_dev_handle, "AcquisitionMode", "Continuous");
+    MV_CC_SetPixelFormat(m_dev_handle, PixelType_Gvsp_Mono8);
+    MV_CC_SetEnumValue(m_dev_handle, "ExposureMode", MV_EXPOSURE_MODE_TIMED);
+    MV_CC_SetEnumValue(m_dev_handle, "ExposureAuto", MV_EXPOSURE_AUTO_MODE_OFF);
+    MV_CC_SetEnumValue(m_dev_handle, "GainAuto", 0);
+    MV_CC_SetBoolValue(m_dev_handle, "AcquisitionFrameRateEnable", true);
+    MV_CC_SetEnumValue(m_dev_handle, "BinningHorizontal", 1);
+    MV_CC_SetEnumValue(m_dev_handle, "BinningVertical", 1);
 }
 
 void __stdcall MvCam::exception_cb(unsigned int message_type, void *user_data)
 {
     if (message_type != MV_EXCEPTION_DEV_DISCONNECT || !user_data) return;
-    static_cast<MvCam*>(user_data)->reconnect_required = true;
+    static_cast<MvCam*>(user_data)->m_reconnect_required = true;
 }
 
 int MvCam::search_for_devices()
 {
     // FIXME: error 2 -2146885623
-    MV_CC_EnumDevices(MV_GIGE_DEVICE, &gige_dev_list);
-    MV_CC_EnumDevices(MV_USB_DEVICE,  &usb3_dev_list);
+    MV_CC_EnumDevices(MV_GIGE_DEVICE, &m_gige_dev_list);
+    MV_CC_EnumDevices(MV_USB_DEVICE,  &m_usb3_dev_list);
     int ret = 0;
-    if (gige_dev_list.nDeviceNum) ret = MV_CC_CreateHandle(&dev_handle, gige_dev_list.pDeviceInfo[0]);
-    else if (usb3_dev_list.nDeviceNum) ret = MV_CC_CreateHandle(&dev_handle, usb3_dev_list.pDeviceInfo[0]);
+    if (m_gige_dev_list.nDeviceNum) ret = MV_CC_CreateHandle(&m_dev_handle, m_gige_dev_list.pDeviceInfo[0]);
+    else if (m_usb3_dev_list.nDeviceNum) ret = MV_CC_CreateHandle(&m_dev_handle, m_usb3_dev_list.pDeviceInfo[0]);
 
-    return gige_dev_list.nDeviceNum + usb3_dev_list.nDeviceNum;
+    return m_gige_dev_list.nDeviceNum + m_usb3_dev_list.nDeviceNum;
 }
 
-int MvCam::start(int idx) {
-    curr_idx = idx;
-    MV_CC_DEVICE_INFO *device_info = NULL;
-    if (idx >= 0 && idx < static_cast<int>(gige_dev_list.nDeviceNum)) {
-        device_info = gige_dev_list.pDeviceInfo[idx];
-    } else {
-        const int usb_idx = idx - static_cast<int>(gige_dev_list.nDeviceNum);
-        if (usb_idx >= 0 && usb_idx < static_cast<int>(usb3_dev_list.nDeviceNum))
-            device_info = usb3_dev_list.pDeviceInfo[usb_idx];
+int MvCam::start(int idx)
+{
+    m_curr_idx = idx;
+    MV_CC_DEVICE_INFO *device_info = nullptr;
+    if (idx >= 0 && idx < static_cast<int>(m_gige_dev_list.nDeviceNum)) {
+        device_info = m_gige_dev_list.pDeviceInfo[idx];
+    }
+    else {
+        const int usb_idx = idx - static_cast<int>(m_gige_dev_list.nDeviceNum);
+        if (usb_idx >= 0 && usb_idx < static_cast<int>(m_usb3_dev_list.nDeviceNum))
+            device_info = m_usb3_dev_list.pDeviceInfo[usb_idx];
     }
     if (!device_info) return MV_E_PARAMETER;
 
-    if (dev_handle) release_handle();
+    if (m_dev_handle) release_handle();
 
-    int ret = MV_CC_CreateHandle(&dev_handle, device_info);
+    int ret = MV_CC_CreateHandle(&m_dev_handle, device_info);
     if (ret != MV_OK) {
-        dev_handle = NULL;
+        m_dev_handle = nullptr;
         return ret;
     }
 
-    ret = MV_CC_OpenDevice(dev_handle);
+    ret = MV_CC_OpenDevice(m_dev_handle);
     if (ret != MV_OK) {
-        MV_CC_DestroyHandle(dev_handle);
-        dev_handle = NULL;
+        MV_CC_DestroyHandle(m_dev_handle);
+        m_dev_handle = nullptr;
         return ret;
     }
 
@@ -102,22 +102,22 @@ int MvCam::start(int idx) {
 
 bool MvCam::is_connected() const
 {
-    if (!dev_handle || reconnect_required.load()) return false;
-    const bool connected = MV_CC_IsDeviceConnected(dev_handle);
-    if (!connected) reconnect_required = true;
+    if (!m_dev_handle || m_reconnect_required.load()) return false;
+    const bool connected = MV_CC_IsDeviceConnected(m_dev_handle);
+    if (!connected) m_reconnect_required = true;
     return connected;
 }
 
 int MvCam::reconnect()
 {
-    if (!dev_handle) return MV_E_HANDLE;
+    if (!m_dev_handle) return MV_E_HANDLE;
     if (is_connected()) return MV_OK;
 
     // Required by the MVS SDK after an exceptional GigE disconnect. The stop
     // comes first for the same reason as in release_handle().
-    MV_CC_StopGrabbing(dev_handle);
-    MV_CC_CloseDevice(dev_handle);
-    const int ret = MV_CC_OpenDevice(dev_handle);
+    MV_CC_StopGrabbing(m_dev_handle);
+    MV_CC_CloseDevice(m_dev_handle);
+    const int ret = MV_CC_OpenDevice(m_dev_handle);
     if (ret == MV_OK) configure_device();
     return ret;
 }
@@ -131,19 +131,21 @@ int MvCam::set_user_pointer(StreamFrameSink *sink)
 {
     if (!is_connected()) return MV_E_HANDLE;
     void *user = sink;
-    return MV_CC_RegisterImageCallBackEx(dev_handle, frame_cb, user);
+    return MV_CC_RegisterImageCallBackEx(m_dev_handle, frame_cb, user);
 }
 
-int MvCam::start_grabbing() {
+int MvCam::start_grabbing()
+{
     if (!is_connected()) return MV_E_HANDLE;
-    return MV_CC_StartGrabbing(dev_handle);
+    return MV_CC_StartGrabbing(m_dev_handle);
 }
 
 // Not gated on the connection check: a stop after a link loss is exactly the
 // one the SDK needs before the handle is reused.
-int MvCam::stop_grabbing() {
-    if (!dev_handle) return MV_E_HANDLE;
-    return MV_CC_StopGrabbing(dev_handle);
+int MvCam::stop_grabbing()
+{
+    if (!m_dev_handle) return MV_E_HANDLE;
+    return MV_CC_StopGrabbing(m_dev_handle);
 }
 
 // Dimensions read back as zero on any failure, so a caller can tell a dead
@@ -152,8 +154,8 @@ void MvCam::get_max_frame_size(int *w, int *h)
 {
     MVCC_INTVALUE width_value = {0};
     MVCC_INTVALUE height_value = {0};
-    *w = MV_CC_GetIntValue(dev_handle, "WidthMax", &width_value) == MV_OK ? width_value.nCurValue : 0;
-    *h = MV_CC_GetIntValue(dev_handle, "HeightMax", &height_value) == MV_OK ? height_value.nCurValue : 0;
+    *w = MV_CC_GetIntValue(m_dev_handle, "WidthMax", &width_value) == MV_OK ? width_value.nCurValue : 0;
+    *h = MV_CC_GetIntValue(m_dev_handle, "HeightMax", &height_value) == MV_OK ? height_value.nCurValue : 0;
 }
 
 void MvCam::frame_size(bool read, int *w, int *h, int *inc_w, int *inc_h)
@@ -161,23 +163,23 @@ void MvCam::frame_size(bool read, int *w, int *h, int *inc_w, int *inc_h)
     if (read) {
         MVCC_INTVALUE width_value = {0};
         MVCC_INTVALUE height_value = {0};
-        const bool ok_w = MV_CC_GetIntValue(dev_handle, "Width", &width_value) == MV_OK;
-        const bool ok_h = MV_CC_GetIntValue(dev_handle, "Height", &height_value) == MV_OK;
+        const bool ok_w = MV_CC_GetIntValue(m_dev_handle, "Width", &width_value) == MV_OK;
+        const bool ok_h = MV_CC_GetIntValue(m_dev_handle, "Height", &height_value) == MV_OK;
         *w = ok_w ? width_value.nCurValue : 0;
         *h = ok_h ? height_value.nCurValue : 0;
         if (inc_w) *inc_w = ok_w ? width_value.nInc : 0;
         if (inc_h) *inc_h = ok_h ? height_value.nInc : 0;
     }
     else {
-        MV_CC_SetIntValue(dev_handle, "Width", *w);
-        MV_CC_SetIntValue(dev_handle, "Height", *h);
+        MV_CC_SetIntValue(m_dev_handle, "Width", *w);
+        MV_CC_SetIntValue(m_dev_handle, "Height", *h);
     }
     if (*w <= 0 || *h <= 0) {
         mv_img.release();
         return;
     }
     MVCC_ENUMVALUE temp = {0};
-    MV_CC_GetPixelFormat(dev_handle, &temp);
+    MV_CC_GetPixelFormat(m_dev_handle, &temp);
     switch (temp.nCurValue) {
     case PixelType_Gvsp_RGB8_Packed:
         mv_img = cv::Mat(*h, *w, CV_8UC3);
@@ -201,16 +203,16 @@ void MvCam::frame_offset(bool read, int *x, int *y, int *inc_x, int *inc_y)
 {
     if (read) {
         MVCC_INTVALUE int_value = {0};
-        MV_CC_GetIntValue(dev_handle, "OffsetX", &int_value);
+        MV_CC_GetIntValue(m_dev_handle, "OffsetX", &int_value);
         *x = int_value.nCurValue;
         if (inc_x) *inc_x = int_value.nInc;
-        MV_CC_GetIntValue(dev_handle, "OffsetY", &int_value);
+        MV_CC_GetIntValue(m_dev_handle, "OffsetY", &int_value);
         *y = int_value.nCurValue;
         if (inc_y) *inc_y = int_value.nInc;
     }
     else {
-        MV_CC_SetIntValue(dev_handle, "OffsetX", *x);
-        MV_CC_SetIntValue(dev_handle, "OffsetY", *y);
+        MV_CC_SetIntValue(m_dev_handle, "OffsetX", *x);
+        MV_CC_SetIntValue(m_dev_handle, "OffsetY", *y);
     }
 }
 
@@ -218,52 +220,52 @@ void MvCam::time_exposure(bool read, float *val)
 {
     if (read) {
         MVCC_FLOATVALUE f_val = {0};
-        MV_CC_GetFloatValue(dev_handle, "ExposureTime", &f_val);
+        MV_CC_GetFloatValue(m_dev_handle, "ExposureTime", &f_val);
         *val = f_val.fCurValue;
     }
-    else MV_CC_SetFloatValue(dev_handle, "ExposureTime", *val);
+    else MV_CC_SetFloatValue(m_dev_handle, "ExposureTime", *val);
 }
 
 void MvCam::frame_rate(bool read, float *val)
 {
     if (read) {
         MVCC_FLOATVALUE f_val = {0};
-        MV_CC_GetFloatValue(dev_handle, "ResultingFrameRate", &f_val);
+        MV_CC_GetFloatValue(m_dev_handle, "ResultingFrameRate", &f_val);
         *val = f_val.fCurValue;
     }
-    else MV_CC_SetFloatValue(dev_handle, "AcquisitionFrameRate", *val);
+    else MV_CC_SetFloatValue(m_dev_handle, "AcquisitionFrameRate", *val);
 }
 
 void MvCam::gain_analog(bool read, float *val)
 {
     if (read) {
         MVCC_FLOATVALUE f_val = {0};
-        MV_CC_GetFloatValue(dev_handle, "Gain", &f_val);
+        MV_CC_GetFloatValue(m_dev_handle, "Gain", &f_val);
         *val = f_val.fCurValue;
     }
-    else MV_CC_SetFloatValue(dev_handle, "Gain", *val);
+    else MV_CC_SetFloatValue(m_dev_handle, "Gain", *val);
 }
 
 void MvCam::trigger_mode(bool read, bool *val)
 {
     if (read) {
         MVCC_ENUMVALUE enum_val = {0};
-        MV_CC_GetEnumValue(dev_handle, "TriggerMode", &enum_val);
+        MV_CC_GetEnumValue(m_dev_handle, "TriggerMode", &enum_val);
         *val = enum_val.nCurValue;
     }
-    else MV_CC_SetEnumValue(dev_handle, "TriggerMode", *val);
+    else MV_CC_SetEnumValue(m_dev_handle, "TriggerMode", *val);
 }
 
 void MvCam::trigger_source(bool read, bool *val)
 {
     if (read) {
         MVCC_ENUMVALUE enum_val = {0};
-        MV_CC_GetEnumValue(dev_handle, "TriggerSource", &enum_val);
+        MV_CC_GetEnumValue(m_dev_handle, "TriggerSource", &enum_val);
         *val = enum_val.nCurValue == MV_TRIGGER_SOURCE_SOFTWARE;
     }
     else {
         int source = *val ? MV_TRIGGER_SOURCE_SOFTWARE : MV_TRIGGER_SOURCE_LINE0;
-        MV_CC_SetEnumValue(dev_handle, "TriggerSource", source);
+        MV_CC_SetEnumValue(m_dev_handle, "TriggerSource", source);
     }
 }
 
@@ -271,26 +273,26 @@ int MvCam::ip_config(bool read, int *val)
 {
     int ret = 0;
     if (read) {
-        if (curr_idx >= gige_dev_list.nDeviceNum) return 0;
-        *val = gige_dev_list.pDeviceInfo[curr_idx]->SpecialInfo.stGigEInfo.nIpCfgCurrent;
+        if (m_curr_idx >= m_gige_dev_list.nDeviceNum) return 0;
+        *val = m_gige_dev_list.pDeviceInfo[m_curr_idx]->SpecialInfo.stGigEInfo.nIpCfgCurrent;
     }
-    else ret = MV_GIGE_SetIpConfig(dev_handle, MV_IP_CFG_STATIC);
+    else ret = MV_GIGE_SetIpConfig(m_dev_handle, MV_IP_CFG_STATIC);
     return ret;
 }
 
 int MvCam::ip_address(bool read, int idx, int *ip, int *gateway, int *nic_address)
 {
     if (read) {
-        if (idx >= gige_dev_list.nDeviceNum) return 0;
-        *ip = gige_dev_list.pDeviceInfo[idx]->SpecialInfo.stGigEInfo.nCurrentIp;
-        *gateway = gige_dev_list.pDeviceInfo[idx]->SpecialInfo.stGigEInfo.nDefultGateWay;
-        if (nic_address) *nic_address = gige_dev_list.pDeviceInfo[idx]->SpecialInfo.stGigEInfo.nNetExport;
+        if (idx >= m_gige_dev_list.nDeviceNum) return 0;
+        *ip = m_gige_dev_list.pDeviceInfo[idx]->SpecialInfo.stGigEInfo.nCurrentIp;
+        *gateway = m_gige_dev_list.pDeviceInfo[idx]->SpecialInfo.stGigEInfo.nDefultGateWay;
+        if (nic_address) *nic_address = m_gige_dev_list.pDeviceInfo[idx]->SpecialInfo.stGigEInfo.nNetExport;
         return 0;
     }
     else {
         release_handle();
-        int ret = MV_CC_CreateHandle(&dev_handle, idx < gige_dev_list.nDeviceNum ? gige_dev_list.pDeviceInfo[idx] : usb3_dev_list.pDeviceInfo[idx - gige_dev_list.nDeviceNum]);
-        ret = MV_GIGE_ForceIpEx(dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
+        int ret = MV_CC_CreateHandle(&m_dev_handle, idx < m_gige_dev_list.nDeviceNum ? m_gige_dev_list.pDeviceInfo[idx] : m_usb3_dev_list.pDeviceInfo[idx - m_gige_dev_list.nDeviceNum]);
+        ret = MV_GIGE_ForceIpEx(m_dev_handle, *ip, (255 << 24) + (255 << 16) + (255 << 8), *gateway);
 //        qDebug() << "modify ip: " << hex << ret;
         return ret;
     }
@@ -301,7 +303,7 @@ int MvCam::pixel_type(bool read, int *val)
     int ret = 0;
     if (read) {
         MVCC_ENUMVALUE temp = {0};
-        ret = MV_CC_GetPixelFormat(dev_handle, &temp);
+        ret = MV_CC_GetPixelFormat(m_dev_handle, &temp);
         *val = temp.nCurValue;
     }
     else {
@@ -323,47 +325,47 @@ int MvCam::pixel_type(bool read, int *val)
         default: break;
         }
 
-        ret = MV_CC_SetPixelFormat(dev_handle, *val);
+        ret = MV_CC_SetPixelFormat(m_dev_handle, *val);
     }
     return ret;
 }
 
 void MvCam::trigger_once()
 {
-    MV_CC_SetCommandValue(dev_handle, "TriggerSoftware");
+    MV_CC_SetCommandValue(m_dev_handle, "TriggerSoftware");
 }
 
 QStringList MvCam::get_device_list()
 {
     QStringList sl;
-    for (int i = 0; i < gige_dev_list.nDeviceNum; i++)
-        sl << QString::asprintf("%s (%s)", gige_dev_list.pDeviceInfo[i]->SpecialInfo.stGigEInfo.chUserDefinedName, gige_dev_list.pDeviceInfo[i]->SpecialInfo.stGigEInfo.chModelName);
-    for (int i = 0; i < usb3_dev_list.nDeviceNum; i++)
-        sl << QString::asprintf("%s (%s)", usb3_dev_list.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chUserDefinedName, usb3_dev_list.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chModelName);
+    for (int i = 0; i < m_gige_dev_list.nDeviceNum; i++)
+        sl << QString::asprintf("%s (%s)", m_gige_dev_list.pDeviceInfo[i]->SpecialInfo.stGigEInfo.chUserDefinedName, m_gige_dev_list.pDeviceInfo[i]->SpecialInfo.stGigEInfo.chModelName);
+    for (int i = 0; i < m_usb3_dev_list.nDeviceNum; i++)
+        sl << QString::asprintf("%s (%s)", m_usb3_dev_list.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chUserDefinedName, m_usb3_dev_list.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chModelName);
     return sl;
 }
 
 int MvCam::gige_device_num()
 {
-    return gige_dev_list.nDeviceNum;
+    return m_gige_dev_list.nDeviceNum;
 }
 
 int MvCam::usb3_device_num()
 {
-    return usb3_dev_list.nDeviceNum;
+    return m_usb3_dev_list.nDeviceNum;
 }
 
 void MvCam::binning(bool read, int *val)
 {
     if (read) {
         MVCC_ENUMVALUE enum_val = {0};
-        MV_CC_GetEnumValue(dev_handle, "BinningHorizontal", &enum_val);
-        MV_CC_GetEnumValue(dev_handle, "BinningVertical", &enum_val);
+        MV_CC_GetEnumValue(m_dev_handle, "BinningHorizontal", &enum_val);
+        MV_CC_GetEnumValue(m_dev_handle, "BinningVertical", &enum_val);
         *val = enum_val.nCurValue;
     }
     else {
-        MV_CC_SetEnumValue(dev_handle, "BinningHorizontal", *val);
-        MV_CC_SetEnumValue(dev_handle, "BinningVertical", *val);
+        MV_CC_SetEnumValue(m_dev_handle, "BinningHorizontal", *val);
+        MV_CC_SetEnumValue(m_dev_handle, "BinningVertical", *val);
     }
 }
 

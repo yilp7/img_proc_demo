@@ -8,7 +8,7 @@ class PTZ : public ControlPort, public IPTZController
 {
     Q_OBJECT
 public:
-    enum PARAMS {
+    enum Params {
         STOP       = 0x00,
         UP_LEFT    = 0x01,
         UP         = 0x02,
@@ -44,7 +44,7 @@ public:
     float ptz_get_angle_h() const override;
     float ptz_get_angle_v() const override;
     bool ptz_is_connected() const override;
-    QObject* ptz_qobject() override { return this; }
+    QObject *ptz_qobject() override { return this; }
 
 #if ENABLE_PORT_JSON
     nlohmann::json to_json() override;
@@ -52,7 +52,7 @@ public:
 
 signals:
     void ptz_param_updated(qint32 ptz_param, double val);
-    void angle_updated(float _h, float _v);
+    void angle_updated(float h, float v);
 
 protected slots:
     bool connect_to_serial_port(QString port_name, qint32 baudrate = QSerialPort::Baud9600) override;
@@ -70,14 +70,14 @@ private:
     uchar checksum(QByteArray data);
 
 private:
-    uchar  address;
-    double angle_h;
-    double angle_v;
-    uchar  ptz_speed;       // legacy: set via SPEED, mirrored to pan/tilt
-    uchar  pan_speed;       // command[4] for pan-active directions
-    uchar  tilt_speed;      // command[5] for tilt-active directions
+    uchar  m_address;
+    double m_angle_h;
+    double m_angle_v;
+    uchar  m_ptz_speed;       // legacy: set via SPEED, mirrored to pan/tilt
+    uchar  m_pan_speed;       // command[4] for pan-active directions
+    uchar  m_tilt_speed;      // command[5] for tilt-active directions
 
-    QByteArray query[2];
+    QByteArray m_query[2];
 };
 
 #endif // PTZ_H

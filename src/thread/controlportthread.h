@@ -60,31 +60,31 @@ protected:
 
 // TODO: determine if thread implementation is needed
 protected:
-    bool thread_interrupt;
+    bool m_thread_interrupt;
 
-    QLabel*      lbl;
-    QLineEdit*   edt;
-    DotIndicator* status_icon;
-    int          idx; // 0: TCU, 1: lens, 2: laser, 3: ptz, 4: inclinometer
-    bool         connected_to_serial;
-    bool         connected_to_tcp;
-    bool         use_tcp;
-    QMutex       port_mutex;
-    QSerialPort* serial_port;
-    QTcpSocket*  tcp_port;
-    int          baudrate;
-    int          shared_from; // -1: none, 0-3: refer to idx
-    ControlPortThread* shared_port;
+    QLabel      *m_lbl;
+    QLineEdit   *m_edt;
+    DotIndicator *m_status_icon;
+    int          m_idx; // 0: TCU, 1: lens, 2: laser, 3: ptz, 4: inclinometer
+    bool         m_connected_to_serial;
+    bool         m_connected_to_tcp;
+    bool         m_use_tcp;
+    QMutex       m_port_mutex;
+    QSerialPort *m_serial_port;
+    QTcpSocket  *m_tcp_port;
+    int          m_baudrate;
+    int          m_shared_from; // -1: none, 0-3: refer to idx
+    ControlPortThread *m_shared_port;
 
-    std::queue<PortData> q;
+    std::queue<PortData> m_q;
 
-    bool         hold;
-    QTimer*      timer;
-    int          time_interval;
-    int          write_idx;
-    bool         write_succeeded;
-    int          count_threshold;
-    int          successive_count;
+    bool         m_hold;
+    QTimer      *m_timer;
+    int          m_time_interval;
+    int          m_write_idx;
+    bool         m_write_succeeded;
+    int          m_count_threshold;
+    int          m_successive_count;
 };
 
 struct TCUDataGroup {
@@ -99,10 +99,11 @@ struct TCUDataGroup {
     uint  mcp;
 };
 
-class TCUThread : public ControlPortThread {
+class TCUThread : public ControlPortThread
+{
     Q_OBJECT
 public:
-    enum USER_PARAMS {
+    enum UserParams {
         REPEATED_FREQ = 0x00,
         LASER_WIDTH   = 0x01,
         DELAY_A       = 0x02,
@@ -133,60 +134,61 @@ public:
         NO_PARAM      = 0xFF,
     };
 
-    TCUThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, ScanParams* sp = nullptr, QObject *parent = nullptr, uint init_width = 100);
+    TCUThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, ScanParams *sp = nullptr, QObject *parent = nullptr, uint init_width = 100);
 
-    int set_user_param(TCUThread::USER_PARAMS param, float val);
+    int set_user_param(TCUThread::UserParams param, float val);
     TCUDataGroup get_tcu_params();
 
 public slots:
     void try_communicate() override;
 
 private:
-    int set_tcu_param(TCUThread::USER_PARAMS param, float val);
+    int set_tcu_param(TCUThread::UserParams param, float val);
 
 public:
     // 0: default, head(88) cmd(00) data(MM NN PP QQ) tail(99)
     // 1: step-50ps, head(88) cmd(00) data(MM NN PP QQ SS) tail(99), SS->step by 50ps (max 80)
-    int   tcu_type;
-    bool  scan_mode; // 0: default, 1: scan
+    int   m_tcu_type;
+    bool  m_scan_mode; // 0: default, 1: scan
 
     // TCUThread params
-    float rep_freq;                   // unit: kHz
-    float laser_width;                // unit: ns
-    float delay_a, delay_b;           // unit: ns
-    float gate_width_a, gate_width_b; // unit: ns
-    float ccd_freq;                   // unit: frame/s
-    float duty;                       // unit: μs
-    uint  mcp;
-    uint  laser_on;
-    uint  tcu_dist;                   // unit: m
+    float m_rep_freq;                     // unit: kHz
+    float m_laser_width;                  // unit: ns
+    float m_delay_a, m_delay_b;           // unit: ns
+    float m_gate_width_a, m_gate_width_b; // unit: ns
+    float m_ccd_freq;                     // unit: frame/s
+    float m_duty;                         // unit: μs
+    uint  m_mcp;
+    uint  m_laser_on;
+    uint  m_tcu_dist;                   // unit: m
 
     // user params
-    float dist_ns;                    // unit: m/ns
-    float delay_n;                    // unit: ns
-    float gate_width_n;               // unit: ns
-    float delay_dist;                 // unit: m
-    float depth_of_view;              // unit: m
+    float m_dist_ns;                    // unit: m/ns
+    float m_delay_n;                    // unit: ns
+    float m_gate_width_n;               // unit: ns
+    float m_delay_dist;                 // unit: m
+    float m_depth_of_view;              // unit: m
 
     // configuration
-    bool  auto_rep_freq;
-    bool  ab_lock;
-    float laser_offset;
-    float delay_offset;
-    float gate_width_offset;
-    int   ps_step[4];
+    bool  m_auto_rep_freq;
+    bool  m_ab_lock;
+    float m_laser_offset;
+    float m_delay_offset;
+    float m_gate_width_offset;
+    int   m_ps_step[4];
 
-    bool  use_gw_lut;
-    int   gw_lut[100];                // lookup table for gatewidth config by serial
+    bool  m_use_gw_lut;
+    int   m_gw_lut[100];                // lookup table for gatewidth config by serial
 
 private:
-    ScanParams *scan_params;
+    ScanParams *m_scan_params;
 };
 
-class LensThread : public ControlPortThread {
+class LensThread : public ControlPortThread
+{
     Q_OBJECT
 public:
-    enum PARAMS {
+    enum Params {
         STOP          = 0x00,
         ZOOM_IN       = 0x01,
         ZOOM_OUT      = 0x02,
@@ -206,19 +208,20 @@ public:
 
     LensThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, QObject *parent = nullptr, int init_speed = 32);
 
-    int lens_control(LensThread::PARAMS command, uint *val = nullptr);
+    int lens_control(LensThread::Params command, uint *val = nullptr);
 
 public slots:
     void try_communicate() override;
 
 public:
-    uint zoom;
-    uint focus;
-    uint laser_radius;
-    uint lens_speed;
+    uint m_zoom;
+    uint m_focus;
+    uint m_laser_radius;
+    uint m_lens_speed;
 };
 
-class LaserThread : public ControlPortThread {
+class LaserThread : public ControlPortThread
+{
     Q_OBJECT
 public:
     LaserThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, QObject *parent = nullptr);
@@ -227,10 +230,11 @@ public slots:
     void try_communicate() override;
 };
 
-class PTZThread : public ControlPortThread {
+class PTZThread : public ControlPortThread
+{
     Q_OBJECT
 public:
-    enum PARAMS {
+    enum Params {
         STOP       = 0x00,
         UP_LEFT    = 0x01,
         UP         = 0x02,
@@ -251,7 +255,7 @@ public:
 
     PTZThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, QObject *parent = nullptr, int init_speed = 16);
 
-    int ptz_control(PTZThread::PARAMS param, float *val = nullptr);
+    int ptz_control(PTZThread::Params param, float *val = nullptr);
 
 public slots:
     void try_communicate() override;
@@ -260,12 +264,13 @@ private:
     void send_ctrl_cmd(uchar dir);
 
 public:
-    float angle_h;
-    float angle_v;
-    int   ptz_speed;
+    float m_angle_h;
+    float m_angle_v;
+    int   m_ptz_speed;
 };
 
-class InclinThread : public ControlPortThread {
+class InclinThread : public ControlPortThread
+{
     Q_OBJECT
 public:
     InclinThread(QLabel *label, QLineEdit *edit, int index, DotIndicator *status_icon = nullptr, QObject *parent = nullptr);
@@ -278,18 +283,18 @@ private:
     // set output frequency: 0xFF 0xAA 0x03 0x03 0x00 (1Hz)
     // set output content: 0xFF 0xAA 0x02 0x0F 0x00 (TIME, ACC, GYRO, ANGLE)
     // save config: 0XFF 0XAA 0X00 0X00 0X00
-    float acceleration_x;
-    float acceleration_y;
-    float acceleration_z;
-    float temperature;
+    float m_acceleration_x;
+    float m_acceleration_y;
+    float m_acceleration_z;
+    float m_temperature;
 
-    float angular_x;
-    float angular_y;
-    float angular_z;
+    float m_angular_x;
+    float m_angular_y;
+    float m_angular_z;
 
-    float roll;
-    float pitch;
-    float yaw;
+    float m_roll;
+    float m_pitch;
+    float m_yaw;
 };
 
 #endif // CONTROLPORTTHREAD_H

@@ -2,14 +2,17 @@
 
 #include <QWidget>
 
-FlowLayout::FlowLayout(QWidget *parent, int margin, int hSpacing, int vSpacing)
-    : QLayout(parent), m_h_space(hSpacing), m_v_space(vSpacing)
+FlowLayout::FlowLayout(QWidget *parent, int margin, int h_spacing, int v_spacing) :
+    QLayout(parent),
+    m_h_space(h_spacing),
+    m_v_space(v_spacing)
 {
     setContentsMargins(margin, margin, margin, margin);
 }
 
-FlowLayout::FlowLayout(int margin, int hSpacing, int vSpacing)
-    : m_h_space(hSpacing), m_v_space(vSpacing)
+FlowLayout::FlowLayout(int margin, int h_spacing, int v_spacing) :
+    m_h_space(h_spacing),
+    m_v_space(v_spacing)
 {
     setContentsMargins(margin, margin, margin, margin);
 }
@@ -21,16 +24,16 @@ FlowLayout::~FlowLayout()
 
 void FlowLayout::addItem(QLayoutItem *item) { m_items.append(item); }
 
-int FlowLayout::horizontalSpacing() const
+int FlowLayout::horizontal_spacing() const
 {
     if (m_h_space >= 0) return m_h_space;
-    return const_cast<FlowLayout*>(this)->smartSpacing(QStyle::PM_LayoutHorizontalSpacing);
+    return const_cast<FlowLayout*>(this)->smart_spacing(QStyle::PM_LayoutHorizontalSpacing);
 }
 
-int FlowLayout::verticalSpacing() const
+int FlowLayout::vertical_spacing() const
 {
     if (m_v_space >= 0) return m_v_space;
-    return const_cast<FlowLayout*>(this)->smartSpacing(QStyle::PM_LayoutVerticalSpacing);
+    return const_cast<FlowLayout*>(this)->smart_spacing(QStyle::PM_LayoutVerticalSpacing);
 }
 
 int FlowLayout::count() const { return m_items.size(); }
@@ -43,12 +46,12 @@ QLayoutItem *FlowLayout::takeAt(int index)
 
 Qt::Orientations FlowLayout::expandingDirections() const { return {}; }
 bool FlowLayout::hasHeightForWidth() const { return true; }
-int FlowLayout::heightForWidth(int width) const { return doLayout(QRect(0, 0, width, 0), true); }
+int FlowLayout::heightForWidth(int width) const { return do_layout(QRect(0, 0, width, 0), true); }
 
 void FlowLayout::setGeometry(const QRect &rect)
 {
     QLayout::setGeometry(rect);
-    doLayout(rect, false);
+    do_layout(rect, false);
 }
 
 QSize FlowLayout::sizeHint() const
@@ -59,7 +62,7 @@ QSize FlowLayout::sizeHint() const
     int max_h = 0;
     for (int i = 0; i < m_items.size(); ++i) {
         const QSize s = m_items[i]->sizeHint();
-        if (i > 0) total_w += qMax(0, horizontalSpacing());
+        if (i > 0) total_w += qMax(0, horizontal_spacing());
         total_w += s.width();
         max_h = qMax(max_h, s.height());
     }
@@ -81,7 +84,7 @@ QSize FlowLayout::minimumSize() const
     return size;
 }
 
-int FlowLayout::doLayout(const QRect &rect, bool testOnly) const
+int FlowLayout::do_layout(const QRect &rect, bool test_only) const
 {
     int left, top, right, bottom;
     getContentsMargins(&left, &top, &right, &bottom);
@@ -92,9 +95,9 @@ int FlowLayout::doLayout(const QRect &rect, bool testOnly) const
 
     for (QLayoutItem *item : m_items) {
         QWidget *w = item->widget();
-        int h_spc = horizontalSpacing();
+        int h_spc = horizontal_spacing();
         if (h_spc == -1 && w) h_spc = w->style()->layoutSpacing(QSizePolicy::PushButton, QSizePolicy::PushButton, Qt::Horizontal);
-        int v_spc = verticalSpacing();
+        int v_spc = vertical_spacing();
         if (v_spc == -1 && w) v_spc = w->style()->layoutSpacing(QSizePolicy::PushButton, QSizePolicy::PushButton, Qt::Vertical);
 
         int next_x = x + item->sizeHint().width() + h_spc;
@@ -104,14 +107,14 @@ int FlowLayout::doLayout(const QRect &rect, bool testOnly) const
             next_x = x + item->sizeHint().width() + h_spc;
             line_h = 0;
         }
-        if (!testOnly) item->setGeometry(QRect(QPoint(x, y), item->sizeHint()));
+        if (!test_only) item->setGeometry(QRect(QPoint(x, y), item->sizeHint()));
         x = next_x;
         line_h = qMax(line_h, item->sizeHint().height());
     }
     return y + line_h - rect.y() + bottom;
 }
 
-int FlowLayout::smartSpacing(QStyle::PixelMetric pm) const
+int FlowLayout::smart_spacing(QStyle::PixelMetric pm) const
 {
     QObject *p = parent();
     if (!p) return -1;

@@ -5,101 +5,101 @@
 
 UDPPTZ::UDPPTZ():
     QObject{nullptr},
-    udp_socket(nullptr),
-    target_ip(QHostAddress("192.168.1.10")),
-    target_port(30000),
-    local_ip(QHostAddress("192.168.1.100")),
-    local_port(30001),
-    connected(false),
-    timer_tx(nullptr),
-    timer_rx(nullptr),
-    current_operation(STANDBY),
-    horizontal_angle(0),
-    vertical_angle(0),
-    target_horizontal_angle(0),
-    target_vertical_angle(0),
-    horizontal_velocity(0),
-    vertical_velocity(0),
-    scan_range_horizontal(0),
-    scan_range_vertical(0),
-    servo_status(STANDBY),
-    last_received_time(0),
-    protocol(PROTOCOL_530)
+    m_udp_socket(nullptr),
+    m_target_ip(QHostAddress("192.168.1.10")),
+    m_target_port(30000),
+    m_local_ip(QHostAddress("192.168.1.100")),
+    m_local_port(30001),
+    m_connected(false),
+    m_timer_tx(nullptr),
+    m_timer_rx(nullptr),
+    m_current_operation(STANDBY),
+    m_horizontal_angle(0),
+    m_vertical_angle(0),
+    m_target_horizontal_angle(0),
+    m_target_vertical_angle(0),
+    m_horizontal_velocity(0),
+    m_vertical_velocity(0),
+    m_scan_range_horizontal(0),
+    m_scan_range_vertical(0),
+    m_servo_status(STANDBY),
+    m_last_received_time(0),
+    m_protocol(PROTOCOL_530)
 {
     connect(this, &UDPPTZ::connect_to, this, &UDPPTZ::connect_to_device, Qt::QueuedConnection);
     connect(this, &UDPPTZ::disconnect_from, this, &UDPPTZ::disconnect_from_device, Qt::QueuedConnection);
     connect(this, &UDPPTZ::transmit, this, &UDPPTZ::transmit_data, Qt::QueuedConnection);
     connect(this, &UDPPTZ::control, this, &UDPPTZ::device_control, Qt::QueuedConnection);
 
-    timer_tx = new QTimer(this);
-    timer_tx->setTimerType(Qt::PreciseTimer);
-    timer_tx->setInterval(20); // 20ms transmission cycle
-    connect(timer_tx, &QTimer::timeout, this, &UDPPTZ::transmit_status);
+    m_timer_tx = new QTimer(this);
+    m_timer_tx->setTimerType(Qt::PreciseTimer);
+    m_timer_tx->setInterval(20); // 20ms transmission cycle
+    connect(m_timer_tx, &QTimer::timeout, this, &UDPPTZ::transmit_status);
 
-    timer_rx = new QTimer(this);
-    timer_rx->setTimerType(Qt::PreciseTimer);
-    timer_rx->setInterval(5); // 5ms receive check
-    connect(timer_rx, &QTimer::timeout, this, &UDPPTZ::handle_received);
+    m_timer_rx = new QTimer(this);
+    m_timer_rx->setTimerType(Qt::PreciseTimer);
+    m_timer_rx->setInterval(5); // 5ms receive check
+    connect(m_timer_rx, &QTimer::timeout, this, &UDPPTZ::handle_received);
 }
 
 UDPPTZ::~UDPPTZ()
 {
-    if (timer_tx) {
-        timer_tx->stop();
-        timer_tx->deleteLater();
+    if (m_timer_tx) {
+        m_timer_tx->stop();
+        m_timer_tx->deleteLater();
     }
-    if (timer_rx) {
-        timer_rx->stop();
-        timer_rx->deleteLater();
+    if (m_timer_rx) {
+        m_timer_rx->stop();
+        m_timer_rx->deleteLater();
     }
-    if (udp_socket) {
-        udp_socket->close();
-        udp_socket->deleteLater();
+    if (m_udp_socket) {
+        m_udp_socket->close();
+        m_udp_socket->deleteLater();
     }
 }
 
 void UDPPTZ::set_target(QHostAddress target, quint16 port)
 {
-    target_ip = target;
-    target_port = port;
+    m_target_ip = target;
+    m_target_port = port;
 }
 
 void UDPPTZ::set_protocol(Protocol p)
 {
     if (p != PROTOCOL_500 && p != PROTOCOL_530) p = PROTOCOL_530;
-    protocol = p;
+    m_protocol = p;
     // 530 firmware needs a faster heartbeat (10 ms / 100 Hz); 500 keeps 20 ms.
-    if (timer_tx) timer_tx->setInterval(p == PROTOCOL_530 ? 10 : 20);
+    if (m_timer_tx) m_timer_tx->setInterval(p == PROTOCOL_530 ? 10 : 20);
 }
 
 void UDPPTZ::set_listen(QHostAddress listen, quint16 port)
 {
-    local_ip = listen;
-    local_port = port;
+    m_local_ip = listen;
+    m_local_port = port;
 }
 
 bool UDPPTZ::connect_to_device()
 {
-    if (connected) return false;
+    if (m_connected) return false;
 
-    udp_socket = new QUdpSocket(this);
+    m_udp_socket = new QUdpSocket(this);
     // Bypass system-level proxy lookup. See controlport.cpp for context;
     // QUdpSocket inherits from QAbstractSocket and hits the same code path.
-    udp_socket->setProxy(QNetworkProxy::NoProxy);
+    m_udp_socket->setProxy(QNetworkProxy::NoProxy);
 
     // Bind to local address for receiving status
-    if (!udp_socket->bind(local_ip, local_port)) {
-        qDebug() << "Failed to bind to" << local_ip.toString() << ":" << local_port;
-        udp_socket->deleteLater();
-        udp_socket = nullptr;
+    if (!m_udp_socket->bind(m_local_ip, m_local_port)) {
+        qDebug() << "Failed to bind to" << m_local_ip.toString() << ":" << m_local_port;
+        m_udp_socket->deleteLater();
+        m_udp_socket = nullptr;
         emit connection_status_changed(false);
         return false;
     }
 
-    connected = true;
-    last_received_time = 0;
-    timer_rx->start();
-    timer_tx->start();
+    m_connected = true;
+    m_last_received_time = 0;
+    m_timer_rx->start();
+    m_timer_tx->start();
 
     emit connection_status_changed(true);
     qDebug() << "UDP PTZ connected";
@@ -108,34 +108,34 @@ bool UDPPTZ::connect_to_device()
 
 void UDPPTZ::disconnect_from_device()
 {
-    if (!connected) return;
+    if (!m_connected) return;
 
     // Acquire mutex to ensure timer callbacks aren't running
-    socket_mutex.lock();
+    m_socket_mutex.lock();
 
     // Now safe to stop timers - callbacks can't be executing
-    timer_tx->stop();
-    timer_rx->stop();
+    m_timer_tx->stop();
+    m_timer_rx->stop();
 
-    socket_mutex.unlock();  // Release before cleanup
+    m_socket_mutex.unlock();  // Release before cleanup
 
-    if (udp_socket) {
-        udp_socket->close();
-        udp_socket->deleteLater();
-        udp_socket = nullptr;
+    if (m_udp_socket) {
+        m_udp_socket->close();
+        m_udp_socket->deleteLater();
+        m_udp_socket = nullptr;
     }
 
-    connected = false;
+    m_connected = false;
     emit connection_status_changed(false);
     qDebug() << "UDP PTZ disconnected";
 }
 
 void UDPPTZ::transmit_data(qint32 op)
 {
-    if (!connected || !udp_socket) return;
+    if (!m_connected || !m_udp_socket) return;
 
     QByteArray frame;
-    current_operation = op;
+    m_current_operation = op;
 
     switch (op) {
     case STANDBY:
@@ -145,16 +145,16 @@ void UDPPTZ::transmit_data(qint32 op)
         frame = create_command_frame(RETURN_ZERO);
         break;
     case SCAN:
-        frame = create_command_frame(SCAN, scan_range_horizontal, vertical_angle, scan_range_vertical);
+        frame = create_command_frame(SCAN, m_scan_range_horizontal, m_vertical_angle, m_scan_range_vertical);
         break;
     case MANUAL_SEARCH:
-        frame = create_command_frame(MANUAL_SEARCH, horizontal_velocity, vertical_velocity);
+        frame = create_command_frame(MANUAL_SEARCH, m_horizontal_velocity, m_vertical_velocity);
         break;
     case FOLLOW:
-        frame = create_command_frame(FOLLOW, target_horizontal_angle, target_vertical_angle);
+        frame = create_command_frame(FOLLOW, m_target_horizontal_angle, m_target_vertical_angle);
         break;
     case ANGLE_POSITION:
-        frame = create_command_frame(ANGLE_POSITION, target_horizontal_angle, target_vertical_angle);
+        frame = create_command_frame(ANGLE_POSITION, m_target_horizontal_angle, m_target_vertical_angle);
         break;
 
     // VID_PAGE operations (simple commands, no parameters)
@@ -191,14 +191,12 @@ void UDPPTZ::transmit_data(qint32 op)
         return;
     }
 
-    qint64 bytes_sent = udp_socket->writeDatagram(frame, target_ip, target_port);
+    qint64 bytes_sent = m_udp_socket->writeDatagram(frame, m_target_ip, m_target_port);
 
     if (bytes_sent == -1) {
-        qDebug() << "Failed to send UDP datagram:" << udp_socket->errorString();
+        qDebug() << "Failed to send UDP datagram:" << m_udp_socket->errorString();
     }
 }
-
-// IPTZController interface
 
 void UDPPTZ::ptz_move(int direction, int speed)
 {
@@ -220,10 +218,8 @@ void UDPPTZ::ptz_move(int direction, int speed)
 
 void UDPPTZ::ptz_move_2d(int direction, int h_speed, int v_speed)
 {
-    // Independent per-axis magnitudes from the joystick projection. The
-    // direction enum only contributes signs; magnitudes come from h_speed
-    // and v_speed independently instead of being collapsed to a single
-    // velocity. Same units as ptz_move (vel = speed / 2.0f).
+    // Per-axis magnitudes from the joystick projection: the direction only gives the
+    // signs. Same units as ptz_move (velocity = speed / 2).
     const float h_mag = h_speed / 2.0f;
     const float v_mag = v_speed / 2.0f;
     float h_vel = 0, v_vel = 0;
@@ -248,9 +244,8 @@ void UDPPTZ::ptz_move_velocity(float h_velocity, float v_velocity)
 
 void UDPPTZ::ptz_stop()
 {
-    // Stop semantics are still being characterised per device — currently
-    // zero velocities + MANUAL_SEARCH for all protocols. Will branch on
-    // `protocol` later if a variant requires STANDBY instead.
+    // Stop is zero velocity with MANUAL_SEARCH for every protocol for now; it may have
+    // to branch on the protocol if a device needs STANDBY.
     dispatch_manual_velocity(0, 0, Qt::BlockingQueuedConnection);
 }
 
@@ -275,18 +270,20 @@ void UDPPTZ::apply_manual_velocity(float h_vel, float v_vel)
 
 void UDPPTZ::apply_follow_target(float h, float v)
 {
-    target_horizontal_angle = h;
-    target_vertical_angle = v;
+    m_target_horizontal_angle = h;
+    m_target_vertical_angle = v;
     transmit_data(FOLLOW);
 }
 
 void UDPPTZ::apply_angle_target(float h, float v)
 {
-    target_horizontal_angle = h > 180.0f ? h - 360.0f : h;
-    target_vertical_angle = std::max(-90.0f, std::min(90.0f, v));
+    m_target_horizontal_angle = h > 180.0f ? h - 360.0f : h;
+    m_target_vertical_angle = std::max(-90.0f, std::min(90.0f, v));
     transmit_data(ANGLE_POSITION);
 }
 
+// The socket lives in this object's thread, so a call from another thread is handed
+// over to it. Moves are queued; a stop blocks until it has been applied.
 void UDPPTZ::dispatch_manual_velocity(float h_vel, float v_vel, Qt::ConnectionType connection)
 {
     if (QThread::currentThread() == thread()) {
@@ -321,24 +318,23 @@ void UDPPTZ::device_control(qint32 op, float val)
 {
     switch (op) {
     case STANDBY:
-        current_operation = STANDBY;
+        m_current_operation = STANDBY;
         transmit_data(STANDBY);
         break;
     case RETURN_ZERO:
-        current_operation = RETURN_ZERO;
+        m_current_operation = RETURN_ZERO;
         transmit_data(RETURN_ZERO);
         break;
     case SCAN:
-        // val represents scan range for horizontal
-        scan_range_horizontal = val;
-        current_operation = SCAN;
+        m_scan_range_horizontal = val;
+        m_current_operation = SCAN;
         transmit_data(SCAN);
         break;
     case MANUAL_SEARCH:
         // For manual search, we need separate horizontal and vertical velocities
         // This is simplified - in real implementation you might need separate controls
-        horizontal_velocity = val;
-        current_operation = MANUAL_SEARCH;
+        m_horizontal_velocity = val;
+        m_current_operation = MANUAL_SEARCH;
         transmit_data(MANUAL_SEARCH);
         break;
     case ANGLE_POSITION:
@@ -348,17 +344,18 @@ void UDPPTZ::device_control(qint32 op, float val)
     case ANGLE_H:
         // Set horizontal angle only
         if (val > 180.0f) {
-            target_horizontal_angle = val - 360.0f;
-        } else {
-            target_horizontal_angle = val;
+            m_target_horizontal_angle = val - 360.0f;
         }
-        current_operation = ANGLE_POSITION;
+        else {
+            m_target_horizontal_angle = val;
+        }
+        m_current_operation = ANGLE_POSITION;
         transmit_data(ANGLE_POSITION);
         break;
     case ANGLE_V:
         // Set vertical angle only, clamp to -90 to 90 range
-        target_vertical_angle = std::max(-90.0f, std::min(90.0f, val));
-        current_operation = ANGLE_POSITION;
+        m_target_vertical_angle = std::max(-90.0f, std::min(90.0f, val));
+        m_current_operation = ANGLE_POSITION;
         transmit_data(ANGLE_POSITION);
         break;
     default:
@@ -368,40 +365,39 @@ void UDPPTZ::device_control(qint32 op, float val)
 
 void UDPPTZ::handle_received()
 {
-    if (!connected || !udp_socket) return;
+    if (!m_connected || !m_udp_socket) return;
 
-    socket_mutex.lock();
-    while (udp_socket->hasPendingDatagrams()) {
+    m_socket_mutex.lock();
+    while (m_udp_socket->hasPendingDatagrams()) {
         QByteArray datagram;
-        datagram.resize(udp_socket->pendingDatagramSize());
+        datagram.resize(m_udp_socket->pendingDatagramSize());
         QHostAddress sender;
         quint16 sender_port;
 
-        qint64 bytes_received = udp_socket->readDatagram(datagram.data(), datagram.size(), &sender, &sender_port);
+        qint64 bytes_received = m_udp_socket->readDatagram(datagram.data(), datagram.size(), &sender, &sender_port);
 
         if (bytes_received == 14) { // Expected frame size
             parse_status_frame(datagram);
 
             // Update last received time for future real-time connection check
-            last_received_time = QDateTime::currentMSecsSinceEpoch();
+            m_last_received_time = QDateTime::currentMSecsSinceEpoch();
             // TODO: Uncomment below for real-time connection monitoring
-            // if (!connected) {
-            //     connected = true;
+            // if (!m_connected) {
+            //     m_connected = true;
             //     qDebug() << "UDP PTZ device detected and connected";
             // }
 
-            retrieve_mutex.lock();
-            last_read = datagram;
-            retrieve_mutex.unlock();
+            m_retrieve_mutex.lock();
+            m_last_read = datagram;
+            m_retrieve_mutex.unlock();
         }
     }
-    socket_mutex.unlock();
+    m_socket_mutex.unlock();
 }
 
 void UDPPTZ::transmit_status()
 {
-    // Transmit current command based on current operation
-    transmit_data(current_operation);
+    transmit_data(m_current_operation);
 }
 
 QByteArray UDPPTZ::create_command_frame(qint32 op, float horizontal, float vertical, float scan_range)
@@ -426,14 +422,13 @@ QByteArray UDPPTZ::create_command_frame(qint32 op, float horizontal, float verti
     frame[6] = static_cast<uchar>((v_value >> 8) & 0xFF);
     frame[7] = static_cast<uchar>(v_value & 0xFF);
 
-    // Bytes 8-9: scan range / per-protocol sentinel.
-    // 530: always 0x7F7F (= 32639, the firmware's "no scan" sentinel)
-    // regardless of op, even for SCAN — scan_range parameter is ignored.
-    // 500: scan_range value as-is (0x00 for non-SCAN ops).
-    if (protocol == PROTOCOL_530) {
+    // Bytes 8-9: scan range, or the protocol's sentinel. 530 always sends 0x7F7F
+    // ("no scan"), even for SCAN. 500 sends scan_range, which is 0 unless scanning.
+    if (m_protocol == PROTOCOL_530) {
         frame[8] = 0x7F;
         frame[9] = 0x7F;
-    } else {
+    }
+    else {
         qint16 scan_value = float_to_int16(scan_range);
         frame[8] = static_cast<uchar>((scan_value >> 8) & 0xFF);
         frame[9] = static_cast<uchar>(scan_value & 0xFF);
@@ -441,7 +436,6 @@ QByteArray UDPPTZ::create_command_frame(qint32 op, float horizontal, float verti
 
     // Reserved bytes (10-12) already initialized to 0x00
 
-    // Calculate and set checksum
     frame[13] = calculate_checksum(frame);
 
     return frame;
@@ -467,52 +461,42 @@ void UDPPTZ::parse_status_frame(const QByteArray &data)
         return;
     }
 
-    // Verify checksum
     if (static_cast<uchar>(data[13]) != calculate_checksum(data)) {
         qDebug() << "Checksum mismatch in status frame";
         return;
     }
 
-    // Parse servo status
-    servo_status = static_cast<uchar>(data[3]);
+    m_servo_status = static_cast<uchar>(data[3]);
 
     // Parse horizontal frame angle (bytes 4-5)
     qint16 h_raw = (static_cast<uchar>(data[4]) << 8) | static_cast<uchar>(data[5]);
     float device_h_angle = int16_to_float(h_raw);
     // Convert device angle (-180 to 180) to UI angle (0-360)
     if (device_h_angle < 0.0f) {
-        horizontal_angle = device_h_angle + 360.0f;
-    } else {
-        horizontal_angle = device_h_angle;
+        m_horizontal_angle = device_h_angle + 360.0f;
+    }
+    else {
+        m_horizontal_angle = device_h_angle;
     }
 
     // Parse vertical frame angle (bytes 6-7)
     qint16 v_raw = (static_cast<uchar>(data[6]) << 8) | static_cast<uchar>(data[7]);
-    vertical_angle = int16_to_float(v_raw);
-    // Clamp vertical angle to -90 to 90 range
-    if (vertical_angle > 90.0f) vertical_angle = 90.0f;
-    if (vertical_angle < -90.0f) vertical_angle = -90.0f;
+    m_vertical_angle = int16_to_float(v_raw);
+    if (m_vertical_angle > 90.0f) m_vertical_angle = 90.0f;
+    if (m_vertical_angle < -90.0f) m_vertical_angle = -90.0f;
 
-    // Device reports its current angular rate in bytes 8-9 / 10-11 of the
-    // status frame. Do NOT write into horizontal_velocity / vertical_velocity:
-    // those member fields hold the *commanded* velocity used for outgoing
-    // MANUAL_SEARCH frames (create_command_frame). Writing the device's
-    // reported rate into them corrupts the next outgoing command — e.g. after
-    // joystick release the timer would re-send the device's residual rate
-    // instead of the zeros we set in ptz_stop(). If we ever need device-side
-    // velocity for UI, add separate device_*_velocity fields (mirroring the
-    // target_*_angle vs *_angle split).
+    // Bytes 8-11 of the status frame are the device's current rate. They must not go
+    // into m_horizontal_velocity / m_vertical_velocity: those hold the commanded
+    // velocity for outgoing frames, and the timer would re-send the residual rate after a stop.
 
-    // Emit signals
-    emit angle_updated(horizontal_angle, vertical_angle);
-    emit status_updated(servo_status);
+    emit angle_updated(m_horizontal_angle, m_vertical_angle);
+    emit status_updated(m_servo_status);
 }
 
 qint16 UDPPTZ::float_to_int16(float value)
 {
     // Convert degrees to 0.01 degree units
     int scaled_value = static_cast<int>(value * 100.0f);
-    // Clamp to 16-bit signed integer range
     scaled_value = std::max(-32768, std::min(32767, scaled_value));
     return static_cast<qint16>(scaled_value);
 }
@@ -526,7 +510,7 @@ float UDPPTZ::int16_to_float(qint16 value)
 void UDPPTZ::update_timer_interval(uint interval)
 {
     if (interval > 0) {
-        timer_tx->setInterval(interval);
+        m_timer_tx->setInterval(interval);
     }
 }
 

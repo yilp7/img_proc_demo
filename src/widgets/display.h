@@ -27,7 +27,7 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 signals:
-    void set_pixmap(const QPixmap& pm);
+    void set_pixmap(const QPixmap &pm);
     void widget_resized();   // emitted after resize; UserPanel re-snapshots ProcessingParams
     void view_changed();     // emitted after zoom/pan/selection changes
     // idx: 0: curr_pos, 1: start_pos, 2: shape_size, 3: ptz_target
@@ -45,30 +45,30 @@ signals:
     void clear_roi();
 
 public:
-    QPoint    lefttop;
-    QPoint    center;
-    QPoint    prev_pos; // start position of mouse when image is dragged
-    QPoint    ori_pos;  // start position of roi when image is dragged
-    bool      is_grabbing;
-    int       mode; // 0: zoom mode, 1: selection mode, 2: ptz mode
-    int       curr_scale;
-    float     scale[5];
-    cv::Rect  display_region;
-    cv::Point selection_v1;
-    cv::Point selection_v2;
+    QPoint    m_lefttop;
+    QPoint    m_center;
+    QPoint    m_prev_pos; // start position of mouse when image is dragged
+    QPoint    m_ori_pos;  // start position of roi when image is dragged
+    bool      m_is_grabbing;
+    int       m_mode; // 0: zoom mode, 1: selection mode, 2: ptz mode
+    int       m_curr_scale;
+    float     m_scale[5];
+    cv::Rect  m_display_region;
+    cv::Point m_selection_v1;
+    cv::Point m_selection_v2;
 
-    bool     pressed;
+    bool     m_pressed;
 
     // Follow gate: the rubber band while dragging, and the locked gate the
     // tracker is holding. Both drawn over the pixmap by paintEvent.
     void set_follow_gate(const QRect &gate);
-    QRect    gate_rubber_band;
-    QRect    follow_gate;
-    bool     gate_dragging = false;
-    QPoint   gate_origin;
+    QRect    m_gate_rubber_band;
+    QRect    m_follow_gate;
+    bool     m_gate_dragging = false;
+    QPoint   m_gate_origin;
 
-    QRect    reserved_geometry;
-    bool     is_fullscreen = false;
+    QRect    m_reserved_geometry;
+    bool     m_is_fullscreen = false;
 };
 
 #endif // DISPLAY_H

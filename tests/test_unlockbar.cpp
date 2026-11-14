@@ -6,7 +6,7 @@
 namespace {
 // Drive the bar with synthesized press/move/release events to a target x
 // (widget-local). Targets the middle of the thumb so the press hits it.
-void dragTo(UnlockBar *w, int start_x, int target_x, int y)
+void drag_to(UnlockBar *w, int start_x, int target_x, int y)
 {
     QTest::mousePress(w, Qt::LeftButton, Qt::NoModifier, QPoint(start_x, y));
     QMouseEvent move_ev(QEvent::MouseMove, QPoint(target_x, y),
@@ -22,56 +22,56 @@ class TestUnlockBar : public QObject
     Q_OBJECT
 
 private slots:
-    // TC-UB-001: drag past threshold → unlocked() fires once.
+    // TC-UB-001: a drag past the threshold fires unlocked() once.
     void drag_past_threshold_unlocks()
     {
         UnlockBar w;
-        w.setRelockMs(0); // disable auto-relock for this test
-        w.setUnlockThreshold(0.9);
+        w.set_relock_ms(0); // disable auto-relock for this test
+        w.set_unlock_threshold(0.9);
         w.resize(400, 40);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
 
         QSignalSpy spy(&w, &UnlockBar::unlocked);
-        // Press inside thumb (near x=8, thumb starts at trackLeft=4), drag
+        // Press inside thumb (near x=8, thumb starts at track_left=4), drag
         // to x=400 (far right).
-        dragTo(&w, 20, 400, 20);
+        drag_to(&w, 20, 400, 20);
 
         QCOMPARE(spy.count(), 1);
-        QVERIFY(w.isUnlocked());
+        QVERIFY(w.is_unlocked());
     }
 
-    // TC-UB-002: short drag → no signal, thumb springs back.
+    // TC-UB-002: a short drag gives no signal and the thumb springs back.
     void drag_short_springs_back()
     {
         UnlockBar w;
-        w.setRelockMs(0);
+        w.set_relock_ms(0);
         w.resize(400, 40);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
 
         QSignalSpy unlocked_spy(&w, &UnlockBar::unlocked);
-        // Drag to roughly 40% — well below the 90% threshold.
-        dragTo(&w, 20, 160, 20);
+        // drag to roughly 40%, well below the 90% threshold
+        drag_to(&w, 20, 160, 20);
 
         QCOMPARE(unlocked_spy.count(), 0);
-        QVERIFY(!w.isUnlocked());
+        QVERIFY(!w.is_unlocked());
     }
 
     // TC-UB-003: auto-relock timer fires locked() and re-arms the bar.
     void auto_relock()
     {
         UnlockBar w;
-        w.setRelockMs(50);
+        w.set_relock_ms(50);
         w.resize(400, 40);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
 
         QSignalSpy locked_spy(&w, &UnlockBar::locked);
-        dragTo(&w, 20, 400, 20);
-        QVERIFY(w.isUnlocked());
+        drag_to(&w, 20, 400, 20);
+        QVERIFY(w.is_unlocked());
 
-        QVERIFY(QTest::qWaitFor([&](){ return !w.isUnlocked(); }, 1000));
+        QVERIFY(QTest::qWaitFor([&](){ return !w.is_unlocked(); }, 1000));
         QCOMPARE(locked_spy.count(), 1);
     }
 
@@ -80,18 +80,18 @@ private slots:
     void unlocked_signal_single_fire()
     {
         UnlockBar w;
-        w.setRelockMs(0);
+        w.set_relock_ms(0);
         w.resize(400, 40);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
 
         QSignalSpy spy(&w, &UnlockBar::unlocked);
-        dragTo(&w, 20, 400, 20);
+        drag_to(&w, 20, 400, 20);
         QCOMPARE(spy.count(), 1);
 
         // Thumb is now at right end; pressing there and releasing at right
         // is still past threshold, but we're already unlocked.
-        dragTo(&w, 380, 400, 20);
+        drag_to(&w, 380, 400, 20);
         QCOMPARE(spy.count(), 1);
     }
 
@@ -100,17 +100,17 @@ private slots:
     void manual_relock_slot()
     {
         UnlockBar w;
-        w.setRelockMs(200); // long enough we can verify it doesn't fire twice
+        w.set_relock_ms(200); // long enough we can verify it doesn't fire twice
         w.resize(400, 40);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
 
         QSignalSpy locked_spy(&w, &UnlockBar::locked);
-        dragTo(&w, 20, 400, 20);
-        QVERIFY(w.isUnlocked());
+        drag_to(&w, 20, 400, 20);
+        QVERIFY(w.is_unlocked());
 
         w.relock();
-        QVERIFY(!w.isUnlocked());
+        QVERIFY(!w.is_unlocked());
         QCOMPARE(locked_spy.count(), 1);
 
         // Wait longer than the auto-relock window to make sure the pending

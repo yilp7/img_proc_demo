@@ -8,18 +8,14 @@ class UDPPTZ : public QObject, public IPTZController
 {
     Q_OBJECT
 public:
-    // Device-protocol variant. The 14-byte frame layout and op codes are
-    // shared across vendors, but a few details differ per device family.
-    // For now this controls how the scan-range bytes (8-9) are populated;
-    // the stop semantics are not yet protocol-gated (see ptz_stop).
+    // Device protocol variant. Frame layout and op codes are shared; the variant
+    // decides how the scan-range bytes (8-9) are filled and the TX cadence.
     enum Protocol {
-        PROTOCOL_500 = 500, // bytes 8-9 carry scan_range (0x00 unless SCAN
-                            // populates it); 20 ms TX cadence.
-        PROTOCOL_530 = 530, // bytes 8-9 always 0x7F7F regardless of op;
-                            // 10 ms TX cadence.
+        PROTOCOL_500 = 500, // bytes 8-9 carry scan_range; 20 ms TX cadence
+        PROTOCOL_530 = 530, // bytes 8-9 always 0x7F7F; 10 ms TX cadence
     };
 
-    enum OPERATION {
+    enum Operation {
         // PTZ operations
         STOP            = 0x00,
         STANDBY         = 0x01,
@@ -73,12 +69,13 @@ public:
     void set_target(QHostAddress target, quint16 port);
     void set_listen(QHostAddress listen, quint16 port);
     void set_protocol(Protocol p);
-    Protocol get_protocol() const { return protocol; }
-    bool is_connected() const {
-        return connected && udp_socket != nullptr;
+    Protocol get_protocol() const { return m_protocol; }
+    bool is_connected() const
+    {
+        return m_connected && m_udp_socket != nullptr;
         // TODO: Implement real-time connection check based on received data
         // qint64 current_time = QDateTime::currentMSecsSinceEpoch();
-        // return connected && (current_time - last_received_time) < CONNECTION_TIMEOUT_MS;
+        // return m_connected && (current_time - m_last_received_time) < CONNECTION_TIMEOUT_MS;
     }
     void update_timer_interval(uint interval = 0);
 
@@ -91,10 +88,10 @@ public:
     void ptz_set_angle_h(float h) override;
     void ptz_set_angle_v(float v) override;
     void ptz_follow(float h, float v);
-    float ptz_get_angle_h() const override { return horizontal_angle; }
-    float ptz_get_angle_v() const override { return vertical_angle; }
+    float ptz_get_angle_h() const override { return m_horizontal_angle; }
+    float ptz_get_angle_v() const override { return m_vertical_angle; }
     bool ptz_is_connected() const override { return is_connected(); }
-    QObject* ptz_qobject() override { return this; }
+    QObject *ptz_qobject() override { return this; }
     void communicate(QByteArray write, uint read_size = 0, uint read_timeout = 40, bool heartbeat = false);
 
 public slots:
@@ -113,7 +110,7 @@ signals:
     void disconnect_from();
     void transmit(qint32 param);
     void control(qint32 param, float val);
-    void angle_updated(float _h, float _v);
+    void angle_updated(float h, float v);
     void status_updated(qint32 status);
     void connection_status_changed(bool connected);
 
@@ -127,41 +124,41 @@ private:
     void dispatch_manual_velocity(float h_vel, float v_vel, Qt::ConnectionType connection);
     void dispatch_follow_target(float h, float v, Qt::ConnectionType connection);
     void dispatch_angle_target(float h, float v, Qt::ConnectionType connection);
-    void set_velocities(float h_vel, float v_vel) { horizontal_velocity = h_vel; vertical_velocity = v_vel; }
+    void set_velocities(float h_vel, float v_vel) { m_horizontal_velocity = h_vel; m_vertical_velocity = v_vel; }
 
 private:
-    QUdpSocket *udp_socket;
-    QHostAddress target_ip;
-    quint16 target_port;
-    QHostAddress local_ip;
-    quint16 local_port;
+    QUdpSocket *m_udp_socket;
+    QHostAddress m_target_ip;
+    quint16 m_target_port;
+    QHostAddress m_local_ip;
+    quint16 m_local_port;
 
-    bool connected;
-    QMutex socket_mutex;
-    QMutex retrieve_mutex;
+    bool m_connected;
+    QMutex m_socket_mutex;
+    QMutex m_retrieve_mutex;
 
-    QTimer *timer_tx;
-    QTimer *timer_rx;
+    QTimer *m_timer_tx;
+    QTimer *m_timer_rx;
 
-    qint32 current_operation;
-    float horizontal_angle;        // Current angle reported by device
-    float vertical_angle;          // Current angle reported by device
-    float target_horizontal_angle; // Target angle set by user
-    float target_vertical_angle;   // Target angle set by user
-    float horizontal_velocity;
-    float vertical_velocity;
-    float scan_range_horizontal;
-    float scan_range_vertical;
-    qint32 servo_status;
+    qint32 m_current_operation;
+    float m_horizontal_angle;        // Current angle reported by device
+    float m_vertical_angle;          // Current angle reported by device
+    float m_target_horizontal_angle; // Target angle set by user
+    float m_target_vertical_angle;   // Target angle set by user
+    float m_horizontal_velocity;
+    float m_vertical_velocity;
+    float m_scan_range_horizontal;
+    float m_scan_range_vertical;
+    qint32 m_servo_status;
 
-    QByteArray received;
-    QByteArray last_read;
+    QByteArray m_received;
+    QByteArray m_last_read;
 
     // Connection monitoring
-    qint64 last_received_time;
+    qint64 m_last_received_time;
     static const qint64 CONNECTION_TIMEOUT_MS = 3000; // 3 seconds timeout
 
-    Protocol protocol;
+    Protocol m_protocol;
 };
 
 #endif // UDPPTZ_H

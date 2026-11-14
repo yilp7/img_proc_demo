@@ -17,7 +17,8 @@ struct PresetData{
     double angle_h, angle_v;
     uint ptz_speed;
 
-    friend QDebug& operator << (QDebug& qd, const PresetData& pd) {
+    friend QDebug &operator << (QDebug &qd, const PresetData &pd)
+    {
         qd << "\"PRESET DATA for " << QString::fromUtf8(pd.name) << ": '";
         qd << "PRF: " << pd.rep_freq << ", laser width: " << pd.laser_width;
         qd << ", delay A: " << pd.delay_a << ", gatewidth A: " << pd.gw_a;
@@ -88,16 +89,16 @@ private slots:
     void preset_name_updated(QStandardItem *item);
 
 public:
-    int total;
-    int current_selection;
+    int m_total;
+    int m_current_selection;
 
 private:
-    PresetTableView    *preset_table;
-    QStandardItemModel *preset_model;
-    QButtonGroup       *apply_btn_grp;
-    QButtonGroup       *save_btn_grp;
+    PresetTableView    *m_preset_table;
+    QStandardItemModel *m_preset_model;
+    QButtonGroup       *m_apply_btn_grp;
+    QButtonGroup       *m_save_btn_grp;
 
-    nlohmann::json presets;
+    nlohmann::json m_presets;
 };
 
 #endif // PRESETPANEL_H

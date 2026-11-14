@@ -141,29 +141,23 @@ void ImageIO::save_image_bmp(cv::Mat img, QString filename, QString note)
             fwrite(&padding, 1, padding_size, f);
         }
 
-        // If note is provided, append the custom block immediately
         if (!note.isEmpty()) {
             // Custom block format
             const char magic[] = "NOTE";
             fwrite(magic, 1, 4, f);
 
-            // Get current timestamp
             uint64_t timestamp = QDateTime::currentDateTime().toMSecsSinceEpoch();
 
-            // Convert QString to UTF-8 bytes
-            QByteArray noteBytes = note.toUtf8();
-            uint32_t totalSize = sizeof(timestamp) + noteBytes.size();
-            fwrite(&totalSize, 4, 1, f);
+            QByteArray note_bytes = note.toUtf8();
+            uint32_t total_size = sizeof(timestamp) + note_bytes.size();
+            fwrite(&total_size, 4, 1, f);
 
-            // Write timestamp
             fwrite(&timestamp, sizeof(timestamp), 1, f);
 
-            // Write the note content
-            fwrite(noteBytes.constData(), 1, noteBytes.size(), f);
+            fwrite(note_bytes.constData(), 1, note_bytes.size(), f);
 
-            // Write end marker
-            const char endMarker[] = "END\0";
-            fwrite(endMarker, 1, 4, f);
+            const char end_marker[] = "END\0";
+            fwrite(end_marker, 1, 4, f);
         }
 
         fclose(f);
@@ -395,13 +389,10 @@ bool ImageIO::load_image_tif(cv::Mat &img, QString filename)
     fread(&num_de, 2, 1, f);
     if (is_big_endian) num_de = qFromBigEndian(num_de);
     for (uint16_t c = 0; c < num_de; c++) {
-        // get tag #
         fread(&tag_number, 2, 1, f);
         if (is_big_endian) tag_number = qFromBigEndian(tag_number);
-        // get tag type
         fread(&tag_data_type, 2, 1, f);
         if (is_big_endian) tag_data_type = qFromBigEndian(tag_data_type);
-        // get tag data num
         fread(&tag_data_num, 4, 1, f);
         if (is_big_endian) tag_data_num = qFromBigEndian(tag_data_num);
         // get tag data (or ptr offset)

@@ -21,23 +21,23 @@ public:
     explicit PanoramaPanel(QWidget *parent = nullptr);
 
 public slots:
-    void clearPreview();
-    void setPreviewPixmap(const QPixmap &pixmap);
-    void setGenerating();
-    void setGenerated();
+    void clear_preview();
+    void set_preview_pixmap(const QPixmap &pixmap);
+    void set_generating();
+    void set_generated();
 
 signals:
-    void resizedByUser();
-    void resetRequested();
+    void resized_by_user();
+    void reset_requested();
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
 
 private:
-    QPoint eventPointInViewport(QObject *obj, const QPoint &pos) const;
-    void resetView();
-    void updatePreviewPixmap();
+    QPoint event_point_in_viewport(QObject *obj, const QPoint &pos) const;
+    void reset_view();
+    void update_preview_pixmap();
 
     QScrollArea *m_scroll;
     QLabel      *m_preview;

@@ -3,12 +3,12 @@
 
 DeveloperOptions::DeveloperOptions(QWidget *parent) :
     QDialog(parent),
-    ui(new Ui::DeveloperOptions)
+    m_ui(new Ui::DeveloperOptions)
 {
-    ui->setupUi(this);
+    m_ui->setupUi(this);
 }
 
 DeveloperOptions::~DeveloperOptions()
 {
-    delete ui;
+    delete m_ui;
 }

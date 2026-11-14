@@ -12,12 +12,12 @@ double clamp(double value, double limit)
 
 } // namespace
 
-PtzFollowController::PtzFollowController(QObject *parent)
-    : QObject(parent)
+PtzFollowController::PtzFollowController(QObject *parent) :
+    QObject(parent)
 {
 }
 
-void PtzFollowController::setSettings(const Config::PidFollowSettings &settings)
+void PtzFollowController::set_settings(const Config::PidFollowSettings &settings)
 {
     m_settings = settings;
     // Integral is in output units, so a changed limit must be applied to what
@@ -26,22 +26,22 @@ void PtzFollowController::setSettings(const Config::PidFollowSettings &settings)
     m_axis_v.integral = clamp(m_axis_v.integral, m_settings.integral_limit_deg_s);
 }
 
-void PtzFollowController::engage(int trackId)
+void PtzFollowController::engage(int track_id)
 {
     // Always resets, including when re-engaging the same id: this is only
     // called by explicit operator designation, and carrying the previous
     // target's integral into a fresh one would kick the turret.
-    m_track_id = trackId;
-    resetState();
+    m_track_id = track_id;
+    reset_state();
 }
 
 void PtzFollowController::disengage()
 {
-    m_track_id = Disengaged;
-    resetState();
+    m_track_id = DISENGAGED;
+    reset_state();
 }
 
-void PtzFollowController::setPaused(bool paused)
+void PtzFollowController::set_paused(bool paused)
 {
     if (paused == m_paused) return;
     m_paused = paused;
@@ -54,7 +54,7 @@ void PtzFollowController::setPaused(bool paused)
     }
 }
 
-void PtzFollowController::resetState()
+void PtzFollowController::reset_state()
 {
     m_axis_h = Axis();
     m_axis_v = Axis();
@@ -74,7 +74,8 @@ double PtzFollowController::step(Axis &axis, double error, double dt,
     if (std::fabs(error) < m_settings.deadband_deg) {
         error = 0.0;
         axis.integral *= 0.9;
-    } else {
+    }
+    else {
         axis.integral += error * dt * ki;
         axis.integral = clamp(axis.integral, m_settings.integral_limit_deg_s);
     }
@@ -82,46 +83,45 @@ double PtzFollowController::step(Axis &axis, double error, double dt,
     double derivative_term = 0.0;
     if (kd != 0.0 && m_settings.derivative_filter > 0.0) {
         if (axis.primed && dt > 0.0) {
-            const double raw = (error - axis.previousError) / dt;
+            const double raw = (error - axis.previous_error) / dt;
             // First-order low-pass: a raw derivative on a jittering centroid at
             // this sample rate is mostly noise.
             axis.derivative += m_settings.derivative_filter * (raw - axis.derivative);
             derivative_term = kd * axis.derivative;
         }
     }
-    axis.previousError = error;
+    axis.previous_error = error;
     axis.primed = true;
 
     return kp * error + axis.integral + derivative_term;
 }
 
-PtzFollowController::Output PtzFollowController::update(double errorHorizontalDeg,
-                                                        double errorVerticalDeg)
+PtzFollowController::Output PtzFollowController::update(double error_horizontal_deg,
+                                                        double error_vertical_deg)
 {
     Output out;
-    if (!engaged() || m_paused) {
-        emit telemetry(errorHorizontalDeg, errorVerticalDeg, 0.0, 0.0, false);
+    if (!is_engaged() || m_paused) {
+        emit telemetry(error_horizontal_deg, error_vertical_deg, 0.0, 0.0, false);
         return out;
     }
 
     // Nominal detection interval; used for the first sample and whenever the
     // measured interval is implausible.
-    constexpr double NominalDt = 0.1;
-    double dt = NominalDt;
+    constexpr double NOMINAL_DT = 0.1;
+    double dt = NOMINAL_DT;
     if (m_elapsed.isValid()) {
         dt = m_elapsed.elapsed() / 1000.0;
-        if (dt <= 0.0 || dt > 1.0) dt = NominalDt;
+        if (dt <= 0.0 || dt > 1.0) dt = NOMINAL_DT;
     }
     m_elapsed.restart();
     m_missing.invalidate();
 
-    double error_h = errorHorizontalDeg;
-    double error_v = errorVerticalDeg;
+    double error_h = error_horizontal_deg;
+    double error_v = error_vertical_deg;
     if (m_settings.compensate_turret_motion) {
-        // The frame shows where the target was one interval ago, while the
-        // turret has been moving since. Removing the angle the turret covered
-        // over that interval closes the loop on target motion rather than on
-        // the turret chasing its own lag.
+        // The frame shows the target one interval ago while the turret kept moving.
+        // Removing the angle covered in that interval closes the loop on target motion,
+        // not on the turret's own lag.
         error_h -= m_last_output_h * dt;
         error_v -= m_last_output_v * dt;
     }
@@ -143,17 +143,17 @@ PtzFollowController::Output PtzFollowController::update(double errorHorizontalDe
     m_last_output_h = vh_clamped;
     m_last_output_v = vv_clamped;
 
-    out.horizontalVelocity = vh_clamped;
-    out.verticalVelocity = vv_clamped;
+    out.horizontal_velocity = vh_clamped;
+    out.vertical_velocity = vv_clamped;
     out.valid = true;
     emit telemetry(error_h, error_v, vh_clamped, vv_clamped, true);
     return out;
 }
 
-PtzFollowController::Output PtzFollowController::updateMissing()
+PtzFollowController::Output PtzFollowController::update_missing()
 {
     Output out;
-    if (!engaged() || m_paused) return out;
+    if (!is_engaged() || m_paused) return out;
 
     if (!m_missing.isValid()) m_missing.start();
     if (m_missing.elapsed() > m_settings.coast_ms) {
@@ -161,8 +161,8 @@ PtzFollowController::Output PtzFollowController::updateMissing()
         // MANUAL_SEARCH velocity is retransmitted by the TX timer, so simply
         // stopping would leave the turret slewing indefinitely.
         disengage();
-        out.horizontalVelocity = 0.0;
-        out.verticalVelocity = 0.0;
+        out.horizontal_velocity = 0.0;
+        out.vertical_velocity = 0.0;
         out.valid = true;
         emit telemetry(0.0, 0.0, 0.0, 0.0, false);
         return out;
@@ -170,8 +170,8 @@ PtzFollowController::Output PtzFollowController::updateMissing()
 
     // Short gap: hold the last command. The target is probably still moving as
     // it was, and re-commanding zero would jerk the turret on every dropout.
-    out.horizontalVelocity = m_last_output_h;
-    out.verticalVelocity = m_last_output_v;
+    out.horizontal_velocity = m_last_output_h;
+    out.vertical_velocity = m_last_output_v;
     out.valid = true;
     emit telemetry(m_last_error_h, m_last_error_v, m_last_output_h, m_last_output_v, true);
     return out;

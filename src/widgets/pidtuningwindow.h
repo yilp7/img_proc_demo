@@ -24,21 +24,21 @@ class PidTuningWindow : public QDialog
 public:
     PidTuningWindow(Config *config, PtzFollowController *controller, QWidget *parent = nullptr);
 
-    void toggleVisible();
+    void toggle_visible();
 
 protected:
     void changeEvent(QEvent *event) override;
 
 private slots:
-    void applyToController();
-    void saveToConfig();
-    void reloadFromConfig();
-    void showTelemetry(double errorH, double errorV, double outputH, double outputV, bool active);
+    void apply_to_controller();
+    void save_to_config();
+    void reload_from_config();
+    void show_telemetry(double error_h, double error_v, double output_h, double output_v, bool active);
 
 private:
-    void setupUi();
-    void retranslateUi();
-    Config::PidFollowSettings settingsFromUi() const;
+    void setup_ui();
+    void retranslate_ui();
+    Config::PidFollowSettings settings_from_ui() const;
 
     Config *m_config = nullptr;
     PtzFollowController *m_controller = nullptr;

@@ -5,9 +5,9 @@
 #include <QFile>
 #include <sstream>
 
-YoloDetector::YoloDetector()
-    : m_core(nullptr)
-    , m_initialized(false)
+YoloDetector::YoloDetector() :
+    m_core(nullptr),
+    m_initialized(false)
 {
 }
 
@@ -19,7 +19,7 @@ YoloDetector::~YoloDetector()
     }
 }
 
-bool YoloDetector::initialize(const QString& config_ini_path, const QString& model_path, const QString& classes_file)
+bool YoloDetector::initialize(const QString &config_ini_path, const QString &model_path, const QString &classes_file)
 {
     if (m_initialized) {
         return true;
@@ -43,19 +43,17 @@ bool YoloDetector::initialize(const QString& config_ini_path, const QString& mod
         }
     }
 
-    // Check if model file exists
     if (!QFileInfo::exists(model_path)) {
         qWarning() << "YoloDetector: Model file not found:" << model_path;
         return false;
     }
 
     // Load class names (QFile path so non-ASCII works on Windows).
-    if (!loadClassNames(classes_file)) {
+    if (!load_class_names(classes_file)) {
         qWarning() << "YoloDetector: Failed to load class names from" << classes_file;
         // Continue without class names - not fatal
     }
 
-    // Initialize DCSP_CORE
     m_core = new DCSP_CORE();
 
     DCSP_INIT_PARAM init_param;
@@ -68,7 +66,7 @@ bool YoloDetector::initialize(const QString& config_ini_path, const QString& mod
     init_param.LogSeverityLevel = 3;  // Warning level
     init_param.IntraOpNumThreads = 1;
 
-    char* err = m_core->CreateSession(init_param);
+    char *err = m_core->CreateSession(init_param);
     if (err != RET_OK) {
         qWarning() << "YoloDetector: Failed to create ONNX session:" << err;
         delete m_core;
@@ -76,7 +74,6 @@ bool YoloDetector::initialize(const QString& config_ini_path, const QString& mod
         return false;
     }
 
-    // Set class names in core
     m_core->classes = m_class_names;
 
     m_initialized = true;
@@ -84,7 +81,7 @@ bool YoloDetector::initialize(const QString& config_ini_path, const QString& mod
     return true;
 }
 
-bool YoloDetector::run(const cv::Mat& image, std::vector<YoloResult>& results)
+bool YoloDetector::run(const cv::Mat &image, std::vector<YoloResult> &results)
 {
     results.clear();
 
@@ -102,20 +99,18 @@ bool YoloDetector::run(const cv::Mat& image, std::vector<YoloResult>& results)
         // Create a copy to avoid modifying original
         cv::Mat image_copy = image.clone();
 
-        // Run inference
         std::vector<DCSP_RESULT> dcsp_results;
-        char* err = m_core->RunSession(image_copy, dcsp_results);
+        char *err = m_core->RunSession(image_copy, dcsp_results);
 
         if (err != RET_OK) {
             qWarning() << "YoloDetector: Inference failed:" << err;
             return false;
         }
 
-        // Convert DCSP_RESULT to YoloResult
         results.reserve(dcsp_results.size());
-        for (const auto& r : dcsp_results) {
+        for (const auto &r : dcsp_results) {
             YoloResult yr;
-            yr.classId = r.classId;
+            yr.class_id = r.classId;
             yr.confidence = r.confidence;
             yr.box = r.box;
             results.push_back(yr);
@@ -123,13 +118,13 @@ bool YoloDetector::run(const cv::Mat& image, std::vector<YoloResult>& results)
 
         return true;
     }
-    catch (const std::exception& e) {
+    catch (const std::exception &e) {
         qWarning() << "YoloDetector: Exception during inference:" << e.what();
         return false;
     }
 }
 
-bool YoloDetector::loadClassNames(const QString& filepath)
+bool YoloDetector::load_class_names(const QString &filepath)
 {
     QFile file(filepath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {

@@ -23,51 +23,51 @@ class TargetClassWindow : public QDialog
 public:
     explicit TargetClassWindow(Config *config, QWidget *parent = nullptr);
 
-    void toggleVisible();
+    void toggle_visible();
 
-    const TargetClassTable &table() const { return m_table; }
+    const TargetClassTable &get_table() const { return m_table; }
     // Operator-entered zoom, used to interpolate the lens FOV. The device
     // reports no zoom position, so this is the only source.
-    double currentZoom() const;
+    double get_current_zoom() const;
     // Whether the estimated range is appended to YOLO labels on the video.
-    bool showRangeOnLabels() const;
+    bool get_show_range_on_labels() const;
 
 signals:
-    void tableChanged();
-    void currentZoomChanged(double zoom);
-    void showRangeOnLabelsChanged(bool enabled);
+    void table_changed();
+    void current_zoom_changed(double zoom);
+    void show_range_on_labels_changed(bool enabled);
 
 protected:
     void changeEvent(QEvent *event) override;
 
 private slots:
-    void reloadFromDisk();
-    void saveToDisk();
-    void modelChanged();
+    void reload_from_disk();
+    void save_to_disk();
+    void model_changed();
 
 private:
-    void setupUi();
-    void retranslateUi();
-    void populateTable();
-    void commitTableToModel();
-    QString tableFilePath() const;
-    QStringList classNamesForModel(const QString &model) const;
-    void setStatus(const QString &message, bool error = false);
+    void setup_ui();
+    void retranslate_ui();
+    void populate_table();
+    void commit_table_to_model();
+    QString table_file_path() const;
+    QStringList class_names_for_model(const QString &model) const;
+    void set_status(const QString &message, bool error = false);
 
     Config *m_config = nullptr;
     TargetClassTable m_table;
     QString m_current_model;
 
-    QLabel *m_modelLabel = nullptr;
-    QComboBox *m_modelCombo = nullptr;
-    QLabel *m_zoomLabel = nullptr;
-    QDoubleSpinBox *m_zoomSpin = nullptr;
-    QCheckBox *m_showRangeCheck = nullptr;
-    QLabel *m_sourceLabel = nullptr;
+    QLabel *m_model_label = nullptr;
+    QComboBox *m_model_combo = nullptr;
+    QLabel *m_zoom_label = nullptr;
+    QDoubleSpinBox *m_zoom_spin = nullptr;
+    QCheckBox *m_show_range_check = nullptr;
+    QLabel *m_source_label = nullptr;
     QTableWidget *m_table_widget = nullptr;
-    QPushButton *m_reloadButton = nullptr;
-    QPushButton *m_saveButton = nullptr;
-    QLabel *m_statusLabel = nullptr;
+    QPushButton *m_reload_button = nullptr;
+    QPushButton *m_save_button = nullptr;
+    QLabel *m_status_label = nullptr;
 };
 
 #endif // TARGETCLASSWINDOW_H

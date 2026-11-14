@@ -8,39 +8,39 @@
 
 #include <exception>
 
-ThemeManager& ThemeManager::instance()
+ThemeManager &ThemeManager::instance()
 {
     static ThemeManager manager;
     return manager;
 }
 
-QByteArray ThemeManager::buildStyleSheet(const QString &theme_name, const QString &color_mode) const
+QByteArray ThemeManager::build_style_sheet(const QString &theme_name, const QString &color_mode) const
 {
-    const QString mode_name = normalizedColorMode(color_mode);
-    QByteArray style = readResource(QString(":/style/style_%1.qss").arg(mode_name));
+    const QString mode_name = normalized_color_mode(color_mode);
+    QByteArray style = read_resource(QString(":/style/style_%1.qss").arg(mode_name));
     if (style.isEmpty()) {
         return style;
     }
 
     Theme theme;
-    if (!loadTheme(theme_name, mode_name, &theme)) {
+    if (!load_theme(theme_name, mode_name, &theme)) {
         qWarning() << "Using raw QSS; failed to load theme tokens" << theme_name << mode_name;
         return style;
     }
 
-    return applyTokens(style, theme);
+    return apply_tokens(style, theme);
 }
 
-bool ThemeManager::loadTheme(const QString &theme_name, const QString &color_mode, Theme *theme) const
+bool ThemeManager::load_theme(const QString &theme_name, const QString &color_mode, Theme *theme) const
 {
     if (!theme) return false;
 
     QString safe_name = theme_name.trimmed();
     if (safe_name.isEmpty() || safe_name == "default") safe_name = "gruvbox";
-    const QString mode_name = normalizedColorMode(color_mode);
-    QByteArray bytes = readResource(QString(":/themes/%1/%2.json").arg(safe_name, mode_name));
+    const QString mode_name = normalized_color_mode(color_mode);
+    QByteArray bytes = read_resource(QString(":/themes/%1/%2.json").arg(safe_name, mode_name));
     if (bytes.isEmpty() && safe_name != "gruvbox") {
-        bytes = readResource(QString(":/themes/gruvbox/%1.json").arg(mode_name));
+        bytes = read_resource(QString(":/themes/gruvbox/%1.json").arg(mode_name));
     }
     if (bytes.isEmpty()) return false;
 
@@ -56,16 +56,18 @@ bool ThemeManager::loadTheme(const QString &theme_name, const QString &color_mod
                     ? QString::fromStdString(root["name"].get<std::string>())
                     : safe_name;
         if (root.contains("color_mode") && root["color_mode"].is_string()) {
-            loaded.color_mode = normalizedColorMode(QString::fromStdString(root["color_mode"].get<std::string>()));
-        } else if (root.contains("mode") && root["mode"].is_string()) {
-            loaded.color_mode = normalizedColorMode(QString::fromStdString(root["mode"].get<std::string>()));
-        } else {
+            loaded.color_mode = normalized_color_mode(QString::fromStdString(root["color_mode"].get<std::string>()));
+        }
+        else if (root.contains("mode") && root["mode"].is_string()) {
+            loaded.color_mode = normalized_color_mode(QString::fromStdString(root["mode"].get<std::string>()));
+        }
+        else {
             loaded.color_mode = mode_name;
         }
 
         for (auto it = tokens->begin(); it != tokens->end(); ++it) {
             if (!it.value().is_string()) continue;
-            loaded.tokens.insert(normalizedTokenName(QString::fromStdString(it.key())),
+            loaded.tokens.insert(normalized_token_name(QString::fromStdString(it.key())),
                                  QString::fromStdString(it.value().get<std::string>()));
         }
 
@@ -77,7 +79,7 @@ bool ThemeManager::loadTheme(const QString &theme_name, const QString &color_mod
     }
 }
 
-QStringList ThemeManager::availableThemes() const
+QStringList ThemeManager::available_themes() const
 {
     QStringList themes = QDir(":/themes").entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
     if (!themes.contains("gruvbox")) {
@@ -86,20 +88,20 @@ QStringList ThemeManager::availableThemes() const
     return themes;
 }
 
-bool ThemeManager::setCurrentTheme(const QString &theme_name, const QString &color_mode)
+bool ThemeManager::set_current_theme(const QString &theme_name, const QString &color_mode)
 {
     Theme loaded;
-    if (!loadTheme(theme_name, color_mode, &loaded)) return false;
+    if (!load_theme(theme_name, color_mode, &loaded)) return false;
     m_current = loaded;
     return true;
 }
 
 QString ThemeManager::token(const QString &name, const QString &fallback) const
 {
-    return m_current.tokens.value(normalizedTokenName(name), fallback);
+    return m_current.tokens.value(normalized_token_name(name), fallback);
 }
 
-QByteArray ThemeManager::readResource(const QString &path) const
+QByteArray ThemeManager::read_resource(const QString &path) const
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
@@ -109,7 +111,7 @@ QByteArray ThemeManager::readResource(const QString &path) const
     return file.readAll();
 }
 
-QByteArray ThemeManager::applyTokens(QByteArray style, const Theme &theme) const
+QByteArray ThemeManager::apply_tokens(QByteArray style, const Theme &theme) const
 {
     for (auto it = theme.tokens.constBegin(); it != theme.tokens.constEnd(); ++it) {
         const QByteArray key = it.key().toUtf8();
@@ -124,12 +126,12 @@ QByteArray ThemeManager::applyTokens(QByteArray style, const Theme &theme) const
     return style;
 }
 
-QString ThemeManager::normalizedColorMode(const QString &color_mode) const
+QString ThemeManager::normalized_color_mode(const QString &color_mode) const
 {
     return color_mode.compare("light", Qt::CaseInsensitive) == 0 ? QString("light") : QString("dark");
 }
 
-QString ThemeManager::normalizedTokenName(const QString &name) const
+QString ThemeManager::normalized_token_name(const QString &name) const
 {
     QString normalized = name.trimmed();
     while (normalized.startsWith("--")) {

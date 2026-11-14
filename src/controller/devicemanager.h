@@ -31,19 +31,18 @@ public:
     // Initialize port objects, threads, and internal signal connections (no UI)
     void init();
 
-    // Accessors for other controllers
-    TCU*            tcu()               { return p_tcu; }
-    Lens*           lens()              { return p_lens; }
-    Laser*          laser()             { return p_laser; }
-    PTZ*            ptz()               { return p_ptz; }
-    RangeFinder*    rf()                { return p_rf; }
-    USBCAN*         usbcan()            { return p_usbcan; }
-    UDPPTZ*         udpptz()            { return p_udpptz; }
-    IPTZController* active_ptz_ctrl()   { return active_ptz; }
+    TCU            *get_tcu()               { return m_p_tcu; }
+    Lens           *get_lens()              { return m_p_lens; }
+    Laser          *get_laser()             { return m_p_laser; }
+    PTZ            *get_ptz()               { return m_p_ptz; }
+    RangeFinder    *get_rf()                { return m_p_rf; }
+    USBCAN         *get_usbcan()            { return m_p_usbcan; }
+    UDPPTZ         *get_udpptz()            { return m_p_udpptz; }
+    IPTZController *get_active_ptz_ctrl()   { return m_active_ptz; }
 
-    QSerialPort*    serial(int idx)     { return serial_port[idx]; }
-    bool            serial_connected(int idx) const { return serial_port_connected[idx]; }
-    QTcpSocket*     tcp(int idx) { return tcp_port[idx]; }
+    QSerialPort    *get_serial(int idx)     { return m_serial_port[idx]; }
+    bool            is_serial_connected(int idx) const { return m_serial_port_connected[idx]; }
+    QTcpSocket     *get_tcp(int idx) { return m_tcp_port[idx]; }
 
     // Port management
     void connect_port(int port_idx, QString port_text);
@@ -65,34 +64,31 @@ public:
     void ptz_follow_offset(float h, float v);
     float to_display_ptz_angle_h(float device_angle) const;
     float to_device_ptz_angle_h(float display_angle) const;
-    float get_angle_h() const { return angle_h.load(); }
-    float get_angle_v() const { return angle_v.load(); }
-    void set_angle_h(float h) { angle_h.store(h); }
-    void set_angle_v(float v) { angle_v.store(v); }
+    float get_angle_h() const { return m_angle_h.load(); }
+    float get_angle_v() const { return m_angle_v.load(); }
+    void set_angle_h(float h) { m_angle_h.store(h); }
+    void set_angle_v(float v) { m_angle_v.store(v); }
 
-    int get_ptz_speed() const { return ptz_speed; }
+    int get_ptz_speed() const { return m_ptz_speed; }
 
 public slots:
     // PTZ slots (connected via SIGNAL/SLOT)
-    void update_ptz_angle(float _h, float _v);
+    void update_ptz_angle(float h, float v);
     void update_ptz_params(qint32 ptz_param, double val);
     void ptz_button_pressed(int id);
     void ptz_button_released(int id);
-    // PTZ direction-pad STOP_BTN. UDPPTZ → STANDBY opcode (0x01), distinct
-    // from joystick-release which keeps MANUAL_SEARCH with zero velocity.
-    // Other PTZ types fall back to active_ptz->ptz_stop().
+    // Direction-pad STOP button. UDPPTZ sends STANDBY (0x01), unlike joystick release,
+    // which keeps MANUAL_SEARCH with zero velocity. Other PTZ types call ptz_stop().
     void ptz_stop_btn_clicked();
     void set_ptz_speed(int speed);
-    // Joystick path: independent pan/tilt speeds. For Pelco, emits SPEED_H
-    // and SPEED_V before the direction so the protocol's two speed bytes
-    // carry the actual joystick-projection components. For non-Pelco types
-    // that take a single speed, falls back to max(h, v).
+    // Joystick path with independent pan and tilt speeds. Pelco gets SPEED_H and SPEED_V
+    // before the direction so its two speed bytes carry them. Single-speed types use max(h, v).
     void ptz_move_hv(int id, int h_speed, int v_speed);
 
     // VID camera control slots
     void vid_camera_pressed(int operation);
     void vid_camera_released();
-    bool vid_camera_held() const { return vid_camera_held_flag.load(); }
+    bool is_vid_camera_held() const { return m_vid_camera_held_flag.load(); }
     void vid_defog_toggled(bool checked);
     void vid_ir_power_toggled(bool checked);
     void apply_vid_ir_power_state(bool checked);
@@ -147,39 +143,39 @@ signals:
     void get_lens_param_requested();
 
 private:
-    Config*         m_config;
+    Config         *m_config;
 
     // Port objects
-    TCU*            p_tcu;
-    Lens*           p_lens;
-    Laser*          p_laser;
-    PTZ*            p_ptz;
-    RangeFinder*    p_rf;
-    USBCAN*         p_usbcan;
-    UDPPTZ*         p_udpptz;
-    IPTZController* active_ptz;
+    TCU            *m_p_tcu;
+    Lens           *m_p_lens;
+    Laser          *m_p_laser;
+    PTZ            *m_p_ptz;
+    RangeFinder    *m_p_rf;
+    USBCAN         *m_p_usbcan;
+    UDPPTZ         *m_p_udpptz;
+    IPTZController *m_active_ptz;
 
     // Worker threads
-    QThread*        th_tcu;
-    QThread*        th_lens;
-    QThread*        th_laser;
-    QThread*        th_ptz;
-    QThread*        th_rf;
-    QThread*        th_usbcan;
-    QThread*        th_udpptz;
+    QThread        *m_th_tcu;
+    QThread        *m_th_lens;
+    QThread        *m_th_laser;
+    QThread        *m_th_ptz;
+    QThread        *m_th_rf;
+    QThread        *m_th_usbcan;
+    QThread        *m_th_udpptz;
 
     // Serial/TCP ports (legacy, partially used)
-    QSerialPort*    serial_port[5];
-    bool            serial_port_connected[5];
-    QTcpSocket*     tcp_port[5];
-    bool            use_tcp[5];
-    bool            share_serial_port;
+    QSerialPort    *m_serial_port[5];
+    bool            m_serial_port_connected[5];
+    QTcpSocket     *m_tcp_port[5];
+    bool            m_use_tcp[5];
+    bool            m_share_serial_port;
 
     // PTZ state
-    int             ptz_speed;
-    std::atomic<float> angle_h{0.0f};
-    std::atomic<float> angle_v{0.0f};
-    std::atomic<bool> vid_camera_held_flag{false};
+    int             m_ptz_speed;
+    std::atomic<float> m_angle_h{0.0f};
+    std::atomic<float> m_angle_v{0.0f};
+    std::atomic<bool> m_vid_camera_held_flag{false};
 };
 
 #endif // DEVICEMANAGER_H

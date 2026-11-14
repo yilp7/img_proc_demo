@@ -19,10 +19,10 @@ protected:
     void paintEvent(QPaintEvent *event);
 
 public:
-    bool   vertical;
-    int    interval;
-    QLabel *valueLabel;
-    QLabel *handleLabel;
+    bool   m_vertical;
+    int    m_interval;
+    QLabel *m_value_label;
+    QLabel *m_handle_label;
 
 };
 
@@ -37,13 +37,13 @@ private slots:
     void draw();
 
 private:
-    QPixmap source;
-    QSize   partition_size;
-    QTimer  t;
-    int     count;
+    QPixmap m_source;
+    QSize   m_partition_size;
+    QTimer  m_t;
+    int     m_count;
 
-    QPoint  curr_pos;
-    int     curr_idx;
+    QPoint  m_curr_pos;
+    int     m_curr_idx;
 };
 
 class Tools : public QRadioButton
@@ -71,11 +71,11 @@ public:
     void display_pos(QPoint p);
 
 public:
-    QPoint     pair;
+    QPoint     m_pair;
 
-    InfoLabel* set_name;
-    InfoLabel* coord_x;
-    InfoLabel* coord_y;
+    InfoLabel *m_set_name;
+    InfoLabel *m_coord_x;
+    InfoLabel *m_coord_y;
 };
 
 class IndexLabel : public QLabel
@@ -93,8 +93,8 @@ signals:
     void index_label_clicked(int pos_y);
 
 private:
-    int idx;
-    int pos_y;
+    int m_idx;
+    int m_pos_y;
 };
 
 class MiscSelection : public QComboBox

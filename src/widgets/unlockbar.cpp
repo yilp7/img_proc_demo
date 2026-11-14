@@ -6,12 +6,12 @@
 #include <QTimer>
 
 namespace {
-const int    kMarginH          = 4;
-const int    kMarginV          = 4;
-const int    kDefaultRelockMs  = 3000;
-const double kDefaultThreshold = 0.9;
+const int    MARGIN_H          = 4;
+const int    MARGIN_V          = 4;
+const int    DEFAULT_RELOCK_MS = 3000;
+const double DEFAULT_THRESHOLD = 0.9;
 
-bool updateColor(QColor &slot, const QColor &color)
+bool update_color(QColor &slot, const QColor &color)
 {
     if (slot == color) return false;
     slot = color;
@@ -21,8 +21,8 @@ bool updateColor(QColor &slot, const QColor &color)
 
 UnlockBar::UnlockBar(QWidget *parent) :
     QWidget(parent),
-    m_threshold(kDefaultThreshold),
-    m_relock_ms(kDefaultRelockMs),
+    m_threshold(DEFAULT_THRESHOLD),
+    m_relock_ms(DEFAULT_RELOCK_MS),
     m_unlocked(false),
     m_pressed(false),
     m_thumb_x(0),
@@ -42,97 +42,97 @@ UnlockBar::UnlockBar(QWidget *parent) :
     setCursor(Qt::PointingHandCursor);
 
     m_relock_timer->setSingleShot(true);
-    connect(m_relock_timer, &QTimer::timeout, this, &UnlockBar::onRelockTimeout);
+    connect(m_relock_timer, &QTimer::timeout, this, &UnlockBar::on_relock_timeout);
 }
 
-void UnlockBar::setUnlockThreshold(double fraction)
+void UnlockBar::set_unlock_threshold(double fraction)
 {
     if (fraction <= 0.0)  fraction = 0.01;
     if (fraction >  1.0)  fraction = 1.0;
     m_threshold = fraction;
 }
 
-void UnlockBar::setRelockMs(int ms)
+void UnlockBar::set_relock_ms(int ms)
 {
     if (ms < 0) ms = 0;
     m_relock_ms = ms;
     if (ms == 0) m_relock_timer->stop();
 }
 
-void UnlockBar::setTrackBackgroundColor(const QColor &color)
+void UnlockBar::set_track_background_color(const QColor &color)
 {
-    if (updateColor(m_track_bg_color, color)) update();
+    if (update_color(m_track_bg_color, color)) update();
 }
 
-void UnlockBar::setStripeColor(const QColor &color)
+void UnlockBar::set_stripe_color(const QColor &color)
 {
-    if (updateColor(m_stripe_color, color)) update();
+    if (update_color(m_stripe_color, color)) update();
 }
 
-void UnlockBar::setTrackEdgeColor(const QColor &color)
+void UnlockBar::set_track_edge_color(const QColor &color)
 {
-    if (updateColor(m_track_edge_color, color)) update();
+    if (update_color(m_track_edge_color, color)) update();
 }
 
-void UnlockBar::setThumbLockedColor(const QColor &color)
+void UnlockBar::set_thumb_locked_color(const QColor &color)
 {
-    if (updateColor(m_thumb_locked_color, color)) update();
+    if (update_color(m_thumb_locked_color, color)) update();
 }
 
-void UnlockBar::setThumbUnlockedColor(const QColor &color)
+void UnlockBar::set_thumb_unlocked_color(const QColor &color)
 {
-    if (updateColor(m_thumb_unlocked_color, color)) update();
+    if (update_color(m_thumb_unlocked_color, color)) update();
 }
 
-void UnlockBar::setThumbEdgeArmedColor(const QColor &color)
+void UnlockBar::set_thumb_edge_armed_color(const QColor &color)
 {
-    if (updateColor(m_thumb_edge_armed_color, color)) update();
+    if (update_color(m_thumb_edge_armed_color, color)) update();
 }
 
-void UnlockBar::setThumbEdgePassColor(const QColor &color)
+void UnlockBar::set_thumb_edge_pass_color(const QColor &color)
 {
-    if (updateColor(m_thumb_edge_pass_color, color)) update();
+    if (update_color(m_thumb_edge_pass_color, color)) update();
 }
 
-int UnlockBar::trackLeft() const  { return kMarginH; }
-int UnlockBar::trackRight() const { return width() - kMarginH; }
-int UnlockBar::trackWidth() const { return qMax(0, trackRight() - trackLeft()); }
+int UnlockBar::track_left() const  { return MARGIN_H; }
+int UnlockBar::track_right() const { return width() - MARGIN_H; }
+int UnlockBar::track_width() const { return qMax(0, track_right() - track_left()); }
 
-int UnlockBar::thumbWidth() const
+int UnlockBar::thumb_width() const
 {
     // Thumb width grows with height but never exceeds half the track.
-    const int h = height() - 2 * kMarginV;
-    return qMax(16, qMin(trackWidth() / 2, h));
+    const int h = height() - 2 * MARGIN_V;
+    return qMax(16, qMin(track_width() / 2, h));
 }
 
-void UnlockBar::setThumbX(int x)
+void UnlockBar::set_thumb_x(int x)
 {
-    const int min_x = trackLeft();
-    const int max_x = trackRight() - thumbWidth();
+    const int min_x = track_left();
+    const int max_x = track_right() - thumb_width();
     const int clamped = qBound(min_x, x, qMax(min_x, max_x));
     if (m_thumb_x == clamped) return;
     m_thumb_x = clamped;
     update();
 }
 
-void UnlockBar::springBack()
+void UnlockBar::spring_back()
 {
-    setThumbX(trackLeft());
+    set_thumb_x(track_left());
 }
 
 void UnlockBar::relock()
 {
     m_relock_timer->stop();
-    springBack();
+    spring_back();
     if (!m_unlocked) return;
     m_unlocked = false;
     emit locked();
 }
 
-void UnlockBar::onRelockTimeout()
+void UnlockBar::on_relock_timeout()
 {
     if (!m_unlocked) return;
-    springBack();
+    spring_back();
     m_unlocked = false;
     emit locked();
 }
@@ -142,8 +142,8 @@ void UnlockBar::paintEvent(QPaintEvent *)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
 
-    const QRect track_rect(trackLeft(), kMarginV,
-                           trackWidth(), height() - 2 * kMarginV);
+    const QRect track_rect(track_left(), MARGIN_V,
+                           track_width(), height() - 2 * MARGIN_V);
     if (track_rect.isEmpty()) return;
 
     // Striped background (bg-raised + warning-amber, 45° stripes).
@@ -172,8 +172,8 @@ void UnlockBar::paintEvent(QPaintEvent *)
 
     // Thumb is drawn last so the track border and stripes never sit on top
     // of the draggable handle.
-    const QRect thumb_rect(m_thumb_x, kMarginV,
-                           thumbWidth(), height() - 2 * kMarginV);
+    const QRect thumb_rect(m_thumb_x, MARGIN_V,
+                           thumb_width(), height() - 2 * MARGIN_V);
     p.setPen(QPen(m_unlocked ? m_thumb_edge_pass_color : m_thumb_edge_armed_color, 1.5));
     p.setBrush(m_unlocked ? m_thumb_unlocked_color : m_thumb_locked_color);
     p.drawRoundedRect(thumb_rect, 4, 4);
@@ -186,7 +186,7 @@ void UnlockBar::mousePressEvent(QMouseEvent *event)
         return;
     }
     const int x = event->pos().x();
-    const QRect thumb_rect(m_thumb_x, kMarginV, thumbWidth(), height() - 2 * kMarginV);
+    const QRect thumb_rect(m_thumb_x, MARGIN_V, thumb_width(), height() - 2 * MARGIN_V);
     if (thumb_rect.contains(event->pos())) {
         m_pressed = true;
         m_press_dx = x - m_thumb_x;
@@ -196,7 +196,7 @@ void UnlockBar::mousePressEvent(QMouseEvent *event)
 
 void UnlockBar::mouseMoveEvent(QMouseEvent *event)
 {
-    if (m_pressed) setThumbX(event->pos().x() - m_press_dx);
+    if (m_pressed) set_thumb_x(event->pos().x() - m_press_dx);
     QWidget::mouseMoveEvent(event);
 }
 
@@ -208,23 +208,23 @@ void UnlockBar::mouseReleaseEvent(QMouseEvent *event)
     }
     m_pressed = false;
 
-    const int tw = trackWidth();
-    const int max_travel = qMax(1, tw - thumbWidth());
-    const double frac = double(m_thumb_x - trackLeft()) / double(max_travel);
+    const int tw = track_width();
+    const int max_travel = qMax(1, tw - thumb_width());
+    const double frac = double(m_thumb_x - track_left()) / double(max_travel);
 
     if (frac >= m_threshold) {
-        // Unlock: snap thumb to right end, emit once, start relock timer
-        // (unless auto-relock is disabled or already unlocked — repeated
-        // unlock gestures while unlocked do not re-fire the signal).
-        setThumbX(trackLeft() + max_travel);
+        // Unlock: snap the thumb to the right end, emit once and start the relock timer.
+        // Unlock gestures while already unlocked do not emit again.
+        set_thumb_x(track_left() + max_travel);
         if (!m_unlocked) {
             m_unlocked = true;
             emit unlocked();
         }
         if (m_relock_ms > 0) m_relock_timer->start(m_relock_ms);
-    } else {
+    }
+    else {
         // Short drag: spring back, no signal.
-        springBack();
+        spring_back();
     }
 
     QWidget::mouseReleaseEvent(event);

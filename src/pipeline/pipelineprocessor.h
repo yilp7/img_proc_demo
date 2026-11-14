@@ -31,23 +31,23 @@ class ThreadPool;
 // Singletons + globally shared state. Things that don't belong to any one
 // stream or display.
 struct PipelineGlobals {
-    QMutex*           params_mutex      = nullptr;
-    ProcessingParams* processing_params = nullptr;  // UI snapshot
+    QMutex           *params_mutex      = nullptr;
+    ProcessingParams *processing_params = nullptr;  // UI snapshot
 
-    QMutex*                  roi_mutex = nullptr;
-    std::vector<cv::Rect>*   list_roi  = nullptr;
+    QMutex                  *roi_mutex = nullptr;
+    std::vector<cv::Rect>   *list_roi  = nullptr;
 
-    QMutex* yolo_init_mutex = nullptr;
+    QMutex *yolo_init_mutex = nullptr;
 
-    TCUController*   tcu_ctrl   = nullptr;
-    ScanController*  scan_ctrl  = nullptr;
-    DeviceManager*   device_mgr = nullptr;
-    AuxPanelManager* aux_panel  = nullptr;
+    TCUController   *tcu_ctrl   = nullptr;
+    ScanController  *scan_ctrl  = nullptr;
+    DeviceManager   *device_mgr = nullptr;
+    AuxPanelManager *aux_panel  = nullptr;
 
-    FloatingWindow* secondary_display = nullptr;
-    ScanParams*     scan_params       = nullptr;
-    QString*        save_location     = nullptr;
-    ThreadPool*     tp                = nullptr;
+    FloatingWindow *secondary_display = nullptr;
+    ScanParams     *scan_params       = nullptr;
+    QString        *save_location     = nullptr;
+    ThreadPool     *tp                = nullptr;
 };
 
 struct PanoramaCanvas {
@@ -84,12 +84,12 @@ class PipelineProcessor : public QObject
     Q_OBJECT
 
 public:
-    explicit PipelineProcessor(PipelineGlobals globals, QObject* parent = nullptr);
+    explicit PipelineProcessor(PipelineGlobals globals, QObject *parent = nullptr);
 
     // Main pipeline entry. Called by ConsumerThread::run() with this display's
     // slot and the router (needed for route snapshots). Returns when the slot's
     // consumer_run flag becomes false.
-    int run(DisplayRouter& router, DisplaySlot& display);
+    int run(DisplayRouter &router, DisplaySlot &display);
 
 signals:
     void packet_lost_updated(int packets_lost);
@@ -102,7 +102,7 @@ signals:
     void main_targets_updated(QVector<DetectedTarget> targets);
     // Follow gate state: box in widget coords for drawing, box and frame size
     // in source coords for the follow loop.
-    void follow_gate_updated(QRect displayBox, QRect sourceBox, QSize sourceSize, bool active);
+    void follow_gate_updated(QRect display_box, QRect source_box, QSize source_size, bool active);
     void finish_scan_signal();
     void save_screenshot_signal(QString path);
     void update_delay_in_thread();
@@ -111,15 +111,12 @@ signals:
     void task_queue_full();
     // state: 0=none (no model), 1=loaded (running), 2=failed (load error, no retry).
     void yolo_status_changed(int display_idx, int state);
-    // Edge-triggered: emitted when the routed stream's "is the source dead"
-    // state flips. dead=true when the queue went closed-and-empty; dead=false
-    // when frames flow again (route changed to a live stream, or producer
-    // resumed). Steady-state truth lives in DisplaySlot::source_dead.
+    // Edge-triggered: emitted when the routed stream's source dies (queue closed and
+    // empty) or frames flow again. The steady state is DisplaySlot::source_dead.
     void source_state_changed(int display_idx, bool dead);
-    // Auto-finalize handoff: emitted when the consumer thread releases a
-    // recorder (route change / source death). UserPanel's slot moves the
-    // temp file to save_location, flips DisplaySlot::record_raw/proc to
-    // false, and resets the button text. kind: 0 = raw, 1 = proc.
+    // Emitted when the consumer thread releases a recorder on a route change or source
+    // death. UserPanel moves the temp file to the save location and resets the button.
+    // kind: 0 = raw, 1 = proc.
     void recorder_finalized(int display_idx, int kind, QString temp_path);
 #ifdef LVTONG
     void set_model_list_enabled(bool enabled);
@@ -129,61 +126,60 @@ signals:
 private:
     PipelineGlobals m_g;
 
-    // Pipeline stage methods. Each reads from the passed StreamSlot (producer
-    // metadata + queues) and DisplaySlot (per-display pcfg + recorders +
-    // runtime caches) directly; no SharedState indirection.
-    bool acquire_frame(StreamSlot& stream, DisplaySlot& display,
-        const PipelineConfig& pcfg, cv::Mat& prev_img, bool& updated, int& packets_lost);
-    void preprocess_frame(StreamSlot& stream, DisplaySlot& display,
-        const ProcessingParams& params, const PipelineConfig& pcfg,
-        int& _w, int& _h);
-    std::vector<YoloResult> detect_yolo(StreamSlot& stream, DisplaySlot& display,
-        bool updated, const PipelineConfig& pcfg);
+    // Pipeline stages. Each reads the StreamSlot (producer metadata, queues) and the
+    // DisplaySlot (per-display config, recorders, runtime caches) it is given.
+    bool acquire_frame(StreamSlot &stream, DisplaySlot &display,
+        const PipelineConfig &pcfg, cv::Mat &prev_img, bool &updated, int &packets_lost);
+    void preprocess_frame(StreamSlot &stream, DisplaySlot &display,
+        const ProcessingParams &params, const PipelineConfig &pcfg,
+        int &w, int &h);
+    std::vector<YoloResult> detect_yolo(StreamSlot &stream, DisplaySlot &display,
+        bool updated, const PipelineConfig &pcfg);
 #ifdef LVTONG
-    double detect_fishnet(StreamSlot& stream, DisplaySlot& display,
-        const PipelineConfig& pcfg, cv::dnn::Net& net);
+    double detect_fishnet(StreamSlot &stream, DisplaySlot &display,
+        const PipelineConfig &pcfg, cv::dnn::Net &net);
 #endif
-    void frame_average_and_3d(StreamSlot& stream, DisplaySlot& display,
-        bool updated, const ProcessingParams& params, const PipelineConfig& pcfg,
-        int _w, int _h, int _pixel_depth, int& ww, int& hh);
-    void enhance_frame(StreamSlot& stream, DisplaySlot& display,
-        const ProcessingParams& params, const PipelineConfig& pcfg);
-    void render_and_display(StreamSlot& stream, DisplaySlot& display,
-        const ProcessingParams& params, const PipelineConfig& pcfg,
-        const std::vector<YoloResult>& yolo_results,
-        bool updated, double is_net, int ww, int hh, int _w, int _h, float weight,
-        const QString& info_tcu, const QString& info_time);
+    void frame_average_and_3d(StreamSlot &stream, DisplaySlot &display,
+        bool updated, const ProcessingParams &params, const PipelineConfig &pcfg,
+        int w, int h, int pixel_depth, int &ww, int &hh);
+    void enhance_frame(StreamSlot &stream, DisplaySlot &display,
+        const ProcessingParams &params, const PipelineConfig &pcfg);
+    void render_and_display(StreamSlot &stream, DisplaySlot &display,
+        const ProcessingParams &params, const PipelineConfig &pcfg,
+        const std::vector<YoloResult> &yolo_results,
+        bool updated, double is_net, int ww, int hh, int w, int h, float weight,
+        const QString &info_tcu, const QString &info_time);
     // Main-display-only. Walks main + alt1 in lockstep; needs router for alt1.
-    void advance_scan_main(DisplayRouter& router,
-        StreamSlot& main_stream, DisplaySlot& main_display,
-        bool updated, const PipelineConfig& pcfg,
-        int& scan_img_count,
-        QString& scan_save_path_a, QString& scan_save_path,
-        PanoramaCanvas& panorama_canvas,
-        qint64& panorama_position_started_ms);
-    void advance_panorama_scan_main(DisplayRouter& router,
-        StreamSlot& main_stream, DisplaySlot& main_display,
-        const PipelineConfig& pcfg,
-        int& scan_img_count,
-        QString& scan_save_path,
-        PanoramaCanvas& panorama_canvas,
-        qint64& panorama_position_started_ms);
-    void append_panorama_preview(DisplaySlot& main_display,
-        int ptz_idx, const std::vector<std::pair<float, float>>& route,
-        PanoramaCanvas& panorama_canvas);
-    void save_panorama_preview(const PanoramaCanvas& panorama_canvas,
-        const PipelineConfig& pcfg);
-    void record_frame(StreamSlot& stream, DisplaySlot& display,
-        bool updated, const ProcessingParams& params, const PipelineConfig& pcfg,
+    void advance_scan_main(DisplayRouter &router,
+        StreamSlot &main_stream, DisplaySlot &main_display,
+        bool updated, const PipelineConfig &pcfg,
+        int &scan_img_count,
+        QString &scan_save_path_a, QString &scan_save_path,
+        PanoramaCanvas &panorama_canvas,
+        qint64 &panorama_position_started_ms);
+    void advance_panorama_scan_main(DisplayRouter &router,
+        StreamSlot &main_stream, DisplaySlot &main_display,
+        const PipelineConfig &pcfg,
+        int &scan_img_count,
+        QString &scan_save_path,
+        PanoramaCanvas &panorama_canvas,
+        qint64 &panorama_position_started_ms);
+    void append_panorama_preview(DisplaySlot &main_display,
+        int ptz_idx, const std::vector<std::pair<float, float>> &route,
+        PanoramaCanvas &panorama_canvas);
+    void save_panorama_preview(const PanoramaCanvas &panorama_canvas,
+        const PipelineConfig &pcfg);
+    void record_frame(StreamSlot &stream, DisplaySlot &display,
+        bool updated, const ProcessingParams &params, const PipelineConfig &pcfg,
         double is_net,
-        const QString& info_tcu, const QString& info_time,
+        const QString &info_tcu, const QString &info_time,
         int ww, int hh, float weight);
-    void save_to_file(StreamSlot& stream, DisplaySlot& display,
-        bool save_result, const ProcessingParams& params, const PipelineConfig& pcfg);
-    void save_scan_img(DisplayRouter& router, StreamSlot& main_stream,
-        QString path, QString name, const PipelineConfig& pcfg);
-    void draw_yolo_boxes(DisplaySlot& display,
-        cv::Mat& image, const std::vector<YoloResult>& results);
+    void save_to_file(StreamSlot &stream, DisplaySlot &display,
+        bool save_result, const ProcessingParams &params, const PipelineConfig &pcfg);
+    void save_scan_img(DisplayRouter &router, StreamSlot &main_stream,
+        QString path, QString name, const PipelineConfig &pcfg);
+    void draw_yolo_boxes(DisplaySlot &display,
+        cv::Mat &image, const std::vector<YoloResult> &results);
 };
 
 #endif // PIPELINEPROCESSOR_H

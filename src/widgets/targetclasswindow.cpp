@@ -21,14 +21,14 @@
 
 namespace {
 
-constexpr int ColumnName = 0;
-constexpr int ColumnHeight = 1;
-constexpr int ColumnType = 2;
-constexpr int ColumnCategory = 3;
-constexpr int ColumnCount = 4;
+constexpr int COLUMN_NAME = 0;
+constexpr int COLUMN_HEIGHT = 1;
+constexpr int COLUMN_TYPE = 2;
+constexpr int COLUMN_CATEGORY = 3;
+constexpr int COLUMN_COUNT = 4;
 
 // 709 code tables. Values are the wire codes; text is for the operator.
-const QVector<QPair<int, QString>> &targetTypes()
+const QVector<QPair<int, QString>> &target_types()
 {
     static const QVector<QPair<int, QString>> types = {
         {0, QStringLiteral("0 unknown")}, {1, QStringLiteral("1 air")},
@@ -39,7 +39,7 @@ const QVector<QPair<int, QString>> &targetTypes()
     return types;
 }
 
-const QVector<QPair<int, QString>> &targetCategories()
+const QVector<QPair<int, QString>> &target_categories()
 {
     static const QVector<QPair<int, QString>> categories = {
         {0, QStringLiteral("0 unknown")}, {1, QStringLiteral("1 MJT")},
@@ -54,7 +54,7 @@ const QVector<QPair<int, QString>> &targetCategories()
     return categories;
 }
 
-QComboBox *makeCodeCombo(const QVector<QPair<int, QString>> &codes, int value)
+QComboBox *make_code_combo(const QVector<QPair<int, QString>> &codes, int value)
 {
     auto *combo = new QComboBox();
     for (const auto &code : codes) combo->addItem(code.second, code.first);
@@ -65,9 +65,9 @@ QComboBox *makeCodeCombo(const QVector<QPair<int, QString>> &codes, int value)
 
 } // namespace
 
-TargetClassWindow::TargetClassWindow(Config *config, QWidget *parent)
-    : QDialog(parent),
-      m_config(config)
+TargetClassWindow::TargetClassWindow(Config *config, QWidget *parent) :
+    QDialog(parent),
+    m_config(config)
 {
     setObjectName(QStringLiteral("TARGET_CLASS_WINDOW"));
     setModal(false);
@@ -76,14 +76,14 @@ TargetClassWindow::TargetClassWindow(Config *config, QWidget *parent)
     resize(620, 520);
     setMinimumSize(520, 380);
 
-    setupUi();
-    retranslateUi();
+    setup_ui();
+    retranslate_ui();
 
-    m_current_model = TargetClassTable::VisibleLight;
-    reloadFromDisk();
+    m_current_model = TargetClassTable::VISIBLE_LIGHT;
+    reload_from_disk();
 }
 
-void TargetClassWindow::setupUi()
+void TargetClassWindow::setup_ui()
 {
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(12, 12, 12, 12);
@@ -91,79 +91,79 @@ void TargetClassWindow::setupUi()
 
     auto *header = new QHBoxLayout();
     header->setSpacing(6);
-    m_modelLabel = new QLabel(this);
-    m_modelCombo = new QComboBox(this);
-    for (const QString &model : TargetClassTable::models()) m_modelCombo->addItem(model, model);
-    m_zoomLabel = new QLabel(this);
-    m_zoomSpin = new QDoubleSpinBox(this);
+    m_model_label = new QLabel(this);
+    m_model_combo = new QComboBox(this);
+    for (const QString &model : TargetClassTable::models()) m_model_combo->addItem(model, model);
+    m_zoom_label = new QLabel(this);
+    m_zoom_spin = new QDoubleSpinBox(this);
     // Lens range from panorama_optics.zoom_fov: 10 mm at 1x to 860 mm at 86x.
-    m_zoomSpin->setRange(1.0, 86.0);
-    m_zoomSpin->setDecimals(2);
-    m_zoomSpin->setSingleStep(1.0);
-    m_zoomSpin->setValue(1.0);
-    m_showRangeCheck = new QCheckBox(this);
-    m_sourceLabel = new QLabel(this);
-    m_sourceLabel->setWordWrap(true);
+    m_zoom_spin->setRange(1.0, 86.0);
+    m_zoom_spin->setDecimals(2);
+    m_zoom_spin->setSingleStep(1.0);
+    m_zoom_spin->setValue(1.0);
+    m_show_range_check = new QCheckBox(this);
+    m_source_label = new QLabel(this);
+    m_source_label->setWordWrap(true);
 
-    header->addWidget(m_modelLabel);
-    header->addWidget(m_modelCombo);
+    header->addWidget(m_model_label);
+    header->addWidget(m_model_combo);
     header->addSpacing(12);
-    header->addWidget(m_zoomLabel);
-    header->addWidget(m_zoomSpin);
+    header->addWidget(m_zoom_label);
+    header->addWidget(m_zoom_spin);
     header->addSpacing(12);
-    header->addWidget(m_showRangeCheck);
+    header->addWidget(m_show_range_check);
     header->addStretch(1);
     root->addLayout(header);
-    root->addWidget(m_sourceLabel);
+    root->addWidget(m_source_label);
 
     m_table_widget = new QTableWidget(this);
-    m_table_widget->setColumnCount(ColumnCount);
-    m_table_widget->horizontalHeader()->setSectionResizeMode(ColumnName, QHeaderView::Stretch);
-    m_table_widget->horizontalHeader()->setSectionResizeMode(ColumnHeight, QHeaderView::ResizeToContents);
-    m_table_widget->horizontalHeader()->setSectionResizeMode(ColumnType, QHeaderView::ResizeToContents);
-    m_table_widget->horizontalHeader()->setSectionResizeMode(ColumnCategory, QHeaderView::ResizeToContents);
+    m_table_widget->setColumnCount(COLUMN_COUNT);
+    m_table_widget->horizontalHeader()->setSectionResizeMode(COLUMN_NAME, QHeaderView::Stretch);
+    m_table_widget->horizontalHeader()->setSectionResizeMode(COLUMN_HEIGHT, QHeaderView::ResizeToContents);
+    m_table_widget->horizontalHeader()->setSectionResizeMode(COLUMN_TYPE, QHeaderView::ResizeToContents);
+    m_table_widget->horizontalHeader()->setSectionResizeMode(COLUMN_CATEGORY, QHeaderView::ResizeToContents);
     m_table_widget->verticalHeader()->setVisible(false);
     m_table_widget->setSelectionMode(QAbstractItemView::NoSelection);
     root->addWidget(m_table_widget, 1);
 
     auto *buttons = new QHBoxLayout();
-    m_statusLabel = new QLabel(this);
-    m_reloadButton = new QPushButton(this);
-    m_saveButton = new QPushButton(this);
-    buttons->addWidget(m_statusLabel, 1);
-    buttons->addWidget(m_reloadButton);
-    buttons->addWidget(m_saveButton);
+    m_status_label = new QLabel(this);
+    m_reload_button = new QPushButton(this);
+    m_save_button = new QPushButton(this);
+    buttons->addWidget(m_status_label, 1);
+    buttons->addWidget(m_reload_button);
+    buttons->addWidget(m_save_button);
     root->addLayout(buttons);
 
-    connect(m_modelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &TargetClassWindow::modelChanged);
-    connect(m_reloadButton, &QPushButton::clicked, this, &TargetClassWindow::reloadFromDisk);
-    connect(m_saveButton, &QPushButton::clicked, this, &TargetClassWindow::saveToDisk);
-    connect(m_zoomSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &TargetClassWindow::currentZoomChanged);
-    connect(m_showRangeCheck, &QCheckBox::toggled,
-            this, &TargetClassWindow::showRangeOnLabelsChanged);
+    connect(m_model_combo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &TargetClassWindow::model_changed);
+    connect(m_reload_button, &QPushButton::clicked, this, &TargetClassWindow::reload_from_disk);
+    connect(m_save_button, &QPushButton::clicked, this, &TargetClassWindow::save_to_disk);
+    connect(m_zoom_spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &TargetClassWindow::current_zoom_changed);
+    connect(m_show_range_check, &QCheckBox::toggled,
+            this, &TargetClassWindow::show_range_on_labels_changed);
 }
 
-void TargetClassWindow::retranslateUi()
+void TargetClassWindow::retranslate_ui()
 {
     setWindowTitle(tr("Target Classes"));
-    if (m_modelLabel) m_modelLabel->setText(tr("Model"));
-    if (m_zoomLabel) m_zoomLabel->setText(tr("Current zoom"));
-    if (m_showRangeCheck) m_showRangeCheck->setText(tr("Range on labels"));
-    if (m_reloadButton) m_reloadButton->setText(tr("Reload"));
-    if (m_saveButton) m_saveButton->setText(tr("Save"));
+    if (m_model_label) m_model_label->setText(tr("Model"));
+    if (m_zoom_label) m_zoom_label->setText(tr("Current zoom"));
+    if (m_show_range_check) m_show_range_check->setText(tr("Range on labels"));
+    if (m_reload_button) m_reload_button->setText(tr("Reload"));
+    if (m_save_button) m_save_button->setText(tr("Save"));
     if (m_table_widget) m_table_widget->setHorizontalHeaderLabels(
                 {tr("Class"), tr("Height (m)"), tr("709 type"), tr("709 category")});
 }
 
 void TargetClassWindow::changeEvent(QEvent *event)
 {
-    if (event->type() == QEvent::LanguageChange) retranslateUi();
+    if (event->type() == QEvent::LanguageChange) retranslate_ui();
     QDialog::changeEvent(event);
 }
 
-void TargetClassWindow::toggleVisible()
+void TargetClassWindow::toggle_visible()
 {
     if (isVisible()) {
         hide();
@@ -174,29 +174,29 @@ void TargetClassWindow::toggleVisible()
     activateWindow();
 }
 
-double TargetClassWindow::currentZoom() const
+double TargetClassWindow::get_current_zoom() const
 {
-    return m_zoomSpin ? m_zoomSpin->value() : 1.0;
+    return m_zoom_spin ? m_zoom_spin->value() : 1.0;
 }
 
-bool TargetClassWindow::showRangeOnLabels() const
+bool TargetClassWindow::get_show_range_on_labels() const
 {
-    return m_showRangeCheck && m_showRangeCheck->isChecked();
+    return m_show_range_check && m_show_range_check->isChecked();
 }
 
-QString TargetClassWindow::tableFilePath() const
+QString TargetClassWindow::table_file_path() const
 {
     return QCoreApplication::applicationDirPath() + QStringLiteral("/target_classes.conf");
 }
 
-QStringList TargetClassWindow::classNamesForModel(const QString &model) const
+QStringList TargetClassWindow::class_names_for_model(const QString &model) const
 {
     if (!m_config) return QStringList();
     const Config::YoloSettings &yolo = m_config->get_data().yolo;
     QString relative;
-    if (model == TargetClassTable::VisibleLight) relative = yolo.visible_classes_file;
-    else if (model == TargetClassTable::Thermal) relative = yolo.thermal_classes_file;
-    else if (model == TargetClassTable::Gated) relative = yolo.gated_classes_file;
+    if (model == TargetClassTable::VISIBLE_LIGHT) relative = yolo.visible_classes_file;
+    else if (model == TargetClassTable::THERMAL) relative = yolo.thermal_classes_file;
+    else if (model == TargetClassTable::GATED) relative = yolo.gated_classes_file;
     if (relative.isEmpty()) return QStringList();
 
     // QFile rather than std streams: the deployed path may be non-ASCII.
@@ -213,49 +213,50 @@ QStringList TargetClassWindow::classNamesForModel(const QString &model) const
     return names;
 }
 
-void TargetClassWindow::reloadFromDisk()
+void TargetClassWindow::reload_from_disk()
 {
     QString error;
     // A missing file is the normal first-run state, not a failure: the class
     // names still come from the model and every attribute starts at zero.
-    if (!m_table.load(tableFilePath(), &error) && QFile::exists(tableFilePath())) {
-        setStatus(error, true);
-    } else {
-        setStatus(tr("Loaded %1").arg(QDir::toNativeSeparators(tableFilePath())));
+    if (!m_table.load(table_file_path(), &error) && QFile::exists(table_file_path())) {
+        set_status(error, true);
+    }
+    else {
+        set_status(tr("Loaded %1").arg(QDir::toNativeSeparators(table_file_path())));
     }
 
     for (const QString &model : TargetClassTable::models())
-        m_table.mergeClassNames(model, classNamesForModel(model));
+        m_table.merge_class_names(model, class_names_for_model(model));
 
-    populateTable();
-    emit tableChanged();
+    populate_table();
+    emit table_changed();
 }
 
-void TargetClassWindow::saveToDisk()
+void TargetClassWindow::save_to_disk()
 {
-    commitTableToModel();
+    commit_table_to_model();
     QString error;
-    if (!m_table.save(tableFilePath(), &error)) {
-        setStatus(error, true);
+    if (!m_table.save(table_file_path(), &error)) {
+        set_status(error, true);
         return;
     }
-    setStatus(tr("Saved %1").arg(QDir::toNativeSeparators(tableFilePath())));
-    emit tableChanged();
+    set_status(tr("Saved %1").arg(QDir::toNativeSeparators(table_file_path())));
+    emit table_changed();
 }
 
-void TargetClassWindow::modelChanged()
+void TargetClassWindow::model_changed()
 {
-    commitTableToModel();
-    m_current_model = m_modelCombo->currentData().toString();
-    populateTable();
+    commit_table_to_model();
+    m_current_model = m_model_combo->currentData().toString();
+    populate_table();
 }
 
-void TargetClassWindow::populateTable()
+void TargetClassWindow::populate_table()
 {
     if (!m_table_widget) return;
 
-    const QStringList model_names = classNamesForModel(m_current_model);
-    const QVector<TargetClassEntry> entries = m_table.entries(m_current_model);
+    const QStringList model_names = class_names_for_model(m_current_model);
+    const QVector<TargetClassEntry> entries = m_table.get_entries(m_current_model);
 
     m_table_widget->clearContents();
     m_table_widget->setRowCount(entries.size());
@@ -272,56 +273,56 @@ void TargetClassWindow::populateTable()
             font.setItalic(true);
             name_item->setFont(font);
         }
-        m_table_widget->setItem(row, ColumnName, name_item);
+        m_table_widget->setItem(row, COLUMN_NAME, name_item);
 
         auto *height = new QDoubleSpinBox();
         height->setRange(0.0, 1000.0);
         height->setDecimals(2);
         height->setSingleStep(0.5);
-        height->setValue(entry.heightMeters);
-        m_table_widget->setCellWidget(row, ColumnHeight, height);
+        height->setValue(entry.height_meters);
+        m_table_widget->setCellWidget(row, COLUMN_HEIGHT, height);
 
-        m_table_widget->setCellWidget(row, ColumnType, makeCodeCombo(targetTypes(), entry.targetType));
-        m_table_widget->setCellWidget(row, ColumnCategory,
-                                      makeCodeCombo(targetCategories(), entry.targetCategory));
+        m_table_widget->setCellWidget(row, COLUMN_TYPE, make_code_combo(target_types(), entry.target_type));
+        m_table_widget->setCellWidget(row, COLUMN_CATEGORY,
+                                      make_code_combo(target_categories(), entry.target_category));
     }
 
-    if (m_sourceLabel) {
-        m_sourceLabel->setText(model_names.isEmpty()
+    if (m_source_label) {
+        m_source_label->setText(model_names.isEmpty()
             ? tr("No classes file found for %1 — check the yolo paths in the config.")
               .arg(m_current_model)
             : tr("%1 classes from the model file.").arg(model_names.size()));
     }
 }
 
-void TargetClassWindow::commitTableToModel()
+void TargetClassWindow::commit_table_to_model()
 {
     if (!m_table_widget) return;
 
     QVector<TargetClassEntry> entries;
     entries.reserve(m_table_widget->rowCount());
     for (int row = 0; row < m_table_widget->rowCount(); ++row) {
-        QTableWidgetItem *name_item = m_table_widget->item(row, ColumnName);
+        QTableWidgetItem *name_item = m_table_widget->item(row, COLUMN_NAME);
         if (!name_item) continue;
 
         TargetClassEntry entry;
         entry.name = name_item->text();
-        if (auto *height = qobject_cast<QDoubleSpinBox*>(m_table_widget->cellWidget(row, ColumnHeight)))
-            entry.heightMeters = height->value();
-        if (auto *type = qobject_cast<QComboBox*>(m_table_widget->cellWidget(row, ColumnType)))
-            entry.targetType = type->currentData().toInt();
-        if (auto *category = qobject_cast<QComboBox*>(m_table_widget->cellWidget(row, ColumnCategory)))
-            entry.targetCategory = category->currentData().toInt();
+        if (auto *height = qobject_cast<QDoubleSpinBox*>(m_table_widget->cellWidget(row, COLUMN_HEIGHT)))
+            entry.height_meters = height->value();
+        if (auto *type = qobject_cast<QComboBox*>(m_table_widget->cellWidget(row, COLUMN_TYPE)))
+            entry.target_type = type->currentData().toInt();
+        if (auto *category = qobject_cast<QComboBox*>(m_table_widget->cellWidget(row, COLUMN_CATEGORY)))
+            entry.target_category = category->currentData().toInt();
         entries.push_back(entry);
     }
-    m_table.setEntries(m_current_model, entries);
+    m_table.set_entries(m_current_model, entries);
 }
 
-void TargetClassWindow::setStatus(const QString &message, bool error)
+void TargetClassWindow::set_status(const QString &message, bool error)
 {
-    if (!m_statusLabel) return;
-    m_statusLabel->setText(message);
-    m_statusLabel->setProperty("portState", error ? "error" : "idle");
-    m_statusLabel->style()->unpolish(m_statusLabel);
-    m_statusLabel->style()->polish(m_statusLabel);
+    if (!m_status_label) return;
+    m_status_label->setText(message);
+    m_status_label->setProperty("portState", error ? "error" : "idle");
+    m_status_label->style()->unpolish(m_status_label);
+    m_status_label->style()->polish(m_status_label);
 }

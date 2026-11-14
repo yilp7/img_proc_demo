@@ -7,7 +7,7 @@ class Lens : public ControlPort
 {
     Q_OBJECT
 public:
-    enum PARAMS {
+    enum Params {
         STOP          = 0x00,
         ZOOM_IN       = 0x01,
         ZOOM_OUT      = 0x02,
@@ -59,16 +59,16 @@ private:
     uchar checksum(QByteArray data);
 
 private:
-    uchar address;
-    uint  zoom;
-    uint  focus;
-    uint  laser_radius;
-    uchar lens_speed;
+    uchar m_address;
+    uint  m_zoom;
+    uint  m_focus;
+    uint  m_laser_radius;
+    uchar m_lens_speed;
 
-    std::atomic<bool> hold;
-    std::atomic<bool> interupt;
+    std::atomic<bool> m_hold;
+    std::atomic<bool> m_interupt;
 
-    QByteArray query[3];
+    QByteArray m_query[3];
 };
 
 #endif // LENS_H

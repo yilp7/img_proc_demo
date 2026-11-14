@@ -5,10 +5,7 @@
 
 class QLabel;
 
-// Placeholder for the bottom-left map view. The actual Mapbox / map
-// integration is deferred — this widget just renders a "pending
-// integration" label so the layout reservation is visible during
-// Sprint 17 development.
+// Placeholder for the bottom-left map view: it only shows a label until a map is integrated.
 class MapboxWidget : public QFrame
 {
     Q_OBJECT

@@ -7,7 +7,7 @@ class TCU : public ControlPort
 {
     Q_OBJECT
 public:
-    enum PARAMS {
+    enum Params {
         REPEATED_FREQ = 0x00,
         LASER_WIDTH   = 0x01,
         DELAY_A       = 0x02,
@@ -57,7 +57,7 @@ public:
     ~TCU();
 
     double get(qint32 tcu_param);
-    uint type();
+    uint get_type();
     void set_type(uint type);
 
 #if ENABLE_PORT_JSON
@@ -87,43 +87,43 @@ private:
     // 0: default, head(88) cmd(00) data(MM NN PP QQ) tail(99)
     // 1: step-40ps, head(88) cmd(00) data(MM NN PP QQ) tail(99), ps cmd step by 40ps (max 100)
     // 2: step-10ps, head(88) cmd(00) data(MM NN PP QQ) tail(99), ps cmd step by 10ps (max 100)
-    std::atomic<uint> tcu_type;
-    bool   scan_mode; // 0: default, 1: scan
+    std::atomic<uint> m_tcu_type;
+    bool   m_scan_mode; // 0: default, 1: scan
 
     // TCUThread params
-    double rep_freq;                   // unit: kHz
-    double laser_width;                // unit: ns
-    double delay_a, delay_b;           // unit: ns
-    double gate_width_a, gate_width_b; // unit: ns
-    double ccd_freq;                   // unit: frame/s
-    double duty;                       // unit: μs
-    uint   mcp;
-    uint   laser_on;
-    uint   tcu_dist;                   // unit: m
+    double m_rep_freq;                     // unit: kHz
+    double m_laser_width;                  // unit: ns
+    double m_delay_a, m_delay_b;           // unit: ns
+    double m_gate_width_a, m_gate_width_b; // unit: ns
+    double m_ccd_freq;                     // unit: frame/s
+    double m_duty;                         // unit: μs
+    uint   m_mcp;
+    uint   m_laser_on;
+    uint   m_tcu_dist;                   // unit: m
 
     // user params
-    double dist_ns;                    // unit: m/ns
-    double delay_n;                    // unit: ns
-    double gate_width_n;               // unit: ns
-    double delay_dist;                 // unit: m
-    double depth_of_view;              // unit: m
-    double rep_freq_scan;              // unit: kHz
+    double m_dist_ns;                    // unit: m/ns
+    double m_delay_n;                    // unit: ns
+    double m_gate_width_n;               // unit: ns
+    double m_delay_dist;                 // unit: m
+    double m_depth_of_view;              // unit: m
+    double m_rep_freq_scan;              // unit: kHz
 
     // configuration
-    bool   auto_rep_freq;
-    bool   ab_lock;
-    double laser_offset;
-    double delay_offset;
-    double gate_width_offset;
-    uint   ps_step[4];
+    bool   m_auto_rep_freq;
+    bool   m_ab_lock;
+    double m_laser_offset;
+    double m_delay_offset;
+    double m_gate_width_offset;
+    uint   m_ps_step[4];
 
-    bool   use_gw_lut;
-    int    gw_lut[100];                // lookup table for gatewidth config by serial
+    bool   m_use_gw_lut;
+    int    m_gw_lut[100];                // lookup table for gatewidth config by serial
 
-    std::atomic<bool> hold;
-    std::atomic<bool> interupt;
+    std::atomic<bool> m_hold;
+    std::atomic<bool> m_interupt;
 
-    QByteArray query;
+    QByteArray m_query;
 };
 
 #endif // TCU_H

@@ -16,23 +16,21 @@ class ConsolePanel : public FloatingPanel
 public:
     explicit ConsolePanel(QWidget *parent = nullptr);
 
-    // Pulls the existing console pages out of misc_display and shows them
-    // through the classic three-selector console switcher.
-    // misc_display = MISC_DISPLAY QStackedWidget (from LEFT panel)
-    // After setup(), misc_display and its old parent frame (MISC_DISPLAY_GRP)
-    // should be hidden; they are no longer needed.
+    // Takes the console pages out of misc_display (the MISC_DISPLAY stacked widget)
+    // and shows them through its own three-selector switcher. The caller hides
+    // misc_display and its frame afterwards.
     void setup(QStackedWidget *misc_display);
 
-    int currentOption() const;
+    int get_current_option() const;
 
 signals:
-    void optionSelected(int optionId);
+    void option_selected(int option_id);
 
 private:
-    void populateSelector(MiscSelection *selector, int defaultOption);
-    void activateSelector(int selectorIndex);
-    void activateOption(int optionId);
-    int selectorOption(int selectorIndex) const;
+    void populate_selector(MiscSelection *selector, int default_option);
+    void activate_selector(int selector_index);
+    void activate_option(int option_id);
+    int get_selector_option(int selector_index) const;
 
     QButtonGroup  *m_selector_group;
     QStackedWidget *m_stack;

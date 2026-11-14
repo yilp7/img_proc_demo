@@ -20,45 +20,43 @@ public:
 
     void init(Aliasing *aliasing);
 
-    // Getters for state accessed by other components
-    float get_stepping() const      { return stepping; }
-    int   get_hz_unit() const       { return hz_unit; }
-    int   get_base_unit() const     { return base_unit; }
-    float get_rep_freq() const      { return rep_freq; }
-    float get_laser_width() const   { return laser_width; }
-    float get_delay_dist() const    { return delay_dist.load(); }
-    float get_depth_of_view() const { return depth_of_view; }
-    int   get_mcp_max() const       { return mcp_max; }
-    bool  get_aliasing_mode() const { return aliasing_mode; }
-    int   get_aliasing_level() const{ return aliasing_level; }
-    float get_c() const             { return c; }
-    float get_dist_ns() const       { return dist_ns; }
+    float get_stepping() const      { return m_stepping; }
+    int   get_hz_unit() const       { return m_hz_unit; }
+    int   get_base_unit() const     { return m_base_unit; }
+    float get_rep_freq() const      { return m_rep_freq; }
+    float get_laser_width() const   { return m_laser_width; }
+    float get_delay_dist() const    { return m_delay_dist.load(); }
+    float get_depth_of_view() const { return m_depth_of_view; }
+    int   get_mcp_max() const       { return m_mcp_max; }
+    bool  get_aliasing_mode() const { return m_aliasing_mode; }
+    int   get_aliasing_level() const{ return m_aliasing_level; }
+    float get_c() const             { return m_c; }
+    float get_dist_ns() const       { return m_dist_ns; }
     // The delay floor in metres at the current light speed. The config keeps
     // it in ns because it is a timing limit of the TCU, not a range.
-    float min_delay_dist() const    { return m_config->get_data().tcu.min_delay * dist_ns; }
-    bool  get_auto_mcp() const      { return auto_mcp; }
-    bool  get_frame_a_3d() const    { return frame_a_3d.load(); }
-    int   get_distance() const      { return distance; }
+    float min_delay_dist() const    { return m_config->get_data().tcu.min_delay * m_dist_ns; }
+    bool  get_auto_mcp() const      { return m_auto_mcp; }
+    bool  get_frame_a_3d() const    { return m_frame_a_3d.load(); }
+    int   get_distance() const      { return m_distance; }
 
-    // Setters used by other components
-    void set_stepping(float v)      { stepping = v; }
-    void set_rep_freq(float v)      { rep_freq = v; }
-    void set_laser_width(float v)   { laser_width = v; }
-    void set_delay_dist(float v)    { delay_dist.store(v); }
-    void set_depth_of_view(float v) { depth_of_view = v; }
-    void set_frame_a_3d(bool v)     { frame_a_3d.store(v); }
-    void toggle_frame_a_3d() {
-        bool expected = frame_a_3d.load();
-        while (!frame_a_3d.compare_exchange_weak(expected, !expected));
+    void set_stepping(float v)      { m_stepping = v; }
+    void set_rep_freq(float v)      { m_rep_freq = v; }
+    void set_laser_width(float v)   { m_laser_width = v; }
+    void set_delay_dist(float v)    { m_delay_dist.store(v); }
+    void set_depth_of_view(float v) { m_depth_of_view = v; }
+    void set_frame_a_3d(bool v)     { m_frame_a_3d.store(v); }
+    void toggle_frame_a_3d()
+    {
+        bool expected = m_frame_a_3d.load();
+        while (!m_frame_a_3d.compare_exchange_weak(expected, !expected));
     }
-    void set_auto_mcp(bool v)       { auto_mcp = v; }
-    void set_distance(int v)        { distance = v; }
+    void set_auto_mcp(bool v)       { m_auto_mcp = v; }
+    void set_distance(int v)        { m_distance = v; }
 
-    // Convert data to TCU hex buffer
     QByteArray convert_to_send_tcu(uchar num, unsigned int send);
 
 public slots:
-    // Signaled by Preferences
+    // signalled by the setup overlay
     void update_light_speed(bool uw);
     void setup_hz(int hz_unit);
     void setup_stepping(int base_unit);
@@ -109,7 +107,7 @@ signals:
     void send_uint_tcu_msg(qint32 tcu_param, uint val);
     void send_laser_msg(QString msg);
 
-    // UserPanel forwards to ScanController::params().dist_ns + Preferences::dist_ns
+    // UserPanel copies it into ScanController::get_params().dist_ns
     void dist_ns_changed(float dist_ns);
     void update_distance_display_requested();
 
@@ -135,12 +133,12 @@ signals:
                             QString bu, QString bn, QString bp,
                             QString gw_text);
 
-    // Layout changes. diff = transition for delay/GW reflow (0↔non-0).
-    // laser_diff = transition for LASER_WIDTH (only shown at 40ps step / idx 2).
+    // Layout changes. diff marks a delay / gate-width reflow between 0 and non-0.
+    // laser_diff marks the same for LASER_WIDTH, shown only at the 40 ps step (idx 2).
     void tcu_type_layout_changed(int idx, int diff, int laser_diff);
     void tcu_diff_view_toggled(bool show_diff);
 
-    // Preferences forwarding
+    // setup overlay forwarding
     void ps_config_display_updated(QString stepping_text, QString max_step_text);
     void auto_mcp_chk_click_requested();
     void fire_laser_btn_click_requested();
@@ -164,25 +162,25 @@ private:
     void echo_timeout(Mailbox &box, qint32 param);
     void resync(Mailbox &box);
 
-    Config*         m_config;
-    DeviceManager*  m_device_mgr;
-    Aliasing*       m_aliasing;
+    Config         *m_config;
+    DeviceManager  *m_device_mgr;
+    Aliasing       *m_aliasing;
 
-    float           stepping;
-    int             hz_unit;
-    int             base_unit;
-    float           rep_freq;
-    float           laser_width;
-    std::atomic<float> delay_dist{0.0f};
-    float           depth_of_view;
-    int             mcp_max;
-    bool            aliasing_mode;
-    int             aliasing_level;
-    float           c;
-    float           dist_ns;
-    bool            auto_mcp;
-    std::atomic<bool> frame_a_3d{false};
-    int             distance;
+    float           m_stepping;
+    int             m_hz_unit;
+    int             m_base_unit;
+    float           m_rep_freq;
+    float           m_laser_width;
+    std::atomic<float> m_delay_dist{0.0f};
+    float           m_depth_of_view;
+    int             m_mcp_max;
+    bool            m_aliasing_mode;
+    int             m_aliasing_level;
+    float           m_c;
+    float           m_dist_ns;
+    bool            m_auto_mcp;
+    std::atomic<bool> m_frame_a_3d{false};
+    int             m_distance;
 
     Mailbox         m_delay_box;
     Mailbox         m_dov_box;

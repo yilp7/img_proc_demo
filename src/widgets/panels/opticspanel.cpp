@@ -7,12 +7,14 @@
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
-OpticsPanel::OpticsPanel(QWidget *parent)
-    : FloatingPanel(parent),
-      m_stack(nullptr), m_classic_page(nullptr),
-      m_modern_page(nullptr), m_mode_group(nullptr)
+OpticsPanel::OpticsPanel(QWidget *parent) :
+    FloatingPanel(parent),
+    m_stack(nullptr),
+    m_classic_page(nullptr),
+    m_modern_page(nullptr),
+    m_mode_group(nullptr)
 {
-    setTitle("Optics & PTZ");
+    set_title("Optics & PTZ");
 
     // mode-toggle row
     auto *toggle_row = new QWidget(this);
@@ -21,15 +23,15 @@ OpticsPanel::OpticsPanel(QWidget *parent)
     toggle_layout->setSpacing(2);
 
     m_mode_group = new QButtonGroup(this);
-    auto makeTab = [&](const char *text, int id) {
+    auto make_tab = [&](const char *text, int id) {
         auto *btn = new QPushButton(text, toggle_row);
         btn->setCheckable(true);
         btn->setObjectName(id == 0 ? "OPTICS_CLASSIC_BTN" : "OPTICS_MODERN_BTN");
         m_mode_group->addButton(btn, id);
         toggle_layout->addWidget(btn);
     };
-    makeTab("Classic", 0);
-    makeTab("Modern",  1);
+    make_tab("Classic", 0);
+    make_tab("Modern",  1);
     m_mode_group->setExclusive(true);
     m_mode_group->button(0)->setChecked(true);
     toggle_layout->addStretch(1);
@@ -37,7 +39,6 @@ OpticsPanel::OpticsPanel(QWidget *parent)
     connect(m_mode_group, QOverload<int>::of(&QButtonGroup::buttonClicked),
             this, &OpticsPanel::on_mode_toggled);
 
-    // stacked widget
     m_stack = new QStackedWidget(this);
     m_classic_page = new QWidget(m_stack);
     m_modern_page  = new QWidget(m_stack);
@@ -45,16 +46,15 @@ OpticsPanel::OpticsPanel(QWidget *parent)
     m_stack->addWidget(m_modern_page);   // index 1 = Modern
     m_stack->setCurrentIndex(0);
 
-    contentLayout()->addWidget(toggle_row);
-    contentLayout()->addWidget(m_stack, 1);
+    get_content_layout()->addWidget(toggle_row);
+    get_content_layout()->addWidget(m_stack, 1);
 }
 
 void OpticsPanel::setup(QWidget *lens_static, QWidget *ptz_grp,
                         QWidget *iris_open, QWidget *iris_close)
 {
-    // iris buttons are duplicates of radius — hide instead of delete.
-    // Ui_UserPanel::retranslateUi() (auto-generated) still references their
-    // pointers, so deleting causes a use-after-free at language-switch time.
+    // The iris buttons duplicate radius. They are hidden, not deleted: the generated
+    // retranslateUi() still uses their pointers and would crash on a language switch.
     if (iris_open)  iris_open->hide();
     if (iris_close) iris_close->hide();
 
@@ -83,7 +83,7 @@ void OpticsPanel::set_modern_page(QWidget *w)
     m_modern_page->adjustSize();
 }
 
-OpticsPanel::Mode OpticsPanel::current_mode() const
+OpticsPanel::Mode OpticsPanel::get_current_mode() const
 {
     return static_cast<Mode>(m_stack->currentIndex());
 }
@@ -91,5 +91,5 @@ OpticsPanel::Mode OpticsPanel::current_mode() const
 void OpticsPanel::on_mode_toggled(int id)
 {
     m_stack->setCurrentIndex(id);
-    emit modeChanged(static_cast<Mode>(id));
+    emit mode_changed(static_cast<Mode>(id));
 }

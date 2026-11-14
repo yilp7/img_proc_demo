@@ -6,16 +6,16 @@ QMutex mutex;
 
 EuresysCam::EuresysCam()
 {
-    device_type = 3;
-    dev_handle = NULL;
-    curr_idx = 0;
+    m_device_type = 3;
+    m_dev_handle = 0;
+    m_curr_idx = 0;
 }
-EuresysCam::~EuresysCam() {if (dev_handle) shut_down();}
+EuresysCam::~EuresysCam() {if (m_dev_handle) shut_down();}
 
 int EuresysCam::search_for_devices()
 {
     // Initialize driver and error handling
-    MCSTATUS ret = McOpenDriver(NULL);
+    MCSTATUS ret = McOpenDriver(nullptr);
     if (ret == MC_NO_BOARD_FOUND) return 0;
 
     // Activate message box error handling and generate an error log file
@@ -25,69 +25,69 @@ int EuresysCam::search_for_devices()
     return 1;
 }
 
-int EuresysCam::start(int idx) {
+int EuresysCam::start(int idx)
+{
 #if CLALLSERIAL
-    clSerialClose(serial_ref);
-    int cl_ret = clSerialInit(0, &serial_ref);
+    clSerialClose(m_serial_ref);
+    int cl_ret = clSerialInit(0, &m_serial_ref);
 //    if (cl_ret != CL_ERR_NO_ERR) return cl_ret;
-    cl_ret = clSetBaudRate(serial_ref, CL_BAUDRATE_115200);
+    cl_ret = clSetBaudRate(m_serial_ref, CL_BAUDRATE_115200);
 #endif
 
     MCSTATUS ret = 0;
     // Create a channel and associate it with the first connector on the first board
-    McCreate(MC_CHANNEL, &dev_handle);
-    McSetParamInt(dev_handle, MC_DriverIndex, 0);
+    McCreate(MC_CHANNEL, &m_dev_handle);
+    McSetParamInt(m_dev_handle, MC_DriverIndex, 0);
 
     // In order to use single camera on connector A
     // MC_Connector need to be set to A for Grablink DualBase
     // For all the other Grablink boards the parameter has to be set to M  
     
     // For all GrabLink boards but Grablink DualBase
-    ret = McSetParamStr(dev_handle, MC_Connector, "M");
+    ret = McSetParamStr(m_dev_handle, MC_Connector, "M");
 
     // Configure the height of a slice (1920 lines)
-    ret = McSetParamInt(dev_handle, MC_Hactive_Px, 1920);
-    ret = McSetParamInt(dev_handle, MC_Vactive_Ln, 1080);
+    ret = McSetParamInt(m_dev_handle, MC_Hactive_Px, 1920);
+    ret = McSetParamInt(m_dev_handle, MC_Vactive_Ln, 1080);
 
     // Choose the pixel color format
-    ret = McSetParamInt(dev_handle, MC_Spectrum, MC_Spectrum_COLOR);
-    // ret = McSetParamInt(dev_handle, MC_ColorMethod, MC_ColorMethod_PRISM);
-    // ret = McSetParamInt(dev_handle, MC_ColorFormat, MC_ColorFormat_Y8);
-    ret = McSetParamInt(dev_handle, MC_ColorFormat, MC_ColorFormat_RGB24);
+    ret = McSetParamInt(m_dev_handle, MC_Spectrum, MC_Spectrum_COLOR);
+    // ret = McSetParamInt(m_dev_handle, MC_ColorMethod, MC_ColorMethod_PRISM);
+    // ret = McSetParamInt(m_dev_handle, MC_ColorFormat, MC_ColorFormat_Y8);
+    ret = McSetParamInt(m_dev_handle, MC_ColorFormat, MC_ColorFormat_RGB24);
 
-    // ret = McSetParamInt(dev_handle, MC_TapConfiguration, MC_TapConfiguration_BASE_2T8);
-    // ret = McSetParamInt(dev_handle, MC_TapConfiguration, MC_TapConfiguration_BASE_1T8);
-    ret = McSetParamInt(dev_handle, MC_TapConfiguration, MC_TapConfiguration_BASE_1T24);
+    // ret = McSetParamInt(m_dev_handle, MC_TapConfiguration, MC_TapConfiguration_BASE_2T8);
+    // ret = McSetParamInt(m_dev_handle, MC_TapConfiguration, MC_TapConfiguration_BASE_1T8);
+    ret = McSetParamInt(m_dev_handle, MC_TapConfiguration, MC_TapConfiguration_BASE_1T24);
 
-    // Set the acquisition mode
-    ret = McSetParamInt(dev_handle, MC_AcquisitionMode, MC_AcquisitionMode_HFR);
+    ret = McSetParamInt(m_dev_handle, MC_AcquisitionMode, MC_AcquisitionMode_HFR);
 
     // Choose the number of Frames in a phase
-    ret = McSetParamInt(dev_handle, MC_PhaseLength_Fr, 1);
+    ret = McSetParamInt(m_dev_handle, MC_PhaseLength_Fr, 1);
 
     // Choose the way the first acquisition is triggered
-    ret = McSetParamInt(dev_handle, MC_TrigMode, MC_TrigMode_IMMEDIATE);
+    ret = McSetParamInt(m_dev_handle, MC_TrigMode, MC_TrigMode_IMMEDIATE);
     // Choose the triggering mode for subsequent acquisitions
-    ret = McSetParamInt(dev_handle, MC_NextTrigMode, MC_NextTrigMode_REPEAT);
+    ret = McSetParamInt(m_dev_handle, MC_NextTrigMode, MC_NextTrigMode_REPEAT);
     // Choose the number of images to acquire
-    ret = McSetParamInt(dev_handle, MC_SeqLength_Fr, MC_INDETERMINATE);
+    ret = McSetParamInt(m_dev_handle, MC_SeqLength_Fr, MC_INDETERMINATE);
 
     // Enable MultiCam signals
-    ret = McSetParamInt(dev_handle, MC_SignalEnable + MC_SIG_SURFACE_PROCESSING, MC_SignalEnable_ON);
-    ret = McSetParamInt(dev_handle, MC_SignalEnable + MC_SIG_ACQUISITION_FAILURE, MC_SignalEnable_ON);
+    ret = McSetParamInt(m_dev_handle, MC_SignalEnable + MC_SIG_SURFACE_PROCESSING, MC_SignalEnable_ON);
+    ret = McSetParamInt(m_dev_handle, MC_SignalEnable + MC_SIG_ACQUISITION_FAILURE, MC_SignalEnable_ON);
 
     return ret;
 }
 
 int EuresysCam::shut_down()
 {
-    if (dev_handle == NULL) return MC_NO_BOARD_FOUND;
+    if (m_dev_handle == 0) return MC_NO_BOARD_FOUND;
 
-    int ret = McDelete(dev_handle);
-    dev_handle = NULL;
+    int ret = McDelete(m_dev_handle);
+    m_dev_handle = 0;
 
 #ifdef CLALLSERIAL
-    if (serial_ref) clSerialClose(serial_ref);
+    if (m_serial_ref) clSerialClose(m_serial_ref);
 #endif
 
     return ret;
@@ -96,18 +96,19 @@ int EuresysCam::shut_down()
 int EuresysCam::set_user_pointer(StreamFrameSink *sink)
 {
     void *user = sink;
-    // Register the callback function
-    return McRegisterCallback(dev_handle, frame_cb, user);
+    return McRegisterCallback(m_dev_handle, frame_cb, user);
 }
 
-int EuresysCam::start_grabbing() {
+int EuresysCam::start_grabbing()
+{
     // Start an acquisition sequence by activating the channel
-    return McSetParamInt(dev_handle, MC_ChannelState, MC_ChannelState_ACTIVE);
+    return McSetParamInt(m_dev_handle, MC_ChannelState, MC_ChannelState_ACTIVE);
 }
 
-int EuresysCam::stop_grabbing() {
+int EuresysCam::stop_grabbing()
+{
     // Stop an acquisition sequence by deactivating the channel
-    return McSetParamInt(dev_handle, MC_ChannelState, MC_ChannelState_IDLE);
+    return McSetParamInt(m_dev_handle, MC_ChannelState, MC_ChannelState_IDLE);
 }
 
 void EuresysCam::get_max_frame_size(int *w, int *h)
@@ -115,9 +116,9 @@ void EuresysCam::get_max_frame_size(int *w, int *h)
     *w = x = 1920;
     *h = y = 1080;
     // MVCC_INTVALUE int_value;
-    // MV_CC_GetIntValue(dev_handle, "Width", &int_value);
+    // MV_CC_GetIntValue(m_dev_handle, "Width", &int_value);
     // w = x = int_value.nCurValue;
-    // MV_CC_GetIntValue(dev_handle, "Height", &int_value);
+    // MV_CC_GetIntValue(m_dev_handle, "Height", &int_value);
     // h = y = int_value.nCurValue;
 }
 
@@ -255,7 +256,7 @@ int EuresysCam::pixel_type(bool read, int *val)
 
 void EuresysCam::trigger_once()
 {
-    // MV_CC_SetCommandValue(dev_handle, "TriggerSoftware");
+    // MV_CC_SetCommandValue(m_dev_handle, "TriggerSoftware");
 }
 
 QStringList EuresysCam::get_device_list()
@@ -290,7 +291,8 @@ void EuresysCam::frame_cb(PMCCALLBACKINFO cb_info)
 }
 
 #if CLALLSERIAL
-float Cam::communicate(char* out, char* in, uint out_size, uint in_size, bool read) {
+float Cam::communicate(char *out, char *in, uint out_size, uint in_size, bool read)
+{
     mutex.lock();
     QString str_s = "s", str_r = "r", str_d = "d";
     static uint temp_size = 1;

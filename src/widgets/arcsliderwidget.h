@@ -7,54 +7,49 @@
 class QMouseEvent;
 class QPaintEvent;
 
-// Vertical slider whose track is rendered as a curved arc. Used in triplicate
-// for zoom / focus / iris in PTZ Modern mode.
-//
-// Convention: top of track = maximum, bottom = minimum (matches QSlider with
-// Qt::Vertical + invertedAppearance=false). Value↔pixel mapping is 1D and
-// linear — the arc curvature is purely cosmetic, handled in paintEvent.
+// Vertical slider drawn as a curved arc, used for zoom, focus and iris in the
+// modern optics panel. Top is maximum. The value mapping is linear; the curve is
+// only drawn.
 class ArcSliderWidget : public QWidget
 {
     Q_OBJECT
-    Q_PROPERTY(QColor activeColor READ activeColor WRITE setActiveColor)
-    Q_PROPERTY(QColor inactiveTrackColor READ inactiveTrackColor WRITE setInactiveTrackColor)
-    Q_PROPERTY(QColor thumbEdgeColor READ thumbEdgeColor WRITE setThumbEdgeColor)
+    Q_PROPERTY(QColor activeColor READ get_active_color WRITE set_active_color)
+    Q_PROPERTY(QColor inactiveTrackColor READ get_inactive_track_color WRITE set_inactive_track_color)
+    Q_PROPERTY(QColor thumbEdgeColor READ get_thumb_edge_color WRITE set_thumb_edge_color)
 public:
     explicit ArcSliderWidget(QWidget *parent = nullptr);
 
-    void setRange(int min, int max);
-    int  minimum() const { return m_min; }
-    int  maximum() const { return m_max; }
+    void set_range(int min, int max);
+    int  get_minimum() const { return m_min; }
+    int  get_maximum() const { return m_max; }
 
-    void setValue(int value);
-    int  value() const { return m_value; }
+    void set_value(int value);
+    int  get_value() const { return m_value; }
 
-    // Switch to speed/joystick mode: thumb anchors to midpoint, drag emits
-    // signed speed scaled exponentially from drag distance, quantized to a
-    // step of 4 (min |speed| = 4 once off midpoint), released → snaps to 0.
-    // Calls setRange(-maxSpeed, +maxSpeed) and setValue(0) internally.
-    void setSpeedMode(int maxSpeed);
-    bool isSpeedMode() const { return m_speed_mode; }
+    // Speed mode: the thumb rests at the midpoint and a drag emits a signed speed,
+    // growing with distance, in steps of 4. Release returns to 0. Sets the range to
+    // +/- max_speed.
+    void set_speed_mode(int max_speed);
+    bool is_speed_mode() const { return m_speed_mode; }
 
     // Cosmetic only: color used for the filled portion and thumb fill.
     // Does not affect value mapping or signals.
-    void   setActiveColor(const QColor &c);
-    QColor activeColor() const { return m_active_color; }
-    void   setInactiveTrackColor(const QColor &c);
-    QColor inactiveTrackColor() const { return m_inactive_track_color; }
-    void   setThumbEdgeColor(const QColor &c);
-    QColor thumbEdgeColor() const { return m_thumb_edge_color; }
+    void   set_active_color(const QColor &c);
+    QColor get_active_color() const { return m_active_color; }
+    void   set_inactive_track_color(const QColor &c);
+    QColor get_inactive_track_color() const { return m_inactive_track_color; }
+    void   set_thumb_edge_color(const QColor &c);
+    QColor get_thumb_edge_color() const { return m_thumb_edge_color; }
 
-    // Pure math helpers — testable without constructing a widget.
-    // y=0 is top (=max); y=trackHeight is bottom (=min).
-    static int pixelToValue(int y, int trackHeight, int min, int max);
-    static int valueToPixel(int value, int trackHeight, int min, int max);
+    // Pure helpers, testable without a widget. y = 0 is the top (maximum).
+    static int pixel_to_value(int y, int track_height, int min, int max);
+    static int value_to_pixel(int value, int track_height, int min, int max);
 
 signals:
-    void valueChanged(int value);
+    void value_changed(int value);
     // Speed-mode only: emitted when the quantized signed speed changes.
     // sign > 0 = up-direction, sign < 0 = down-direction, 0 = midpoint/stop.
-    void speedChanged(int signedSpeed);
+    void speed_changed(int signed_speed);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -63,11 +58,11 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override;
 
 private:
-    int  trackHeight() const;
-    int  trackTop()    const;
-    void setValueFromPixel(int local_y);
-    int  pixelToSignedSpeed(int local_y) const;
-    void applySpeedFromPixel(int local_y);
+    int  track_height() const;
+    int  track_top()    const;
+    void set_value_from_pixel(int local_y);
+    int  pixel_to_signed_speed(int local_y) const;
+    void apply_speed_from_pixel(int local_y);
 
     int    m_min;
     int    m_max;

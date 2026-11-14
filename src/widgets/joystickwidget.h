@@ -8,64 +8,60 @@
 class QMouseEvent;
 class QPaintEvent;
 
-// Virtual joystick for PTZ Modern mode. Circular base with a draggable stick
-// that snaps back to center on release. Emits continuous (dx, dy) normalized
-// to [-1, +1] on each axis.
-//
-// This widget intentionally does NOT emit a discrete 8-direction enum — that
-// concept belongs to Classic-mode PTZ direction buttons, not the joystick.
+// Virtual joystick of the modern optics panel: a circular base with a stick that
+// springs back to the centre. Emits a continuous (dx, dy) in [-1, +1] per axis,
+// never a discrete direction.
 class JoystickWidget : public QWidget
 {
     Q_OBJECT
-    Q_PROPERTY(QColor baseEdgeColor READ baseEdgeColor WRITE setBaseEdgeColor)
-    Q_PROPERTY(QColor baseDarkColor READ baseDarkColor WRITE setBaseDarkColor)
-    Q_PROPERTY(QColor baseLightColor READ baseLightColor WRITE setBaseLightColor)
-    Q_PROPERTY(QColor baseGrooveColor READ baseGrooveColor WRITE setBaseGrooveColor)
-    Q_PROPERTY(QColor glyphColor READ glyphColor WRITE setGlyphColor)
-    Q_PROPERTY(QColor handleEdgeColor READ handleEdgeColor WRITE setHandleEdgeColor)
-    Q_PROPERTY(QColor domeDarkColor READ domeDarkColor WRITE setDomeDarkColor)
-    Q_PROPERTY(QColor domeLightColor READ domeLightColor WRITE setDomeLightColor)
+    Q_PROPERTY(QColor baseEdgeColor READ get_base_edge_color WRITE set_base_edge_color)
+    Q_PROPERTY(QColor baseDarkColor READ get_base_dark_color WRITE set_base_dark_color)
+    Q_PROPERTY(QColor baseLightColor READ get_base_light_color WRITE set_base_light_color)
+    Q_PROPERTY(QColor baseGrooveColor READ get_base_groove_color WRITE set_base_groove_color)
+    Q_PROPERTY(QColor glyphColor READ get_glyph_color WRITE set_glyph_color)
+    Q_PROPERTY(QColor handleEdgeColor READ get_handle_edge_color WRITE set_handle_edge_color)
+    Q_PROPERTY(QColor domeDarkColor READ get_dome_dark_color WRITE set_dome_dark_color)
+    Q_PROPERTY(QColor domeLightColor READ get_dome_light_color WRITE set_dome_light_color)
 public:
     explicit JoystickWidget(QWidget *parent = nullptr);
 
     // Deadzone as a fraction of the base radius. Inside this radius, the
     // reported direction snaps to (0, 0) so small jitter doesn't spam
     // consumers. Default 0.1. Clamped to [0, 1).
-    void   setDeadzone(double fraction);
-    double deadzone() const { return m_deadzone_frac; }
+    void   set_deadzone(double fraction);
+    double get_deadzone() const { return m_deadzone_frac; }
 
-    QPointF direction() const { return m_direction; }
+    QPointF get_direction() const { return m_direction; }
 
-    QColor baseEdgeColor() const { return m_base_edge_color; }
-    QColor baseDarkColor() const { return m_base_dark_color; }
-    QColor baseLightColor() const { return m_base_light_color; }
-    QColor baseGrooveColor() const { return m_base_groove_color; }
-    QColor glyphColor() const { return m_glyph_color; }
-    QColor handleEdgeColor() const { return m_handle_edge_color; }
-    QColor domeDarkColor() const { return m_dome_dark_color; }
-    QColor domeLightColor() const { return m_dome_light_color; }
+    QColor get_base_edge_color() const { return m_base_edge_color; }
+    QColor get_base_dark_color() const { return m_base_dark_color; }
+    QColor get_base_light_color() const { return m_base_light_color; }
+    QColor get_base_groove_color() const { return m_base_groove_color; }
+    QColor get_glyph_color() const { return m_glyph_color; }
+    QColor get_handle_edge_color() const { return m_handle_edge_color; }
+    QColor get_dome_dark_color() const { return m_dome_dark_color; }
+    QColor get_dome_light_color() const { return m_dome_light_color; }
 
-    void setBaseEdgeColor(const QColor &color);
-    void setBaseDarkColor(const QColor &color);
-    void setBaseLightColor(const QColor &color);
-    void setBaseGrooveColor(const QColor &color);
-    void setGlyphColor(const QColor &color);
-    void setHandleEdgeColor(const QColor &color);
-    void setDomeDarkColor(const QColor &color);
-    void setDomeLightColor(const QColor &color);
+    void set_base_edge_color(const QColor &color);
+    void set_base_dark_color(const QColor &color);
+    void set_base_light_color(const QColor &color);
+    void set_base_groove_color(const QColor &color);
+    void set_glyph_color(const QColor &color);
+    void set_handle_edge_color(const QColor &color);
+    void set_dome_dark_color(const QColor &color);
+    void set_dome_light_color(const QColor &color);
 
-    // Pure math helpers — testable without constructing a widget.
-    // Clamp a vector's magnitude to `radius`.
-    static QPointF clampToCircle(QPointF v, double radius);
+    // Pure helpers, testable without a widget. Clamps a vector's length to radius.
+    static QPointF clamp_to_circle(QPointF v, double radius);
     // Compute normalized direction in [-1, +1] from a stick position in
     // widget-local coords. Returns (0, 0) when inside the deadzone.
-    static QPointF computeDirection(QPointF stickLocal,
-                                    QPointF center,
-                                    double  radius,
-                                    double  deadzoneFrac);
+    static QPointF compute_direction(QPointF stick_local,
+                                     QPointF center,
+                                     double  radius,
+                                     double  deadzone_frac);
 
 signals:
-    void directionChanged(double dx, double dy);
+    void direction_changed(double dx, double dy);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -75,11 +71,11 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
 
 private:
-    QPointF baseCenter() const;
-    double  baseRadius() const;
+    QPointF base_center() const;
+    double  base_radius() const;
 
-    void    updateStick(const QPointF &stickLocal);
-    void    emitDirection(const QPointF &dir);
+    void    update_stick(const QPointF &stick_local);
+    void    emit_direction(const QPointF &dir);
 
     QPointF m_stick_local;   // stick center in widget coords
     QPointF m_direction;     // last emitted (dx, dy)

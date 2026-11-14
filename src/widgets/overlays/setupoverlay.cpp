@@ -24,19 +24,19 @@
 #include <cmath>
 #include <cstdio>
 
-SetupOverlay::SetupOverlay(QWidget *parent)
-    : QFrame(parent),
-      m_scroll(nullptr),
-      m_rows_container(nullptr),
-      m_preview_sidebar(nullptr),
-      m_preview_layout(nullptr),
-      m_form_root(nullptr),
-      m_ui(nullptr),
-      m_config(nullptr),
-      m_laser_grp(nullptr),
-      m_split(false),
-      m_cameralink(false),
-      m_dist_ns(3e8f / 2e9f)
+SetupOverlay::SetupOverlay(QWidget *parent) :
+    QFrame(parent),
+    m_scroll(nullptr),
+    m_rows_container(nullptr),
+    m_preview_sidebar(nullptr),
+    m_preview_layout(nullptr),
+    m_form_root(nullptr),
+    m_ui(nullptr),
+    m_config(nullptr),
+    m_laser_grp(nullptr),
+    m_split(false),
+    m_cameralink(false),
+    m_dist_ns(3e8f / 2e9f)
 {
     setObjectName("SETUP_OVERLAY");
     for (int i = 0; i < 3; ++i) {
@@ -93,13 +93,13 @@ SetupOverlay::~SetupOverlay()
     delete m_form_root;
 }
 
-QWidget *SetupOverlay::contentRow(int idx) const
+QWidget *SetupOverlay::get_content_row(int idx) const
 {
     if (idx < 0 || idx >= 3) return nullptr;
     return m_row[idx];
 }
 
-QHBoxLayout *SetupOverlay::rowLayout(int idx) const
+QHBoxLayout *SetupOverlay::get_row_layout(int idx) const
 {
     if (idx < 0 || idx >= 3) return nullptr;
     return m_row_layout[idx];
@@ -131,18 +131,16 @@ void SetupOverlay::setup_form()
 
         auto *title_lbl = new QLabel(title, wrap);
         title_lbl->setObjectName("SETUP_CARD_TITLE");
-        // Use plain monaco — matches the effective render of QGroupBox::title
-        // (its QSS font-weight: 700 doesn't actually bold the subcontrol on
-        // this style, so explicit bold here made these labels look heavier).
+        // Plain monaco: it matches how QGroupBox::title really renders (the stylesheet's
+        // bold does not reach that subcontrol), so bold here would look heavier.
         title_lbl->setFont(monaco);
         vl->addWidget(title_lbl);
 
         card->setParent(wrap);
         card->move(0, 0);
         if (!card->layout()) {
-            // Pin to original size — these QFrames have absolutely-positioned
-            // children, so we don't want the layout to stretch them vertically
-            // (would float the content mid-card, away from the title above).
+            // Pinned to the original size: the children are positioned absolutely, and a
+            // stretched frame would leave them floating away from the title.
             card->setFixedSize(orig_size);
         }
         card->show();
@@ -160,11 +158,8 @@ void SetupOverlay::setup_form()
     move_card(m_row_layout[0], m_ui->TCU_GRP,          m_row[0], tr("TCU"));
     move_card(m_row_layout[1], m_ui->DEVICES_GRP,      m_row[1], tr("Device"));
 
-    // Row 3 — Image Processing as a single full-width card whose body is a
-    // FlowLayout. The 6 sub-groups (ACCUMULATIVE / ADAPTIVE / DCP / IMAGE_3D /
-    // FISHNET / ECC) re-parent out of the legacy IMG_PROC_GRP into the flow,
-    // tiling left-to-right and wrapping when total width exceeds the card.
-    // IMG_PROC_GRP itself stays under m_form_root as an empty husk.
+    // Row 3: image processing as one full-width card with a FlowLayout body. The six
+    // sub-groups are re-parented into it and wrap when they exceed the card's width.
     auto *img_proc_card = new QGroupBox(tr("Image Processing"), m_row[2]);
     img_proc_card->setObjectName("IMG_PROC_FLOW");
     auto *flow = new FlowLayout(img_proc_card, 8, 8, 8);
@@ -191,10 +186,8 @@ void SetupOverlay::setup_form()
     sp.setVerticalPolicy(QSizePolicy::MinimumExpanding);
     sp.setHeightForWidth(true);
     img_proc_card->setSizePolicy(sp);
-    // Backstop minimum height: tallest sub-group (ECC=205) + groupbox title +
-    // margins. Guarantees the card shows full content even when the parent
-    // QVBoxLayout doesn't propagate heightForWidth. If sub-groups wrap to
-    // multiple rows on narrow displays, heightForWidth bumps this up further.
+    // Backstop minimum height: the tallest sub-group (ECC, 205) plus title and margins,
+    // for when the parent layout does not propagate heightForWidth.
     img_proc_card->setMinimumHeight(240);
     img_proc_card->show();
     m_row_layout[2]->addWidget(img_proc_card, 1);  // stretch factor: span full width
@@ -338,11 +331,9 @@ void SetupOverlay::bind()
                 update_distance_display();
             });
 
-    // editingFinished must write the EDT text into Config *before* emitting,
-    // otherwise downstream slots (e.g. DELAY_SLIDER::setMaximum via
-    // delay_slider_max_changed) read the stale value — data_exchange(true)
-    // doesn't run until the user leaves Setup mode. Mirrors the per-base_unit
-    // conversion in data_exchange(read=true).
+    // editingFinished has to write the text into Config before emitting: downstream
+    // slots (the slider maxima) read Config, and data_exchange(true) only runs when
+    // the operator leaves the setup mode.
     auto read_unit_field = [this, u](float &dst_meters, QLineEdit *edt) {
         if (!m_config) return;
         const float v = edt->text().toFloat();
@@ -407,7 +398,7 @@ void SetupOverlay::bind()
             [this, u](){
                 if (!m_config) return;
                 int idx = u->TCU_PS_CONFIG_LIST->currentIndex();
-                auto& ps = m_config->get_data().tcu.ps_step[idx];
+                auto &ps = m_config->get_data().tcu.ps_step[idx];
                 ps = std::min(std::max(u->PS_STEPPING_EDT->text().toUInt(), (uint)1), (uint)4000);
                 u->MAX_PS_STEP_EDT->setText(QString::number(int(std::round(4000. / ps))));
                 u->PS_STEPPING_EDT->setText(QString::number(ps));
@@ -419,7 +410,7 @@ void SetupOverlay::bind()
                 int idx = u->TCU_PS_CONFIG_LIST->currentIndex();
                 int max_step = std::min(std::max(u->MAX_PS_STEP_EDT->text().toInt(), 1), 100);
                 u->MAX_PS_STEP_EDT->setText(QString::number(max_step));
-                auto& ps = m_config->get_data().tcu.ps_step[idx];
+                auto &ps = m_config->get_data().tcu.ps_step[idx];
                 ps = int(std::round(4000. / max_step));
                 u->PS_STEPPING_EDT->setText(QString::number(ps));
                 emit ps_config_updated(false, idx, u->PS_STEPPING_EDT->text().toInt());
@@ -499,7 +490,7 @@ void SetupOverlay::bind()
     connect(u->FISHNET_THRESH_EDIT, &QLineEdit::editingFinished, this,
             [this, u](){
                 if (!m_config) return;
-                auto& ft = m_config->get_data().image_proc.fishnet_thresh;
+                auto &ft = m_config->get_data().image_proc.fishnet_thresh;
                 ft = u->FISHNET_THRESH_EDIT->text().toFloat();
                 u->FISHNET_THRESH_EDIT->setText(QString::number(ft, 'f', 2));
             });
@@ -534,10 +525,10 @@ void SetupOverlay::data_exchange(bool read)
 {
     if (!m_config || !m_ui) return;
     auto *u = m_ui;
-    auto& ip = m_config->get_data().image_proc;
-    auto& tcu = m_config->get_data().tcu;
-    auto& sv = m_config->get_data().save;
-    auto& dev = m_config->get_data().device;
+    auto &ip = m_config->get_data().image_proc;
+    auto &tcu = m_config->get_data().tcu;
+    auto &sv = m_config->get_data().save;
+    auto &dev = m_config->get_data().device;
 
     if (read) {
         dev.flip            = u->FLIP_OPTION_LIST->currentIndex();
@@ -717,7 +708,7 @@ void SetupOverlay::update_distance_display()
 {
     if (!m_config || !m_ui) return;
     auto *u = m_ui;
-    const auto& tcu = m_config->get_data().tcu;
+    const auto &tcu = m_config->get_data().tcu;
 
     switch (tcu.base_unit) {
     case 0:
@@ -814,7 +805,7 @@ void SetupOverlay::send_cmd(QString str)
 void SetupOverlay::toggle_laser(int id, bool /*on*/)
 {
     if (!m_config) return;
-    auto& laser_on = m_config->get_data().tcu.laser_on;
+    auto &laser_on = m_config->get_data().tcu.laser_on;
     laser_on ^= 1 << id;
     emit laser_toggled(laser_on);
 }

@@ -17,7 +17,7 @@
 
 namespace {
 
-const int kMaxPanoramaStops = 2000;
+const int MAX_PANORAMA_STOPS = 2000;
 
 int clamp_int(int value, int lo, int hi)
 {
@@ -28,14 +28,14 @@ int clamp_int(int value, int lo, int hi)
 
 } // namespace
 
-ScanOverlay::ScanOverlay(QWidget *parent)
-    : QFrame(parent),
-      m_scroll(nullptr),
-      m_cards_container(nullptr),
-      m_cards_layout(nullptr),
-      m_preview_sidebar(nullptr),
-      m_preview_layout(nullptr),
-      m_ctrl(nullptr)
+ScanOverlay::ScanOverlay(QWidget *parent) :
+    QFrame(parent),
+    m_scroll(nullptr),
+    m_cards_container(nullptr),
+    m_cards_layout(nullptr),
+    m_preview_sidebar(nullptr),
+    m_preview_layout(nullptr),
+    m_ctrl(nullptr)
 {
     setObjectName("SCAN_OVERLAY");
 
@@ -55,7 +55,7 @@ ScanOverlay::ScanOverlay(QWidget *parent)
     m_cards_layout = new QHBoxLayout(m_cards_container);
     m_cards_layout->setContentsMargins(0, 0, 0, 0);
     m_cards_layout->setSpacing(8);
-    // Callers insert cards then addStretch(1) — no trailing stretch here.
+    // callers insert the cards and then add the stretch
     m_scroll->setWidget(m_cards_container);
 
     // Right: fixed preview sidebar
@@ -76,10 +76,7 @@ ScanOverlay::ScanOverlay(QWidget *parent)
     root->addWidget(m_preview_sidebar);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// S22: ScanConfig replacement — bind widgets + controller, set up connections,
-// implement the same widget-sync slots ScanConfig used to provide.
-// ─────────────────────────────────────────────────────────────────────────────
+// binds the widgets and the controller and sets up the widget-sync slots
 
 void ScanOverlay::bind(ScanController *ctrl, const Widgets &w)
 {
@@ -140,46 +137,46 @@ void ScanOverlay::bind(ScanController *ctrl, const Widgets &w)
                 this, [this](int) { on_panorama_edit(); });
     }
 
-    loadFromParams();
+    load_from_params();
     setup_hz(0);
     setup_unit(0);
 }
 
-void ScanOverlay::loadFromParams()
+void ScanOverlay::load_from_params()
 {
     if (!m_ctrl) return;
-    ScanParams &p = m_ctrl->params();
+    ScanParams &p = m_ctrl->get_params();
     update_panorama_fov_from_zoom(p);
 
     if (!p.scan_delay_enabled && !p.scan_gate_width_enabled && !p.scan_ptz_enabled)
         p.scan_ptz_enabled = true;
 
-    auto setT = [](QLineEdit *e, const QString &s) { if (e) e->setText(s); };
-    auto setI = [&setT](QLineEdit *e, int v)       { setT(e, QString::number(v)); };
-    auto setF = [&setT](QLineEdit *e, double v, int prec = 2) {
-        setT(e, QString::number(v, 'f', prec));
+    auto set_t = [](QLineEdit *e, const QString &s) { if (e) e->setText(s); };
+    auto set_i = [&set_t](QLineEdit *e, int v)      { set_t(e, QString::number(v)); };
+    auto set_f = [&set_t](QLineEdit *e, double v, int prec = 2) {
+        set_t(e, QString::number(v, 'f', prec));
     };
 
     switch (p.base_unit) {
     case 0: case 1: // ns / μs
-        setI(m_w.start_delay_u, p.starting_delay / 1000);
-        setI(m_w.start_delay_n, p.starting_delay % 1000);
-        setI(m_w.end_delay_u,   p.ending_delay / 1000);
-        setI(m_w.end_delay_n,   p.ending_delay % 1000);
-        setI(m_w.start_gw_u,    p.starting_gw / 1000);
-        setI(m_w.start_gw_n,    p.starting_gw % 1000);
-        setI(m_w.end_gw_u,      p.ending_gw / 1000);
-        setI(m_w.end_gw_n,      p.ending_gw % 1000);
+        set_i(m_w.start_delay_u, p.starting_delay / 1000);
+        set_i(m_w.start_delay_n, p.starting_delay % 1000);
+        set_i(m_w.end_delay_u,   p.ending_delay / 1000);
+        set_i(m_w.end_delay_n,   p.ending_delay % 1000);
+        set_i(m_w.start_gw_u,    p.starting_gw / 1000);
+        set_i(m_w.start_gw_n,    p.starting_gw % 1000);
+        set_i(m_w.end_gw_u,      p.ending_gw / 1000);
+        set_i(m_w.end_gw_n,      p.ending_gw % 1000);
         break;
     case 2: // m
-        // legacy quirk preserved: M edits get gw values overwriting delay values
-        setI(m_w.start_gw_m, (int)(p.starting_gw * p.dist_ns));
-        setI(m_w.end_gw_m,   (int)(p.ending_gw   * p.dist_ns));
+        // known quirk kept: in metre mode the gate-width values overwrite the delay edits
+        set_i(m_w.start_gw_m, (int)(p.starting_gw * p.dist_ns));
+        set_i(m_w.end_gw_m,   (int)(p.ending_gw   * p.dist_ns));
         break;
     }
-    setI(m_w.frame_count, p.frame_count);
-    setF(m_w.step_delay,  p.step_size_delay);
-    setF(m_w.step_gw,     p.step_size_gw);
+    set_i(m_w.frame_count, p.frame_count);
+    set_f(m_w.step_delay,  p.step_size_delay);
+    set_f(m_w.step_gw,     p.step_size_gw);
     if (m_w.rep_freq) m_w.rep_freq->setText(QString::number(p.rep_freq));
 
     if (m_w.capture_ori) m_w.capture_ori->setChecked(p.capture_scan_ori);
@@ -187,36 +184,36 @@ void ScanOverlay::loadFromParams()
     if (m_w.record_ori)  m_w.record_ori ->setChecked(p.record_scan_ori);
     if (m_w.record_res)  m_w.record_res ->setChecked(p.record_scan_res);
 
-    auto setCheckedBlocked = [](QCheckBox *box, bool checked) {
+    auto set_checked_blocked = [](QCheckBox *box, bool checked) {
         if (!box) return;
         QSignalBlocker blocker(box);
         box->setChecked(checked);
     };
-    setCheckedBlocked(m_w.enable_delay, p.scan_delay_enabled);
-    setCheckedBlocked(m_w.enable_gate,  p.scan_gate_width_enabled);
-    setCheckedBlocked(m_w.enable_ptz,   p.scan_ptz_enabled);
+    set_checked_blocked(m_w.enable_delay, p.scan_delay_enabled);
+    set_checked_blocked(m_w.enable_gate,  p.scan_gate_width_enabled);
+    set_checked_blocked(m_w.enable_ptz,   p.scan_ptz_enabled);
 
-    setF(m_w.start_h, p.starting_h);
-    setF(m_w.start_v, p.starting_v);
-    setF(m_w.end_h,   p.ending_h);
-    setF(m_w.end_v,   p.ending_v);
-    setF(m_w.step_h,  p.step_h);
-    setF(m_w.step_v,  p.step_v);
-    setI(m_w.frame_h, p.count_h);
-    setI(m_w.frame_v, p.count_v);
-    setI(m_w.ptz_wait,       p.ptz_wait_time);
-    setI(m_w.num_single_pos, p.num_single_pos);
+    set_f(m_w.start_h, p.starting_h);
+    set_f(m_w.start_v, p.starting_v);
+    set_f(m_w.end_h,   p.ending_h);
+    set_f(m_w.end_v,   p.ending_v);
+    set_f(m_w.step_h,  p.step_h);
+    set_f(m_w.step_v,  p.step_v);
+    set_i(m_w.frame_h, p.count_h);
+    set_i(m_w.frame_v, p.count_v);
+    set_i(m_w.ptz_wait,       p.ptz_wait_time);
+    set_i(m_w.num_single_pos, p.num_single_pos);
 
     if (m_w.mode_grid)     m_w.mode_grid->setChecked(p.ptz_scan_mode == ScanParams::PTZ_SCAN_GRID);
     if (m_w.mode_panorama) m_w.mode_panorama->setChecked(p.ptz_scan_mode == ScanParams::PTZ_SCAN_PANORAMA);
-    setF(m_w.panorama_start_h, p.panorama_start_h);
+    set_f(m_w.panorama_start_h, p.panorama_start_h);
     if (m_w.panorama_use_end_h) m_w.panorama_use_end_h->setChecked(p.panorama_use_end_h);
-    setF(m_w.panorama_end_h,   p.panorama_end_h);
-    setF(m_w.panorama_fixed_v, p.panorama_fixed_v);
-    setF(m_w.panorama_step_h,  p.panorama_step_h);
-    setI(m_w.panorama_count,   p.panorama_count);
-    setI(m_w.panorama_wait,    p.panorama_wait_time);
-    setF(m_w.panorama_zoom,    p.panorama_zoom_level, 2);
+    set_f(m_w.panorama_end_h,   p.panorama_end_h);
+    set_f(m_w.panorama_fixed_v, p.panorama_fixed_v);
+    set_f(m_w.panorama_step_h,  p.panorama_step_h);
+    set_i(m_w.panorama_count,   p.panorama_count);
+    set_i(m_w.panorama_wait,    p.panorama_wait_time);
+    set_f(m_w.panorama_zoom,    p.panorama_zoom_level, 2);
     if (m_w.panorama_fusion) {
         QSignalBlocker block(m_w.panorama_fusion);
         m_w.panorama_fusion->setCurrentIndex(clamp_int(p.panorama_fusion_mode, 0, 2));
@@ -230,7 +227,7 @@ void ScanOverlay::loadFromParams()
 void ScanOverlay::setup_hz(int idx)
 {
     if (!m_ctrl) return;
-    ScanParams &p = m_ctrl->params();
+    ScanParams &p = m_ctrl->get_params();
     p.hz_unit = idx;
     switch (idx) {
     case 0: if (m_w.rep_freq)  m_w.rep_freq->setText(QString::number((int)p.rep_freq));
@@ -244,37 +241,37 @@ void ScanOverlay::setup_hz(int idx)
 void ScanOverlay::setup_unit(int idx)
 {
     if (!m_ctrl) return;
-    ScanParams &p = m_ctrl->params();
+    ScanParams &p = m_ctrl->get_params();
     p.base_unit = idx;
 
     auto sv = [](QWidget *w, bool v) { if (w) w->setVisible(v); };
 
-    const bool m_mode = (idx == 2);
-    sv(m_w.start_delay_m, m_mode); sv(m_w.end_delay_m, m_mode);
-    sv(m_w.start_gw_m,    m_mode); sv(m_w.end_gw_m,    m_mode);
-    sv(m_w.unit_m_1, m_mode); sv(m_w.unit_m_2, m_mode);
-    sv(m_w.unit_m_3, m_mode); sv(m_w.unit_m_4, m_mode);
-    sv(m_w.start_delay_u, !m_mode); sv(m_w.start_delay_n, !m_mode);
-    sv(m_w.end_delay_u,   !m_mode); sv(m_w.end_delay_n,   !m_mode);
-    sv(m_w.start_gw_u,    !m_mode); sv(m_w.start_gw_n,    !m_mode);
-    sv(m_w.end_gw_u,      !m_mode); sv(m_w.end_gw_n,      !m_mode);
-    sv(m_w.unit_us_1, !m_mode); sv(m_w.unit_us_2, !m_mode);
-    sv(m_w.unit_us_3, !m_mode); sv(m_w.unit_us_4, !m_mode);
-    sv(m_w.unit_ns_1, !m_mode); sv(m_w.unit_ns_2, !m_mode);
-    sv(m_w.unit_ns_3, !m_mode); sv(m_w.unit_ns_4, !m_mode);
+    const bool metre_mode = (idx == 2);
+    sv(m_w.start_delay_m, metre_mode); sv(m_w.end_delay_m, metre_mode);
+    sv(m_w.start_gw_m,    metre_mode); sv(m_w.end_gw_m,    metre_mode);
+    sv(m_w.unit_m_1, metre_mode); sv(m_w.unit_m_2, metre_mode);
+    sv(m_w.unit_m_3, metre_mode); sv(m_w.unit_m_4, metre_mode);
+    sv(m_w.start_delay_u, !metre_mode); sv(m_w.start_delay_n, !metre_mode);
+    sv(m_w.end_delay_u,   !metre_mode); sv(m_w.end_delay_n,   !metre_mode);
+    sv(m_w.start_gw_u,    !metre_mode); sv(m_w.start_gw_n,    !metre_mode);
+    sv(m_w.end_gw_u,      !metre_mode); sv(m_w.end_gw_n,      !metre_mode);
+    sv(m_w.unit_us_1, !metre_mode); sv(m_w.unit_us_2, !metre_mode);
+    sv(m_w.unit_us_3, !metre_mode); sv(m_w.unit_us_4, !metre_mode);
+    sv(m_w.unit_ns_1, !metre_mode); sv(m_w.unit_ns_2, !metre_mode);
+    sv(m_w.unit_ns_3, !metre_mode); sv(m_w.unit_ns_4, !metre_mode);
 
     if (m_w.step_delay) m_w.step_delay->setText(QString::number(
-        m_mode ? p.step_size_delay * p.dist_ns : p.step_size_delay, 'f', 2));
+        metre_mode ? p.step_size_delay * p.dist_ns : p.step_size_delay, 'f', 2));
     if (m_w.step_gw)    m_w.step_gw->setText(QString::number(
-        m_mode ? p.step_size_gw * p.dist_ns : p.step_size_gw, 'f', 2));
-    if (m_w.unit_1) m_w.unit_1->setText(m_mode ? "m" : "ns");
-    if (m_w.unit_2) m_w.unit_2->setText(m_mode ? "m" : "ns");
+        metre_mode ? p.step_size_gw * p.dist_ns : p.step_size_gw, 'f', 2));
+    if (m_w.unit_1) m_w.unit_1->setText(metre_mode ? "m" : "ns");
+    if (m_w.unit_2) m_w.unit_2->setText(metre_mode ? "m" : "ns");
 }
 
 void ScanOverlay::on_tcu_edit()
 {
     if (!m_ctrl) return;
-    ScanParams &p = m_ctrl->params();
+    ScanParams &p = m_ctrl->get_params();
 
     auto txt = [](QLineEdit *e) { return e ? e->text().toInt()   : 0; };
     auto txtf= [](QLineEdit *e) { return e ? e->text().toFloat() : 0.f; };
@@ -294,7 +291,7 @@ void ScanOverlay::on_tcu_edit()
             ? txt(m_w.end_gw_n)
             : txt(m_w.end_gw_u) * 1000 + txt(m_w.end_gw_n);
         break;
-    case 2: // m  (legacy uses GW_EDIT_M for both delay and gw — quirk preserved)
+    case 2: // m (GW_EDIT_M serves both delay and gate width, a quirk kept as is)
         p.starting_delay = txt(m_w.start_gw_m);
         p.ending_delay   = txt(m_w.end_gw_m);
         p.starting_gw    = txt(m_w.start_gw_m);
@@ -310,7 +307,8 @@ void ScanOverlay::on_tcu_edit()
         if (std::fabs(p.step_size_delay) < 1e-4f) {
             p.step_size_delay = 0;
             p.frame_count = 1;
-        } else {
+        }
+        else {
             p.step_size_gw  = 1.0f * (p.ending_gw - p.starting_gw) / (p.frame_count - 1);
             p.frame_count   = 1.0f * (p.ending_delay - p.starting_delay) / p.step_size_delay + 1;
         }
@@ -320,7 +318,8 @@ void ScanOverlay::on_tcu_edit()
         if (std::fabs(p.step_size_gw) < 1e-4f) {
             p.frame_count = 1;
             p.step_size_gw = 0;
-        } else {
+        }
+        else {
             p.frame_count     = 1.0f * (p.ending_delay - p.starting_delay) / p.step_size_delay + 1;
             p.step_size_delay = 1.0f * (p.ending_delay - p.starting_delay) / (p.frame_count - 1);
         }
@@ -331,7 +330,8 @@ void ScanOverlay::on_tcu_edit()
             p.frame_count = 1;
             p.step_size_delay = 0;
             p.step_size_gw    = 0;
-        } else {
+        }
+        else {
             p.step_size_delay = 1.0f * (p.ending_delay - p.starting_delay) / (p.frame_count - 1);
             p.step_size_gw    = 1.0f * (p.ending_gw    - p.starting_gw)    / (p.frame_count - 1);
             if (std::fabs(p.step_size_delay) < 1e-4f) p.step_size_delay = 1;
@@ -340,17 +340,17 @@ void ScanOverlay::on_tcu_edit()
     }
 
     if (m_w.frame_count) m_w.frame_count->setText(QString::number(p.frame_count));
-    const bool m_mode = (p.base_unit == 2);
+    const bool metre_mode = (p.base_unit == 2);
     if (m_w.step_delay) m_w.step_delay->setText(QString::number(
-        m_mode ? p.step_size_delay * p.dist_ns : p.step_size_delay, 'f', 2));
+        metre_mode ? p.step_size_delay * p.dist_ns : p.step_size_delay, 'f', 2));
     if (m_w.step_gw)    m_w.step_gw->setText(QString::number(
-        m_mode ? p.step_size_gw * p.dist_ns : p.step_size_gw, 'f', 2));
+        metre_mode ? p.step_size_gw * p.dist_ns : p.step_size_gw, 'f', 2));
 }
 
 void ScanOverlay::on_ptz_edit()
 {
     if (!m_ctrl) return;
-    ScanParams &p = m_ctrl->params();
+    ScanParams &p = m_ctrl->get_params();
     auto txtf = [](QLineEdit *e) { return e ? e->text().toFloat() : 0.f; };
     auto txti = [](QLineEdit *e) { return e ? e->text().toInt()   : 0; };
 
@@ -394,21 +394,21 @@ void ScanOverlay::on_ptz_edit()
     }
 }
 
-void ScanOverlay::on_capture_ori(int s) { if (m_ctrl) m_ctrl->params().capture_scan_ori = s; }
-void ScanOverlay::on_capture_res(int s) { if (m_ctrl) m_ctrl->params().capture_scan_res = s; }
-void ScanOverlay::on_record_ori (int s) { if (m_ctrl) m_ctrl->params().record_scan_ori  = s; }
-void ScanOverlay::on_record_res (int s) { if (m_ctrl) m_ctrl->params().record_scan_res  = s; }
+void ScanOverlay::on_capture_ori(int s) { if (m_ctrl) m_ctrl->get_params().capture_scan_ori = s; }
+void ScanOverlay::on_capture_res(int s) { if (m_ctrl) m_ctrl->get_params().capture_scan_res = s; }
+void ScanOverlay::on_record_ori (int s) { if (m_ctrl) m_ctrl->get_params().record_scan_ori  = s; }
+void ScanOverlay::on_record_res (int s) { if (m_ctrl) m_ctrl->get_params().record_scan_res  = s; }
 
 void ScanOverlay::on_dir_n()
 {
     if (m_w.dir_z) m_w.dir_z->setChecked(false);
-    if (m_ctrl) m_ctrl->params().ptz_direction = 0;
+    if (m_ctrl) m_ctrl->get_params().ptz_direction = 0;
 }
 
 void ScanOverlay::on_dir_z()
 {
     if (m_w.dir_n) m_w.dir_n->setChecked(false);
-    if (m_ctrl) m_ctrl->params().ptz_direction = 1;
+    if (m_ctrl) m_ctrl->get_params().ptz_direction = 1;
 }
 
 void ScanOverlay::on_ptz_wait_edit()
@@ -417,7 +417,7 @@ void ScanOverlay::on_ptz_wait_edit()
     int v = m_w.ptz_wait->text().toInt();
     if (v < 0)  v = 0;
     if (v > 20) v = 20;
-    m_ctrl->params().ptz_wait_time = v;
+    m_ctrl->get_params().ptz_wait_time = v;
     m_w.ptz_wait->setText(QString::number(v));
 }
 
@@ -427,21 +427,21 @@ void ScanOverlay::on_num_single_pos_edit()
     int v = m_w.num_single_pos->text().toInt();
     if (v < 1)  v = 1;
     if (v > 20) v = 20;
-    m_ctrl->params().num_single_pos = v;
+    m_ctrl->get_params().num_single_pos = v;
     m_w.num_single_pos->setText(QString::number(v));
 }
 
 void ScanOverlay::on_mode_grid()
 {
     if (m_w.mode_panorama) m_w.mode_panorama->setChecked(false);
-    if (m_ctrl) m_ctrl->params().ptz_scan_mode = ScanParams::PTZ_SCAN_GRID;
+    if (m_ctrl) m_ctrl->get_params().ptz_scan_mode = ScanParams::PTZ_SCAN_GRID;
     update_mode_enabled();
 }
 
 void ScanOverlay::on_mode_panorama()
 {
     if (m_w.mode_grid) m_w.mode_grid->setChecked(false);
-    if (m_ctrl) m_ctrl->params().ptz_scan_mode = ScanParams::PTZ_SCAN_PANORAMA;
+    if (m_ctrl) m_ctrl->get_params().ptz_scan_mode = ScanParams::PTZ_SCAN_PANORAMA;
     update_mode_enabled();
 }
 
@@ -463,7 +463,7 @@ void ScanOverlay::on_grid_section_toggled()
         ptz_enabled = m_w.enable_ptz && m_w.enable_ptz->isChecked();
     }
 
-    ScanParams &p = m_ctrl->params();
+    ScanParams &p = m_ctrl->get_params();
     p.scan_delay_enabled = delay_enabled;
     p.scan_gate_width_enabled = gate_enabled;
     p.scan_ptz_enabled = ptz_enabled;
@@ -474,10 +474,10 @@ void ScanOverlay::on_panorama_edit()
 {
     if (!m_ctrl) return;
 
-    ScanParams &p = m_ctrl->params();
+    ScanParams &p = m_ctrl->get_params();
     auto txtf = [](QLineEdit *e) { return e ? e->text().toFloat() : 0.f; };
     auto txti = [](QLineEdit *e) { return e ? e->text().toInt()   : 0; };
-    auto setF = [](QLineEdit *e, float v, int prec = 2) {
+    auto set_f = [](QLineEdit *e, float v, int prec = 2) {
         if (e) e->setText(QString::number(v, 'f', prec));
     };
 
@@ -502,15 +502,18 @@ void ScanOverlay::on_panorama_edit()
         if (step < 1e-4f) step = p.panorama_fov_h > 0.0f ? p.panorama_fov_h : 360.0f;
         p.panorama_step_h = step;
         count = get_panorama_stop_count(p);
-    } else if (src == m_w.panorama_count) {
-        count = clamp_int(count, 1, kMaxPanoramaStops);
+    }
+    else if (src == m_w.panorama_count) {
+        count = clamp_int(count, 1, MAX_PANORAMA_STOPS);
         const float sweep = get_panorama_sweep_degrees(p);
         const int segments = p.panorama_use_end_h ? qMax(1, count - 1) : count;
         p.panorama_step_h = sweep / static_cast<float>(segments);
-    } else {
+    }
+    else {
         if (src == m_w.panorama_zoom) {
             p.panorama_step_h = p.panorama_fov_h > 0.0f ? p.panorama_fov_h : p.panorama_step_h;
-        } else {
+        }
+        else {
             p.panorama_step_h = std::fabs(step);
             if (p.panorama_step_h < 1e-4f) {
                 p.panorama_step_h = p.panorama_fov_h > 0.0f ? p.panorama_fov_h : 360.0f;
@@ -521,14 +524,14 @@ void ScanOverlay::on_panorama_edit()
 
     p.panorama_count = count;
 
-    setF(m_w.panorama_start_h, p.panorama_start_h);
+    set_f(m_w.panorama_start_h, p.panorama_start_h);
     if (m_w.panorama_use_end_h) m_w.panorama_use_end_h->setChecked(p.panorama_use_end_h);
-    setF(m_w.panorama_end_h, p.panorama_end_h);
-    setF(m_w.panorama_fixed_v, p.panorama_fixed_v);
-    setF(m_w.panorama_step_h, p.panorama_step_h);
+    set_f(m_w.panorama_end_h, p.panorama_end_h);
+    set_f(m_w.panorama_fixed_v, p.panorama_fixed_v);
+    set_f(m_w.panorama_step_h, p.panorama_step_h);
     if (m_w.panorama_count) m_w.panorama_count->setText(QString::number(p.panorama_count));
     if (m_w.panorama_wait) m_w.panorama_wait->setText(QString::number(p.panorama_wait_time));
-    setF(m_w.panorama_zoom, p.panorama_zoom_level, 2);
+    set_f(m_w.panorama_zoom, p.panorama_zoom_level, 2);
     if (m_w.panorama_fusion && m_w.panorama_fusion->currentIndex() != p.panorama_fusion_mode) {
         QSignalBlocker block(m_w.panorama_fusion);
         m_w.panorama_fusion->setCurrentIndex(p.panorama_fusion_mode);
@@ -539,14 +542,14 @@ void ScanOverlay::on_panorama_edit()
 void ScanOverlay::on_panorama_cw()
 {
     if (m_w.panorama_ccw) m_w.panorama_ccw->setChecked(false);
-    if (m_ctrl) m_ctrl->params().panorama_direction = 0;
+    if (m_ctrl) m_ctrl->get_params().panorama_direction = 0;
     on_panorama_edit();
 }
 
 void ScanOverlay::on_panorama_ccw()
 {
     if (m_w.panorama_cw) m_w.panorama_cw->setChecked(false);
-    if (m_ctrl) m_ctrl->params().panorama_direction = 1;
+    if (m_ctrl) m_ctrl->get_params().panorama_direction = 1;
     on_panorama_edit();
 }
 
@@ -554,7 +557,7 @@ void ScanOverlay::update_mode_enabled()
 {
     if (!m_ctrl) return;
 
-    const ScanParams &p = m_ctrl->params();
+    const ScanParams &p = m_ctrl->get_params();
     const bool grid_mode = (p.ptz_scan_mode == ScanParams::PTZ_SCAN_GRID);
     const bool panorama_mode = !grid_mode;
 
@@ -573,5 +576,5 @@ void ScanOverlay::update_mode_enabled()
 
     if (m_w.mode_grid) m_w.mode_grid->setEnabled(true);
     if (m_w.mode_panorama) m_w.mode_panorama->setEnabled(true);
-    if (m_w.panorama_end_h) m_w.panorama_end_h->setEnabled(panorama_mode && m_ctrl->params().panorama_use_end_h);
+    if (m_w.panorama_end_h) m_w.panorama_end_h->setEnabled(panorama_mode && m_ctrl->get_params().panorama_use_end_h);
 }

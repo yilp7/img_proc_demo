@@ -9,7 +9,7 @@ class TestConstants : public QObject
 
 private slots:
     // TC-C-001: Pelco shared protocol constants
-    void pelcoSharedConstants()
+    void pelco_shared_constants()
     {
         QCOMPARE(SYNC_BYTE, (unsigned char)0xFF);
         QCOMPARE(MIN_SPEED, (unsigned char)0x01);
@@ -18,7 +18,7 @@ private slots:
     }
 
     // TC-C-002: Angle encoding constants
-    void angleConstants()
+    void angle_constants()
     {
         QCOMPARE(ANGLE_SCALE, 100);
         QCOMPARE(FULL_ROTATION, 36000);
@@ -27,7 +27,7 @@ private slots:
     }
 
     // TC-C-003: TCU protocol constants
-    void tcuProtocolConstants()
+    void tcu_protocol_constants()
     {
         QCOMPARE(TCU_HEAD, (unsigned char)0x88);
         QCOMPARE(TCU_TAIL, (unsigned char)0x99);
@@ -37,14 +37,14 @@ private slots:
     }
 
     // TC-C-004: Physics constant
-    void physicsConstant()
+    void physics_constant()
     {
         double expected = 3e8 * 1e-9 / 2; // ~0.15 m/ns
         QCOMPARE(LIGHT_SPEED_M_NS, expected);
     }
 
     // TC-C-005: Pipeline constants
-    void pipelineConstants()
+    void pipeline_constants()
     {
         QCOMPARE(MAX_QUEUE_SIZE, 5);
         QCOMPARE(AUTO_MCP_DIVISOR, 200);

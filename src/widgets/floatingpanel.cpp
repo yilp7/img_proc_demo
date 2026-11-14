@@ -7,8 +7,8 @@
 #include <QVBoxLayout>
 
 namespace {
-const int kHeaderHeight = 28;
-const int kButtonSize   = 20;
+const int HEADER_HEIGHT = 28;
+const int BUTTON_SIZE   = 20;
 }
 
 FloatingPanel::FloatingPanel(QWidget *parent) :
@@ -29,7 +29,7 @@ FloatingPanel::FloatingPanel(QWidget *parent) :
 
     m_header = new QWidget(this);
     m_header->setObjectName("FloatingPanelHeader");
-    m_header->setFixedHeight(kHeaderHeight);
+    m_header->setFixedHeight(HEADER_HEIGHT);
     m_header->setAttribute(Qt::WA_StyledBackground, true);
     m_header->setCursor(Qt::OpenHandCursor);
 
@@ -39,12 +39,12 @@ FloatingPanel::FloatingPanel(QWidget *parent) :
     m_pin_button = new QPushButton(QStringLiteral("pin"), m_header);
     m_pin_button->setObjectName("FloatingPanelPin");
     m_pin_button->setCheckable(true);
-    m_pin_button->setFixedSize(kButtonSize * 2, kButtonSize);
+    m_pin_button->setFixedSize(BUTTON_SIZE * 2, BUTTON_SIZE);
     m_pin_button->setFocusPolicy(Qt::NoFocus);
 
     m_hide_button = new QPushButton(QStringLiteral("X"), m_header);
     m_hide_button->setObjectName("FloatingPanelHide");
-    m_hide_button->setFixedSize(kButtonSize, kButtonSize);
+    m_hide_button->setFixedSize(BUTTON_SIZE, BUTTON_SIZE);
     m_hide_button->setFocusPolicy(Qt::NoFocus);
 
     QHBoxLayout *header_layout = new QHBoxLayout(m_header);
@@ -63,42 +63,42 @@ FloatingPanel::FloatingPanel(QWidget *parent) :
     m_root_layout->addWidget(m_header);
     m_root_layout->addLayout(m_content_layout, 1);
 
-    connect(m_pin_button,  &QPushButton::clicked, this, &FloatingPanel::onPinClicked);
-    connect(m_hide_button, &QPushButton::clicked, this, &FloatingPanel::onHideClicked);
+    connect(m_pin_button,  &QPushButton::clicked, this, &FloatingPanel::on_pin_clicked);
+    connect(m_hide_button, &QPushButton::clicked, this, &FloatingPanel::on_hide_clicked);
 }
 
-void FloatingPanel::setTitle(const QString &title)
+void FloatingPanel::set_title(const QString &title)
 {
     m_title_label->setText(title);
     setWindowTitle(title);
 }
 
-QString FloatingPanel::title() const
+QString FloatingPanel::get_title() const
 {
     return m_title_label->text();
 }
 
-void FloatingPanel::setPinned(bool pinned)
+void FloatingPanel::set_pinned(bool pinned)
 {
     if (m_pinned == pinned) return;
     m_pinned = pinned;
     m_pin_button->setChecked(pinned);
     m_header->setCursor(pinned ? Qt::ArrowCursor : Qt::OpenHandCursor);
     if (pinned && m_dragging) m_dragging = false;
-    emit pinToggled(pinned);
+    emit pin_toggled(pinned);
 }
 
-QPoint FloatingPanel::clampToParent(const QPoint &desiredTopLeft,
-                                    const QSize &panelSize,
-                                    const QSize &parentSize)
+QPoint FloatingPanel::clamp_to_parent(const QPoint &desired_top_left,
+                                      const QSize &panel_size,
+                                      const QSize &parent_size)
 {
     // Parent smaller than panel on an axis: clamp to 0 on that axis (no
     // negative coords; caller's layout decides how to handle oversized
     // panels, which should not occur in practice).
-    const int max_x = qMax(0, parentSize.width()  - panelSize.width());
-    const int max_y = qMax(0, parentSize.height() - panelSize.height());
-    const int x = qBound(0, desiredTopLeft.x(), max_x);
-    const int y = qBound(0, desiredTopLeft.y(), max_y);
+    const int max_x = qMax(0, parent_size.width()  - panel_size.width());
+    const int max_y = qMax(0, parent_size.height() - panel_size.height());
+    const int x = qBound(0, desired_top_left.x(), max_x);
+    const int y = qBound(0, desired_top_left.y(), max_y);
     return QPoint(x, y);
 }
 
@@ -114,7 +114,7 @@ void FloatingPanel::mousePressEvent(QMouseEvent *event)
     // Drag only when the press is on the header band and not on a button.
     // Use the fixed header height rather than m_header->geometry(), so the
     // hit-test works before the layout has been activated.
-    if (!m_pinned && event->pos().y() >= 0 && event->pos().y() < kHeaderHeight) {
+    if (!m_pinned && event->pos().y() >= 0 && event->pos().y() < HEADER_HEIGHT) {
         const QWidget *child = m_header->childAt(m_header->mapFrom(this, event->pos()));
         const bool on_button = (child == m_pin_button || child == m_hide_button);
         if (!on_button) {
@@ -133,7 +133,7 @@ void FloatingPanel::mouseMoveEvent(QMouseEvent *event)
         const QPoint global = event->globalPos();
         const QPoint parent_local = parentWidget()->mapFromGlobal(global);
         const QPoint desired = parent_local - m_press_offset;
-        const QPoint clamped = clampToParent(desired, size(), parentWidget()->size());
+        const QPoint clamped = clamp_to_parent(desired, size(), parentWidget()->size());
         if (pos() != clamped) {
             move(clamped);
             emit dragged(clamped);
@@ -152,13 +152,13 @@ void FloatingPanel::mouseReleaseEvent(QMouseEvent *event)
     QWidget::mouseReleaseEvent(event);
 }
 
-void FloatingPanel::onPinClicked()
+void FloatingPanel::on_pin_clicked()
 {
-    setPinned(m_pin_button->isChecked());
+    set_pinned(m_pin_button->isChecked());
 }
 
-void FloatingPanel::onHideClicked()
+void FloatingPanel::on_hide_clicked()
 {
-    emit hideRequested();
+    emit hide_requested();
     hide();
 }

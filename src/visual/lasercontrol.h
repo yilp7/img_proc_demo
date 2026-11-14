@@ -37,14 +37,14 @@ signals:
     void com_write(int id, QByteArray cmd);
 
 private:
-    Ui::LaserControl *ui;
+    Ui::LaserControl *m_ui;
 
-    bool   pressed;
-    QPoint prev_pos;
+    bool   m_pressed;
+    QPoint m_prev_pos;
 
-    Lens         *p_lens;
-    QButtonGroup *laser_control;
-    uchar        speed[4];
+    Lens         *m_p_lens;
+    QButtonGroup *m_laser_control;
+    uchar        m_speed[4];
 };
 
 #endif // LASERCONTROL_H

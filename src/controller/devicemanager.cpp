@@ -6,32 +6,32 @@
 #include <QTimer>
 
 namespace {
-QString portStyleState(bool serial_connected, bool network_connected = false)
+QString port_style_state(bool serial_connected, bool network_connected = false)
 {
     QString state = (serial_connected || network_connected) ? QStringLiteral("connected") : QStringLiteral("error");
     if (network_connected) state += QStringLiteral("|network");
     return state;
 }
 
-QString portStyleState(qint32 status)
+QString port_style_state(qint32 status)
 {
-    return portStyleState(status & ControlPort::SERIAL_CONNECTED,
-                          status & ControlPort::TCP_CONNECTED);
+    return port_style_state(status & ControlPort::SERIAL_CONNECTED,
+                            status & ControlPort::TCP_CONNECTED);
 }
 
-QString activeState(bool active)
+QString active_state(bool active)
 {
     return active ? QStringLiteral("active") : QStringLiteral("inactive");
 }
 
-float normalizeHorizontalAngle(float angle)
+float normalize_horizontal_angle(float angle)
 {
     float normalized = std::fmod(angle, 360.0f);
     if (normalized < 0.0f) normalized += 360.0f;
     return normalized;
 }
 
-int directionForVelocity(float h_velocity, float v_velocity)
+int direction_for_velocity(float h_velocity, float v_velocity)
 {
     const bool left = h_velocity < 0.0f;
     const bool right = h_velocity > 0.0f;
@@ -49,175 +49,174 @@ int directionForVelocity(float h_velocity, float v_velocity)
     return -1;
 }
 
-int normalizedPtzSpeed(float velocity)
+int normalized_ptz_speed(float velocity)
 {
-    constexpr float MaxProtocolVelocity = 60.0f;
-    constexpr float MaxDeviceSpeed = 64.0f;
-    const float magnitude = std::min(std::abs(velocity), MaxProtocolVelocity);
+    constexpr float MAX_PROTOCOL_VELOCITY = 60.0f;
+    constexpr float MAX_DEVICE_SPEED = 64.0f;
+    const float magnitude = std::min(std::abs(velocity), MAX_PROTOCOL_VELOCITY);
     if (magnitude < 0.005f) return 0;
-    return std::max(1, static_cast<int>(std::lround(magnitude * MaxDeviceSpeed
-                                                    / MaxProtocolVelocity)));
+    return std::max(1, static_cast<int>(std::lround(magnitude * MAX_DEVICE_SPEED
+                                                    / MAX_PROTOCOL_VELOCITY)));
 }
 }
 
-DeviceManager::DeviceManager(Config *config, QObject *parent)
-    : QObject(parent),
-      m_config(config),
-      p_tcu(nullptr),
-      p_lens(nullptr),
-      p_laser(nullptr),
-      p_ptz(nullptr),
-      p_rf(nullptr),
-      p_usbcan(nullptr),
-      p_udpptz(nullptr),
-      active_ptz(nullptr),
-      th_tcu(nullptr),
-      th_lens(nullptr),
-      th_laser(nullptr),
-      th_ptz(nullptr),
-      th_rf(nullptr),
-      th_usbcan(nullptr),
-      th_udpptz(nullptr),
-      serial_port{nullptr},
-      serial_port_connected{false},
-      tcp_port{nullptr},
-      use_tcp{false},
-      share_serial_port(false),
-      ptz_speed(32),
-      angle_h(0),
-      angle_v(0)
+DeviceManager::DeviceManager(Config *config, QObject *parent) :
+    QObject(parent),
+    m_config(config),
+    m_p_tcu(nullptr),
+    m_p_lens(nullptr),
+    m_p_laser(nullptr),
+    m_p_ptz(nullptr),
+    m_p_rf(nullptr),
+    m_p_usbcan(nullptr),
+    m_p_udpptz(nullptr),
+    m_active_ptz(nullptr),
+    m_th_tcu(nullptr),
+    m_th_lens(nullptr),
+    m_th_laser(nullptr),
+    m_th_ptz(nullptr),
+    m_th_rf(nullptr),
+    m_th_usbcan(nullptr),
+    m_th_udpptz(nullptr),
+    m_serial_port{nullptr},
+    m_serial_port_connected{false},
+    m_tcp_port{nullptr},
+    m_use_tcp{false},
+    m_share_serial_port(false),
+    m_ptz_speed(32),
+    m_angle_h(0),
+    m_angle_v(0)
 {
 }
 
 DeviceManager::~DeviceManager()
 {
-    th_tcu->quit();
-    th_lens->quit();
-    th_laser->quit();
-    th_ptz->quit();
-    th_rf->quit();
+    m_th_tcu->quit();
+    m_th_lens->quit();
+    m_th_laser->quit();
+    m_th_ptz->quit();
+    m_th_rf->quit();
 
     // Wait for I/O threads to finish - 100ms is sufficient for serial/TCP operations
-    th_tcu->wait(100);
-    th_lens->wait(100);
-    th_laser->wait(100);
-    th_ptz->wait(100);
-    th_rf->wait(100);
+    m_th_tcu->wait(100);
+    m_th_lens->wait(100);
+    m_th_laser->wait(100);
+    m_th_ptz->wait(100);
+    m_th_rf->wait(100);
 
-    th_tcu->deleteLater();
-    th_lens->deleteLater();
-    th_laser->deleteLater();
-    th_ptz->deleteLater();
-    th_rf->deleteLater();
-    p_tcu->deleteLater();
-    p_lens->deleteLater();
-    p_laser->deleteLater();
-    p_ptz->deleteLater();
-    p_rf->deleteLater();
+    m_th_tcu->deleteLater();
+    m_th_lens->deleteLater();
+    m_th_laser->deleteLater();
+    m_th_ptz->deleteLater();
+    m_th_rf->deleteLater();
+    m_p_tcu->deleteLater();
+    m_p_lens->deleteLater();
+    m_p_laser->deleteLater();
+    m_p_ptz->deleteLater();
+    m_p_rf->deleteLater();
 
-    th_usbcan->quit();
-    th_usbcan->wait(100);
-    th_usbcan->deleteLater();
-    p_usbcan->deleteLater();
+    m_th_usbcan->quit();
+    m_th_usbcan->wait(100);
+    m_th_usbcan->deleteLater();
+    m_p_usbcan->deleteLater();
 
-    th_udpptz->quit();
-    th_udpptz->wait(100);
-    th_udpptz->deleteLater();
-    p_udpptz->deleteLater();
+    m_th_udpptz->quit();
+    m_th_udpptz->wait(100);
+    m_th_udpptz->deleteLater();
+    m_p_udpptz->deleteLater();
 }
 
 void DeviceManager::init()
 {
     // Serial/TCP port objects
-    for (int i = 0; i < 5; i++) serial_port[i] = new QSerialPort(parent());
-    for (int i = 0; i < 5; i++) tcp_port[i] = new QTcpSocket(parent());
+    for (int i = 0; i < 5; i++) m_serial_port[i] = new QSerialPort(parent());
+    for (int i = 0; i < 5; i++) m_tcp_port[i] = new QTcpSocket(parent());
 
     // Create port objects and threads
-    p_tcu   = new TCU(0);
-    p_lens  = new Lens(1);
-    p_laser = new Laser(2);
-    p_ptz   = new PTZ(3);
-    p_rf    = new RangeFinder(4);
-    th_tcu   = new QThread(parent());
-    th_lens  = new QThread(parent());
-    th_laser = new QThread(parent());
-    th_ptz   = new QThread(parent());
-    th_rf    = new QThread(parent());
-    p_tcu  ->moveToThread(th_tcu);
-    p_lens ->moveToThread(th_lens);
-    p_laser->moveToThread(th_laser);
-    p_ptz  ->moveToThread(th_ptz);
-    p_rf   ->moveToThread(th_rf);
-    th_tcu  ->start();
-    th_lens ->start();
-    th_laser->start();
-    th_ptz  ->start();
-    th_rf   ->start();
+    m_p_tcu   = new TCU(0);
+    m_p_lens  = new Lens(1);
+    m_p_laser = new Laser(2);
+    m_p_ptz   = new PTZ(3);
+    m_p_rf    = new RangeFinder(4);
+    m_th_tcu   = new QThread(parent());
+    m_th_lens  = new QThread(parent());
+    m_th_laser = new QThread(parent());
+    m_th_ptz   = new QThread(parent());
+    m_th_rf    = new QThread(parent());
+    m_p_tcu  ->moveToThread(m_th_tcu);
+    m_p_lens ->moveToThread(m_th_lens);
+    m_p_laser->moveToThread(m_th_laser);
+    m_p_ptz  ->moveToThread(m_th_ptz);
+    m_p_rf   ->moveToThread(m_th_rf);
+    m_th_tcu  ->start();
+    m_th_lens ->start();
+    m_th_laser->start();
+    m_th_ptz  ->start();
+    m_th_rf   ->start();
 
     // TCU connections (internal)
-    connect(p_tcu, &ControlPort::port_status_updated, this, [this]() { update_port_status(0); });
-    connect(p_tcu, &ControlPort::port_io_log, this, &DeviceManager::port_io_log, Qt::QueuedConnection);
-    connect(p_tcu, &TCU::tcu_param_updated, this, &DeviceManager::tcu_param_updated);
-    connect(this, SIGNAL(send_double_tcu_msg(qint32, double)), p_tcu, SLOT(set_user_param(qint32, double)), Qt::QueuedConnection);
-    connect(this, SIGNAL(send_uint_tcu_msg(qint32, uint)), p_tcu, SLOT(set_user_param(qint32, uint)), Qt::QueuedConnection);
+    connect(m_p_tcu, &ControlPort::port_status_updated, this, [this]() { update_port_status(0); });
+    connect(m_p_tcu, &ControlPort::port_io_log, this, &DeviceManager::port_io_log, Qt::QueuedConnection);
+    connect(m_p_tcu, &TCU::tcu_param_updated, this, &DeviceManager::tcu_param_updated);
+    connect(this, SIGNAL(send_double_tcu_msg(qint32, double)), m_p_tcu, SLOT(set_user_param(qint32, double)), Qt::QueuedConnection);
+    connect(this, SIGNAL(send_uint_tcu_msg(qint32, uint)), m_p_tcu, SLOT(set_user_param(qint32, uint)), Qt::QueuedConnection);
 
     // Lens connections
-    connect(p_lens, &ControlPort::port_status_updated, this, [this]() { update_port_status(1); });
-    connect(p_lens, &ControlPort::port_io_log, this, &DeviceManager::port_io_log, Qt::QueuedConnection);
-    connect(p_lens, &Lens::lens_param_updated, this, &DeviceManager::lens_param_updated);
-    connect(this, SIGNAL(send_lens_msg(qint32, uint)), p_lens, SLOT(lens_control(qint32, uint)), Qt::QueuedConnection);
-    connect(this, SIGNAL(set_lens_pos(qint32, uint)), p_lens, SLOT(set_pos_temp(qint32, uint)), Qt::QueuedConnection);
+    connect(m_p_lens, &ControlPort::port_status_updated, this, [this]() { update_port_status(1); });
+    connect(m_p_lens, &ControlPort::port_io_log, this, &DeviceManager::port_io_log, Qt::QueuedConnection);
+    connect(m_p_lens, &Lens::lens_param_updated, this, &DeviceManager::lens_param_updated);
+    connect(this, SIGNAL(send_lens_msg(qint32, uint)), m_p_lens, SLOT(lens_control(qint32, uint)), Qt::QueuedConnection);
+    connect(this, SIGNAL(set_lens_pos(qint32, uint)), m_p_lens, SLOT(set_pos_temp(qint32, uint)), Qt::QueuedConnection);
 
     // Laser connections
-    connect(p_laser, &ControlPort::port_status_updated, this, [this]() { update_port_status(2); });
-    connect(this, SIGNAL(send_laser_msg(QString)), p_laser, SLOT(laser_control(QString)), Qt::QueuedConnection);
+    connect(m_p_laser, &ControlPort::port_status_updated, this, [this]() { update_port_status(2); });
+    connect(this, SIGNAL(send_laser_msg(QString)), m_p_laser, SLOT(laser_control(QString)), Qt::QueuedConnection);
 
     // PTZ connections
-    connect(p_ptz, &ControlPort::port_status_updated, this, [this]() {
+    connect(m_p_ptz, &ControlPort::port_status_updated, this, [this]() {
         update_port_status(3);
-        bool connected = p_ptz->get_port_status() & (ControlPort::SERIAL_CONNECTED | ControlPort::TCP_CONNECTED);
-        if (connected) active_ptz = p_ptz;
+        bool connected = m_p_ptz->get_port_status() & (ControlPort::SERIAL_CONNECTED | ControlPort::TCP_CONNECTED);
+        if (connected) m_active_ptz = m_p_ptz;
         emit ptz_type_enable_changed(!connected);
     });
-    connect(p_ptz, &ControlPort::port_io_log, this, &DeviceManager::port_io_log, Qt::QueuedConnection);
-    connect(p_ptz, &PTZ::ptz_param_updated, this, &DeviceManager::update_ptz_params);
-    connect(p_ptz, &PTZ::angle_updated, this, &DeviceManager::update_ptz_angle);
-    connect(this, SIGNAL(send_ptz_msg(qint32, double)), p_ptz, SLOT(ptz_control(qint32, double)), Qt::QueuedConnection);
+    connect(m_p_ptz, &ControlPort::port_io_log, this, &DeviceManager::port_io_log, Qt::QueuedConnection);
+    connect(m_p_ptz, &PTZ::ptz_param_updated, this, &DeviceManager::update_ptz_params);
+    connect(m_p_ptz, &PTZ::angle_updated, this, &DeviceManager::update_ptz_angle);
+    connect(this, SIGNAL(send_ptz_msg(qint32, double)), m_p_ptz, SLOT(ptz_control(qint32, double)), Qt::QueuedConnection);
 
     // RangeFinder connections
-    connect(p_rf, &RangeFinder::distance_updated, this, &DeviceManager::distance_updated);
+    connect(m_p_rf, &RangeFinder::distance_updated, this, &DeviceManager::distance_updated);
 
     // USBCAN
-    p_usbcan = new USBCAN();
-    th_usbcan = new QThread(parent());
-    p_usbcan->moveToThread(th_usbcan);
-    th_usbcan->start();
-    connect(p_usbcan, &USBCAN::angle_updated, this, &DeviceManager::update_ptz_angle);
-    connect(p_usbcan, &USBCAN::connection_status_changed, this, [this](bool connected) {
-        if (connected) active_ptz = p_usbcan;
+    m_p_usbcan = new USBCAN();
+    m_th_usbcan = new QThread(parent());
+    m_p_usbcan->moveToThread(m_th_usbcan);
+    m_th_usbcan->start();
+    connect(m_p_usbcan, &USBCAN::angle_updated, this, &DeviceManager::update_ptz_angle);
+    connect(m_p_usbcan, &USBCAN::connection_status_changed, this, [this](bool connected) {
+        if (connected) m_active_ptz = m_p_usbcan;
         emit ptz_type_enable_changed(!connected);
     });
-    connect(p_usbcan, &USBCAN::connection_status_changed, this, &DeviceManager::update_ptz_status);
-    connect(p_usbcan, &USBCAN::connect_to, this, [this]() { emit ptz_type_enable_changed(false); });
-    connect(p_usbcan, &USBCAN::disconnect_from, this, [this]() { emit ptz_type_enable_changed(true); });
+    connect(m_p_usbcan, &USBCAN::connection_status_changed, this, &DeviceManager::update_ptz_status);
+    connect(m_p_usbcan, &USBCAN::connect_to, this, [this]() { emit ptz_type_enable_changed(false); });
+    connect(m_p_usbcan, &USBCAN::disconnect_from, this, [this]() { emit ptz_type_enable_changed(true); });
 
     // UDPPTZ
-    p_udpptz = new UDPPTZ();
-    th_udpptz = new QThread(parent());
-    p_udpptz->moveToThread(th_udpptz);
-    th_udpptz->start();
-    connect(p_udpptz, &UDPPTZ::angle_updated, this, &DeviceManager::update_ptz_angle);
-    connect(p_udpptz, &UDPPTZ::connection_status_changed, this, [this](bool connected) {
-        if (connected) active_ptz = p_udpptz;
+    m_p_udpptz = new UDPPTZ();
+    m_th_udpptz = new QThread(parent());
+    m_p_udpptz->moveToThread(m_th_udpptz);
+    m_th_udpptz->start();
+    connect(m_p_udpptz, &UDPPTZ::angle_updated, this, &DeviceManager::update_ptz_angle);
+    connect(m_p_udpptz, &UDPPTZ::connection_status_changed, this, [this](bool connected) {
+        if (connected) m_active_ptz = m_p_udpptz;
         emit ptz_type_enable_changed(!connected);
     });
-    connect(p_udpptz, &UDPPTZ::connection_status_changed, this, &DeviceManager::update_ptz_status);
-    connect(p_udpptz, &UDPPTZ::connect_to, this, [this]() { emit ptz_type_enable_changed(false); });
-    connect(p_udpptz, &UDPPTZ::disconnect_from, this, [this]() { emit ptz_type_enable_changed(true); });
+    connect(m_p_udpptz, &UDPPTZ::connection_status_changed, this, &DeviceManager::update_ptz_status);
+    connect(m_p_udpptz, &UDPPTZ::connect_to, this, [this]() { emit ptz_type_enable_changed(false); });
+    connect(m_p_udpptz, &UDPPTZ::disconnect_from, this, [this]() { emit ptz_type_enable_changed(true); });
 
-    active_ptz = nullptr;
+    m_active_ptz = nullptr;
 
-    // Initialize PTZ status display
     update_ptz_status();
 }
 
@@ -226,10 +225,10 @@ void DeviceManager::connect_port(int port_idx, QString port_text)
     ControlPort *port = nullptr;
     QString *config_port = nullptr;
     switch (port_idx) {
-    case 0: port = p_tcu;   config_port = &m_config->get_data().com_tcu.port;   break;
-    case 1: port = p_lens;  config_port = &m_config->get_data().com_lens.port;  break;
-    case 2: port = p_laser; config_port = &m_config->get_data().com_laser.port; break;
-    case 4: port = p_rf;    config_port = &m_config->get_data().com_range.port; break;
+    case 0: port = m_p_tcu;   config_port = &m_config->get_data().com_tcu.port;   break;
+    case 1: port = m_p_lens;  config_port = &m_config->get_data().com_lens.port;  break;
+    case 2: port = m_p_laser; config_port = &m_config->get_data().com_laser.port; break;
+    case 4: port = m_p_rf;    config_port = &m_config->get_data().com_range.port; break;
     default: return;
     }
     port->emit connect_to_serial(port_text);
@@ -245,16 +244,16 @@ void DeviceManager::connect_ptz_port(QString port_text)
 {
     switch (m_config->get_data().device.ptz_type) {
     case 0:
-        if (port_text.isEmpty()) p_ptz->emit disconnect_from(true);
-        else p_ptz->emit connect_to_serial(port_text);
+        if (port_text.isEmpty()) m_p_ptz->emit disconnect_from(true);
+        else m_p_ptz->emit connect_to_serial(port_text);
         break;
     case 1:
-        if (port_text.isEmpty()) p_usbcan->emit disconnect_from();
-        else p_usbcan->emit connect_to();
+        if (port_text.isEmpty()) m_p_usbcan->emit disconnect_from();
+        else m_p_usbcan->emit connect_to();
         break;
     case 2:
-        if (port_text.isEmpty()) p_udpptz->emit disconnect_from();
-        else p_udpptz->emit connect_to();
+        if (port_text.isEmpty()) m_p_udpptz->emit disconnect_from();
+        else m_p_udpptz->emit connect_to();
         break;
     }
 #ifdef WIN32
@@ -273,8 +272,8 @@ void DeviceManager::setup_serial_port(QSerialPort **port, int id, QString port_n
         QThread::msleep(10);
         (*port)->clear();
         qDebug("COM%s connected\n", qPrintable(port_num));
-        serial_port_connected[id] = true;
-        emit port_label_style_changed(id, portStyleState(true));
+        m_serial_port_connected[id] = true;
+        emit port_label_style_changed(id, port_style_state(true));
 
         (*port)->setBaudRate(baud_rate);
         (*port)->setDataBits(QSerialPort::Data8);
@@ -285,7 +284,7 @@ void DeviceManager::setup_serial_port(QSerialPort **port, int id, QString port_n
         // send initial data
         switch (id) {
         case 0:
-            emit send_double_tcu_msg(TCU::LASER_USR, p_tcu->get(TCU::LASER_WIDTH));
+            emit send_double_tcu_msg(TCU::LASER_USR, m_p_tcu->get(TCU::LASER_WIDTH));
             break;
         case 2:
             emit get_lens_param_requested();
@@ -296,8 +295,8 @@ void DeviceManager::setup_serial_port(QSerialPort **port, int id, QString port_n
         emit baudrate_display_requested(id, baud_rate);
     }
     else {
-        serial_port_connected[id] = false;
-        emit port_label_style_changed(id, portStyleState(false));
+        m_serial_port_connected[id] = false;
+        emit port_label_style_changed(id, port_style_state(false));
     }
 }
 
@@ -305,15 +304,15 @@ void DeviceManager::update_port_status(int port_idx)
 {
     ControlPort *port = nullptr;
     switch (port_idx) {
-    case 0: port = p_tcu;   break;
-    case 1: port = p_lens;  break;
-    case 2: port = p_laser; break;
-    case 3: port = p_ptz;   break;
-    case 4: port = p_rf;    break;
+    case 0: port = m_p_tcu;   break;
+    case 1: port = m_p_lens;  break;
+    case 2: port = m_p_laser; break;
+    case 3: port = m_p_ptz;   break;
+    case 4: port = m_p_rf;    break;
     default: return;
     }
     qint32 port_status = port->get_port_status();
-    emit port_label_style_changed(port_idx, portStyleState(port_status));
+    emit port_label_style_changed(port_idx, port_style_state(port_status));
 }
 
 void DeviceManager::update_port_status(int connected_status, bool dummy)
@@ -325,33 +324,32 @@ void DeviceManager::update_port_status(int connected_status, bool dummy)
 void DeviceManager::update_ptz_params(qint32 ptz_param, double val)
 {
     Q_UNUSED(val);
-    switch (ptz_param)
-    {
-        case PTZ::NO_PARAM:
-            update_ptz_angle((float)p_ptz->get(PTZ::ANGLE_H), (float)p_ptz->get(PTZ::ANGLE_V));
-            emit ptz_speed_display_changed(std::round(p_ptz->get(PTZ::SPEED)), "");
-            break;
-        default:break;
+    switch (ptz_param) {
+    case PTZ::NO_PARAM:
+        update_ptz_angle((float)m_p_ptz->get(PTZ::ANGLE_H), (float)m_p_ptz->get(PTZ::ANGLE_V));
+        emit ptz_speed_display_changed(std::round(m_p_ptz->get(PTZ::SPEED)), "");
+        break;
+    default:break;
     }
 }
 
-void DeviceManager::update_ptz_angle(float _h, float _v)
+void DeviceManager::update_ptz_angle(float h, float v)
 {
-    angle_h.store(_h);
-    angle_v.store(_v);
-    const float display_h = to_display_ptz_angle_h(_h);
-    emit angle_display_updated(QString::asprintf("%06.2f", display_h), QString::asprintf("%05.2f", _v));
-    emit ptz_angle_changed(_h, _v);
+    m_angle_h.store(h);
+    m_angle_v.store(v);
+    const float display_h = to_display_ptz_angle_h(h);
+    emit angle_display_updated(QString::asprintf("%06.2f", display_h), QString::asprintf("%05.2f", v));
+    emit ptz_angle_changed(h, v);
 }
 
 float DeviceManager::to_display_ptz_angle_h(float device_angle) const
 {
-    return normalizeHorizontalAngle(device_angle - m_config->get_data().device.ptz_zero_angle_h);
+    return normalize_horizontal_angle(device_angle - m_config->get_data().device.ptz_zero_angle_h);
 }
 
 float DeviceManager::to_device_ptz_angle_h(float display_angle) const
 {
-    return normalizeHorizontalAngle(display_angle + m_config->get_data().device.ptz_zero_angle_h);
+    return normalize_horizontal_angle(display_angle + m_config->get_data().device.ptz_zero_angle_h);
 }
 
 void DeviceManager::update_ptz_status()
@@ -363,17 +361,17 @@ void DeviceManager::update_ptz_status()
     case 0: // pelco-p - use existing ControlPort status
         return; // ControlPort handles this automatically
     case 1: // usbcan - treat as serial connection when connected
-        connected = p_usbcan->is_connected();
+        connected = m_p_usbcan->is_connected();
         is_network = false;
         break;
     case 2: // udp-scw - treat as network connection when connected
-        connected = p_udpptz->is_connected();
+        connected = m_p_udpptz->is_connected();
         is_network = true;
         break;
     }
 
-    emit port_label_style_changed(3, portStyleState(connected && !is_network,
-                                                    connected && is_network)); // 3 = PTZ_COM
+    emit port_label_style_changed(3, port_style_state(connected && !is_network,
+                                                      connected && is_network)); // 3 = PTZ_COM
 }
 
 void DeviceManager::ptz_button_pressed(int id)
@@ -385,23 +383,24 @@ void DeviceManager::ptz_button_pressed(int id)
         switch (ptz_type) {
         case 0: emit send_ptz_msg(PTZ::SELF_CHECK); break;
         case 1:
-            p_usbcan->emit transmit(USBCAN::OFF);
+            m_p_usbcan->emit transmit(USBCAN::OFF);
             QThread::msleep(1000);
-            p_usbcan->emit transmit(USBCAN::SELF_CHECK);
+            m_p_usbcan->emit transmit(USBCAN::SELF_CHECK);
             QThread::msleep(1000);
-            p_usbcan->emit transmit(USBCAN::LOCK);
+            m_p_usbcan->emit transmit(USBCAN::LOCK);
             QThread::msleep(1000);
             break;
-        case 2: p_udpptz->emit transmit(UDPPTZ::RETURN_ZERO); break;
+        case 2: m_p_udpptz->emit transmit(UDPPTZ::RETURN_ZERO); break;
         }
         return;
     }
 
     if (ptz_type == 0) {
-        emit send_ptz_msg(PTZ::SPEED, ptz_speed);
+        emit send_ptz_msg(PTZ::SPEED, m_ptz_speed);
         emit send_ptz_msg(id + 1);
-    } else if (active_ptz) {
-        active_ptz->ptz_move(id, ptz_speed);
+    }
+    else if (m_active_ptz) {
+        m_active_ptz->ptz_move(id, m_ptz_speed);
     }
 }
 
@@ -410,18 +409,19 @@ void DeviceManager::ptz_button_released(int id)
     if (id == 4) return;
     if (m_config->get_data().device.ptz_type == 0)
         emit send_ptz_msg(PTZ::STOP);
-    else if (active_ptz)
-        active_ptz->ptz_stop();
+    else if (m_active_ptz)
+        m_active_ptz->ptz_stop();
 }
 
 void DeviceManager::ptz_stop_btn_clicked()
 {
     if (m_config->get_data().device.ptz_type == 2) {
-        // UDPPTZ STANDBY (0x01) — explicit STOP. Joystick-release still uses
-        // ptz_stop() which sends MANUAL_SEARCH (0x04) with zero velocity.
-        if (p_udpptz) p_udpptz->emit transmit(UDPPTZ::STANDBY);
-    } else if (active_ptz) {
-        active_ptz->ptz_stop();
+        // UDPPTZ STANDBY (0x01) is an explicit stop. Joystick release still goes through
+        // ptz_stop(), which sends MANUAL_SEARCH (0x04) with zero velocity.
+        if (m_p_udpptz) m_p_udpptz->emit transmit(UDPPTZ::STANDBY);
+    }
+    else if (m_active_ptz) {
+        m_active_ptz->ptz_stop();
     }
 }
 
@@ -429,9 +429,9 @@ void DeviceManager::set_ptz_speed(int speed)
 {
     if (speed > 64) speed = 64;
     if (speed < 1)  speed = 1;
-    ptz_speed = speed;
-    emit send_ptz_msg(PTZ::SPEED, ptz_speed);
-    emit ptz_speed_display_changed(ptz_speed, QString::number(ptz_speed));
+    m_ptz_speed = speed;
+    emit send_ptz_msg(PTZ::SPEED, m_ptz_speed);
+    emit ptz_speed_display_changed(m_ptz_speed, QString::number(m_ptz_speed));
 }
 
 void DeviceManager::ptz_move_hv(int id, int h_speed, int v_speed)
@@ -448,40 +448,32 @@ void DeviceManager::ptz_move_hv(int id, int h_speed, int v_speed)
         emit send_ptz_msg(PTZ::SPEED_H, h_speed);
         emit send_ptz_msg(PTZ::SPEED_V, v_speed);
         emit send_ptz_msg(id + 1);
-    } else if (active_ptz) {
-        // UDPPTZ overrides ptz_move_2d to use its native h_vel/v_vel.
-        // USBCAN falls back to the IPTZController default (single-speed
-        // max(h, v)) until/unless its protocol gains a 2D variant.
-        // Deliberately do NOT update DeviceManager::ptz_speed here —
-        // that field is the user's slider value and is read back by
-        // ptz_button_pressed for Classic-panel direction buttons. The
-        // joystick path uses its own independent speeds and shouldn't
-        // overwrite the slider.
-        active_ptz->ptz_move_2d(id, h_speed, v_speed);
     }
-    // Deliberately do NOT emit ptz_speed_display_changed here. That would
-    // drive the PTZ_SPEED_SLIDER, whose valueChanged is wired back to
-    // set_ptz_speed → PTZ::SPEED, which clobbers pan_speed/tilt_speed
-    // with a single scalar and ruins the per-axis independence on the
-    // next direction command. The slider stays at whatever the user set
-    // it to manually (its role here is a "max speed" override).
+    else if (m_active_ptz) {
+        // UDPPTZ moves with its own h/v velocities; USBCAN uses the single-speed default.
+        // m_ptz_speed is the operator's slider value, read back by the direction buttons,
+        // so the joystick path must not overwrite it.
+        m_active_ptz->ptz_move_2d(id, h_speed, v_speed);
+    }
+    // No ptz_speed_display_changed here: it would drive the speed slider, whose
+    // valueChanged writes PTZ::SPEED and replaces the two per-axis speeds with one.
 }
 
 void DeviceManager::ptz_move_velocity(float h_velocity, float v_velocity)
 {
-    constexpr float MaxProtocolVelocity = 60.0f;
-    h_velocity = std::max(-MaxProtocolVelocity, std::min(MaxProtocolVelocity, h_velocity));
-    v_velocity = std::max(-MaxProtocolVelocity, std::min(MaxProtocolVelocity, v_velocity));
+    constexpr float MAX_PROTOCOL_VELOCITY = 60.0f;
+    h_velocity = std::max(-MAX_PROTOCOL_VELOCITY, std::min(MAX_PROTOCOL_VELOCITY, h_velocity));
+    v_velocity = std::max(-MAX_PROTOCOL_VELOCITY, std::min(MAX_PROTOCOL_VELOCITY, v_velocity));
 
     const int ptz_type = m_config->get_data().device.ptz_type;
     if (ptz_type == 2) {
-        if (p_udpptz && p_udpptz->is_connected()) {
-            p_udpptz->ptz_move_velocity(h_velocity, v_velocity);
+        if (m_p_udpptz && m_p_udpptz->is_connected()) {
+            m_p_udpptz->ptz_move_velocity(h_velocity, v_velocity);
         }
         return;
     }
 
-    const int direction = directionForVelocity(h_velocity, v_velocity);
+    const int direction = direction_for_velocity(h_velocity, v_velocity);
     if (direction < 0) {
         ptz_button_released(-1);
         return;
@@ -489,17 +481,18 @@ void DeviceManager::ptz_move_velocity(float h_velocity, float v_velocity)
 
     // Pelco and USB-CAN expose the application's normalized 1..64 speed
     // range rather than physical angular velocity, so scale the G3 range.
-    ptz_move_hv(direction, normalizedPtzSpeed(h_velocity),
-                normalizedPtzSpeed(v_velocity));
+    ptz_move_hv(direction, normalized_ptz_speed(h_velocity),
+                normalized_ptz_speed(v_velocity));
 }
 
 void DeviceManager::set_ptz_angle()
 {
     if (m_config->get_data().device.ptz_type == 0) {
-        emit send_ptz_msg(PTZ::SET_H, angle_h.load());
-        emit send_ptz_msg(PTZ::SET_V, angle_v.load());
-    } else if (active_ptz) {
-        active_ptz->ptz_set_angle(angle_h.load(), angle_v.load());
+        emit send_ptz_msg(PTZ::SET_H, m_angle_h.load());
+        emit send_ptz_msg(PTZ::SET_V, m_angle_v.load());
+    }
+    else if (m_active_ptz) {
+        m_active_ptz->ptz_set_angle(m_angle_h.load(), m_angle_v.load());
     }
 }
 
@@ -508,8 +501,9 @@ void DeviceManager::send_ptz_angle(float h, float v)
     if (m_config->get_data().device.ptz_type == 0) {
         emit send_ptz_msg(PTZ::SET_H, h);
         emit send_ptz_msg(PTZ::SET_V, v);
-    } else if (active_ptz) {
-        active_ptz->ptz_set_angle(h, v);
+    }
+    else if (m_active_ptz) {
+        m_active_ptz->ptz_set_angle(h, v);
     }
 }
 
@@ -517,16 +511,16 @@ void DeviceManager::send_ptz_angle_h(float h)
 {
     if (m_config->get_data().device.ptz_type == 0)
         emit send_ptz_msg(PTZ::SET_H, h);
-    else if (active_ptz)
-        active_ptz->ptz_set_angle_h(h);
+    else if (m_active_ptz)
+        m_active_ptz->ptz_set_angle_h(h);
 }
 
 void DeviceManager::send_ptz_angle_v(float v)
 {
     if (m_config->get_data().device.ptz_type == 0)
         emit send_ptz_msg(PTZ::SET_V, v);
-    else if (active_ptz)
-        active_ptz->ptz_set_angle_v(v);
+    else if (m_active_ptz)
+        m_active_ptz->ptz_set_angle_v(v);
 }
 
 void DeviceManager::point_ptz_to_target(QPoint target, int display_width, int display_height)
@@ -542,42 +536,42 @@ void DeviceManager::point_ptz_to_target(QPoint target, int display_width, int di
 
 void DeviceManager::ptz_follow_offset(float h, float v)
 {
-    // FOLLOW (0x05) parameters are an offset from the frame centre, not an
-    // absolute bearing — (0, 0) therefore means "track whatever is centred".
-    if (m_config->get_data().device.ptz_type != 2 || !p_udpptz || !p_udpptz->is_connected())
+    // FOLLOW (0x05) takes an offset from the frame centre, not an absolute bearing,
+    // so (0, 0) means "track whatever is centred".
+    if (m_config->get_data().device.ptz_type != 2 || !m_p_udpptz || !m_p_udpptz->is_connected())
         return;
 
-    p_udpptz->ptz_follow(h, v);
+    m_p_udpptz->ptz_follow(h, v);
 }
 
 void DeviceManager::vid_camera_pressed(int operation)
 {
-    if (!p_udpptz || !p_udpptz->is_connected()) return;
+    if (!m_p_udpptz || !m_p_udpptz->is_connected()) return;
     // Zoom and focus are continuous: they hold the single command slot until
     // released, so anything else driving that slot has to stand down.
-    vid_camera_held_flag.store(true);
+    m_vid_camera_held_flag.store(true);
     emit vid_camera_btn_text(operation, "x");
-    p_udpptz->emit transmit(operation);
+    m_p_udpptz->emit transmit(operation);
 }
 
 void DeviceManager::vid_camera_released()
 {
-    vid_camera_held_flag.store(false);
-    if (!p_udpptz || !p_udpptz->is_connected()) return;
+    m_vid_camera_held_flag.store(false);
+    if (!m_p_udpptz || !m_p_udpptz->is_connected()) return;
     emit vid_camera_buttons_reset();
-    p_udpptz->emit transmit(UDPPTZ::STOP);
+    m_p_udpptz->emit transmit(UDPPTZ::STOP);
 }
 
 void DeviceManager::vid_defog_toggled(bool checked)
 {
-    emit vid_btn_style_changed("VL_DEFOG_BTN", activeState(checked));
-    if (!p_udpptz || !p_udpptz->is_connected()) return;
-    p_udpptz->emit transmit(checked ? UDPPTZ::VL_DEFOG_ON : UDPPTZ::VL_DEFOG_OFF);
+    emit vid_btn_style_changed("VL_DEFOG_BTN", active_state(checked));
+    if (!m_p_udpptz || !m_p_udpptz->is_connected()) return;
+    m_p_udpptz->emit transmit(checked ? UDPPTZ::VL_DEFOG_ON : UDPPTZ::VL_DEFOG_OFF);
 }
 
 void DeviceManager::vid_ir_power_toggled(bool checked)
 {
-    if (!p_udpptz || !p_udpptz->is_connected()) return;
+    if (!m_p_udpptz || !m_p_udpptz->is_connected()) return;
 
     // Manual IR power-off requires confirmation. Protocol-driven state
     // updates call apply_vid_ir_power_state() directly and bypass this prompt.
@@ -596,79 +590,78 @@ void DeviceManager::vid_ir_power_toggled(bool checked)
 
 void DeviceManager::apply_vid_ir_power_state(bool checked)
 {
-    emit vid_btn_style_changed("IR_POWER_BTN", activeState(checked));
-    if (!p_udpptz || !p_udpptz->is_connected()) return;
-    p_udpptz->emit transmit(checked ? UDPPTZ::IR_POWER_ON : UDPPTZ::IR_POWER_OFF);
+    emit vid_btn_style_changed("IR_POWER_BTN", active_state(checked));
+    if (!m_p_udpptz || !m_p_udpptz->is_connected()) return;
+    m_p_udpptz->emit transmit(checked ? UDPPTZ::IR_POWER_ON : UDPPTZ::IR_POWER_OFF);
 }
 
 void DeviceManager::vid_ir_auto_focus_clicked()
 {
-    if (!p_udpptz || !p_udpptz->is_connected()) return;
-    p_udpptz->emit transmit(UDPPTZ::IR_AUTO_FOCUS);
+    if (!m_p_udpptz || !m_p_udpptz->is_connected()) return;
+    m_p_udpptz->emit transmit(UDPPTZ::IR_AUTO_FOCUS);
 }
 
 void DeviceManager::vid_ldm_toggled(bool checked)
 {
-    if (!p_udpptz || !p_udpptz->is_connected()) return;
-    p_udpptz->emit transmit(checked ? UDPPTZ::LASER_ON : UDPPTZ::LASER_OFF);
-    emit vid_btn_style_changed("LDM_BTN", activeState(checked));
+    if (!m_p_udpptz || !m_p_udpptz->is_connected()) return;
+    m_p_udpptz->emit transmit(checked ? UDPPTZ::LASER_ON : UDPPTZ::LASER_OFF);
+    emit vid_btn_style_changed("LDM_BTN", active_state(checked));
 }
 
 void DeviceManager::vid_video_source_toggled(bool checked)
 {
-    if (!p_udpptz || !p_udpptz->is_connected()) return;
-    p_udpptz->emit transmit(checked ? UDPPTZ::SWITCH_IR : UDPPTZ::SWITCH_VL);
+    if (!m_p_udpptz || !m_p_udpptz->is_connected()) return;
+    m_p_udpptz->emit transmit(checked ? UDPPTZ::SWITCH_IR : UDPPTZ::SWITCH_VL);
     emit vid_btn_text_changed("VIDEO_SOURCE_BTN", checked ? tr("Switch to VL") : tr("Switch to IR"));
 }
 
 void DeviceManager::vid_osd_toggled(bool checked)
 {
-    if (!p_udpptz || !p_udpptz->is_connected()) return;
-    p_udpptz->emit transmit(checked ? UDPPTZ::OSD_FULL : UDPPTZ::OSD_HIDE);
-    emit vid_btn_style_changed("OSD_BTN", activeState(checked));
+    if (!m_p_udpptz || !m_p_udpptz->is_connected()) return;
+    m_p_udpptz->emit transmit(checked ? UDPPTZ::OSD_FULL : UDPPTZ::OSD_HIDE);
+    emit vid_btn_style_changed("OSD_BTN", active_state(checked));
 }
 
 void DeviceManager::set_baudrate(int idx, int baudrate)
 {
     switch (idx) {
-        case 0: p_tcu->set_baudrate(baudrate); break;
-        case 1: break;
-        case 2: p_lens->set_baudrate(baudrate); break;
-        case 3: p_laser->set_baudrate(baudrate); break;
-        case 4: p_ptz->set_baudrate(baudrate); break;
-        default: break;
+    case 0: m_p_tcu->set_baudrate(baudrate); break;
+    case 1: break;
+    case 2: m_p_lens->set_baudrate(baudrate); break;
+    case 3: m_p_laser->set_baudrate(baudrate); break;
+    case 4: m_p_ptz->set_baudrate(baudrate); break;
+    default: break;
     }
 }
 
 void DeviceManager::set_tcp_status_on_port(int idx, bool use_tcp)
 {
     switch (idx) {
-        case 0: p_tcu->set_use_tcp(use_tcp); break;
-        case 1: break;
-        case 2: p_lens->set_use_tcp(use_tcp); break;
-        case 3: p_laser->set_use_tcp(use_tcp); break;
-        case 4: p_ptz->set_use_tcp(use_tcp); break;
-        default: break;
+    case 0: m_p_tcu->set_use_tcp(use_tcp); break;
+    case 1: break;
+    case 2: m_p_lens->set_use_tcp(use_tcp); break;
+    case 3: m_p_laser->set_use_tcp(use_tcp); break;
+    case 4: m_p_ptz->set_use_tcp(use_tcp); break;
+    default: break;
     }
 }
 
 void DeviceManager::set_tcu_as_shared_port(bool share)
 {
-    p_lens->share_port_from(share ? p_tcu : nullptr);
-    p_ptz->share_port_from(share ? p_tcu : nullptr);
+    m_p_lens->share_port_from(share ? m_p_tcu : nullptr);
+    m_p_ptz->share_port_from(share ? m_p_tcu : nullptr);
 }
 
 void DeviceManager::com_write_data(int com_idx, QByteArray data)
 {
     ControlPort *temp = nullptr;
-    switch (com_idx)
-    {
-        case 0: temp = p_tcu; break;
-        case 1: break;
-        case 2: temp = p_lens; break;
-        case 3: temp = p_laser; break;
-        case 4: temp = p_ptz; break;
-        default: break;
+    switch (com_idx) {
+    case 0: temp = m_p_tcu; break;
+    case 1: break;
+    case 2: temp = m_p_lens; break;
+    case 3: temp = m_p_laser; break;
+    case 4: temp = m_p_ptz; break;
+    default: break;
     }
     if (temp) temp->emit send_data(data, 0, 100);
 }
@@ -677,11 +670,11 @@ void DeviceManager::display_port_info(int idx)
 {
     ControlPort *cp = nullptr;
     switch (idx) {
-    case 0: cp = p_tcu; break;
+    case 0: cp = m_p_tcu; break;
     case 1: emit baudrate_display_requested(idx, 0); return;
-    case 2: cp = p_lens; break;
-    case 3: cp = p_laser; break;
-    case 4: cp = p_ptz; break;
+    case 2: cp = m_p_lens; break;
+    case 3: cp = m_p_laser; break;
+    case 4: cp = m_p_ptz; break;
     default: break;
     }
     if (cp) {
@@ -692,18 +685,18 @@ void DeviceManager::display_port_info(int idx)
 
 void DeviceManager::connect_to_serial_server_tcp(QString server_ip)
 {
-    p_tcu->emit connect_to_tcp(server_ip, 10001);
+    m_p_tcu->emit connect_to_tcp(server_ip, 10001);
     QThread::msleep(200);
-    p_lens->emit connect_to_tcp(server_ip, 10002);
+    m_p_lens->emit connect_to_tcp(server_ip, 10002);
     QThread::msleep(200);
-    p_rf->emit connect_to_tcp(server_ip, 10003);
+    m_p_rf->emit connect_to_tcp(server_ip, 10003);
 
     QTimer::singleShot(1000,
     [this]()
     {
-        const bool tcu_ok  = ControlPort::TCP_CONNECTED & p_tcu->get_port_status();
-        const bool lens_ok = ControlPort::TCP_CONNECTED & p_lens->get_port_status();
-        const bool rf_ok   = ControlPort::TCP_CONNECTED & p_rf->get_port_status();
+        const bool tcu_ok  = ControlPort::TCP_CONNECTED & m_p_tcu->get_port_status();
+        const bool lens_ok = ControlPort::TCP_CONNECTED & m_p_lens->get_port_status();
+        const bool rf_ok   = ControlPort::TCP_CONNECTED & m_p_rf->get_port_status();
         if (tcu_ok && lens_ok && rf_ok) {
             emit tcp_server_chk_update(true, true);
         }
@@ -717,7 +710,7 @@ void DeviceManager::connect_to_serial_server_tcp(QString server_ip)
 
 void DeviceManager::disconnect_from_serial_server_tcp()
 {
-    p_tcu-> emit disconnect_from(true);
-    p_lens->emit disconnect_from(true);
+    m_p_tcu-> emit disconnect_from(true);
+    m_p_lens->emit disconnect_from(true);
     emit tcp_server_chk_update(false, false);
 }

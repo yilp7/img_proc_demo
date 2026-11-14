@@ -6,7 +6,8 @@
 #include <QLabel>
 #include <queue>
 
-class TimedQueue : public QThread {
+class TimedQueue : public QThread
+{
     Q_OBJECT
 public:
     TimedQueue(double expiration_time);
@@ -22,11 +23,11 @@ protected:
     void run();
 
 private:
-    QMutex mtx;
-    bool _quit;
-    double expiration_time;
-    std::queue<struct timespec> q;
-    QLabel* fps_status;
+    QMutex m_mtx;
+    bool m_quit;
+    double m_expiration_time;
+    std::queue<struct timespec> m_q;
+    QLabel *m_fps_status;
 };
 
 #endif // TIMEDQUEUE_H

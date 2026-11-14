@@ -9,11 +9,11 @@ class TestImageIO : public QObject
 
 private slots:
     // TC-IO-001: BMP save/load grayscale 8-bit
-    void bmpSaveLoadGrayscale8Bit()
+    void bmp_save_load_grayscale8_bit()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString path = tmpDir.path() + "/test.bmp";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString path = tmp_dir.path() + "/test.bmp";
 
         // Create 100x100 CV_8U gradient image: pixel(r,c) = (r+c) % 256
         cv::Mat img(100, 100, CV_8U);
@@ -39,11 +39,11 @@ private slots:
     }
 
     // TC-IO-002: BMP save/load color 3-channel
-    void bmpSaveLoadColor3Channel()
+    void bmp_save_load_color3_channel()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString path = tmpDir.path() + "/test_color.bmp";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString path = tmp_dir.path() + "/test_color.bmp";
 
         // Create 100x100 CV_8UC3 with different values per channel
         cv::Mat img(100, 100, CV_8UC3);
@@ -64,65 +64,58 @@ private slots:
         QCOMPARE(loaded.size(), img.size());
         QCOMPARE(loaded.channels(), 3);
 
-        // BMP save does BGR->RGB conversion internally.
-        // The round-trip (save then imread which reads as BGR) should
-        // produce data consistent with the original after accounting
-        // for the channel swap. Verify size and channel count are correct;
-        // exact pixel matching depends on the BGR/RGB convention used.
+        // BMP save converts BGR to RGB internally, so exact pixels depend on the channel
+        // convention. Only size and channel count are checked here.
     }
 
     // TC-IO-003: BMP with NOTE metadata
-    void bmpSaveWithNoteMetadata()
+    void bmp_save_with_note_metadata()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString pathWithNote = tmpDir.path() + "/test_note.bmp";
-        QString pathPlain = tmpDir.path() + "/test_plain.bmp";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString path_with_note = tmp_dir.path() + "/test_note.bmp";
+        QString path_plain = tmp_dir.path() + "/test_plain.bmp";
 
         // Create 50x50 CV_8U image
         cv::Mat img(50, 50, CV_8U, cv::Scalar(128));
 
         // Save with note and without note
-        ImageIO::save_image_bmp(img, pathPlain);
-        ImageIO::save_image_bmp(img, pathWithNote, "Test note 12345");
+        ImageIO::save_image_bmp(img, path_plain);
+        ImageIO::save_image_bmp(img, path_with_note, "Test note 12345");
 
-        // Verify both files exist
-        QVERIFY(QFile::exists(pathPlain));
-        QVERIFY(QFile::exists(pathWithNote));
+        QVERIFY(QFile::exists(path_plain));
+        QVERIFY(QFile::exists(path_with_note));
 
         // File with note should be larger than the plain BMP
-        QFileInfo plainInfo(pathPlain);
-        QFileInfo noteInfo(pathWithNote);
-        QVERIFY2(noteInfo.size() > plainInfo.size(),
+        QFileInfo plain_info(path_plain);
+        QFileInfo note_info(path_with_note);
+        QVERIFY2(note_info.size() > plain_info.size(),
                  qPrintable(QString("BMP with note (%1 bytes) should be larger than plain BMP (%2 bytes)")
-                            .arg(noteInfo.size()).arg(plainInfo.size())));
+                            .arg(note_info.size()).arg(plain_info.size())));
 
         // Read the file with note as binary and verify "NOTE" magic bytes
         // are present after the pixel data
-        QFile noteFile(pathWithNote);
-        QVERIFY(noteFile.open(QIODevice::ReadOnly));
-        QByteArray fileData = noteFile.readAll();
-        noteFile.close();
+        QFile note_file(path_with_note);
+        QVERIFY(note_file.open(QIODevice::ReadOnly));
+        QByteArray file_data = note_file.readAll();
+        note_file.close();
 
-        // Search for "NOTE" magic bytes in the file
-        int noteIndex = fileData.indexOf("NOTE");
-        QVERIFY2(noteIndex >= 0, "\"NOTE\" magic bytes not found in BMP file with note");
+        int note_index = file_data.indexOf("NOTE");
+        QVERIFY2(note_index >= 0, "\"NOTE\" magic bytes not found in BMP file with note");
 
-        // The NOTE marker should appear after the pixel data (after the BMP
-        // header + color table + pixel data), not at the beginning
-        // BMP header = 54 bytes, color table for 8-bit = 256*4 = 1024 bytes
-        // So NOTE should be well past the header area
-        QVERIFY2(noteIndex > 54,
+        // NOTE has to come after the pixel data: the header is 54 bytes and the 8-bit
+        // colour table 1024, so it must be well past the header.
+        QVERIFY2(note_index > 54,
                  qPrintable(QString("NOTE marker at offset %1 should be after BMP header (54+)")
-                            .arg(noteIndex)));
+                            .arg(note_index)));
     }
 
     // TC-IO-004: TIF save/load 16-bit
-    void tifSaveLoad16Bit()
+    void tif_save_load16_bit()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString path = tmpDir.path() + "/test16.tif";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString path = tmp_dir.path() + "/test16.tif";
 
         // Create 100x100 CV_16U image with values spanning 0-65535
         cv::Mat img(100, 100, CV_16U);
@@ -151,11 +144,11 @@ private slots:
     }
 
     // TC-IO-005: TIF save/load 8-bit
-    void tifSaveLoad8Bit()
+    void tif_save_load8_bit()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString path = tmpDir.path() + "/test8.tif";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString path = tmp_dir.path() + "/test8.tif";
 
         // Create 100x100 CV_8U gradient
         cv::Mat img(100, 100, CV_8U);
@@ -173,17 +166,16 @@ private slots:
         QVERIFY2(!loaded.empty(), "Failed to load saved 8-bit TIF file");
         QCOMPARE(loaded.size(), img.size());
 
-        // Known limitation: save_image_tif/load_image_tif use 2-byte element
-        // size unconditionally (imageio.cpp:197,429), so 8-bit round-trip is
-        // not pixel-accurate. Verify type only; exact pixels tested in 16-bit.
+        // Known limitation: save_image_tif / load_image_tif always use a 2-byte element
+        // size, so the 8-bit round trip is not pixel-accurate. Only the type is checked.
     }
 
     // TC-IO-006: JPG save (lossy)
-    void jpgSaveLossy()
+    void jpg_save_lossy()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString path = tmpDir.path() + "/test.jpg";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString path = tmp_dir.path() + "/test.jpg";
 
         // Create 100x100 CV_8UC3 color image
         cv::Mat img(100, 100, CV_8UC3);
@@ -208,11 +200,11 @@ private slots:
     }
 
     // TC-IO-007: BMP row padding (non-multiple-of-4 width)
-    void bmpRowPaddingNonMultipleOf4Width()
+    void bmp_row_padding_non_multiple_of4_width()
     {
-        QTemporaryDir tmpDir;
-        QVERIFY(tmpDir.isValid());
-        QString path = tmpDir.path() + "/test_padding.bmp";
+        QTemporaryDir tmp_dir;
+        QVERIFY(tmp_dir.isValid());
+        QString path = tmp_dir.path() + "/test_padding.bmp";
 
         // Create 97x50 CV_8U image (97 bytes per row needs 3 bytes padding
         // to reach a multiple of 4 = 100 for BMP row alignment)

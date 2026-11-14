@@ -21,7 +21,7 @@ public:
     };
 
     struct TCUParams {
-        float PRF = 30.0f;
+        float prf = 30.0f;
         float laser_width = 2000.0f;
         float delay_a = 11220.0f;
         float delay_b = 11220.0f;
@@ -87,43 +87,37 @@ public:
     explicit ScanPreset(QObject *parent = nullptr);
     ~ScanPreset();
 
-    // Core functionality
-    bool load_from_file(const QString& filepath);
-    bool save_to_file(const QString& filepath) const;
+    bool load_from_file(const QString &filepath);
+    bool save_to_file(const QString &filepath) const;
     bool validate_preset();
     bool apply_preset();
 
-    // Getters
-    const ScanPresetData& get_data() const { return m_data; }
+    const ScanPresetData &get_data() const { return m_data; }
     bool is_valid() const { return m_is_valid; }
     QString get_last_error() const { return m_last_error; }
 
-    // Setters
-    void set_data(const ScanPresetData& data) { m_data = data; m_is_valid = false; }
+    void set_data(const ScanPresetData &data) { m_data = data; m_is_valid = false; }
 
 private:
-    // Validation functions
     bool validate_camera_params() const;
     bool validate_tcu_params() const;
     bool validate_ptz_params() const;
     bool validate_scan_parameters() const;
     bool verify_device_connectivity() const;
 
-    // JSON conversion functions
-    nlohmann::json camera_params_to_json(const CameraParams& params) const;
-    CameraParams camera_params_from_json(const nlohmann::json& obj) const;
+    nlohmann::json camera_params_to_json(const CameraParams &params) const;
+    CameraParams camera_params_from_json(const nlohmann::json &obj) const;
 
-    nlohmann::json tcu_params_to_json(const TCUParams& params) const;
-    TCUParams tcu_params_from_json(const nlohmann::json& obj) const;
+    nlohmann::json tcu_params_to_json(const TCUParams &params) const;
+    TCUParams tcu_params_from_json(const nlohmann::json &obj) const;
 
-    nlohmann::json ptz_position_to_json(const PTZStartingPosition& pos) const;
-    PTZStartingPosition ptz_position_from_json(const nlohmann::json& obj) const;
+    nlohmann::json ptz_position_to_json(const PTZStartingPosition &pos) const;
+    PTZStartingPosition ptz_position_from_json(const nlohmann::json &obj) const;
 
-    nlohmann::json scan_params_to_json(const ScanParameters& params) const;
-    ScanParameters scan_params_from_json(const nlohmann::json& obj) const;
+    nlohmann::json scan_params_to_json(const ScanParameters &params) const;
+    ScanParameters scan_params_from_json(const nlohmann::json &obj) const;
 
-    // Helper functions
-    void set_error(const QString& error) const;
+    void set_error(const QString &error) const;
     void clear_error() const;
 
 private:
@@ -132,8 +126,8 @@ private:
     mutable QString m_last_error;
 
 signals:
-    void scan_preset_loaded(const QString& name);
-    void scan_preset_validation_failed(const QString& error);
+    void scan_preset_loaded(const QString &name);
+    void scan_preset_validation_failed(const QString &error);
 };
 
 #endif // SCANPRESET_H
