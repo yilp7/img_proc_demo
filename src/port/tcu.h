@@ -66,6 +66,9 @@ public:
 
 signals:
     void tcu_param_updated(qint32 tcu_param);
+    // A stored parameter may have changed. It carries no echo meaning, unlike
+    // tcu_param_updated, so a listener only reads the state again.
+    void state_changed();
 
 protected slots:
     bool connect_to_serial_port(QString port_name, qint32 baudrate = QSerialPort::Baud9600) override;

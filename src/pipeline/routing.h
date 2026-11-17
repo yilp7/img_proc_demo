@@ -307,6 +307,11 @@ struct DisplaySlot {
     std::atomic<bool> save_raw    {false};
     std::atomic<bool> save_proc   {false};
 
+    // 3D builds range from two gated frames; true exchanges their roles. The pipeline
+    // flips it after each frame when it pairs consecutive frames, the GUI resets or
+    // swaps it. Only the main display's is read.
+    std::atomic<bool> frame_a_3d  {false};
+
     // Recorders, finalised on route change, source death or display blank.
     // raw_path / proc_path are the temp files of the open writers; the consumer thread
     // reports them through recorder_finalized so the GUI can move them.

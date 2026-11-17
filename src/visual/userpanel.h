@@ -622,8 +622,11 @@ private:
     // Thread-safe snapshots of UI widget state and Config for the consumers.
     QMutex                  m_params_mutex;
     ProcessingParams        m_processing_params;
+    // The scan as ScanController last announced it. Guarded by m_params_mutex too.
+    ScanJob                 m_scan_job;
     // Display picked on the GENERAL tab. Its controls read and write
-    // m_router.get_display(m_picked_display).pcfg, except RESET_3D_BTN, which is TCU state.
+    // m_router.get_display(m_picked_display).pcfg, except RESET_3D_BTN, which acts on the
+    // main display, the only one that builds 3D.
     DisplayId               m_picked_display = DisplayId::MAIN;
     // The global view of the pipeline settings. update_processing_params() copies it
     // into every DisplaySlot's pcfg.

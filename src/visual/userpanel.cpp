@@ -268,67 +268,6 @@ void ConsumerThread::run()
     if (m_pipeline && m_router && m_display) m_pipeline->run(*m_router, *m_display);
 }
 
-TimedQueue::TimedQueue(double time) : QThread(), m_quit(false), m_expiration_time(time), m_fps_status(nullptr) {}
-TimedQueue::~TimedQueue()
-{
-    m_quit = true;
-    while (!m_q.empty()) m_q.pop();
-}
-
-inline void TimedQueue::set_display_label(QLabel *lbl) { m_fps_status = lbl; }
-
-void TimedQueue::add_to_q()
-{
-    struct timespec t;
-    timespec_get(&t, TIME_UTC);
-    m_mtx.lock();
-    m_q.push(t);
-    m_mtx.unlock();
-}
-
-void TimedQueue::empty_q()
-{
-    m_mtx.lock();
-    std::queue<struct timespec>().swap(m_q);
-    m_mtx.unlock();
-}
-
-inline int TimedQueue::count() { return m_q.size(); }
-
-void TimedQueue::stop()
-{
-    m_quit = true;
-    quit();
-    wait();
-}
-
-// return difference in milliseconds
-inline double diff_timespec(struct timespec &t1, struct timespec &t2)
-{
-    return (t2.tv_sec - t1.tv_sec) * 1e3 + (t2.tv_nsec - t1.tv_nsec) / 1e6;
-}
-
-void TimedQueue::run()
-{
-    QElapsedTimer et;
-    while (!m_quit) {
-#if 1
-        QThread::msleep(5);
-        struct timespec t;
-        timespec_get(&t, TIME_UTC);
-        if (m_q.empty()) { continue; }
-        m_mtx.lock();
-        if (diff_timespec(m_q.front(), t) > m_expiration_time * 1e3) m_q.pop();
-        if (et.isValid() && et.elapsed() < 200) { m_mtx.unlock(); continue; }
-        // the label belongs to the GUI thread
-        QMetaObject::invokeMethod(m_fps_status, "setText", Qt::QueuedConnection,
-                                  Q_ARG(QString, QString::number(m_q.size() ? ((m_q.size() - 1) / diff_timespec(m_q.front(), m_q.back())) * 1000 : 0.f, 'f', 2) + " fps"));
-        m_mtx.unlock();
-        et.restart();
-#endif
-    }
-}
-
 void UserPanel::position_display_overlays(DisplayId did)
 {
     DisplaySlot &d = m_router.get_display(did);
@@ -696,6 +635,7 @@ UserPanel::UserPanel(QWidget *parent) :
     // the stale crop.
     for (int i = 0; i < 3; i++)
         connect(m_router.get_display(static_cast<DisplayId>(i)).widget, &Display::widget_resized, this, [this]() { update_processing_params(); });
+    connect(m_secondary_display->get_display_widget(), &Display::widget_resized, this, [this]() { update_processing_params(); });
     connect(m_ui->SOURCE_DISPLAY, &Display::view_changed, this, [this]() { update_processing_params(); });
 
     // center toolbar: reparent existing Tools + INFO_CHECK into a framed row
@@ -1107,6 +1047,8 @@ UserPanel::UserPanel(QWidget *parent) :
     // wiring. It emits the old option ids for the pages it still hosts.
     m_ui->MISC_DISPLAY_GRP->hide();
     disconnect(m_aux_panel, &AuxPanelManager::display_page_changed, nullptr, nullptr);
+    // after the disconnect above, which would drop it: the pipeline's copy carries the option
+    connect(m_aux_panel, &AuxPanelManager::display_page_changed, this, [this](int) { update_processing_params(); });
     auto sync_console_option = [this](int option_id) {
         // select_display takes combo_index and stores combo_index + 1. The 3D
         // placeholder has no master option id, so pass -1 to clear side output.
@@ -2082,6 +2024,11 @@ UserPanel::UserPanel(QWidget *parent) :
 
     // Forward DeviceManager signals
     connect(m_device_mgr, &DeviceManager::tcu_param_updated, m_tcu_ctrl, &TCUController::update_tcu_params);
+    // The pipeline's copy follows the TCU side. The window is the context object, so an
+    // emit from a frame thread is queued and the widgets are read on the GUI thread only.
+    connect(m_tcu_ctrl, &TCUController::pipeline_inputs_changed, this, [this]() { update_processing_params(); });
+    connect(m_device_mgr, &DeviceManager::tcu_state_changed, this, [this]() { update_processing_params(); });
+    update_processing_params();
     m_lens_ctrl = new LensController(m_device_mgr, this);
     m_lens_ctrl->init(&m_simple_ui, &m_lang);
     connect(m_device_mgr, &DeviceManager::lens_param_updated, m_lens_ctrl, &LensController::update_lens_params);
@@ -2105,6 +2052,11 @@ UserPanel::UserPanel(QWidget *parent) :
 
     m_scan_ctrl = new ScanController(m_tcu_ctrl, m_device_mgr, this);
     m_scan_ctrl->init(&m_save_location, &m_router.get_stream(StreamId::S0).meta.width, &m_router.get_stream(StreamId::S0).meta.height);
+    // The frame path takes the scan job under the lock it takes for its other inputs.
+    connect(m_scan_ctrl, &ScanController::scan_job_changed, this, [this](const ScanJob &job) {
+        QMutexLocker lk(&m_params_mutex);
+        m_scan_job = job;
+    });
 
     // Bind the scan overlay's widgets to ScanController now that it exists.
     if (m_scan_overlay) m_scan_overlay->bind(m_scan_ctrl, m_scan_overlay_widgets);
@@ -2783,16 +2735,10 @@ UserPanel::UserPanel(QWidget *parent) :
     {
         m_globals.params_mutex      = &m_params_mutex;
         m_globals.processing_params = &m_processing_params;
+        m_globals.scan_job          = &m_scan_job;
         m_globals.roi_mutex         = &m_roi_mutex;
         m_globals.list_roi          = &m_list_roi;
         m_globals.yolo_init_mutex   = &m_yolo_init_mutex;
-        m_globals.tcu_ctrl          = m_tcu_ctrl;
-        m_globals.scan_ctrl         = m_scan_ctrl;
-        m_globals.device_mgr        = m_device_mgr;
-        m_globals.aux_panel         = m_aux_panel;
-        m_globals.secondary_display = m_secondary_display;
-        m_globals.scan_params       = &m_scan_ctrl->get_params();
-        m_globals.save_location     = &m_save_location;
         m_globals.tp                = &m_tp;
         m_pipeline = new PipelineProcessor(m_globals, this);
     }
@@ -2812,11 +2758,22 @@ UserPanel::UserPanel(QWidget *parent) :
     // handled on the GUI thread.
     qRegisterMetaType<QVector<QRect>>("QVector<QRect>");
     qRegisterMetaType<QVector<DetectedTarget>>("QVector<DetectedTarget>");
+    qRegisterMetaType<ScanStep>("ScanStep");
     connect(m_pipeline, &PipelineProcessor::main_targets_updated,
             this, &UserPanel::update_main_targets, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::follow_gate_updated,
             this, &UserPanel::update_follow_gate, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::update_mcp_in_thread, this, &UserPanel::change_mcp, Qt::QueuedConnection);
+    // A frame is handed to the display's own signal, not to setPixmap: the thumbnails of
+    // the overlays and of the side panel follow that signal.
+    connect(m_pipeline, &PipelineProcessor::display_frame_ready, this, [this](int display_idx, QPixmap pm) {
+        if (display_idx < 0 || display_idx >= static_cast<int>(DISPLAY_COUNT)) return;
+        Display *widget = m_router.get_display(static_cast<DisplayId>(display_idx)).widget;
+        if (widget) emit widget->set_pixmap(pm);
+    }, Qt::QueuedConnection);
+    connect(m_pipeline, &PipelineProcessor::secondary_frame_ready, this, [this](QPixmap pm) {
+        emit m_secondary_display->get_display_widget()->set_pixmap(pm);
+    }, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::set_hist_pixmap, m_ui->HIST_DISPLAY, &Display::setPixmap, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::panorama_preview_updated, m_panorama_panel, &PanoramaPanel::set_preview_pixmap, Qt::QueuedConnection);
     // Only caches the boxes for click-to-follow hit testing. Auto-follow runs on the
@@ -2824,15 +2781,10 @@ UserPanel::UserPanel(QWidget *parent) :
     connect(m_pipeline, &PipelineProcessor::main_detection_boxes_updated, this, [this](QVector<QRect> boxes) {
         m_main_detection_boxes = boxes;
     }, Qt::QueuedConnection);
-    connect(m_pipeline, &PipelineProcessor::finish_scan_signal, m_scan_ctrl, &ScanController::on_SCAN_BUTTON_clicked, Qt::QueuedConnection);
+    connect(m_pipeline, &PipelineProcessor::scan_step_requested, m_scan_ctrl, &ScanController::apply_scan_step, Qt::QueuedConnection);
+    connect(m_pipeline, &PipelineProcessor::finish_scan_signal, m_scan_ctrl, &ScanController::end_scan, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::save_screenshot_signal, this, [this](QString path) {
         window()->grab().save(path);
-    }, Qt::QueuedConnection);
-    connect(m_pipeline, &PipelineProcessor::update_delay_in_thread, this, [this](){
-        m_tcu_ctrl->update_delay();
-    }, Qt::QueuedConnection);
-    connect(m_pipeline, &PipelineProcessor::update_gate_width_in_thread, this, [this](){
-        m_tcu_ctrl->update_gate_width();
     }, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::update_dist_mat, this, [this](cv::Mat mat, double min, double max){
 #ifdef DISTANCE_3D_VIEW
@@ -3185,6 +3137,7 @@ void UserPanel::data_exchange(bool read)
         m_time_exposure_edit = m_ui->DUTY_EDIT->text().toFloat() * 1000;
         m_router.get_stream(StreamId::S0).meta.fps = m_ui->CCD_FREQ_EDIT->text().toFloat();
         m_save_location = m_ui->FILE_PATH_EDIT->text();
+        update_processing_params();
 
         switch (m_tcu_ctrl->get_hz_unit()) {
         // kHz
@@ -3959,6 +3912,7 @@ void UserPanel::on_FILE_PATH_BROWSE_clicked()
     if (m_router.get_display(DisplayId::MAIN).save_proc && !QDir(temp + "/res_bmp").exists()) QDir().mkdir(temp + "/res_bmp");
 
     m_ui->FILE_PATH_EDIT->setText(m_save_location);
+    update_processing_params();
 }
 
 void UserPanel::clean()
@@ -4458,6 +4412,11 @@ void UserPanel::run_automatic_actions()
 
 void UserPanel::update_processing_params()
 {
+    // built before the lock is taken: the frame threads wait on it for their copy
+    TCU *tcu_port = m_device_mgr ? m_device_mgr->get_tcu() : nullptr;
+    QString tcu_note;
+    if (tcu_port) tcu_note = QString::fromStdString(tcu_port->to_json().dump());
+
     QMutexLocker lk(&m_params_mutex);
     m_processing_params.brightness           = m_ui->BRIGHTNESS_SLIDER->value();
     m_processing_params.contrast             = m_ui->CONTRAST_SLIDER->value();
@@ -4475,6 +4434,28 @@ void UserPanel::update_processing_params()
     m_processing_params.display_region       = m_router.get_display(DisplayId::MAIN).widget->m_display_region;
     m_processing_params.display_width        = m_router.get_display(DisplayId::MAIN).widget->width();
     m_processing_params.display_height       = m_router.get_display(DisplayId::MAIN).widget->height();
+
+    // The controllers are created after the first call, hence the checks.
+    if (m_tcu_ctrl) {
+        m_processing_params.tcu.base_unit     = m_tcu_ctrl->get_base_unit();
+        m_processing_params.tcu.delay_dist    = m_tcu_ctrl->get_delay_dist();
+        m_processing_params.tcu.depth_of_view = m_tcu_ctrl->get_depth_of_view();
+        m_processing_params.tcu.dist_ns       = m_tcu_ctrl->get_dist_ns();
+        m_processing_params.tcu.auto_mcp      = m_tcu_ctrl->get_auto_mcp();
+    }
+    if (tcu_port) {
+        m_processing_params.tcu.mcp           = tcu_port->get(TCU::MCP);
+        m_processing_params.tcu.offset_delay  = tcu_port->get(TCU::OFFSET_DELAY);
+        m_processing_params.tcu.offset_gw     = tcu_port->get(TCU::OFFSET_GW);
+        m_processing_params.tcu.note          = tcu_note;
+    }
+    if (m_aux_panel) m_processing_params.alt_display_option = m_aux_panel->get_alt_display_option();
+    for (int i = 0; i < 3; i++) {
+        const Display *display_widget = m_router.get_display(static_cast<DisplayId>(i)).widget;
+        if (display_widget) m_processing_params.display_size[i] = display_widget->size();
+    }
+    m_processing_params.secondary_size       = m_secondary_display->get_display_widget()->size();
+    m_processing_params.save_location        = m_save_location;
 
     // Snapshot Config fields read by pipeline methods
     const auto &data = m_config->get_data();
@@ -5106,7 +5087,8 @@ void UserPanel::on_IMG_3D_CHECK_stateChanged(int arg1)
         m_router.get_display(m_picked_display).pcfg.image_3d  = arg1;
         m_router.get_display(m_picked_display).pcfg.enable_3d = arg1;
     }
-    if (!arg1) m_tcu_ctrl->set_frame_a_3d(false);
+    // the pipeline builds 3D on the main display only, whichever display is picked
+    if (!arg1) m_router.get_display(DisplayId::MAIN).frame_a_3d = false;
     update_processing_params();
 
     QResizeEvent e(this->size(), this->size());
@@ -6701,6 +6683,10 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
 
     if (display_idx) m_fw_display[display_idx - 1]->resize_display(width, height);
     else {
+        // The second window shows this stream unprocessed, stretched to its own shape, so
+        // it takes the shape of the stream first, as it does when the camera starts. The
+        // resize below then carries its new size into the pipeline's copy.
+        m_secondary_display->resize_display(width, height);
         QResizeEvent e(this->size(), this->size());
         resizeEvent(&e);
     }
@@ -6910,6 +6896,7 @@ void UserPanel::on_FILE_PATH_EDIT_editingFinished()
     if (QDir(temp_location).exists() || QDir().mkdir(temp_location)) m_save_location = temp_location;
     else QMessageBox::warning(this, tr("PROMPT"), tr("cannot create directory"));
     m_ui->FILE_PATH_EDIT->setText(m_save_location);
+    update_processing_params();
 }
 
 void UserPanel::on_BINNING_CHECK_stateChanged(int arg1)
@@ -7152,7 +7139,8 @@ void UserPanel::load_addons()
 
 void UserPanel::on_RESET_3D_BTN_clicked()
 {
-    m_tcu_ctrl->set_frame_a_3d(!m_tcu_ctrl->get_frame_a_3d());
+    DisplaySlot &main_display = m_router.get_display(DisplayId::MAIN);
+    main_display.frame_a_3d = !main_display.frame_a_3d;
 //    for (cv::Mat &m: frame_a_sum) m = 0;
 //    for (cv::Mat &m: frame_b_sum) m = 0;
 }

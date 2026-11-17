@@ -235,6 +235,7 @@ void TCU::set_user_param(qint32 tcu_param, double val)
 
     default: break;
     }
+    emit state_changed();
 }
 
 void TCU::set_user_param(qint32 tcu_param, uint val)
@@ -263,6 +264,7 @@ void TCU::set_user_param(qint32 tcu_param, uint val)
     case AB_LOCK:   m_ab_lock = val; break;
     default: break;
     }
+    emit state_changed();
 }
 
 #if ENABLE_PORT_JSON

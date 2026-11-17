@@ -1,24 +1,19 @@
 #include "pipeline/pipelineprocessor.h"
-#include "controller/tcucontroller.h"
-#include "controller/scancontroller.h"
-#include "controller/devicemanager.h"
-#include "controller/auxpanelmanager.h"
 #include "pipeline/scanparams.h"
-#include "widgets/display.h"
-#include "widgets/floatingwindow.h"
 #include "image/imageio.h"
 #include "image/imageproc.h"
 #include "image/nafnetenhancer.h"
 #include "util/threadpool.h"
 #include "util/constants.h"
 #include "util/timedqueue.h"
-#include "port/tcu.h"
 
 #include <QThread>
 #include <QDir>
 #include <QFile>
 #include <QDateTime>
 #include <QCoreApplication>
+#include <QDebug>
+#include <QImage>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -190,6 +185,8 @@ int PipelineProcessor::run(DisplayRouter &router, DisplaySlot &display)
     QString scan_save_path_a, scan_save_path;
     PanoramaCanvas panorama_canvas;
     qint64 panorama_position_started_ms = -1;
+    ScanJob scan_job;   // this thread's copy; only the main display steps a scan
+    ScanProgress scan_progress;
 
 #ifdef LVTONG
     emit set_model_list_enabled(false);
@@ -284,7 +281,13 @@ int PipelineProcessor::run(DisplayRouter &router, DisplaySlot &display)
 
         ProcessingParams params;
         PipelineConfig pcfg;
-        { QMutexLocker lk(m_g.params_mutex); params = *m_g.processing_params; pcfg = display.pcfg; }
+        {
+            QMutexLocker lk(m_g.params_mutex);
+            params = *m_g.processing_params;
+            pcfg = display.pcfg;
+            // the job holds routes, so it is copied only when ScanController has changed it
+            if (display.id == DisplayId::MAIN && m_g.scan_job->revision != scan_job.revision) scan_job = *m_g.scan_job;
+        }
 
         if (!acquire_frame(stream, display, pcfg, display.avg_state.prev_img, updated, packets_lost)) continue;
 
@@ -314,14 +317,15 @@ int PipelineProcessor::run(DisplayRouter &router, DisplaySlot &display)
 
         QString info_tcu = pcfg.custom_topleft_info ?
                     params.custom_info_text :
-                    m_g.tcu_ctrl->get_base_unit() == 2 ? QString::asprintf("DIST %05d m  DOV %04d m", (int)m_g.tcu_ctrl->get_delay_dist(), (int)m_g.tcu_ctrl->get_depth_of_view()) :
-                                     QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(m_g.tcu_ctrl->get_delay_dist() / m_g.tcu_ctrl->get_dist_ns()), (int)std::round(m_g.tcu_ctrl->get_depth_of_view() / m_g.tcu_ctrl->get_dist_ns()));
+                    params.tcu.base_unit == 2 ? QString::asprintf("DIST %05d m  DOV %04d m", (int)params.tcu.delay_dist, (int)params.tcu.depth_of_view) :
+                                     QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(params.tcu.delay_dist / params.tcu.dist_ns), (int)std::round(params.tcu.depth_of_view / params.tcu.dist_ns));
         QString info_time = QDateTime::currentDateTime().toString("hh:mm:ss:zzz");
 
         render_and_display(stream, display, params, pcfg, yolo_results, updated, is_net, ww, hh, w, h, weight, info_tcu, info_time);
 
         if (display.id == DisplayId::MAIN) {
-            advance_scan_main(router, stream, display, updated, pcfg, scan_img_count, scan_save_path_a, scan_save_path,
+            advance_scan_main(router, stream, display, updated, params, pcfg, scan_job, scan_progress,
+                              scan_img_count, scan_save_path_a, scan_save_path,
                               panorama_canvas, panorama_position_started_ms);
         }
 
@@ -438,11 +442,11 @@ void PipelineProcessor::preprocess_frame(StreamSlot &stream, DisplaySlot &displa
     { int sym = pcfg.flip; if (sym) cv::flip(latest, latest, sym - 2); }
 
     // mcp self-adaptive
-    if (m_g.tcu_ctrl->get_auto_mcp() && !params.mcp_slider_focused) {
+    if (params.tcu.auto_mcp && !params.mcp_slider_focused) {
         int thresh_num = latest.total() / AUTO_MCP_DIVISOR, thresh = (1 << meta_depth) - 1;
         while (thresh && thresh_num > 0) thresh_num -= display.hist[thresh--];
-        if (thresh > (1 << meta_depth) * 0.94) emit update_mcp_in_thread(m_g.device_mgr->get_tcu()->get(TCU::MCP) - sqrt(thresh - (1 << meta_depth) * 0.94));
-        if (thresh < (1 << meta_depth) * 0.39) emit update_mcp_in_thread(m_g.device_mgr->get_tcu()->get(TCU::MCP) + sqrt((1 << meta_depth) * 0.39 - thresh));
+        if (thresh > (1 << meta_depth) * 0.94) emit update_mcp_in_thread(params.tcu.mcp - sqrt(thresh - (1 << meta_depth) * 0.94));
+        if (thresh < (1 << meta_depth) * 0.39) emit update_mcp_in_thread(params.tcu.mcp + sqrt((1 << meta_depth) * 0.39 - thresh));
     }
 }
 
@@ -650,35 +654,40 @@ void PipelineProcessor::frame_average_and_3d(StreamSlot &stream, DisplaySlot &di
         cv::Mat dist_mat;
         double dist_min = 0, dist_max = 0;
         if (updated) {
+            const TcuReadout &tcu = params.tcu;
+            // read once, so both images of a frame are chosen by the same value
+            const bool frame_a_3d = display.frame_a_3d;
             if (pcfg.frame_avg_enabled) {
                 cv::Mat frame_a_avg, frame_b_avg;
                 avg_state.frame_a_sum.convertTo(frame_a_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
                 avg_state.frame_b_sum.convertTo(frame_b_avg, pixel_depth > 8 ? CV_16U : CV_8U, 0.25);
 #ifdef LVTONG
-                ImageProc::gated_3d_v2(m_g.tcu_ctrl->get_frame_a_3d() ? frame_b_avg : frame_a_avg, m_g.tcu_ctrl->get_frame_a_3d() ? frame_a_avg : frame_b_avg, result,
-                                       pcfg.custom_3d_param ? pcfg.custom_3d_delay : (m_g.tcu_ctrl->get_delay_dist() - m_g.device_mgr->get_tcu()->get(TCU::OFFSET_DELAY) * m_g.tcu_ctrl->get_dist_ns()) / m_g.tcu_ctrl->get_dist_ns(),
-                                       pcfg.custom_3d_param ? pcfg.custom_3d_gate_width : (m_g.tcu_ctrl->get_depth_of_view() - m_g.device_mgr->get_tcu()->get(TCU::OFFSET_GW) * m_g.tcu_ctrl->get_dist_ns()) / m_g.tcu_ctrl->get_dist_ns(),
+                ImageProc::gated_3d_v2(frame_a_3d ? frame_b_avg : frame_a_avg, frame_a_3d ? frame_a_avg : frame_b_avg, result,
+                                       pcfg.custom_3d_param ? pcfg.custom_3d_delay : (tcu.delay_dist - tcu.offset_delay * tcu.dist_ns) / tcu.dist_ns,
+                                       pcfg.custom_3d_param ? pcfg.custom_3d_gate_width : (tcu.depth_of_view - tcu.offset_gw * tcu.dist_ns) / tcu.dist_ns,
                                        pcfg.colormap, pcfg.lower_3d_thresh, pcfg.upper_3d_thresh, pcfg.truncate_3d);
 #else
-                ImageProc::gated_3d_v2(m_g.tcu_ctrl->get_frame_a_3d() ? frame_b_avg : frame_a_avg, m_g.tcu_ctrl->get_frame_a_3d() ? frame_a_avg : frame_b_avg, result,
-                                       pcfg.custom_3d_param ? pcfg.custom_3d_delay : (m_g.tcu_ctrl->get_delay_dist() - m_g.device_mgr->get_tcu()->get(TCU::OFFSET_DELAY) * m_g.tcu_ctrl->get_dist_ns()) / m_g.tcu_ctrl->get_dist_ns(),
-                                       pcfg.custom_3d_param ? pcfg.custom_3d_gate_width : (m_g.tcu_ctrl->get_depth_of_view() - m_g.device_mgr->get_tcu()->get(TCU::OFFSET_GW) * m_g.tcu_ctrl->get_dist_ns()) / m_g.tcu_ctrl->get_dist_ns(),
+                ImageProc::gated_3d_v2(frame_a_3d ? frame_b_avg : frame_a_avg, frame_a_3d ? frame_a_avg : frame_b_avg, result,
+                                       pcfg.custom_3d_param ? pcfg.custom_3d_delay : (tcu.delay_dist - tcu.offset_delay * tcu.dist_ns) / tcu.dist_ns,
+                                       pcfg.custom_3d_param ? pcfg.custom_3d_gate_width : (tcu.depth_of_view - tcu.offset_gw * tcu.dist_ns) / tcu.dist_ns,
                                        pcfg.colormap, pcfg.lower_3d_thresh, pcfg.upper_3d_thresh, pcfg.truncate_3d, &dist_mat, &dist_min, &dist_max);
 #endif
             }
             else {
 #ifdef LVTONG
-                ImageProc::gated_3d_v2(m_g.tcu_ctrl->get_frame_a_3d() ? avg_state.prev_img : latest, m_g.tcu_ctrl->get_frame_a_3d() ? latest : avg_state.prev_img, result,
-                                       pcfg.custom_3d_param ? pcfg.custom_3d_delay : (m_g.tcu_ctrl->get_delay_dist() - m_g.device_mgr->get_tcu()->get(TCU::OFFSET_DELAY) * m_g.tcu_ctrl->get_dist_ns()) / m_g.tcu_ctrl->get_dist_ns(),
-                                       pcfg.custom_3d_param ? pcfg.custom_3d_gate_width : (m_g.tcu_ctrl->get_depth_of_view() - m_g.device_mgr->get_tcu()->get(TCU::OFFSET_GW) * m_g.tcu_ctrl->get_dist_ns()) / m_g.tcu_ctrl->get_dist_ns(),
+                ImageProc::gated_3d_v2(frame_a_3d ? avg_state.prev_img : latest, frame_a_3d ? latest : avg_state.prev_img, result,
+                                       pcfg.custom_3d_param ? pcfg.custom_3d_delay : (tcu.delay_dist - tcu.offset_delay * tcu.dist_ns) / tcu.dist_ns,
+                                       pcfg.custom_3d_param ? pcfg.custom_3d_gate_width : (tcu.depth_of_view - tcu.offset_gw * tcu.dist_ns) / tcu.dist_ns,
                                        pcfg.colormap, pcfg.lower_3d_thresh, pcfg.upper_3d_thresh, pcfg.truncate_3d);
 #else
-                ImageProc::gated_3d_v2(m_g.tcu_ctrl->get_frame_a_3d() ? avg_state.prev_img : latest, m_g.tcu_ctrl->get_frame_a_3d() ? latest : avg_state.prev_img, result,
-                                       pcfg.custom_3d_param ? pcfg.custom_3d_delay : (m_g.tcu_ctrl->get_delay_dist() - m_g.device_mgr->get_tcu()->get(TCU::OFFSET_DELAY) * m_g.tcu_ctrl->get_dist_ns()) / m_g.tcu_ctrl->get_dist_ns(),
-                                       pcfg.custom_3d_param ? pcfg.custom_3d_gate_width : (m_g.tcu_ctrl->get_depth_of_view() - m_g.device_mgr->get_tcu()->get(TCU::OFFSET_GW) * m_g.tcu_ctrl->get_dist_ns()) / m_g.tcu_ctrl->get_dist_ns(),
+                ImageProc::gated_3d_v2(frame_a_3d ? avg_state.prev_img : latest, frame_a_3d ? latest : avg_state.prev_img, result,
+                                       pcfg.custom_3d_param ? pcfg.custom_3d_delay : (tcu.delay_dist - tcu.offset_delay * tcu.dist_ns) / tcu.dist_ns,
+                                       pcfg.custom_3d_param ? pcfg.custom_3d_gate_width : (tcu.depth_of_view - tcu.offset_gw * tcu.dist_ns) / tcu.dist_ns,
                                        pcfg.colormap, pcfg.lower_3d_thresh, pcfg.upper_3d_thresh, pcfg.truncate_3d, &dist_mat, &dist_min, &dist_max);
 #endif
-                m_g.tcu_ctrl->toggle_frame_a_3d();
+                // compare-exchange, so a swap the GUI makes during this frame is not lost
+                bool expected = display.frame_a_3d.load();
+                while (!display.frame_a_3d.compare_exchange_weak(expected, !expected));
             }
 #ifndef LVTONG
             avg_state.prev_3d = result.clone();
@@ -813,7 +822,6 @@ void PipelineProcessor::render_and_display(StreamSlot &stream, DisplaySlot &disp
     const QString &info_tcu, const QString &info_time)
 {
     (void)info_tcu;
-    Display *disp = display.widget;
     cv::Mat &result = display.modified_result;
     bool is_color = false;
     { QMutexLocker mlk(&stream.meta_mutex); is_color = stream.meta.is_color; }
@@ -821,7 +829,7 @@ void PipelineProcessor::render_and_display(StreamSlot &stream, DisplaySlot &disp
     if (!yolo_results.empty()) draw_yolo_boxes(display, result, yolo_results);
 
     // Histogram side-output: gray-value or 3D distance hist.
-    if (m_g.aux_panel->get_alt_display_option() == 2) {
+    if (params.alt_display_option == 2) {
         cv::Mat mat_for_hist;
         if (!is_color && !pcfg.pseudocolor) mat_for_hist = result.clone();
         else                                   cv::cvtColor(result, mat_for_hist, cv::COLOR_RGB2GRAY);
@@ -976,18 +984,20 @@ void PipelineProcessor::render_and_display(StreamSlot &stream, DisplaySlot &disp
     if (use_mask) img_display = (img_display & (~info_mask)) + ((~thresh_result) & info_mask);
 
     QImage stream_img = QImage(img_display.data, img_display.cols, img_display.rows, static_cast<int>(img_display.step), is_color || pcfg.pseudocolor ? QImage::Format_RGB888 : QImage::Format_Indexed8);
-    if (disp) disp->emit set_pixmap(QPixmap::fromImage(stream_img.scaled(disp->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+    // a display without a widget shows nothing, so nothing is sent for it
+    const int display_idx = static_cast<int>(display.id);
+    if (display.widget) emit display_frame_ready(display_idx, QPixmap::fromImage(stream_img.scaled(params.display_size[display_idx], Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     if (display.id == DisplayId::MAIN && updated) {
         emit main_detection_boxes_updated(main_detection_boxes);
         emit main_targets_updated(main_targets);
     }
 
-    if (display.id == DisplayId::MAIN && params.dual_display && m_g.secondary_display) {
+    if (display.id == DisplayId::MAIN && params.dual_display) {
         cv::Mat ori_img_display;
-        Display *ori_display = m_g.secondary_display->get_display_widget();
-        cv::resize(stream.latest_raw, ori_img_display, cv::Size(ori_display->width(), ori_display->height()), 0, 0, cv::INTER_AREA);
+        const QSize ori_size = params.secondary_size;
+        cv::resize(stream.latest_raw, ori_img_display, cv::Size(ori_size.width(), ori_size.height()), 0, 0, cv::INTER_AREA);
         QImage ori_img = QImage(ori_img_display.data, ori_img_display.cols, ori_img_display.rows, static_cast<int>(ori_img_display.step), is_color ? QImage::Format_RGB888 : QImage::Format_Indexed8);
-        ori_display->emit set_pixmap(QPixmap::fromImage(ori_img).scaled(ori_display->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        emit secondary_frame_ready(QPixmap::fromImage(ori_img).scaled(ori_size, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     }
 }
 
@@ -1301,6 +1311,7 @@ cv::Mat render_panorama_canvas(const PanoramaCanvas &canvas, bool crop_to_conten
 
 void PipelineProcessor::append_panorama_preview(DisplaySlot &main_display,
     int ptz_idx, const std::vector<std::pair<float, float>> &route,
+    const ScanParams &scan_params,
     PanoramaCanvas &panorama_canvas)
 {
     if (ptz_idx < 0 || ptz_idx >= static_cast<int>(route.size()) || main_display.modified_result.empty()) return;
@@ -1311,8 +1322,8 @@ void PipelineProcessor::append_panorama_preview(DisplaySlot &main_display,
     if (ptz_idx == 0) panorama_canvas.reset();
     if (panorama_canvas.accum.empty()
             || panorama_canvas.route_size != static_cast<int>(route.size())
-            || std::fabs(panorama_canvas.fov_h - m_g.scan_params->panorama_fov_h) > 1e-4f) {
-        if (!initialize_panorama_canvas(panorama_canvas, rgb, route, *m_g.scan_params)) return;
+            || std::fabs(panorama_canvas.fov_h - scan_params.panorama_fov_h) > 1e-4f) {
+        if (!initialize_panorama_canvas(panorama_canvas, rgb, route, scan_params)) return;
     }
 
     cv::Mat resized;
@@ -1329,7 +1340,7 @@ void PipelineProcessor::append_panorama_preview(DisplaySlot &main_display,
          - panorama_canvas.left_deg) * panorama_canvas.px_per_deg));
     const int y = (panorama_canvas.canvas_height - src_float.rows) / 2;
 
-    if (m_g.scan_params->panorama_fusion_mode == ScanParams::PANORAMA_FUSION_MATCHING) {
+    if (scan_params.panorama_fusion_mode == ScanParams::PANORAMA_FUSION_MATCHING) {
         x = refine_panorama_x_by_matching(panorama_canvas, src_float, mask, x, y);
     }
 
@@ -1342,8 +1353,8 @@ void PipelineProcessor::append_panorama_preview(DisplaySlot &main_display,
     cv::Mat accum_roi = panorama_canvas.accum(dst_rect);
     cv::Mat weights_roi = panorama_canvas.weights(dst_rect);
 
-    if (m_g.scan_params->panorama_fusion_mode == ScanParams::PANORAMA_FUSION_GAIN
-            || m_g.scan_params->panorama_fusion_mode == ScanParams::PANORAMA_FUSION_MATCHING) {
+    if (scan_params.panorama_fusion_mode == ScanParams::PANORAMA_FUSION_GAIN
+            || scan_params.panorama_fusion_mode == ScanParams::PANORAMA_FUSION_MATCHING) {
         apply_panorama_gain(src_roi, mask_roi, accum_roi, weights_roi);
     }
 
@@ -1368,9 +1379,9 @@ void PipelineProcessor::append_panorama_preview(DisplaySlot &main_display,
 }
 
 void PipelineProcessor::save_panorama_preview(const PanoramaCanvas &panorama_canvas,
-    const PipelineConfig &pcfg)
+    const QString &scan_root, const PipelineConfig &pcfg)
 {
-    if (panorama_canvas.accum.empty() || !m_g.save_location || !m_g.tp || !m_g.scan_ctrl) return;
+    if (panorama_canvas.accum.empty() || !m_g.tp) return;
 
     const cv::Mat panorama = render_panorama_canvas(panorama_canvas, false);
     if (panorama.empty()) return;
@@ -1379,7 +1390,6 @@ void PipelineProcessor::save_panorama_preview(const PanoramaCanvas &panorama_can
                        static_cast<int>(panorama.step), QImage::Format_RGB888);
     emit panorama_preview_updated(QPixmap::fromImage(preview_img.copy()));
 
-    const QString scan_root = *m_g.save_location + "/" + m_g.scan_ctrl->get_scan_name();
     QDir().mkpath(scan_root);
 
     (void)pcfg;
@@ -1392,17 +1402,38 @@ void PipelineProcessor::save_panorama_preview(const PanoramaCanvas &panorama_can
 // Main-display-only scan step. Reaches across slots via the router because
 // scan walks main+alt1 in lockstep.
 void PipelineProcessor::advance_scan_main(DisplayRouter &router, StreamSlot &main_stream, DisplaySlot &main_display,
-    bool updated, const PipelineConfig &pcfg,
+    bool updated, const ProcessingParams &params, const PipelineConfig &pcfg,
+    const ScanJob &job, ScanProgress &progress,
     int &scan_img_count,
     QString &scan_save_path_a, QString &scan_save_path,
     PanoramaCanvas &panorama_canvas,
     qint64 &panorama_position_started_ms)
 {
     (void)main_display;
-    if (!m_g.scan_ctrl->is_scanning() || !updated) return;
+    if (job.generation != progress.generation) {
+        // A scan this thread has not stepped yet. A new one begins before its first
+        // position; one that was under way when the thread started goes on from where
+        // ScanController last saw it.
+        progress = ScanProgress();
+        progress.generation = job.generation;
+        progress.ptz_idx = job.ptz_idx;
+        progress.tcu_idx = job.tcu_idx;
+        // Nothing of the scan before is finished or kept. Without this, the frames left
+        // for its last position would still be counted and saved into its folder.
+        scan_img_count = -1;
+        scan_save_path_a.clear();
+        scan_save_path.clear();
+        panorama_canvas.reset();
+        panorama_position_started_ms = -1;
+    }
+    // The end is announced once. The flag falls when the GUI has stopped the scan, so
+    // continuing a finished scan ends it again, as before.
+    if (!job.running) { progress.end_reported = false; return; }
+    if (progress.end_reported || !updated) return;
+    const ScanParams &scan_params = job.params;
 
-    if (m_g.scan_params->ptz_scan_mode == ScanParams::PTZ_SCAN_PANORAMA) {
-        advance_panorama_scan_main(router, main_stream, main_display, pcfg, scan_img_count, scan_save_path,
+    if (scan_params.ptz_scan_mode == ScanParams::PTZ_SCAN_PANORAMA) {
+        advance_panorama_scan_main(router, main_stream, main_display, params, pcfg, job, progress, scan_img_count, scan_save_path,
                                    panorama_canvas,
                                    panorama_position_started_ms);
         return;
@@ -1411,10 +1442,10 @@ void PipelineProcessor::advance_scan_main(DisplayRouter &router, StreamSlot &mai
     scan_img_count -= 1;
     if (scan_img_count < 0) scan_img_count = 0;
 
-    int save_img_num = m_g.scan_params->num_single_pos;
+    int save_img_num = scan_params.num_single_pos;
     if (save_img_num < 1) save_img_num = 1;
     if (scan_img_count > 0 && scan_img_count <= save_img_num && !scan_save_path.isEmpty()) {
-        save_scan_img(router, main_stream, scan_save_path, QString::number(save_img_num - scan_img_count + 1) + ".bmp", pcfg);
+        save_scan_img(router, main_stream, scan_save_path, QString::number(save_img_num - scan_img_count + 1) + ".bmp", params, pcfg, scan_params);
     }
     if (scan_img_count == save_img_num && !scan_save_path.isEmpty()) {
         emit save_screenshot_signal(scan_save_path + "/screenshot_" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".png");
@@ -1424,32 +1455,40 @@ void PipelineProcessor::advance_scan_main(DisplayRouter &router, StreamSlot &mai
         float fps = 0.0f;
         { QMutexLocker mlk(&main_stream.meta_mutex); fps = main_stream.meta.fps; }
         if (fps <= 0.0f) fps = 1.0f; // safety floor
-        const int wait_time = m_g.scan_params->scan_ptz_enabled
-            ? m_g.scan_params->ptz_wait_time : 0;
+        const int wait_time = scan_params.scan_ptz_enabled
+            ? scan_params.ptz_wait_time : 0;
         scan_img_count = fps * (wait_time + save_img_num / fps);
 
-        int tcu_idx = m_g.scan_ctrl->get_scan_tcu_idx();
-        int ptz_idx = m_g.scan_ctrl->get_scan_ptz_idx();
-        const auto tcu_route = m_g.scan_ctrl->get_scan_tcu_route();
-        const auto gate_width_route = m_g.scan_ctrl->get_scan_gate_width_route();
-        const auto ptz_route = m_g.scan_ctrl->get_scan_ptz_route();
+        int tcu_idx = progress.tcu_idx;
+        int ptz_idx = progress.ptz_idx;
+        const auto &tcu_route = job.tcu_route;
+        const auto &gate_width_route = job.gate_width_route;
+        const auto &ptz_route = job.ptz_route;
         if (tcu_route.empty() || gate_width_route.size() != tcu_route.size() || ptz_route.empty()) {
             scan_img_count = -1;
-            emit finish_scan_signal();
+            progress.end_reported = true;
+            emit finish_scan_signal(job.generation);
             return;
         }
 
+        // what this step has to command; sent once the profile is known
+        ScanStep step;
+        step.generation = job.generation;
+
         if (tcu_idx == (int)tcu_route.size() - 1 || tcu_idx == -1) {
-            m_g.scan_ctrl->set_scan_tcu_idx(-1);
+            progress.tcu_idx = -1;
             tcu_idx = -1;
             ptz_idx++;
-            m_g.scan_ctrl->set_scan_ptz_idx(ptz_idx);
+            progress.ptz_idx = ptz_idx;
 
             if (ptz_idx < (int)ptz_route.size()) {
-                if (m_g.scan_params->scan_ptz_enabled)
-                    m_g.device_mgr->send_ptz_angle(ptz_route[ptz_idx].first, ptz_route[ptz_idx].second);
+                if (scan_params.scan_ptz_enabled) {
+                    step.move_ptz = true;
+                    step.angle_h = ptz_route[ptz_idx].first;
+                    step.angle_v = ptz_route[ptz_idx].second;
+                }
 
-                scan_save_path_a = *m_g.save_location + "/" + m_g.scan_ctrl->get_scan_name() + "/" + QString::number(ptz_idx);
+                scan_save_path_a = params.save_location + "/" + job.name + "/" + QString::number(ptz_idx);
                 QDir().mkdir(scan_save_path_a);
                 QFile params_file(scan_save_path_a + "/params");
                 params_file.open(QIODevice::WriteOnly);
@@ -1461,28 +1500,36 @@ void PipelineProcessor::advance_scan_main(DisplayRouter &router, StreamSlot &mai
             }
             else {
                 scan_img_count = -1;
-                emit finish_scan_signal();
+                progress.end_reported = true;
+                emit finish_scan_signal(job.generation);
                 return;
             }
         }
 
-        tcu_idx = m_g.scan_ctrl->get_scan_tcu_idx() + 1;
-        m_g.scan_ctrl->set_scan_tcu_idx(tcu_idx);
-        if (m_g.scan_params->scan_delay_enabled)
-            m_g.tcu_ctrl->set_delay_dist(tcu_route[tcu_idx] * m_g.tcu_ctrl->get_dist_ns());
-        if (m_g.scan_params->scan_gate_width_enabled)
-            m_g.tcu_ctrl->set_depth_of_view(gate_width_route[tcu_idx] * m_g.tcu_ctrl->get_dist_ns());
+        tcu_idx = progress.tcu_idx + 1;
+        progress.tcu_idx = tcu_idx;
+        if (scan_params.scan_delay_enabled) {
+            step.set_delay = true;
+            step.delay_ns = tcu_route[tcu_idx];
+        }
+        if (scan_params.scan_gate_width_enabled) {
+            step.set_gate_width = true;
+            step.gate_width_ns = gate_width_route[tcu_idx];
+        }
+        step.ptz_idx = progress.ptz_idx;
+        step.tcu_idx = progress.tcu_idx;
+        emit scan_step_requested(step);
 
         QString profile_name;
-        if (m_g.scan_params->scan_delay_enabled && m_g.scan_params->scan_gate_width_enabled) {
+        if (scan_params.scan_delay_enabled && scan_params.scan_gate_width_enabled) {
             profile_name = QString("%1 ns - gw %2 ns")
                 .arg(tcu_route[tcu_idx], 0, 'f', 2)
                 .arg(gate_width_route[tcu_idx], 0, 'f', 2);
         }
-        else if (m_g.scan_params->scan_delay_enabled) {
+        else if (scan_params.scan_delay_enabled) {
             profile_name = QString::number(tcu_route[tcu_idx], 'f', 2) + " ns";
         }
-        else if (m_g.scan_params->scan_gate_width_enabled) {
+        else if (scan_params.scan_gate_width_enabled) {
             profile_name = "gw " + QString::number(gate_width_route[tcu_idx], 'f', 2) + " ns";
         }
         else {
@@ -1497,24 +1544,23 @@ void PipelineProcessor::advance_scan_main(DisplayRouter &router, StreamSlot &mai
         // Alt1 contributes a side capture if it's currently routed.
         StreamId alt1_stream = router.stream_routed_to(DisplayId::ALT1);
         if (alt1_stream != StreamId::NONE) QDir().mkdir(scan_save_path + "/alt_bmp");
-
-        if (m_g.scan_params->scan_delay_enabled) emit update_delay_in_thread();
-        if (m_g.scan_params->scan_gate_width_enabled) emit update_gate_width_in_thread();
 #endif
     }
 }
 
 void PipelineProcessor::advance_panorama_scan_main(DisplayRouter &router, StreamSlot &main_stream, DisplaySlot &main_display,
-    const PipelineConfig &pcfg,
+    const ProcessingParams &params, const PipelineConfig &pcfg,
+    const ScanJob &job, ScanProgress &progress,
     int &scan_img_count,
     QString &scan_save_path,
     PanoramaCanvas &panorama_canvas,
     qint64 &panorama_position_started_ms)
 {
-    int save_img_num = m_g.scan_params->num_single_pos;
+    const ScanParams &scan_params = job.params;
+    int save_img_num = scan_params.num_single_pos;
     if (save_img_num < 1) save_img_num = 1;
 
-    if (m_g.scan_ctrl->get_scan_ptz_idx() < 0 && scan_img_count >= 0) {
+    if (progress.ptz_idx < 0 && scan_img_count >= 0) {
         scan_img_count = -1;
         scan_save_path.clear();
         panorama_canvas.reset();
@@ -1524,12 +1570,12 @@ void PipelineProcessor::advance_panorama_scan_main(DisplayRouter &router, Stream
     if (scan_img_count > 0) {
         const int image_number = save_img_num - scan_img_count + 1;
         if (scan_img_count == save_img_num && !scan_save_path.isEmpty()) {
-            const auto ptz_route = m_g.scan_ctrl->get_scan_ptz_route();
-            append_panorama_preview(main_display, m_g.scan_ctrl->get_scan_ptz_idx(),
-                                    ptz_route, panorama_canvas);
+            const auto &ptz_route = job.ptz_route;
+            append_panorama_preview(main_display, progress.ptz_idx,
+                                    ptz_route, scan_params, panorama_canvas);
         }
         if (!scan_save_path.isEmpty()) {
-            save_scan_img(router, main_stream, scan_save_path, QString::number(image_number) + ".bmp", pcfg);
+            save_scan_img(router, main_stream, scan_save_path, QString::number(image_number) + ".bmp", params, pcfg, scan_params);
         }
 
         scan_img_count -= 1;
@@ -1541,7 +1587,7 @@ void PipelineProcessor::advance_panorama_scan_main(DisplayRouter &router, Stream
     }
 
     if (scan_img_count == 0) {
-        const int wait_time = m_g.scan_params->panorama_wait_time < 0 ? 0 : m_g.scan_params->panorama_wait_time;
+        const int wait_time = scan_params.panorama_wait_time < 0 ? 0 : scan_params.panorama_wait_time;
         const qint64 now_ms = QDateTime::currentMSecsSinceEpoch();
         if (panorama_position_started_ms < 0) panorama_position_started_ms = now_ms;
         if (now_ms - panorama_position_started_ms < static_cast<qint64>(wait_time) * 1000) return;
@@ -1550,35 +1596,43 @@ void PipelineProcessor::advance_panorama_scan_main(DisplayRouter &router, Stream
         return;
     }
 
-    const auto ptz_route = m_g.scan_ctrl->get_scan_ptz_route();
-    int ptz_idx = m_g.scan_ctrl->get_scan_ptz_idx() + 1;
-    m_g.scan_ctrl->set_scan_ptz_idx(ptz_idx);
+    const auto &ptz_route = job.ptz_route;
+    int ptz_idx = progress.ptz_idx + 1;
+    progress.ptz_idx = ptz_idx;
 
     if (ptz_route.empty() || ptz_idx >= (int)ptz_route.size()) {
-        save_panorama_preview(panorama_canvas, pcfg);
+        save_panorama_preview(panorama_canvas, params.save_location + "/" + job.name, pcfg);
         panorama_canvas.reset();
         scan_img_count = -1;
         scan_save_path.clear();
         panorama_position_started_ms = -1;
-        emit finish_scan_signal();
+        progress.end_reported = true;
+        emit finish_scan_signal(job.generation);
         return;
     }
 
     const float angle_h = ptz_route[ptz_idx].first;
     const float angle_v = ptz_route[ptz_idx].second;
-    m_g.device_mgr->send_ptz_angle(angle_h, angle_v);
+    ScanStep step;
+    step.generation = job.generation;
+    step.ptz_idx = ptz_idx;
+    step.tcu_idx = progress.tcu_idx;
+    step.move_ptz = true;
+    step.angle_h = angle_h;
+    step.angle_v = angle_v;
+    emit scan_step_requested(step);
 
     const QString pos_name = QString("%1_h%2_v%3")
         .arg(ptz_idx, 3, 10, QChar('0'))
         .arg(angle_h, 0, 'f', 2)
         .arg(angle_v, 0, 'f', 2);
-    scan_save_path = *m_g.save_location + "/" + m_g.scan_ctrl->get_scan_name() + "/" + pos_name;
+    scan_save_path = params.save_location + "/" + job.name + "/" + pos_name;
     QDir().mkdir(scan_save_path);
 
     QFile params_file(scan_save_path + "/params");
     params_file.open(QIODevice::WriteOnly);
-    const QString ending = m_g.scan_params->panorama_use_end_h
-        ? QString::number(m_g.scan_params->panorama_end_h, 'f', 2) + " deg"
+    const QString ending = scan_params.panorama_use_end_h
+        ? QString::number(scan_params.panorama_end_h, 'f', 2) + " deg"
         : QString("disabled");
     params_file.write(QString("mode: panorama\n"
                               "angle:\n"
@@ -1592,10 +1646,10 @@ void PipelineProcessor::advance_panorama_scan_main(DisplayRouter &router, Stream
                           .arg(angle_h, 0, 'f', 2)
                           .arg(angle_v, 0, 'f', 2)
                           .arg(ending)
-                          .arg(m_g.scan_params->panorama_zoom_level, 0, 'f', 2)
-                          .arg(m_g.scan_params->panorama_fov_h, 0, 'f', 2)
-                          .arg(m_g.scan_params->panorama_fov_v, 0, 'f', 2)
-                          .arg(get_panorama_fusion_name(m_g.scan_params->panorama_fusion_mode))
+                          .arg(scan_params.panorama_zoom_level, 0, 'f', 2)
+                          .arg(scan_params.panorama_fov_h, 0, 'f', 2)
+                          .arg(scan_params.panorama_fov_v, 0, 'f', 2)
+                          .arg(get_panorama_fusion_name(scan_params.panorama_fusion_mode))
                           .toUtf8());
     params_file.close();
 
@@ -1667,30 +1721,30 @@ void PipelineProcessor::save_to_file(StreamSlot &stream, DisplaySlot &display,
         QString dt = QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz");
         if (params.split) {
             if (pcfg.integrate_info) {
-                QString tcu_note = QString::fromStdString(m_g.device_mgr->get_tcu()->to_json().dump());
-                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(), *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp", tcu_note))) emit task_queue_full();
-                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(), *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp", tcu_note))) emit task_queue_full();
-                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp", tcu_note))) emit task_queue_full();
-                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp", tcu_note))) emit task_queue_full();
+                const QString &tcu_note = params.tcu.note;
+                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(), params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp", tcu_note))) emit task_queue_full();
+                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(), params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp", tcu_note))) emit task_queue_full();
+                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp", tcu_note))) emit task_queue_full();
+                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp", tcu_note))) emit task_queue_full();
             }
             else {
-                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(), *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp"))) emit task_queue_full();
-                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(), *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp"))) emit task_queue_full();
-                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp"))) emit task_queue_full();
-                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp"))) emit task_queue_full();
+                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0,              0, temp->cols / 2, temp->rows / 2)).clone(), params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_0" + ".bmp"))) emit task_queue_full();
+                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2,              0, temp->cols / 2, temp->rows / 2)).clone(), params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_1" + ".bmp"))) emit task_queue_full();
+                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(             0, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_2" + ".bmp"))) emit task_queue_full();
+                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image(cv::Rect(temp->cols / 2, temp->rows / 2, temp->cols / 2, temp->rows / 2)).clone(), params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + dt + "_3" + ".bmp"))) emit task_queue_full();
             }
         }
         switch (pcfg.img_format) {
         case 0:
             if (pcfg.integrate_info) {
-                QString tcu_note = QString::fromStdString(m_g.device_mgr->get_tcu()->to_json().dump());
-                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image, *m_g.save_location + "/res_bmp/" + dt + ".bmp", tcu_note))) emit task_queue_full();
+                const QString &tcu_note = params.tcu.note;
+                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image, params.save_location + "/res_bmp/" + dt + ".bmp", tcu_note))) emit task_queue_full();
             }
             else {
-                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image, *m_g.save_location + "/res_bmp/" + dt + ".bmp"))) emit task_queue_full();
+                if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image, params.save_location + "/res_bmp/" + dt + ".bmp"))) emit task_queue_full();
             }
             break;
-        case 1: if (!m_g.tp->append_task(std::bind(ImageIO::save_image_jpg, result_image, *m_g.save_location + "/res_bmp/" + dt + ".jpg"))) emit task_queue_full(); break;
+        case 1: if (!m_g.tp->append_task(std::bind(ImageIO::save_image_jpg, result_image, params.save_location + "/res_bmp/" + dt + ".jpg"))) emit task_queue_full(); break;
         default: break;
         }
     }
@@ -1700,14 +1754,14 @@ void PipelineProcessor::save_to_file(StreamSlot &stream, DisplaySlot &display,
             switch (pcfg.img_format) {
             case 0:
                 if (pcfg.integrate_info) {
-                    QString tcu_note = QString::fromStdString(m_g.device_mgr->get_tcu()->to_json().dump());
-                    if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image, *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", tcu_note))) emit task_queue_full();
+                    const QString &tcu_note = params.tcu.note;
+                    if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), result_image, params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp", tcu_note))) emit task_queue_full();
                 }
                 else {
-                    if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image, *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
+                    if (!m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), result_image, params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".bmp"))) emit task_queue_full();
                 }
                 break;
-            case 1: if (!m_g.tp->append_task(std::bind(ImageIO::save_image_jpg, result_image, *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".jpg"))) emit task_queue_full(); break;
+            case 1: if (!m_g.tp->append_task(std::bind(ImageIO::save_image_jpg, result_image, params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".jpg"))) emit task_queue_full(); break;
             default: break;
             }
             break;
@@ -1715,8 +1769,8 @@ void PipelineProcessor::save_to_file(StreamSlot &stream, DisplaySlot &display,
         case 12:
         case 16:
             switch (pcfg.img_format) {
-            case 0: if (!m_g.tp->append_task(std::bind(ImageIO::save_image_tif, result_image * (1 << (16 - pixel_depth)), *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
-            case 1: if (!m_g.tp->append_task(std::bind(ImageIO::save_image_jpg, result_image * (1 << (16 - pixel_depth)), *m_g.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".jpg"))) emit task_queue_full(); break;
+            case 0: if (!m_g.tp->append_task(std::bind(ImageIO::save_image_tif, result_image * (1 << (16 - pixel_depth)), params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".tif"))) emit task_queue_full(); break;
+            case 1: if (!m_g.tp->append_task(std::bind(ImageIO::save_image_jpg, result_image * (1 << (16 - pixel_depth)), params.save_location + (save_result ? "/res_bmp/" : "/ori_bmp/") + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + ".jpg"))) emit task_queue_full(); break;
             default: break;
             }
             break;
@@ -1726,22 +1780,24 @@ void PipelineProcessor::save_to_file(StreamSlot &stream, DisplaySlot &display,
 }
 
 void PipelineProcessor::save_scan_img(DisplayRouter &router, StreamSlot &main_stream,
-    QString path, QString name, const PipelineConfig &pcfg)
+    QString path, QString name,
+    const ProcessingParams &params, const PipelineConfig &pcfg,
+    const ScanParams &scan_params)
 {
     DisplaySlot &main_display = router.get_display(DisplayId::MAIN);
 
-    if (m_g.scan_params->capture_scan_ori) {
+    if (scan_params.capture_scan_ori) {
         if (pcfg.integrate_info) {
-            QString tcu_note = QString::fromStdString(m_g.device_mgr->get_tcu()->to_json().dump());
+            const QString &tcu_note = params.tcu.note;
             m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), main_stream.latest_raw.clone(), path + "/ori_bmp/" + name, tcu_note));
         }
         else {
             m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString)>(&ImageIO::save_image_bmp), main_stream.latest_raw.clone(), path + "/ori_bmp/" + name));
         }
     }
-    if (m_g.scan_params->capture_scan_res) {
+    if (scan_params.capture_scan_res) {
         if (pcfg.integrate_info) {
-            QString tcu_note = QString::fromStdString(m_g.device_mgr->get_tcu()->to_json().dump());
+            const QString &tcu_note = params.tcu.note;
             m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), main_display.modified_result.clone(), path + "/res_bmp/" + name, tcu_note));
         }
         else {
@@ -1754,7 +1810,7 @@ void PipelineProcessor::save_scan_img(DisplayRouter &router, StreamSlot &main_st
     if (alt1_stream != StreamId::NONE) {
         StreamSlot &alt1 = router.get_stream(alt1_stream);
         if (pcfg.integrate_info) {
-            QString tcu_note = QString::fromStdString(m_g.device_mgr->get_tcu()->to_json().dump());
+            const QString &tcu_note = params.tcu.note;
             m_g.tp->append_task(std::bind(static_cast<void(*)(cv::Mat, QString, QString)>(&ImageIO::save_image_bmp), alt1.latest_raw.clone(), path + "/alt_bmp/" + name, tcu_note));
         }
         else {

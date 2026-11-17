@@ -18,36 +18,32 @@
 #include "pipeline/pipelineconfig.h"
 #include "pipeline/detectedtarget.h"
 #include "pipeline/routing.h"
+#include "pipeline/scanjob.h"
 #include "yolo/yolo_detector.h"
 
-class TCUController;
-class ScanController;
-class DeviceManager;
-class AuxPanelManager;
-struct ScanParams;
-class FloatingWindow;
 class ThreadPool;
 
 // Singletons + globally shared state. Things that don't belong to any one
 // stream or display.
 struct PipelineGlobals {
-    QMutex           *params_mutex      = nullptr;
+    QMutex           *params_mutex      = nullptr;  // guards processing_params and scan_job
     ProcessingParams *processing_params = nullptr;  // UI snapshot
+    ScanJob          *scan_job          = nullptr;  // the scan as ScanController last announced it
 
     QMutex                  *roi_mutex = nullptr;
     std::vector<cv::Rect>   *list_roi  = nullptr;
 
     QMutex *yolo_init_mutex = nullptr;
 
-    TCUController   *tcu_ctrl   = nullptr;
-    ScanController  *scan_ctrl  = nullptr;
-    DeviceManager   *device_mgr = nullptr;
-    AuxPanelManager *aux_panel  = nullptr;
-
-    FloatingWindow *secondary_display = nullptr;
-    ScanParams     *scan_params       = nullptr;
-    QString        *save_location     = nullptr;
     ThreadPool     *tp                = nullptr;
+};
+
+// The frame thread's place in a scan. It starts again when the job's generation moves.
+struct ScanProgress {
+    quint64 generation   = 0;
+    int     ptz_idx      = -1;
+    int     tcu_idx      = -1;
+    bool    end_reported = false;   // the end of this scan has been announced
 };
 
 struct PanoramaCanvas {
@@ -94,6 +90,10 @@ public:
 signals:
     void packet_lost_updated(int packets_lost);
     void update_mcp_in_thread(int new_mcp);
+    // The rendered frame of one display, scaled to the widget size held in the per-frame copy.
+    void display_frame_ready(int display_idx, QPixmap pm);
+    // The unprocessed frame for the second window: main display only, while dual display is on.
+    void secondary_frame_ready(QPixmap pm);
     void set_hist_pixmap(QPixmap pm);
     void panorama_preview_updated(QPixmap pm);
     void main_detection_boxes_updated(QVector<QRect> boxes);
@@ -103,10 +103,12 @@ signals:
     // Follow gate state: box in widget coords for drawing, box and frame size
     // in source coords for the follow loop.
     void follow_gate_updated(QRect display_box, QRect source_box, QSize source_size, bool active);
-    void finish_scan_signal();
+    // What a scan step has to command, and where the scan then stands. ScanController
+    // carries it out on the GUI thread.
+    void scan_step_requested(ScanStep step);
+    // The scan of this generation has reached its end. Emitted once per stop of that scan.
+    void finish_scan_signal(quint64 generation);
     void save_screenshot_signal(QString path);
-    void update_delay_in_thread();
-    void update_gate_width_in_thread();
     void update_dist_mat(cv::Mat, double, double);
     void task_queue_full();
     // state: 0=none (no model), 1=loaded (running), 2=failed (load error, no retry).
@@ -150,25 +152,29 @@ private:
         bool updated, double is_net, int ww, int hh, int w, int h, float weight,
         const QString &info_tcu, const QString &info_time);
     // Main-display-only. Walks main + alt1 in lockstep; needs router for alt1.
+    // job is the frame thread's own copy of the scan job, progress its place in that scan.
     void advance_scan_main(DisplayRouter &router,
         StreamSlot &main_stream, DisplaySlot &main_display,
-        bool updated, const PipelineConfig &pcfg,
+        bool updated, const ProcessingParams &params, const PipelineConfig &pcfg,
+        const ScanJob &job, ScanProgress &progress,
         int &scan_img_count,
         QString &scan_save_path_a, QString &scan_save_path,
         PanoramaCanvas &panorama_canvas,
         qint64 &panorama_position_started_ms);
     void advance_panorama_scan_main(DisplayRouter &router,
         StreamSlot &main_stream, DisplaySlot &main_display,
-        const PipelineConfig &pcfg,
+        const ProcessingParams &params, const PipelineConfig &pcfg,
+        const ScanJob &job, ScanProgress &progress,
         int &scan_img_count,
         QString &scan_save_path,
         PanoramaCanvas &panorama_canvas,
         qint64 &panorama_position_started_ms);
     void append_panorama_preview(DisplaySlot &main_display,
         int ptz_idx, const std::vector<std::pair<float, float>> &route,
+        const ScanParams &scan_params,
         PanoramaCanvas &panorama_canvas);
     void save_panorama_preview(const PanoramaCanvas &panorama_canvas,
-        const PipelineConfig &pcfg);
+        const QString &scan_root, const PipelineConfig &pcfg);
     void record_frame(StreamSlot &stream, DisplaySlot &display,
         bool updated, const ProcessingParams &params, const PipelineConfig &pcfg,
         double is_net,
@@ -177,7 +183,9 @@ private:
     void save_to_file(StreamSlot &stream, DisplaySlot &display,
         bool save_result, const ProcessingParams &params, const PipelineConfig &pcfg);
     void save_scan_img(DisplayRouter &router, StreamSlot &main_stream,
-        QString path, QString name, const PipelineConfig &pcfg);
+        QString path, QString name,
+        const ProcessingParams &params, const PipelineConfig &pcfg,
+        const ScanParams &scan_params);
     void draw_yolo_boxes(DisplaySlot &display,
         cv::Mat &image, const std::vector<YoloResult> &results);
 };

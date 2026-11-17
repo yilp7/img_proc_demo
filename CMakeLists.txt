@@ -146,6 +146,7 @@ set(SOURCE_FILES
     src/util/threadpool.h
     src/util/threadpool.cpp
     src/util/timedqueue.h
+    src/util/timedqueue.cpp
     src/util/config.h
     src/util/config.cpp
     src/util/targetclasstable.h
@@ -282,6 +283,7 @@ set(SOURCE_FILES
     src/pipeline/ffmpegsource.cpp
     src/pipeline/scanparams.h
     src/pipeline/scanparams.cpp
+    src/pipeline/scanjob.h
     src/controller/devicemanager.h
     src/controller/devicemanager.cpp
     src/controller/ptzfollowcontroller.h
@@ -609,6 +611,28 @@ if(BUILD_TESTS)
     target_include_directories(test_unlockbar PRIVATE src)
     target_link_libraries(test_unlockbar Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets)
     add_test(NAME unlockbar COMMAND test_unlockbar)
+
+    # Tier 4: the frame path. Its source list holds no controller, port, widget or window
+    # file, so this target also checks that the pipeline builds without them. Windows
+    # only: the yolo sources it needs include Windows.h and link ONNX Runtime.
+
+    if(WIN32)
+        add_executable(test_pipeline tests/test_pipeline.cpp
+            src/pipeline/pipelineprocessor.h src/pipeline/pipelineprocessor.cpp
+            src/pipeline/scanparams.h        src/pipeline/scanparams.cpp
+            src/image/imageio.h              src/image/imageio.cpp
+            src/image/nafnetenhancer.h       src/image/nafnetenhancer.cpp
+            src/yolo/yolo_detector.h         src/yolo/yolo_detector.cpp
+            src/yolo/inference.h             src/yolo/inference.cpp
+            src/yolo/targettracker.h         src/yolo/targettracker.cpp
+            src/yolo/gatetracker.h           src/yolo/gatetracker.cpp
+            src/util/targetestimator.h       src/util/targetestimator.cpp
+            src/util/threadpool.h            src/util/threadpool.cpp
+            src/util/timedqueue.h            src/util/timedqueue.cpp)
+        target_include_directories(test_pipeline PRIVATE src)
+        target_link_libraries(test_pipeline Qt${QT_VERSION_MAJOR}::Test Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::SerialPort Qt${QT_VERSION_MAJOR}::Network ImgProc opencv_core454 opencv_imgcodecs454 opencv_imgproc454 opencv_videoio454 opencv_video454 opencv_dnn454 onnxruntime)
+        add_test(NAME pipeline COMMAND test_pipeline)
+    endif()
 
     # Widget gallery — visual smoke test launcher for the Sprint 15 widgets.
     # Not a ctest target; launch manually when inspecting widget behavior.

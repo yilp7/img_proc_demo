@@ -36,21 +36,14 @@ public:
     // it in ns because it is a timing limit of the TCU, not a range.
     float min_delay_dist() const    { return m_config->get_data().tcu.min_delay * m_dist_ns; }
     bool  get_auto_mcp() const      { return m_auto_mcp; }
-    bool  get_frame_a_3d() const    { return m_frame_a_3d.load(); }
     int   get_distance() const      { return m_distance; }
 
     void set_stepping(float v)      { m_stepping = v; }
     void set_rep_freq(float v)      { m_rep_freq = v; }
     void set_laser_width(float v)   { m_laser_width = v; }
-    void set_delay_dist(float v)    { m_delay_dist.store(v); }
-    void set_depth_of_view(float v) { m_depth_of_view = v; }
-    void set_frame_a_3d(bool v)     { m_frame_a_3d.store(v); }
-    void toggle_frame_a_3d()
-    {
-        bool expected = m_frame_a_3d.load();
-        while (!m_frame_a_3d.compare_exchange_weak(expected, !expected));
-    }
-    void set_auto_mcp(bool v)       { m_auto_mcp = v; }
+    void set_delay_dist(float v)    { m_delay_dist.store(v); emit pipeline_inputs_changed(); }
+    void set_depth_of_view(float v) { m_depth_of_view = v;   emit pipeline_inputs_changed(); }
+    void set_auto_mcp(bool v)       { m_auto_mcp = v;        emit pipeline_inputs_changed(); }
     void set_distance(int v)        { m_distance = v; }
 
     QByteArray convert_to_send_tcu(uchar num, unsigned int send);
@@ -91,6 +84,10 @@ public slots:
     // Called by UserPanel::on_DIST_BTN_clicked after obtaining distance
     void apply_distance(int dist);
 
+    // A scan step. Unlike the operator's controls it may go below the delay floor: a scan
+    // asks for its delays on purpose. The upper limit still holds.
+    void apply_scan_delay(float delay_dist);
+
     // UI button slots
     void on_SWITCH_TCU_UI_BTN_clicked();
     void on_AUTO_MCP_CHK_clicked();
@@ -110,6 +107,9 @@ signals:
     // UserPanel copies it into ScanController::get_params().dist_ns
     void dist_ns_changed(float dist_ns);
     void update_distance_display_requested();
+    // Base unit, delay, gate width, dist_ns or auto MCP may have changed: the values the
+    // frame path works with. UserPanel refreshes the pipeline's copy.
+    void pipeline_inputs_changed();
 
     // UI update signals
     void freq_display_updated(QString unit_text, QString value_text);
@@ -179,7 +179,6 @@ private:
     float           m_c;
     float           m_dist_ns;
     bool            m_auto_mcp;
-    std::atomic<bool> m_frame_a_3d{false};
     int             m_distance;
 
     Mailbox         m_delay_box;

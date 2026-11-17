@@ -14,8 +14,8 @@ struct PanoramaZoomFovPoint {
         : zoom(z), focal_length_mm(focal), fov_h(h), fov_v(v) {}
 };
 
-// Plain-data scan configuration, owned by ScanController and read by the pipeline
-// thread through PipelineGlobals::scan_params.
+// Plain-data scan configuration, owned by ScanController. The pipeline thread gets a
+// copy of it inside the ScanJob.
 struct ScanParams {
     enum PtzScanMode {
         PTZ_SCAN_GRID = 0,

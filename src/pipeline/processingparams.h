@@ -5,8 +5,21 @@
 #include <QString>
 #include <opencv2/core.hpp>
 
-// Snapshot of UI state for the pipeline thread. The GUI thread writes it through
-// update_processing_params() under m_params_mutex; the worker copies it at loop start.
+// What the frame path needs from the TCU side, in the units of TCUController.
+struct TcuReadout {
+    int     base_unit     = 0;
+    float   delay_dist    = 0.0f;   // m
+    float   depth_of_view = 0.0f;   // m
+    float   dist_ns       = 0.0f;   // m per ns
+    bool    auto_mcp      = false;
+    double  mcp           = 0.0;    // as the TCU port holds it
+    double  offset_delay  = 0.0;    // ns, as the TCU port holds it
+    double  offset_gw     = 0.0;    // ns, as the TCU port holds it
+    QString note;                   // TCU state as JSON text, written into saved BMP files
+};
+
+// Snapshot of UI and controller state for the pipeline threads. The GUI thread writes it
+// through update_processing_params() under m_params_mutex; the worker copies it at loop start.
 // Per-display toggles live in PipelineConfig.
 struct ProcessingParams {
     // global UI sliders / toggles (single value applies to whichever
@@ -34,6 +47,13 @@ struct ProcessingParams {
     // from the setup overlay
     bool    split              = false;
     QString custom_info_text;
+
+    // from the controllers and the display widgets
+    TcuReadout tcu;
+    int     alt_display_option = 0;      // AuxPanelManager; 2 shows the histogram
+    QSize   display_size[3];             // widget size, by DisplayId
+    QSize   secondary_size;              // display of the second window
+    QString save_location;
 };
 
 #endif // PROCESSINGPARAMS_H

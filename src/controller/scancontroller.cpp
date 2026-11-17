@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QFile>
 #include <QDateTime>
+#include <QTimer>
 #include <cmath>
 
 ScanController::ScanController(TCUController *tcu_ctrl, DeviceManager *device_mgr,
@@ -50,6 +51,70 @@ void ScanController::refresh_current_values()
     const float v = m_device_mgr->get_angle_v();
     m_params.starting_h = h;
     m_params.starting_v = v;
+    schedule_job();
+}
+
+void ScanController::schedule_job()
+{
+    if (m_job_scheduled) return;
+    m_job_scheduled = true;
+    // Not at once: the caller writes the parameters after get_params() has returned.
+    // One job then covers all writes of the current event.
+    QTimer::singleShot(0, this, [this]() { publish_job(); });
+}
+
+void ScanController::publish_job()
+{
+    m_job_scheduled = false;
+
+    ScanJob job;
+    {
+        QMutexLocker lk(&m_scan_mutex);
+        job.revision         = ++m_job_revision;
+        job.generation       = m_generation;
+        job.running          = m_scan;
+        job.ptz_idx          = m_scan_ptz_idx;
+        job.tcu_idx          = m_scan_tcu_idx;
+        job.name             = m_scan_name;
+        job.ptz_route        = m_scan_ptz_route;
+        job.tcu_route        = m_scan_tcu_route;
+        job.gate_width_route = m_scan_gate_width_route;
+    }
+    job.params = m_params;
+    emit scan_job_changed(job);
+}
+
+void ScanController::apply_scan_step(const ScanStep &step)
+{
+    {
+        QMutexLocker lk(&m_scan_mutex);
+        // a step of a scan that has been replaced since must not move anything
+        if (step.generation != m_generation) return;
+        m_scan_ptz_idx = step.ptz_idx;
+        m_scan_tcu_idx = step.tcu_idx;
+    }
+
+    if (step.move_ptz) m_device_mgr->send_ptz_angle(step.angle_h, step.angle_v);
+    // not update_delay(): that would lift a delay below the floor up to it
+    if (step.set_delay) m_tcu_ctrl->apply_scan_delay(step.delay_ns * m_tcu_ctrl->get_dist_ns());
+    // set_ only stores the value; update_ clamps it, shows it and sends it to the TCU
+    if (step.set_gate_width) {
+        m_tcu_ctrl->set_depth_of_view(step.gate_width_ns * m_tcu_ctrl->get_dist_ns());
+        m_tcu_ctrl->update_gate_width();
+    }
+    // the job carries the indices, for a frame thread that starts while the scan runs
+    schedule_job();
+}
+
+void ScanController::end_scan(quint64 generation)
+{
+    {
+        QMutexLocker lk(&m_scan_mutex);
+        // The button slot is a toggle. An end that arrives for an earlier scan, or after
+        // the operator has stopped this one, would start a new scan with it.
+        if (!m_scan || generation != m_generation) return;
+    }
+    on_SCAN_BUTTON_clicked();
 }
 
 void ScanController::on_SCAN_BUTTON_clicked()
@@ -70,6 +135,7 @@ void ScanController::on_SCAN_BUTTON_clicked()
 
         {
             QMutexLocker lk(&m_scan_mutex);
+            m_generation++;
             m_scan_idx = 0;
             m_scan_ptz_idx = -1;
             m_scan_tcu_idx = -1;
@@ -180,6 +246,7 @@ void ScanController::on_SCAN_BUTTON_clicked()
     else {
         emit update_scan(false);
         { QMutexLocker lk(&m_scan_mutex); m_scan = false; }
+        publish_job();
         emit scan_button_text_changed(tr("Scan"));
     }
 }
@@ -187,6 +254,8 @@ void ScanController::on_SCAN_BUTTON_clicked()
 void ScanController::on_CONTINUE_SCAN_BUTTON_clicked()
 {
     { QMutexLocker lk(&m_scan_mutex); m_scan = true; }
+    // at once, not scheduled: the frame path starts and stops on this flag
+    publish_job();
     emit update_scan(true);
     emit scan_button_text_changed(tr("Pause"));
 }

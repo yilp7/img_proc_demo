@@ -158,6 +158,7 @@ void DeviceManager::init()
     connect(m_p_tcu, &ControlPort::port_status_updated, this, [this]() { update_port_status(0); });
     connect(m_p_tcu, &ControlPort::port_io_log, this, &DeviceManager::port_io_log, Qt::QueuedConnection);
     connect(m_p_tcu, &TCU::tcu_param_updated, this, &DeviceManager::tcu_param_updated);
+    connect(m_p_tcu, &TCU::state_changed, this, &DeviceManager::tcu_state_changed);
     connect(this, SIGNAL(send_double_tcu_msg(qint32, double)), m_p_tcu, SLOT(set_user_param(qint32, double)), Qt::QueuedConnection);
     connect(this, SIGNAL(send_uint_tcu_msg(qint32, uint)), m_p_tcu, SLOT(set_user_param(qint32, uint)), Qt::QueuedConnection);
 

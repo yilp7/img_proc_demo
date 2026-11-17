@@ -33,7 +33,6 @@ TCUController::TCUController(Config *config, DeviceManager *device_mgr, QObject 
     m_c(3e8),
     m_dist_ns(0),
     m_auto_mcp(false),
-    m_frame_a_3d(false),
     m_distance(0)
 {
     m_dist_ns = m_c * 1e-9 / 2;
@@ -130,6 +129,7 @@ void TCUController::setup_stepping(int base_unit)
     case 2: emit stepping_display_updated("m", QString::number(m_stepping * m_dist_ns, 'f', 2)); break;
     default: break;
     }
+    emit pipeline_inputs_changed();
 }
 
 void TCUController::setup_max_dist(float max_dist)
@@ -187,6 +187,8 @@ void TCUController::set_tcu_type(int idx)
 
     emit tcu_type_layout_changed(idx, diff, laser_diff);
     emit mcp_slider_max_changed(m_mcp_max);
+    // the type is part of the TCU note saved with images
+    emit pipeline_inputs_changed();
 }
 
 void TCUController::update_ps_config(bool read, int idx, uint val)
@@ -204,6 +206,7 @@ void TCUController::set_auto_mcp_slot(bool auto_mcp)
 {
     this->m_auto_mcp = auto_mcp;
     emit auto_mcp_chk_changed(auto_mcp);
+    emit pipeline_inputs_changed();
 }
 
 void TCUController::set_distance_set(int id)
@@ -273,6 +276,7 @@ void TCUController::update_tcu_params(qint32 tcu_param)
         if (m_dov_box.pending)   dispatch(m_dov_box,   TCU::EST_DOV);
     default: break;
     }
+    emit pipeline_inputs_changed();
 }
 
 void TCUController::change_mcp(int val)
@@ -323,6 +327,7 @@ void TCUController::apply_delay(int val)
     emit delay_slider_value_changed(applied);
     emit est_dist_text_updated(QString::asprintf("%.2f m", m_delay_dist.load()));
     request(m_delay_box, TCU::EST_DIST, m_delay_dist.load());
+    emit pipeline_inputs_changed();
 }
 
 void TCUController::apply_gatewidth(int val)
@@ -333,6 +338,7 @@ void TCUController::apply_gatewidth(int val)
 
     emit gw_slider_value_changed(applied);
     request(m_dov_box, TCU::EST_DOV, m_depth_of_view);
+    emit pipeline_inputs_changed();
 }
 
 void TCUController::apply_distance(int dist)
@@ -379,6 +385,7 @@ void TCUController::apply_distance(int dist)
             QString::asprintf(  "%d", au), QString::asprintf("%03d", an), QString::asprintf("%03d", ap),
             QString::asprintf(  "%d", bu), QString::asprintf("%03d", bn), QString::asprintf("%03d", bp));
     }
+    emit pipeline_inputs_changed();
 }
 
 void TCUController::on_SWITCH_TCU_UI_BTN_clicked()
@@ -429,6 +436,19 @@ void TCUController::update_delay()
         m_aliasing_mode = false;
         request(m_delay_box, TCU::EST_DIST, m_device_mgr->get_tcu()->get(TCU::EST_DIST));
     }
+    emit pipeline_inputs_changed();
+}
+
+void TCUController::apply_scan_delay(float delay_dist)
+{
+    m_delay_dist.store(qBound(0.0f, delay_dist, m_config->get_data().tcu.max_dist));
+
+    // The slider cannot show a value below its minimum and stays there; the estimate text
+    // carries the real one. The slider reports only drags, so nothing comes back from it.
+    emit delay_slider_value_changed(m_delay_dist.load());
+    emit est_dist_text_updated(QString::asprintf("%.2f m", m_delay_dist.load()));
+    request(m_delay_box, TCU::EST_DIST, m_delay_dist.load());
+    emit pipeline_inputs_changed();
 }
 
 void TCUController::update_gate_width()
@@ -439,6 +459,7 @@ void TCUController::update_gate_width()
         emit gw_slider_value_changed(m_depth_of_view);
 
     request(m_dov_box, TCU::EST_DOV, m_depth_of_view);
+    emit pipeline_inputs_changed();
 }
 
 void TCUController::update_light_speed(bool uw)
@@ -455,6 +476,7 @@ void TCUController::update_light_speed(bool uw)
     // The mailbox holds the re-push until the link is free, so rapid toggles cannot drop it.
     request(m_delay_box, TCU::EST_DIST, m_delay_dist.load());
     request(m_dov_box,   TCU::EST_DOV,  m_depth_of_view);
+    emit pipeline_inputs_changed();
 }
 
 void TCUController::update_current(float current_value)

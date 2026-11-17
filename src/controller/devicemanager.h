@@ -120,6 +120,7 @@ signals:
 
     // Forwarded from port objects
     void tcu_param_updated(qint32 tcu_param);
+    void tcu_state_changed();
     void lens_param_updated(qint32 lens_param, uint val);
     void distance_updated(double distance);
     void ptz_angle_changed(float h, float v);
