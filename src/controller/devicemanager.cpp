@@ -98,11 +98,13 @@ DeviceManager::~DeviceManager()
     m_th_rf->quit();
 
     // Wait for I/O threads to finish - 100ms is sufficient for serial/TCP operations
-    m_th_tcu->wait(100);
-    m_th_lens->wait(100);
-    m_th_laser->wait(100);
-    m_th_ptz->wait(100);
-    m_th_rf->wait(100);
+    // A thread that misses it is named in the log: its object is destroyed while it runs,
+    // which ends the program with "QThread: Destroyed while thread is still running".
+    if (!m_th_tcu->wait(100))   qWarning("port thread still running after 100 ms: TCU");
+    if (!m_th_lens->wait(100))  qWarning("port thread still running after 100 ms: lens");
+    if (!m_th_laser->wait(100)) qWarning("port thread still running after 100 ms: laser");
+    if (!m_th_ptz->wait(100))   qWarning("port thread still running after 100 ms: PTZ");
+    if (!m_th_rf->wait(100))    qWarning("port thread still running after 100 ms: rangefinder");
 
     m_th_tcu->deleteLater();
     m_th_lens->deleteLater();
@@ -116,12 +118,12 @@ DeviceManager::~DeviceManager()
     m_p_rf->deleteLater();
 
     m_th_usbcan->quit();
-    m_th_usbcan->wait(100);
+    if (!m_th_usbcan->wait(100)) qWarning("port thread still running after 100 ms: USBCAN");
     m_th_usbcan->deleteLater();
     m_p_usbcan->deleteLater();
 
     m_th_udpptz->quit();
-    m_th_udpptz->wait(100);
+    if (!m_th_udpptz->wait(100)) qWarning("port thread still running after 100 ms: UDP PTZ");
     m_th_udpptz->deleteLater();
     m_p_udpptz->deleteLater();
 }

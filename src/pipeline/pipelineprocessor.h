@@ -128,11 +128,13 @@ signals:
 private:
     PipelineGlobals m_g;
 
-    // Pipeline stages. Each reads the StreamSlot (producer metadata, queues) and the
-    // DisplaySlot (per-display config, recorders, runtime caches) it is given.
+    // Pipeline stages. Each works on the frame in the StreamSlot and on the DisplaySlot
+    // (recorders, runtime caches) it is given. acquire_frame copies the stream's metadata
+    // once, and the stages of that frame read the copy, not the slot.
     bool acquire_frame(StreamSlot &stream, DisplaySlot &display,
-        const PipelineConfig &pcfg, cv::Mat &prev_img, bool &updated, int &packets_lost);
-    void preprocess_frame(StreamSlot &stream, DisplaySlot &display,
+        const PipelineConfig &pcfg, cv::Mat &prev_img, StreamMeta &meta,
+        bool &updated, int &packets_lost);
+    void preprocess_frame(StreamSlot &stream, DisplaySlot &display, const StreamMeta &meta,
         const ProcessingParams &params, const PipelineConfig &pcfg,
         int &w, int &h);
     std::vector<YoloResult> detect_yolo(StreamSlot &stream, DisplaySlot &display,
@@ -141,12 +143,12 @@ private:
     double detect_fishnet(StreamSlot &stream, DisplaySlot &display,
         const PipelineConfig &pcfg, cv::dnn::Net &net);
 #endif
-    void frame_average_and_3d(StreamSlot &stream, DisplaySlot &display,
+    void frame_average_and_3d(StreamSlot &stream, DisplaySlot &display, const StreamMeta &meta,
         bool updated, const ProcessingParams &params, const PipelineConfig &pcfg,
         int w, int h, int pixel_depth, int &ww, int &hh);
-    void enhance_frame(StreamSlot &stream, DisplaySlot &display,
+    void enhance_frame(DisplaySlot &display, const StreamMeta &meta,
         const ProcessingParams &params, const PipelineConfig &pcfg);
-    void render_and_display(StreamSlot &stream, DisplaySlot &display,
+    void render_and_display(StreamSlot &stream, DisplaySlot &display, const StreamMeta &meta,
         const ProcessingParams &params, const PipelineConfig &pcfg,
         const std::vector<YoloResult> &yolo_results,
         bool updated, double is_net, int ww, int hh, int w, int h, float weight,
@@ -154,7 +156,7 @@ private:
     // Main-display-only. Walks main + alt1 in lockstep; needs router for alt1.
     // job is the frame thread's own copy of the scan job, progress its place in that scan.
     void advance_scan_main(DisplayRouter &router,
-        StreamSlot &main_stream, DisplaySlot &main_display,
+        StreamSlot &main_stream, DisplaySlot &main_display, const StreamMeta &meta,
         bool updated, const ProcessingParams &params, const PipelineConfig &pcfg,
         const ScanJob &job, ScanProgress &progress,
         int &scan_img_count,
@@ -175,12 +177,13 @@ private:
         PanoramaCanvas &panorama_canvas);
     void save_panorama_preview(const PanoramaCanvas &panorama_canvas,
         const QString &scan_root, const PipelineConfig &pcfg);
-    void record_frame(StreamSlot &stream, DisplaySlot &display,
+    void finalize_recorders(DisplaySlot &display);
+    void record_frame(StreamSlot &stream, DisplaySlot &display, const StreamMeta &meta,
         bool updated, const ProcessingParams &params, const PipelineConfig &pcfg,
         double is_net,
         const QString &info_tcu, const QString &info_time,
         int ww, int hh, float weight);
-    void save_to_file(StreamSlot &stream, DisplaySlot &display,
+    void save_to_file(StreamSlot &stream, DisplaySlot &display, const StreamMeta &meta,
         bool save_result, const ProcessingParams &params, const PipelineConfig &pcfg);
     void save_scan_img(DisplayRouter &router, StreamSlot &main_stream,
         QString path, QString name,

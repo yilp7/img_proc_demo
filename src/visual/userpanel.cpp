@@ -270,7 +270,7 @@ void ConsumerThread::run()
 
 void UserPanel::position_display_overlays(DisplayId did)
 {
-    DisplaySlot &d = m_router.get_display(did);
+    const DisplayWidgets &d = m_display_widgets[did];
     Display *w = d.widget;
     if (!w) return;
 
@@ -298,9 +298,8 @@ void UserPanel::set_source_dead_overlay(DisplayId did, bool dead)
 {
     if (did == DisplayId::COUNT) return;
 
-    DisplaySlot &d = m_router.get_display(did);
-    d.source_dead = dead;
-    QLabel *sd = d.source_dead_label;
+    m_router.get_display(did).source_dead = dead;
+    QLabel *sd = m_display_widgets[did].source_dead_label;
     if (!sd) return;
 
     position_display_overlays(did);
@@ -554,9 +553,9 @@ UserPanel::UserPanel(QWidget *parent) :
 //    setMask(bg);
     m_fw_display[0] = new FloatingWindow();
     m_fw_display[1] = new FloatingWindow();
-    m_router.get_display(DisplayId::MAIN).widget = m_ui->SOURCE_DISPLAY;
-    m_router.get_display(DisplayId::ALT1).widget = m_fw_display[0]->get_display_widget();
-    m_router.get_display(DisplayId::ALT2).widget = m_fw_display[1]->get_display_widget();
+    m_display_widgets[DisplayId::MAIN].widget = m_ui->SOURCE_DISPLAY;
+    m_display_widgets[DisplayId::ALT1].widget = m_fw_display[0]->get_display_widget();
+    m_display_widgets[DisplayId::ALT2].widget = m_fw_display[1]->get_display_widget();
     m_secondary_display = new FloatingWindow();
 
     m_trans.load("zh_cn.qm");
@@ -577,11 +576,11 @@ UserPanel::UserPanel(QWidget *parent) :
         fps_main->setAttribute(Qt::WA_TranslucentBackground);
         fps_main->setAttribute(Qt::WA_StyledBackground, true);
         fps_main->hide(); // shown once resizeEvent places it
-        m_router.get_display(DisplayId::MAIN).fps_label = fps_main;
+        m_display_widgets[DisplayId::MAIN].fps_label = fps_main;
     }
     for (int i = 1; i < 3; i++) {
         DisplayId did = static_cast<DisplayId>(i);
-        Display *w = m_router.get_display(did).widget;
+        Display *w = m_display_widgets[did].widget;
         QLabel *lbl = new QLabel("0.00 fps", w);
         lbl->setObjectName("FPS_LABEL");
         lbl->setAttribute(Qt::WA_TranslucentBackground);
@@ -589,7 +588,7 @@ UserPanel::UserPanel(QWidget *parent) :
         lbl->move(6, w->height() - 20);
         lbl->show();
         lbl->raise();
-        m_router.get_display(did).fps_label = lbl;
+        m_display_widgets[did].fps_label = lbl;
         w->installEventFilter(this); // reposition on Display resize
     }
 
@@ -601,11 +600,11 @@ UserPanel::UserPanel(QWidget *parent) :
         lbl->setAttribute(Qt::WA_TranslucentBackground);
         lbl->setAttribute(Qt::WA_StyledBackground, true);
         lbl->hide();
-        m_router.get_display(DisplayId::MAIN).source_dead_label = lbl;
+        m_display_widgets[DisplayId::MAIN].source_dead_label = lbl;
     }
     for (int i = 1; i < 3; i++) {
         DisplayId did = static_cast<DisplayId>(i);
-        Display *w = m_router.get_display(did).widget;
+        Display *w = m_display_widgets[did].widget;
         QLabel *lbl = new QLabel(tr("STREAM ENDED"), w);
         lbl->setObjectName("SOURCE_DEAD_LABEL");
         lbl->setAttribute(Qt::WA_TranslucentBackground);
@@ -613,7 +612,7 @@ UserPanel::UserPanel(QWidget *parent) :
         lbl->adjustSize();
         lbl->move(w->width() - lbl->width() - 6, w->height() - 20);
         lbl->hide();
-        m_router.get_display(did).source_dead_label = lbl;
+        m_display_widgets[did].source_dead_label = lbl;
     }
 
     m_custom_title_label = new QLabel(QString(), m_ui->CENTRAL);
@@ -634,7 +633,7 @@ UserPanel::UserPanel(QWidget *parent) :
     // and scales for the current widget size. Without it a fullscreen toggle stretches
     // the stale crop.
     for (int i = 0; i < 3; i++)
-        connect(m_router.get_display(static_cast<DisplayId>(i)).widget, &Display::widget_resized, this, [this]() { update_processing_params(); });
+        connect(m_display_widgets[static_cast<DisplayId>(i)].widget, &Display::widget_resized, this, [this]() { update_processing_params(); });
     connect(m_secondary_display->get_display_widget(), &Display::widget_resized, this, [this]() { update_processing_params(); });
     connect(m_ui->SOURCE_DISPLAY, &Display::view_changed, this, [this]() { update_processing_params(); });
 
@@ -691,7 +690,7 @@ UserPanel::UserPanel(QWidget *parent) :
     for (int i = 0; i < 3; i++) {
         DisplayId did = static_cast<DisplayId>(i);
         TimedQueue *tq = new TimedQueue(5);
-        tq->set_display_label(m_router.get_display(did).fps_label);
+        tq->set_display_label(m_display_widgets[did].fps_label);
         tq->start();
         m_router.get_display(did).fps_calc = tq;
     }
@@ -856,7 +855,10 @@ UserPanel::UserPanel(QWidget *parent) :
     connect(m_ui->RANGE_THRESH_EDIT, &QLineEdit::textChanged, this,
             [this](QString arg1){
                 const double normalized = arg1.toFloat() / (1 << m_router.get_stream(StreamId::S0).meta.pixel_depth);
-                m_router.get_display(m_picked_display).pcfg.lower_3d_thresh = normalized;
+                {
+                    QMutexLocker lk(&m_params_mutex);
+                    m_router.get_display(m_picked_display).pcfg.lower_3d_thresh = normalized;
+                }
                 // Only Main's threshold goes back to Config and the setup page: the 3D stage runs
                 // on Main only, so the Alt1 / Alt2 values are session-local.
                 if (m_picked_display == DisplayId::MAIN) {
@@ -1161,7 +1163,7 @@ UserPanel::UserPanel(QWidget *parent) :
     // the external library is in.
     m_side_display = new SideDisplayWidget(m_ui->CENTRAL);
     m_mapbox       = new MapboxWidget(m_ui->CENTRAL);
-    m_side_display->setup(m_router.get_display(DisplayId::ALT1).widget, m_router.get_display(DisplayId::ALT2).widget);
+    m_side_display->setup(m_display_widgets[DisplayId::ALT1].widget, m_display_widgets[DisplayId::ALT2].widget);
     // The swap button on an ALT thumbnail exchanges its stream with the main display:
     // alt_idx 1 swaps Main with Alt1, 2 with Alt2.
     connect(m_side_display, &SideDisplayWidget::swap_requested,
@@ -1923,7 +1925,7 @@ UserPanel::UserPanel(QWidget *parent) :
     // Each thumbnail follows its Display's set_pixmap, emitted queued from the consumer
     // thread and scaled here on the GUI thread. Without a source the thumbnail stays dark.
     for (int i = 0; i < 3; ++i) {
-        if (!m_router.get_display(static_cast<DisplayId>(i)).widget) continue;
+        if (!m_display_widgets[static_cast<DisplayId>(i)].widget) continue;
         auto scaler = [](QLabel *thumb) {
             return [thumb](const QPixmap &pm) {
                 if (!thumb || pm.isNull()) return;
@@ -1931,9 +1933,9 @@ UserPanel::UserPanel(QWidget *parent) :
             };
         };
         if (m_setup_thumb[i])
-            connect(m_router.get_display(static_cast<DisplayId>(i)).widget, &Display::set_pixmap, m_setup_thumb[i], scaler(m_setup_thumb[i]), Qt::QueuedConnection);
+            connect(m_display_widgets[static_cast<DisplayId>(i)].widget, &Display::set_pixmap, m_setup_thumb[i], scaler(m_setup_thumb[i]), Qt::QueuedConnection);
         if (m_scan_thumb[i])
-            connect(m_router.get_display(static_cast<DisplayId>(i)).widget, &Display::set_pixmap, m_scan_thumb[i], scaler(m_scan_thumb[i]), Qt::QueuedConnection);
+            connect(m_display_widgets[static_cast<DisplayId>(i)].widget, &Display::set_pixmap, m_scan_thumb[i], scaler(m_scan_thumb[i]), Qt::QueuedConnection);
     }
 
     // Mode-tab wiring: overlays are mutually exclusive; MONITOR hides both.
@@ -1960,11 +1962,11 @@ UserPanel::UserPanel(QWidget *parent) :
         if (m_right_stack)   m_right_stack  ->setVisible(!overlay_mode);
         if (m_pbar)          m_pbar         ->setVisible(!overlay_mode);
         position_display_overlays(DisplayId::MAIN);
-        if (m_router.get_display(DisplayId::MAIN).fps_label) m_router.get_display(DisplayId::MAIN).fps_label->setVisible(!overlay_mode);
+        if (m_display_widgets[DisplayId::MAIN].fps_label) m_display_widgets[DisplayId::MAIN].fps_label->setVisible(!overlay_mode);
         position_custom_title_label();
         // Source-death label tracks the actual queue state (DisplaySlot::source_dead),
         // but stays hidden whenever an overlay is up.
-        if (QLabel *sd = m_router.get_display(DisplayId::MAIN).source_dead_label) {
+        if (QLabel *sd = m_display_widgets[DisplayId::MAIN].source_dead_label) {
             sd->setVisible(!overlay_mode && m_router.get_display(DisplayId::MAIN).source_dead);
             if (sd->isVisible()) sd->raise();
         }
@@ -2768,7 +2770,7 @@ UserPanel::UserPanel(QWidget *parent) :
     // the overlays and of the side panel follow that signal.
     connect(m_pipeline, &PipelineProcessor::display_frame_ready, this, [this](int display_idx, QPixmap pm) {
         if (display_idx < 0 || display_idx >= static_cast<int>(DISPLAY_COUNT)) return;
-        Display *widget = m_router.get_display(static_cast<DisplayId>(display_idx)).widget;
+        Display *widget = m_display_widgets[static_cast<DisplayId>(display_idx)].widget;
         if (widget) emit widget->set_pixmap(pm);
     }, Qt::QueuedConnection);
     connect(m_pipeline, &PipelineProcessor::secondary_frame_ready, this, [this](QPixmap pm) {
@@ -2818,6 +2820,7 @@ UserPanel::UserPanel(QWidget *parent) :
             const int btn_id = 4 + (display_idx - 1);
             if (auto *btn = m_alt_ctrl_grp->button(btn_id)) btn->setText("REC");
         }
+        QMutexLocker lk(&d.recorder_mutex);
         if (kind == 0) d.raw_path.clear();
         else           d.proc_path.clear();
     }, Qt::QueuedConnection);
@@ -2939,14 +2942,8 @@ UserPanel::~UserPanel()
     if (m_curr_cam && m_start_grabbing) m_curr_cam->stop_grabbing();
     for (PluginInterface *addon : m_addons) addon->stop();
 
-    for (int i = 0; i < 3; i++) {
-        if (m_router.get_display(static_cast<DisplayId>(i)).fps_calc) {
-            if (m_router.get_display(static_cast<DisplayId>(i)).fps_calc->isRunning()) m_router.get_display(static_cast<DisplayId>(i)).fps_calc->stop();
-            delete m_router.get_display(static_cast<DisplayId>(i)).fps_calc;
-            m_router.get_display(static_cast<DisplayId>(i)).fps_calc = nullptr;
-        }
-    }
-
+    // The frame threads go before the FPS counters: a frame thread counts every frame it
+    // gets, and a still image keeps supplying frames after its producer has stopped.
     for (int i = 0; i < 3; i++) {
         m_router.get_display(static_cast<DisplayId>(i)).consumer_run = false;
         if (m_router.get_display(static_cast<DisplayId>(i)).consumer) {
@@ -2954,6 +2951,14 @@ UserPanel::~UserPanel()
             m_router.get_display(static_cast<DisplayId>(i)).consumer->wait();
             delete m_router.get_display(static_cast<DisplayId>(i)).consumer;
             m_router.get_display(static_cast<DisplayId>(i)).consumer = nullptr;
+        }
+    }
+
+    for (int i = 0; i < 3; i++) {
+        if (m_router.get_display(static_cast<DisplayId>(i)).fps_calc) {
+            if (m_router.get_display(static_cast<DisplayId>(i)).fps_calc->isRunning()) m_router.get_display(static_cast<DisplayId>(i)).fps_calc->stop();
+            delete m_router.get_display(static_cast<DisplayId>(i)).fps_calc;
+            m_router.get_display(static_cast<DisplayId>(i)).fps_calc = nullptr;
         }
     }
 
@@ -3130,8 +3135,11 @@ void UserPanel::data_exchange(bool read)
         m_calc_avg_option = m_ui->FRAME_AVG_OPTIONS->currentIndex() * 4 + 4;
 
         m_trigger_by_software = m_ui->SOFTWARE_CHECK->isChecked();
-        m_router.get_display(m_picked_display).pcfg.image_3d = m_ui->IMG_3D_CHECK->isChecked();
-        m_router.get_display(m_picked_display).pcfg.enable_3d = m_ui->IMG_3D_CHECK->isChecked();
+        {
+            QMutexLocker lk(&m_params_mutex);
+            m_router.get_display(m_picked_display).pcfg.image_3d = m_ui->IMG_3D_CHECK->isChecked();
+            m_router.get_display(m_picked_display).pcfg.enable_3d = m_ui->IMG_3D_CHECK->isChecked();
+        }
 
         m_gain_analog_edit = m_ui->GAIN_EDIT->text().toFloat();
         m_time_exposure_edit = m_ui->DUTY_EDIT->text().toFloat() * 1000;
@@ -3245,8 +3253,8 @@ void UserPanel::swap_grab_thread_display(int display_idx1, int display_idx2)
     m_router.swap(d1, d2);
     // Clear any stale pixmap that landed in-flight before the swap took
     // effect. Queued so it lands after any in-flight set_pixmap event.
-    Display *w1 = m_router.get_display(d1).widget;
-    Display *w2 = m_router.get_display(d2).widget;
+    Display *w1 = m_display_widgets[d1].widget;
+    Display *w2 = m_display_widgets[d2].widget;
     if (w1) QMetaObject::invokeMethod(w1, "clear", Qt::QueuedConnection);
     if (w2) QMetaObject::invokeMethod(w2, "clear", Qt::QueuedConnection);
 }
@@ -3608,7 +3616,7 @@ void UserPanel::on_START_GRABBING_BUTTON_clicked()
                 delete d.consumer;
                 d.consumer = nullptr;
             }
-            if (d.widget) d.widget->m_is_grabbing = false;
+            if (Display *w = m_display_widgets[old_cam_display].widget) w->m_is_grabbing = false;
         }
         m_router.unroute(StreamId::S0);
         m_start_grabbing = false;
@@ -3811,7 +3819,7 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
 //        m_curr_cam->stop_recording(0);
         QString res_avi;
         {
-            QMutexLocker locker(&d.paint_mutex);
+            QMutexLocker locker(&d.recorder_mutex);
             res_avi = d.proc_path;
             d.proc_path.clear();
             d.proc_writer.release();
@@ -3826,7 +3834,7 @@ void UserPanel::on_SAVE_FINAL_BUTTON_clicked()
 //        m_curr_cam->start_recording(0, QString(m_save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
         QString res_avi;
         {
-            QMutexLocker locker(&d.paint_mutex);
+            QMutexLocker locker(&d.recorder_mutex);
             res_avi = QString(m_temp_save_location + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_main_res.mp4");
             d.proc_path = res_avi;
 //            m_router.get_display(DisplayId::MAIN).proc_writer.open(res_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(m_router.get_display(m_picked_display).pcfg.image_3d ? m_router.get_stream(StreamId::S0).meta.width + 104 : m_router.get_stream(StreamId::S0).meta.width, m_router.get_stream(StreamId::S0).meta.height), m_router.get_stream(StreamId::S0).meta.is_color || m_router.get_display(m_picked_display).pcfg.image_3d);
@@ -3919,7 +3927,8 @@ void UserPanel::clean()
 {
     m_ui->SOURCE_DISPLAY->clear();
     m_ui->DATA_EXCHANGE->clear();
-    if (m_router.get_display(DisplayId::MAIN).consumer_run) return;
+    // consumer_run falls when the frame thread is asked to stop, consumer_state when it has ended
+    if (m_router.get_display(DisplayId::MAIN).consumer_run || m_router.get_display(DisplayId::MAIN).consumer_state) return;
     m_router.get_stream(StreamId::S0).frames.clear();
     m_router.get_stream(StreamId::S0).latest_raw.release();
     m_router.get_display(DisplayId::MAIN).modified_result.release();
@@ -3977,7 +3986,10 @@ void UserPanel::update_lower_3d_thresh()
     // pcfg, the only place 3D runs. RANGE_THRESH_EDIT is refreshed only when the
     // picker is on Main; otherwise it shows an Alt's own value.
     const double normalized = m_config->get_data().image_proc.lower_3d_thresh;
-    m_router.get_display(DisplayId::MAIN).pcfg.lower_3d_thresh = normalized;
+    {
+        QMutexLocker lk(&m_params_mutex);
+        m_router.get_display(DisplayId::MAIN).pcfg.lower_3d_thresh = normalized;
+    }
     if (m_picked_display == DisplayId::MAIN) {
         QSignalBlocker b(m_ui->RANGE_THRESH_EDIT);
         m_ui->RANGE_THRESH_EDIT->setText(QString::number(
@@ -4429,11 +4441,11 @@ void UserPanel::update_processing_params()
     m_processing_params.hist_display_size    = m_ui->HIST_DISPLAY->size();
     m_processing_params.split                = m_setup_overlay->get_split();
     m_processing_params.custom_info_text     = m_setup_overlay->get_w()->CUSTOM_INFO_EDT->text();
-    m_processing_params.selection_v1         = m_router.get_display(DisplayId::MAIN).widget->m_selection_v1;
-    m_processing_params.selection_v2         = m_router.get_display(DisplayId::MAIN).widget->m_selection_v2;
-    m_processing_params.display_region       = m_router.get_display(DisplayId::MAIN).widget->m_display_region;
-    m_processing_params.display_width        = m_router.get_display(DisplayId::MAIN).widget->width();
-    m_processing_params.display_height       = m_router.get_display(DisplayId::MAIN).widget->height();
+    m_processing_params.selection_v1         = m_display_widgets[DisplayId::MAIN].widget->m_selection_v1;
+    m_processing_params.selection_v2         = m_display_widgets[DisplayId::MAIN].widget->m_selection_v2;
+    m_processing_params.display_region       = m_display_widgets[DisplayId::MAIN].widget->m_display_region;
+    m_processing_params.display_width        = m_display_widgets[DisplayId::MAIN].widget->width();
+    m_processing_params.display_height       = m_display_widgets[DisplayId::MAIN].widget->height();
 
     // The controllers are created after the first call, hence the checks.
     if (m_tcu_ctrl) {
@@ -4451,7 +4463,7 @@ void UserPanel::update_processing_params()
     }
     if (m_aux_panel) m_processing_params.alt_display_option = m_aux_panel->get_alt_display_option();
     for (int i = 0; i < 3; i++) {
-        const Display *display_widget = m_router.get_display(static_cast<DisplayId>(i)).widget;
+        const Display *display_widget = m_display_widgets[static_cast<DisplayId>(i)].widget;
         if (display_widget) m_processing_params.display_size[i] = display_widget->size();
     }
     m_processing_params.secondary_size       = m_secondary_display->get_display_widget()->size();
@@ -5083,7 +5095,8 @@ void UserPanel::on_IMG_3D_CHECK_stateChanged(int arg1)
     // m_router.get_display(m_picked_display).pcfg.image_3d = m_ui->IMG_3D_CHECK->isChecked();
 
     {
-        QMutexLocker pl(&m_router.get_display(m_picked_display).paint_mutex);
+        // the mutex under which a frame thread takes its copy, so it gets both or neither
+        QMutexLocker lk(&m_params_mutex);
         m_router.get_display(m_picked_display).pcfg.image_3d  = arg1;
         m_router.get_display(m_picked_display).pcfg.enable_3d = arg1;
     }
@@ -5860,8 +5873,8 @@ void UserPanel::resizeEvent(QResizeEvent *event)
     m_ui->SOURCE_DISPLAY->setGeometry(region);
     m_ui->SOURCE_DISPLAY->update_roi(center);
     position_display_overlays(DisplayId::MAIN);
-    if (QLabel *fps = m_router.get_display(DisplayId::MAIN).fps_label) fps->setVisible(!any_overlay);
-    if (QLabel *sd = m_router.get_display(DisplayId::MAIN).source_dead_label)
+    if (QLabel *fps = m_display_widgets[DisplayId::MAIN].fps_label) fps->setVisible(!any_overlay);
+    if (QLabel *sd = m_display_widgets[DisplayId::MAIN].source_dead_label)
         sd->setVisible(!any_overlay && m_router.get_display(DisplayId::MAIN).source_dead);
     position_custom_title_label();
     qInfo("display region x: %d, y: %d, w: %d, h: %d", region.x(), region.y(), region.width(), region.height());
@@ -6618,9 +6631,10 @@ void UserPanel::stop_all_sources_on_slot(int display_idx)
 
 void UserPanel::rotate(int angle)
 {
-    m_router.get_display(DisplayId::MAIN).paint_mutex.lock();
-    m_processing_params.image_rotate = angle;
-    m_router.get_display(DisplayId::MAIN).paint_mutex.unlock();
+    {
+        QMutexLocker lk(&m_params_mutex);
+        m_processing_params.image_rotate = angle;
+    }
     update_processing_params();
 
     QResizeEvent e(this->size(), this->size());
@@ -6666,20 +6680,25 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
     m_router.unroute(sid);
 
     {
-        QMutexLocker lk(&m_router.get_display(static_cast<DisplayId>(display_idx)).paint_mutex);
-        m_router.get_stream(static_cast<StreamId>(display_idx)).meta.width = width;
-        m_router.get_stream(static_cast<StreamId>(display_idx)).meta.height = height;
-        if (display_idx == 0) m_ui->TITLE->set_resolution(width, height);
-        this->m_router.get_stream(static_cast<StreamId>(display_idx)).meta.is_color = is_color;
-        update_pixel_depth(pixel_depth, display_idx);
-        if (display_idx == 0) this->m_device_type = device_type;
+        // After a swap another display's frame thread can still be in a frame of this
+        // stream. It copies the metadata under this mutex, so it gets the old set or the new.
+        StreamSlot &s = m_router.get_stream(sid);
+        QMutexLocker lk(&s.meta_mutex);
+        s.meta.width = width;
+        s.meta.height = height;
+        s.meta.is_color = is_color;
+        s.meta.pixel_depth = pixel_depth;
         // map device_type to the stream's SourceType
-        m_router.get_stream(sid).meta.source_type =
+        s.meta.source_type =
             device_type == 1  ? SourceType::INDUSTRIAL_CAM :
             device_type == -1 ? SourceType::LOCAL_FILE     :
             device_type == -2 ? SourceType::NETWORK_STREAM :
                                 SourceType::NONE;
     }
+    if (display_idx == 0) m_ui->TITLE->set_resolution(width, height);
+    // the title shows the depth of the display started last, as update_pixel_depth does
+    m_ui->TITLE->set_pixel_depth(pixel_depth);
+    if (display_idx == 0) this->m_device_type = device_type;
 
     if (display_idx) m_fw_display[display_idx - 1]->resize_display(width, height);
     else {
@@ -6703,7 +6722,7 @@ void UserPanel::start_static_display(int width, int height, bool is_color, int d
     m_router.route(did, sid);
     m_router.get_stream(sid).producer_run = true;
     m_router.get_display(static_cast<DisplayId>(display_idx)).consumer->start();
-    m_router.get_display(static_cast<DisplayId>(display_idx)).widget->m_is_grabbing = true;
+    m_display_widgets[static_cast<DisplayId>(display_idx)].widget->m_is_grabbing = true;
     if (display_idx == 0) {
         m_start_grabbing = true;
         enable_controls(true);
@@ -6731,7 +6750,7 @@ void UserPanel::on_SAVE_AVI_BUTTON_clicked()
 //        m_curr_cam->stop_recording(0);
         QString raw_avi;
         {
-            QMutexLocker lk(&d.paint_mutex);
+            QMutexLocker lk(&d.recorder_mutex);
             raw_avi = d.raw_path;
             d.raw_path.clear();
             d.raw_writer.release();
@@ -6744,7 +6763,7 @@ void UserPanel::on_SAVE_AVI_BUTTON_clicked()
     }
     else {
 //        m_curr_cam->start_recording(0, QString(m_save_location + "/" + QDateTime::currentDateTime().toString("MMddhhmmsszzz") + ".avi").toLatin1().data(), w, h, result_fps);
-        d.paint_mutex.lock();
+        QMutexLocker lk(&d.recorder_mutex);
         QString raw_avi = QString(m_temp_save_location + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_main_raw.mp4");
         d.raw_path = raw_avi;
 //        m_router.get_display(DisplayId::MAIN).raw_writer.open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), frame_rate_edit, cv::Size(m_router.get_stream(StreamId::S0).meta.width, m_router.get_stream(StreamId::S0).meta.height), m_router.get_stream(StreamId::S0).meta.is_color);
@@ -6761,7 +6780,6 @@ void UserPanel::on_SAVE_AVI_BUTTON_clicked()
                  << "color=" << meta.is_color;
         m_router.get_display(DisplayId::MAIN).raw_writer.open(raw_avi.toLatin1().data(), cv::VideoWriter::fourcc('a', 'v', 'c', '1'), vw_fps_ori, cv::Size(meta.width, meta.height), meta.is_color);
         qDebug() << "[vid_out ORI] isOpened=" << m_router.get_display(DisplayId::MAIN).raw_writer.isOpened();
-        m_router.get_display(DisplayId::MAIN).paint_mutex.unlock();
     }
     m_router.get_display(DisplayId::MAIN).record_raw = !m_router.get_display(DisplayId::MAIN).record_raw;
     m_ui->SAVE_AVI_BUTTON->setText(m_router.get_display(DisplayId::MAIN).record_raw ? tr("STOP") : tr("ORI"));
@@ -6992,7 +7010,7 @@ void UserPanel::alt_display_control(int cmd)
             delete m_router.get_display(static_cast<DisplayId>(display_idx)).consumer;
             m_router.get_display(static_cast<DisplayId>(display_idx)).consumer = nullptr;
         }
-        QTimer::singleShot(100, m_router.get_display(static_cast<DisplayId>(display_idx)).widget, SLOT(clear()));
+        QTimer::singleShot(100, m_display_widgets[static_cast<DisplayId>(display_idx)].widget, SLOT(clear()));
         set_source_dead_overlay(static_cast<DisplayId>(display_idx), true);
 
         break;
@@ -7007,7 +7025,7 @@ void UserPanel::alt_display_control(int cmd)
         if (d.record_proc) {
             QString res_avi;
             {
-                QMutexLocker lk(&d.paint_mutex);
+                QMutexLocker lk(&d.recorder_mutex);
                 res_avi = d.proc_path;
                 d.proc_path.clear();
                 d.proc_writer.release();
@@ -7021,7 +7039,7 @@ void UserPanel::alt_display_control(int cmd)
         else {
             QString res_avi;
             {
-                QMutexLocker lk(&d.paint_mutex);
+                QMutexLocker lk(&d.recorder_mutex);
                 res_avi = QString(m_temp_save_location + "/" + QDateTime::currentDateTime().toString("MMdd_hhmmss_zzz") + "_alt" + QString::number(display_idx) + "_res.mp4");
                 d.proc_path = res_avi;
                 const double measured_fps_alt = d.fps_calc ? d.fps_calc->count() / 5.0 : 0.0;
@@ -7302,7 +7320,8 @@ void UserPanel::on_SENSOR_TAPS_BTN_clicked()
 void UserPanel::on_PSEUDOCOLOR_CHK_stateChanged(int arg1)
 {
     {
-        QMutexLocker pl(&m_router.get_display(m_picked_display).paint_mutex);
+        // the mutex under which a frame thread takes its copy, so it gets both or neither
+        QMutexLocker lk(&m_params_mutex);
         m_router.get_display(m_picked_display).pcfg.pseudocolor         = arg1;
         m_router.get_display(m_picked_display).pcfg.pseudocolor_enabled = arg1;
     }
@@ -7313,10 +7332,10 @@ bool UserPanel::eventFilter(QObject *obj, QEvent *event)
 {
     if (event->type() == QEvent::Resize) {
         for (int i = 1; i < 3; i++) {
-            if (obj == m_router.get_display(static_cast<DisplayId>(i)).widget) {
+            if (obj == m_display_widgets[static_cast<DisplayId>(i)].widget) {
                 position_display_overlays(static_cast<DisplayId>(i));
-                if (QLabel *fps = m_router.get_display(static_cast<DisplayId>(i)).fps_label) fps->show();
-                if (QLabel *sd = m_router.get_display(static_cast<DisplayId>(i)).source_dead_label)
+                if (QLabel *fps = m_display_widgets[static_cast<DisplayId>(i)].fps_label) fps->show();
+                if (QLabel *sd = m_display_widgets[static_cast<DisplayId>(i)].source_dead_label)
                     sd->setVisible(m_router.get_display(static_cast<DisplayId>(i)).source_dead);
             }
         }

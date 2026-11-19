@@ -85,6 +85,7 @@ QT_END_NAMESPACE
 class UserPanel;
 class DisplayRouter;
 struct DisplaySlot;
+class Display;
 
 // Consumer-side worker: reads frames from whichever StreamSlot the router has
 // bound to its DisplaySlot.
@@ -552,6 +553,15 @@ private:
     DisplayRouter    m_router;
     PipelineGlobals  m_globals;
     StreamFrameSink  m_cam_sink;
+
+    // The widgets of each display. They are the window's own: a frame thread gets sizes
+    // as copies and never sees a widget.
+    struct DisplayWidgets {
+        Display *widget            = nullptr;
+        QLabel  *fps_label         = nullptr;
+        QLabel  *source_dead_label = nullptr;    // the "source died" overlay in the corner
+    };
+    IdArray<DisplayId, DisplayWidgets, DISPLAY_COUNT> m_display_widgets;
 
     int  m_device_type;        // 1/2/3: industrial cam; -1: local file; -2: network stream
     bool m_device_on;          // whether curr device is on

@@ -187,6 +187,9 @@ int PipelineProcessor::run(DisplayRouter &router, DisplaySlot &display)
     qint64 panorama_position_started_ms = -1;
     ScanJob scan_job;   // this thread's copy; only the main display steps a scan
     ScanProgress scan_progress;
+    // True once this thread has closed the recorders for the source death in progress.
+    // source_dead cannot tell that: the window sets it too, before it closes the queue.
+    bool death_seen = false;
 
 #ifdef LVTONG
     emit set_model_list_enabled(false);
@@ -210,14 +213,7 @@ int PipelineProcessor::run(DisplayRouter &router, DisplaySlot &display)
             display.avg_state.release_all();
             display.ecc_state.clear();
             memset(display.hist, 0, sizeof(display.hist));
-            if (display.raw_writer.isOpened()) {
-                display.raw_writer.release();
-                emit recorder_finalized(static_cast<int>(display.id), 0, display.raw_path);
-            }
-            if (display.proc_writer.isOpened()) {
-                display.proc_writer.release();
-                emit recorder_finalized(static_cast<int>(display.id), 1, display.proc_path);
-            }
+            finalize_recorders(display);
             display.modified_result.release();
             // A route change means a different scene: existing tracks cannot
             // survive it, and their ids must not be reused for whatever the
@@ -239,14 +235,20 @@ int PipelineProcessor::run(DisplayRouter &router, DisplaySlot &display)
 
             if (snap.stream != StreamId::NONE) {
                 StreamSlot &s = router.get_stream(snap.stream);
-                QMutexLocker mlk(&s.meta_mutex);
-                w = s.meta.width;
-                h = s.meta.height;
-                pixel_depth = s.meta.pixel_depth;
+                bool is_color = false;
+                {
+                    QMutexLocker mlk(&s.meta_mutex);
+                    w = s.meta.width;
+                    h = s.meta.height;
+                    pixel_depth = s.meta.pixel_depth;
+                    is_color = s.meta.is_color;
+                }
                 weight = h / FONT_SCALE_DIVISOR;
                 if (w > 0 && h > 0) {
                     display.avg_state.prev_3d = cv::Mat(h, w, CV_8UC3);
-                    display.avg_state.prev_img = cv::Mat(h, w, CV_MAKETYPE(pixel_depth == 8 ? CV_8U : CV_16U, s.meta.is_color ? 3 : 1));
+                    display.avg_state.prev_img = cv::Mat(h, w, CV_MAKETYPE(pixel_depth == 8 ? CV_8U : CV_16U, is_color ? 3 : 1));
+                    // the window draws regions into this mask under the same mutex
+                    QMutexLocker rlk(m_g.roi_mutex);
                     display.user_mask = cv::Mat::zeros(h, w, CV_8UC1);
                 }
             }
@@ -259,25 +261,22 @@ int PipelineProcessor::run(DisplayRouter &router, DisplaySlot &display)
 
         StreamSlot &stream = router.get_stream(snap.stream);
 
-        // Source-died observation: closed-and-empty queue. Emit only on
-        // transition; finalize the recorders the first time we see death so
-        // the resulting files close cleanly.
+        // Source-died observation: closed-and-empty queue. The recorders are closed the
+        // first time it is seen, so that their files end cleanly. The signal is emitted
+        // on the transition of source_dead only.
         if (stream.frames.is_closed() && stream.frames.empty()) {
+            if (!death_seen) {
+                death_seen = true;
+                finalize_recorders(display);
+            }
             if (!display.source_dead) {
                 display.source_dead = true;
-                if (display.raw_writer.isOpened()) {
-                    display.raw_writer.release();
-                    emit recorder_finalized(static_cast<int>(display.id), 0, display.raw_path);
-                }
-                if (display.proc_writer.isOpened()) {
-                    display.proc_writer.release();
-                    emit recorder_finalized(static_cast<int>(display.id), 1, display.proc_path);
-                }
                 emit source_state_changed(static_cast<int>(display.id), true);
             }
             QThread::msleep(QUEUE_EMPTY_SLEEP_MS);
             continue;
         }
+        death_seen = false;
 
         ProcessingParams params;
         PipelineConfig pcfg;
@@ -289,7 +288,8 @@ int PipelineProcessor::run(DisplayRouter &router, DisplaySlot &display)
             if (display.id == DisplayId::MAIN && m_g.scan_job->revision != scan_job.revision) scan_job = *m_g.scan_job;
         }
 
-        if (!acquire_frame(stream, display, pcfg, display.avg_state.prev_img, updated, packets_lost)) continue;
+        StreamMeta meta;    // the stream's state as this frame sees it
+        if (!acquire_frame(stream, display, pcfg, display.avg_state.prev_img, meta, updated, packets_lost)) continue;
 
         if (display.source_dead) {
             display.source_dead = false;
@@ -300,7 +300,7 @@ int PipelineProcessor::run(DisplayRouter &router, DisplaySlot &display)
             QMutexLocker processing_locker(&display.paint_mutex);
 
         if (updated) {
-            preprocess_frame(stream, display, params, pcfg, w, h);
+            preprocess_frame(stream, display, meta, params, pcfg, w, h);
         }
 
         std::vector<YoloResult> yolo_results = detect_yolo(stream, display, updated, pcfg);
@@ -311,9 +311,9 @@ int PipelineProcessor::run(DisplayRouter &router, DisplaySlot &display)
 #endif
 
         int ww = 0, hh = 0;
-        frame_average_and_3d(stream, display, updated, params, pcfg, w, h, pixel_depth, ww, hh);
+        frame_average_and_3d(stream, display, meta, updated, params, pcfg, w, h, pixel_depth, ww, hh);
 
-        enhance_frame(stream, display, params, pcfg);
+        enhance_frame(display, meta, params, pcfg);
 
         QString info_tcu = pcfg.custom_topleft_info ?
                     params.custom_info_text :
@@ -321,15 +321,15 @@ int PipelineProcessor::run(DisplayRouter &router, DisplaySlot &display)
                                      QString::asprintf("DELAY %06d ns  GATE %04d ns", (int)std::round(params.tcu.delay_dist / params.tcu.dist_ns), (int)std::round(params.tcu.depth_of_view / params.tcu.dist_ns));
         QString info_time = QDateTime::currentDateTime().toString("hh:mm:ss:zzz");
 
-        render_and_display(stream, display, params, pcfg, yolo_results, updated, is_net, ww, hh, w, h, weight, info_tcu, info_time);
+        render_and_display(stream, display, meta, params, pcfg, yolo_results, updated, is_net, ww, hh, w, h, weight, info_tcu, info_time);
 
         if (display.id == DisplayId::MAIN) {
-            advance_scan_main(router, stream, display, updated, params, pcfg, scan_job, scan_progress,
+            advance_scan_main(router, stream, display, meta, updated, params, pcfg, scan_job, scan_progress,
                               scan_img_count, scan_save_path_a, scan_save_path,
                               panorama_canvas, panorama_position_started_ms);
         }
 
-        record_frame(stream, display, updated, params, pcfg, is_net, info_tcu, info_time, ww, hh, weight);
+        record_frame(stream, display, meta, updated, params, pcfg, is_net, info_tcu, info_time, ww, hh, weight);
 
         if (updated) {
             QMutexLocker mlk(&stream.meta_mutex);
@@ -349,7 +349,8 @@ int PipelineProcessor::run(DisplayRouter &router, DisplaySlot &display)
 }
 
 bool PipelineProcessor::acquire_frame(StreamSlot &stream, DisplaySlot &display,
-    const PipelineConfig &pcfg, cv::Mat &prev_img, bool &updated, int &packets_lost)
+    const PipelineConfig &pcfg, cv::Mat &prev_img, StreamMeta &meta,
+    bool &updated, int &packets_lost)
 {
     // BoundedQueue handles drop-oldest internally on push.
     cv::Mat frame;
@@ -358,16 +359,23 @@ bool PipelineProcessor::acquire_frame(StreamSlot &stream, DisplaySlot &display,
         return false; // caller continues (skip iteration)
 #else
         QMutexLocker mlk(&stream.meta_mutex);
+        meta = stream.meta;
         stream.latest_raw = prev_img.clone();
         updated = false;
         return true;
 #endif
     }
 
+    // One copy for the whole frame, so that its stages cannot see two states of the stream.
+    {
+        QMutexLocker mlk(&stream.meta_mutex);
+        meta = stream.meta;
+    }
+
     int popped_frames = 1;
     const bool low_latency_ecc = pcfg.frame_avg_enabled
         && pcfg.frame_avg_mode == 1
-        && !source_repush_on_pause(stream.meta.source_type);
+        && !source_repush_on_pause(meta.source_type);
     if (low_latency_ecc) {
         cv::Mat newer_frame;
         while (stream.frames.try_pop(newer_frame)) {
@@ -382,7 +390,7 @@ bool PipelineProcessor::acquire_frame(StreamSlot &stream, DisplaySlot &display,
     }
 
     int packets_lost_frame = 0;
-    if (source_has_frame_info(stream.meta.source_type)) {
+    if (source_has_frame_info(meta.source_type)) {
         for (int i = 0; i < popped_frames; ++i) {
             int info = 0;
             if (!stream.frame_info.try_pop(info)) break;
@@ -392,24 +400,21 @@ bool PipelineProcessor::acquire_frame(StreamSlot &stream, DisplaySlot &display,
     packets_lost += packets_lost_frame;
     if (packets_lost_frame) emit packet_lost_updated(packets_lost);
     updated = true;
-    if (source_repush_on_pause(stream.meta.source_type)) {
+    if (source_repush_on_pause(meta.source_type)) {
         stream.frames.push(frame.clone());
     }
     if (display.fps_calc) display.fps_calc->add_to_q();
     return true;
 }
 
-void PipelineProcessor::preprocess_frame(StreamSlot &stream, DisplaySlot &display,
+void PipelineProcessor::preprocess_frame(StreamSlot &stream, DisplaySlot &display, const StreamMeta &meta,
     const ProcessingParams &params, const PipelineConfig &pcfg,
     int &w, int &h)
 {
     cv::Mat &latest = stream.latest_raw;
-    int meta_w = 0, meta_h = 0;
-    bool meta_color = false;
-    int meta_depth = 8;
-    { QMutexLocker mlk(&stream.meta_mutex);
-      meta_w = stream.meta.width; meta_h = stream.meta.height;
-      meta_color = stream.meta.is_color; meta_depth = stream.meta.pixel_depth; }
+    const int meta_w = meta.width, meta_h = meta.height;
+    const bool meta_color = meta.is_color;
+    const int meta_depth = meta.pixel_depth;
     (void)meta_color; (void)meta_depth;
 
     switch (params.image_rotate) {
@@ -523,7 +528,7 @@ std::vector<YoloResult> PipelineProcessor::detect_yolo(StreamSlot &stream, Displ
     return results;
 }
 
-void PipelineProcessor::frame_average_and_3d(StreamSlot &stream, DisplaySlot &display,
+void PipelineProcessor::frame_average_and_3d(StreamSlot &stream, DisplaySlot &display, const StreamMeta &meta,
     bool updated, const ProcessingParams &params, const PipelineConfig &pcfg,
     int w, int h, int pixel_depth, int &ww, int &hh)
 {
@@ -531,8 +536,7 @@ void PipelineProcessor::frame_average_and_3d(StreamSlot &stream, DisplaySlot &di
     cv::Mat &result = display.modified_result;
     FrameAverageRuntime &avg_state = display.avg_state;
     ECCRuntime &ecc_state = display.ecc_state;
-    bool is_color = false;
-    { QMutexLocker mlk(&stream.meta_mutex); is_color = stream.meta.is_color; }
+    const bool is_color = meta.is_color;
 
     if (avg_state.seq_sum.empty()) avg_state.seq_sum = cv::Mat::zeros(h, w, CV_MAKETYPE(CV_16U, is_color ? 3 : 1));
     if (avg_state.frame_a_sum.empty()) avg_state.frame_a_sum = cv::Mat::zeros(h, w, CV_MAKETYPE(CV_16U, is_color ? 3 : 1));
@@ -768,12 +772,11 @@ double PipelineProcessor::detect_fishnet(StreamSlot &stream, DisplaySlot &displa
 }
 #endif
 
-void PipelineProcessor::enhance_frame(StreamSlot &stream, DisplaySlot &display,
+void PipelineProcessor::enhance_frame(DisplaySlot &display, const StreamMeta &meta,
     const ProcessingParams &params, const PipelineConfig &pcfg)
 {
     cv::Mat &result = display.modified_result;
-    bool is_color = false;
-    { QMutexLocker mlk(&stream.meta_mutex); is_color = stream.meta.is_color; }
+    const bool is_color = meta.is_color;
 
     // Skip enhance when 3D is active on main display with grayscale source.
     if (!pcfg.enable_3d || display.id != DisplayId::MAIN || is_color) {
@@ -815,7 +818,7 @@ void PipelineProcessor::enhance_frame(StreamSlot &stream, DisplaySlot &display,
     }
 }
 
-void PipelineProcessor::render_and_display(StreamSlot &stream, DisplaySlot &display,
+void PipelineProcessor::render_and_display(StreamSlot &stream, DisplaySlot &display, const StreamMeta &meta,
     const ProcessingParams &params, const PipelineConfig &pcfg,
     const std::vector<YoloResult> &yolo_results,
     bool updated, double is_net, int ww, int hh, int w, int h, float weight,
@@ -823,8 +826,7 @@ void PipelineProcessor::render_and_display(StreamSlot &stream, DisplaySlot &disp
 {
     (void)info_tcu;
     cv::Mat &result = display.modified_result;
-    bool is_color = false;
-    { QMutexLocker mlk(&stream.meta_mutex); is_color = stream.meta.is_color; }
+    const bool is_color = meta.is_color;
 
     if (!yolo_results.empty()) draw_yolo_boxes(display, result, yolo_results);
 
@@ -984,9 +986,8 @@ void PipelineProcessor::render_and_display(StreamSlot &stream, DisplaySlot &disp
     if (use_mask) img_display = (img_display & (~info_mask)) + ((~thresh_result) & info_mask);
 
     QImage stream_img = QImage(img_display.data, img_display.cols, img_display.rows, static_cast<int>(img_display.step), is_color || pcfg.pseudocolor ? QImage::Format_RGB888 : QImage::Format_Indexed8);
-    // a display without a widget shows nothing, so nothing is sent for it
     const int display_idx = static_cast<int>(display.id);
-    if (display.widget) emit display_frame_ready(display_idx, QPixmap::fromImage(stream_img.scaled(params.display_size[display_idx], Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+    emit display_frame_ready(display_idx, QPixmap::fromImage(stream_img.scaled(params.display_size[display_idx], Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     if (display.id == DisplayId::MAIN && updated) {
         emit main_detection_boxes_updated(main_detection_boxes);
         emit main_targets_updated(main_targets);
@@ -1402,7 +1403,7 @@ void PipelineProcessor::save_panorama_preview(const PanoramaCanvas &panorama_can
 // Main-display-only scan step. Reaches across slots via the router because
 // scan walks main+alt1 in lockstep.
 void PipelineProcessor::advance_scan_main(DisplayRouter &router, StreamSlot &main_stream, DisplaySlot &main_display,
-    bool updated, const ProcessingParams &params, const PipelineConfig &pcfg,
+    const StreamMeta &meta, bool updated, const ProcessingParams &params, const PipelineConfig &pcfg,
     const ScanJob &job, ScanProgress &progress,
     int &scan_img_count,
     QString &scan_save_path_a, QString &scan_save_path,
@@ -1452,8 +1453,7 @@ void PipelineProcessor::advance_scan_main(DisplayRouter &router, StreamSlot &mai
     }
 
     if (!scan_img_count) {
-        float fps = 0.0f;
-        { QMutexLocker mlk(&main_stream.meta_mutex); fps = main_stream.meta.fps; }
+        float fps = meta.fps;
         if (fps <= 0.0f) fps = 1.0f; // safety floor
         const int wait_time = scan_params.scan_ptz_enabled
             ? scan_params.ptz_wait_time : 0;
@@ -1665,27 +1665,50 @@ void PipelineProcessor::advance_panorama_scan_main(DisplayRouter &router, Stream
     scan_img_count = 0;
 }
 
-void PipelineProcessor::record_frame(StreamSlot &stream, DisplaySlot &display, bool updated,
-    const ProcessingParams &params, const PipelineConfig &pcfg,
+// Closes the recorders that are open and reports each one. The path stays in the slot for
+// the window to clear: a Stop pressed before the signal arrives still has to find it.
+void PipelineProcessor::finalize_recorders(DisplaySlot &display)
+{
+    QString raw_path, proc_path;
+    bool raw_closed = false, proc_closed = false;
+    {
+        QMutexLocker lk(&display.recorder_mutex);
+        if (display.raw_writer.isOpened()) {
+            display.raw_writer.release();
+            raw_path = display.raw_path;
+            raw_closed = true;
+        }
+        if (display.proc_writer.isOpened()) {
+            display.proc_writer.release();
+            proc_path = display.proc_path;
+            proc_closed = true;
+        }
+    }
+    if (raw_closed) emit recorder_finalized(static_cast<int>(display.id), 0, raw_path);
+    if (proc_closed) emit recorder_finalized(static_cast<int>(display.id), 1, proc_path);
+}
+
+void PipelineProcessor::record_frame(StreamSlot &stream, DisplaySlot &display, const StreamMeta &meta,
+    bool updated, const ProcessingParams &params, const PipelineConfig &pcfg,
     double is_net,
     const QString &info_tcu, const QString &info_time,
     int ww, int hh, float weight)
 {
     (void)info_tcu;
-    bool is_color = false;
-    { QMutexLocker mlk(&stream.meta_mutex); is_color = stream.meta.is_color; }
+    const bool is_color = meta.is_color;
 
     if (updated && display.save_raw) {
-        save_to_file(stream, display, false, params, pcfg);
-        if (source_repush_on_pause(stream.meta.source_type) || !pcfg.consecutive_capture || display.id != DisplayId::MAIN) display.save_raw = false;
+        save_to_file(stream, display, meta, false, params, pcfg);
+        if (source_repush_on_pause(meta.source_type) || !pcfg.consecutive_capture || display.id != DisplayId::MAIN) display.save_raw = false;
     }
     if (updated && display.save_proc) {
-        save_to_file(stream, display, true, params, pcfg);
-        if (source_repush_on_pause(stream.meta.source_type) || !pcfg.consecutive_capture || display.id != DisplayId::MAIN) display.save_proc = false;
+        save_to_file(stream, display, meta, true, params, pcfg);
+        if (source_repush_on_pause(meta.source_type) || !pcfg.consecutive_capture || display.id != DisplayId::MAIN) display.save_proc = false;
     }
     if (updated && display.record_raw) {
         cv::Mat temp = stream.latest_raw.clone();
         if (is_color) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
+        QMutexLocker lk(&display.recorder_mutex);
         if (display.raw_writer.isOpened()) display.raw_writer.write(temp);
     }
     if (updated && display.record_proc) {
@@ -1702,16 +1725,16 @@ void PipelineProcessor::record_frame(StreamSlot &stream, DisplaySlot &display, b
             }
         }
         if (is_color || pcfg.pseudocolor) cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
+        QMutexLocker lk(&display.recorder_mutex);
         if (display.proc_writer.isOpened()) display.proc_writer.write(temp);
     }
 }
 
-void PipelineProcessor::save_to_file(StreamSlot &stream, DisplaySlot &display,
+void PipelineProcessor::save_to_file(StreamSlot &stream, DisplaySlot &display, const StreamMeta &meta,
     bool save_result, const ProcessingParams &params, const PipelineConfig &pcfg)
 {
     cv::Mat *temp = save_result ? &display.modified_result : &stream.latest_raw;
-    int pixel_depth = 8;
-    { QMutexLocker mlk(&stream.meta_mutex); pixel_depth = stream.meta.pixel_depth; }
+    const int pixel_depth = meta.pixel_depth;
 
     cv::Mat result_image;
     if (pcfg.save_in_grayscale) cv::cvtColor(*temp, result_image, cv::COLOR_RGB2GRAY);

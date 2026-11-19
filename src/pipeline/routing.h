@@ -20,8 +20,6 @@
 #include "yolo/gatetracker.h"
 #include "util/targetestimator.h"
 
-class Display;
-class QLabel;
 class TimedQueue;
 class YoloDetector;
 class NafNetEnhancer;
@@ -226,7 +224,9 @@ struct StreamFrameSink {
     SourceType             source_type = SourceType::NONE;
 };
 
-// Producer side.
+// Producer side. meta and latest_raw are shared under meta_mutex, and a frame thread
+// copies meta once per frame. The two queues lock inside themselves, producer_run is
+// atomic. The window still writes meta without the lock in most places that set up a source.
 
 struct StreamSlot {
     StreamId   id           = StreamId::NONE;
@@ -251,81 +251,84 @@ struct StreamSlot {
     }
 };
 
-// Consumer side.
+// Consumer side. The comment above each group of fields says who may touch it. A lock of
+// this struct is held for a copy or a swap, and never together with another one;
+// paint_mutex, which the frame thread holds for a whole frame, is the exception.
 
 struct DisplaySlot {
-    DisplayId  id            = DisplayId::MAIN;
-    Display   *widget        = nullptr;     // owned by UserPanel/Qt parent tree
-    QLabel    *fps_label     = nullptr;     // owned by Qt parent tree
-    QLabel    *source_dead_label = nullptr; // bottom-right "source died" overlay; owned by Qt parent
+    // Fixed once the window is built. Any thread reads them.
+    DisplayId   id       = DisplayId::MAIN;
+    TimedQueue *fps_calc = nullptr;     // owned by UserPanel, deleted after the last consumer stops
 
-    QMutex     paint_mutex;                 // guards modified_result <-> widget paint
-    QMutex     setup_mutex;                 // held by a loader while it sets up this slot, never in the pipeline loop
-    cv::Mat    modified_result;             // last pipeline output (also read by export pipeline)
-    cv::Mat    user_mask;                   // ROI overlay drawn on this display
-    TimedQueue *fps_calc     = nullptr;     // owned by UserPanel
+    // The window's own. No frame thread touches them.
+    ConsumerThread *consumer = nullptr;
+    QMutex          setup_mutex;        // held by a loader while it sets up this slot, never in the pipeline loop
 
-    // YOLO, one detector per display
-    YoloDetector *yolo       = nullptr;
-    int           yolo_last_model = -1;
+    // The frame thread's own. The window touches them only while this display has no
+    // consumer thread, which consumer_state tells.
+    cv::Mat             modified_result;         // last pipeline output
+    FrameAverageRuntime avg_state;               // caches, reset when the route generation changes
+    ECCRuntime          ecc_state;
+    uint                hist[256] = {0};
+    std::uint64_t       last_route_gen = 0;      // detects route changes mid-loop
+    YoloDetector       *yolo = nullptr;          // one detector per display
+    int                 yolo_last_model = -1;
     // Learned enhance option, created on first selection so the ONNX session
     // is not paid for by installations that never pick it.
-    NafNetEnhancer *nafnet   = nullptr;
-    TargetTracker tracker;
+    NafNetEnhancer     *nafnet = nullptr;
+    TargetTracker       tracker;
     // Source-frame size the tracker's boxes are expressed in. Range and
     // bearing need it; the display geometry cannot supply it after cropping.
-    cv::Size      tracker_frame_size;
+    cv::Size            tracker_frame_size;
+    GateTracker         gate_tracker;            // follow gate; its request arrives through gate_mutex
 
-    // Range-on-label snapshot, pushed from the GUI thread. Heights are indexed
-    // by class id for the currently selected model, so the pipeline needs no
-    // class-name lookup and no access to the table.
+    // Shared under the params mutex (UserPanel::m_params_mutex): the frame thread copies
+    // it once per frame. Per display, not persisted to the config file.
+    PipelineConfig pcfg;
+
+    // Shared under the ROI mutex (UserPanel::m_roi_mutex): the ROI overlay drawn on this display.
+    cv::Mat user_mask;
+
+    // Shared under label_mutex: the range-on-label settings, pushed from the GUI thread.
+    // Heights are indexed by class id for the currently selected model, so the pipeline
+    // needs no class-name lookup and no access to the table.
     QMutex        label_mutex;
     bool          range_label_enabled = false;
     std::vector<double> class_heights;
     TargetEstimator::Optics label_optics;
 
-    // Operator-designated follow gate, for closed-loop follow with no detector.
-    // The request crosses from the GUI thread, so it is guarded; the tracker
-    // itself is only ever touched by the pipeline thread.
-    GateTracker   gate_tracker;
+    // Shared under gate_mutex: the operator's follow-gate request, for closed-loop follow
+    // with no detector.
     QMutex        gate_mutex;
     QRect         gate_request;          // display-space; empty request clears
     bool          gate_request_pending = false;
     GateTracker::Settings gate_settings; // method and options, from the setup panel
 
-    // Per-display pipeline config (not persisted to config file).
-    PipelineConfig pcfg;
-
-    // Pipeline-runtime caches reset on route-generation bump.
-    FrameAverageRuntime avg_state;
-    ECCRuntime          ecc_state;
-    uint                hist[256] = {0};
-
-    // Recording / one-shot save flags driven by UI buttons.
-    std::atomic<bool> record_raw  {false};
-    std::atomic<bool> record_proc {false};
-    std::atomic<bool> save_raw    {false};
-    std::atomic<bool> save_proc   {false};
-
-    // 3D builds range from two gated frames; true exchanges their roles. The pipeline
-    // flips it after each frame when it pairs consecutive frames, the GUI resets or
-    // swaps it. Only the main display's is read.
-    std::atomic<bool> frame_a_3d  {false};
-
-    // Recorders, finalised on route change, source death or display blank.
+    // Shared under recorder_mutex, which is held for one call into a writer: the recorders.
     // raw_path / proc_path are the temp files of the open writers; the consumer thread
     // reports them through recorder_finalized so the GUI can move them.
+    QMutex          recorder_mutex;
     cv::VideoWriter raw_writer;
     cv::VideoWriter proc_writer;
     QString         raw_path;
     QString         proc_path;
 
-    // Consumer thread state.
-    ConsumerThread   *consumer       = nullptr;
+    // Held by the frame thread for a whole frame. The window takes it where it lays out
+    // the main display. Without it a white strip shows at an edge of the window while
+    // that edge is dragged; why is not known.
+    QMutex          paint_mutex;
+
+    // Atomic.
+    std::atomic<bool> record_raw  {false};      // recording and one-shot save flags, driven by UI buttons
+    std::atomic<bool> record_proc {false};
+    std::atomic<bool> save_raw    {false};
+    std::atomic<bool> save_proc   {false};
+    // 3D builds range from two gated frames; true exchanges their roles. The pipeline
+    // flips it after each frame when it pairs consecutive frames, the GUI resets or
+    // swaps it. Only the main display's is read.
+    std::atomic<bool> frame_a_3d  {false};
     std::atomic<bool> consumer_run   {false};   // consumer should keep iterating
     std::atomic<bool> consumer_state {false};   // true while consumer alive (status)
-    std::uint64_t     last_route_gen = 0;       // detects route changes mid-loop
-
     // True while the routed stream's queue is closed and empty, false once a frame arrives.
     // Transitions emit PipelineProcessor::source_state_changed for the corner overlay.
     std::atomic<bool> source_dead    {false};
